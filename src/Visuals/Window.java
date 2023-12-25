@@ -12,6 +12,17 @@ public class Window extends JFrame {
 
     public Window(Game game) {
         this.game = game;
+    }
+
+    private void init() {
+        setLayout(new GridLayout(2, 0));
+        for (Player player: game.getPlayers()) {
+            PlayerPanel playerPanel = new PlayerPanel(player, game);
+            add(playerPanel);
+        }
+    }
+
+    public void boot() {
         setTitle("Machi Koro Calculator");
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setUndecorated(true);
@@ -19,13 +30,4 @@ public class Window extends JFrame {
         init();
         setVisible(true);
     }
-
-    private void init() {
-        setLayout(new GridLayout());
-        for (Player player: Game.getPlayers()) {
-            PlayerPanel playerPanel = new PlayerPanel(player);
-            add(playerPanel);
-        }
-    }
-
 }

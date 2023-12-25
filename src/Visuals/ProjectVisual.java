@@ -14,22 +14,37 @@ public class ProjectVisual extends JPanel {
     }
 
     private void init() {
-        setLayout(new GridLayout(1, 0));
+        setLayout(new BorderLayout());
 
-        JLabel imageLabel = new JLabel(new ImageIcon("Images." + project.getCategory() + ".png"));
-        imageLabel.setBackground(Images.GlobalColors.getCorrectBackgroundColor(project.getID()));
+        JPanel mainPanel = new JPanel();
+        mainPanel.setLayout(new GridLayout(1, 0));
+        mainPanel.setBackground(GlobalColors.getCorrectBackgroundColor(project.getID()));
+
+        JLabel amountLabel = new JLabel(project.getOwnCount() + "/" + project.getMaxOwnCount());
+
         JLabel nameLabel = new JLabel(project.getName());
-        nameLabel.setBackground(Images.GlobalColors.getCorrectBackgroundColor(project.getID()));
+        Image projectIcon = new ImageIcon(project.getCategory() + ".png").getImage();
+        nameLabel.setIcon(new ImageIcon(projectIcon.getScaledInstance(25, 25, Image.SCALE_SMOOTH)));
         JPanel buttonPanel = new JPanel();
         buttonPanel.setLayout(new GridLayout(0, 1));
         JButton plusButton = new JButton("+");
+        plusButton.addActionListener(e -> {
+             if (project.getMaxOwnCount() > project.getOwnCount()) project.setOwnCount(project.getOwnCount() + 1);
+            amountLabel.setText(project.getOwnCount() + "/" + project.getMaxOwnCount());
+        });
         JButton minusButton = new JButton("-");
+        minusButton.addActionListener(e -> {
+            if (0 < project.getOwnCount()) project.setOwnCount(project.getOwnCount() - 1);
+            amountLabel.setText(project.getOwnCount() + "/" + project.getMaxOwnCount());
+        });
         buttonPanel.add(plusButton);
         buttonPanel.add(minusButton);
 
-        add(imageLabel);
-        add(nameLabel);
-        add(buttonPanel);
+        mainPanel.add(nameLabel);
+        mainPanel.add(buttonPanel);
+
+        add(mainPanel);
+        add(amountLabel, BorderLayout.SOUTH);
     }
 
 }

@@ -10,10 +10,8 @@ public class CoinsLabel extends JPanel {
     Player player;
 
     public CoinsLabel(Player player) {
-
         this.player = player;
         init();
-
     }
 
     private void init() {
@@ -25,13 +23,13 @@ public class CoinsLabel extends JPanel {
         JButton coinsPlus = new JButton("+");
         coinsPlus.addActionListener(e -> {
             player.setCoins(player.getCoins() + 1);
-            repaint();
+            text.setText("Coins: " + player.getCoins());
         });
 
         JButton coinsMinus = new JButton("-");
         coinsMinus.addActionListener(e -> {
             player.setCoins(player.getCoins() - 1);
-            repaint();
+            text.setText("Coins: " + player.getCoins());
         });
 
         JPanel buttonPanel = new JPanel();

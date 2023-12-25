@@ -23,6 +23,7 @@ public class PlayerPanel extends JPanel {
         setBorder(BorderFactory.createEtchedBorder());
 
         JPanel northPanel = new JPanel();
+        northPanel.setBorder(BorderFactory.createEtchedBorder());
         northPanel.setLayout(new GridLayout(1, 0));
         JLabel nameLabel = new JLabel(player.getName());
         CoinsLabel coinsLabel = new CoinsLabel(player);

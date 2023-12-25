@@ -1,4 +1,4 @@
-package Images;
+package Visuals;
 
 import java.awt.*;
 
@@ -10,9 +10,11 @@ public class GlobalColors {
     public static Color backgroundPurple = new Color(166, 72, 203);
     public static Color backgroundYellow = new Color(203, 181, 72);
     public static Color backgroundGrey = new Color(87, 87, 87);
+    public static Color myEX = new Color(149, 236, 205);
+    public static Color otherEX = new Color(165, 149, 236);
 
     public static Color getCorrectBackgroundColor(int id) {
-        Color back = null;
+        Color back;
         switch (id) {
             case 0, 1, 2, 3 -> back = backgroundYellow;
             case 4, 6, 11, 12, 15 -> back = backgroundBlue;

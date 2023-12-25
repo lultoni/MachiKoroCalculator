@@ -18,6 +18,13 @@ public class GPSwitch extends JPanel {
         setLayout(new GridLayout(1, 0));
         JLabel nameLabel = new JLabel(project.getName());
         JButton switchButton = new JButton("Set Owned: " + ((project.getOwnCount() == 0) ? "TRUE" : "FALSE"));
+        switchButton.addActionListener(e -> {
+            if (project.getOwnCount() == 0) {
+                project.setOwnCount(1);
+            } else {
+                project.setOwnCount(0);
+            }
+        });
         add(nameLabel);
         add(switchButton);
     }

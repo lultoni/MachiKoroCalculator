@@ -29,4 +29,16 @@ public class Project {
     public int getOwnCount() {
         return ownCount;
     }
+
+    public void setOwnCount(int i) {
+        ownCount = i;
+    }
+
+    public Category getCategory() {
+        return category;
+    }
+
+    public int getID() {
+        return id;
+    }
 }

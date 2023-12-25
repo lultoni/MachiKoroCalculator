@@ -56,11 +56,14 @@ public class PlayerPanel extends JPanel {
             dCP.add(pv);
         }
 
+        PredictionList predictionList = new PredictionList(player, game);
+
         centerPanel.add(uCP, BorderLayout.NORTH);
         centerPanel.add(dCP, BorderLayout.CENTER);
 
         add(northPanel, BorderLayout.NORTH);
         add(centerPanel, BorderLayout.CENTER);
+        add(predictionList, BorderLayout.EAST);
     }
 
 }

@@ -7,13 +7,15 @@ public class Player {
     Project[] projectList;
     int[] diceValuesOwn;
     int[] diceValuesOthers;
+    Game game;
 
-    public Player(int id, Project[] projectList) {
+    public Player(int id, Project[] projectList, Game game) {
         this.id = id;
         this.projectList = projectList;
         this.coins = 3;
         diceValuesOwn = new int[12];
         diceValuesOthers = new int[12];
+        this.game = game;
     }
 
     public String getName() {
@@ -39,8 +41,10 @@ public class Player {
     public double getEX(boolean single, boolean own) { // TODO own/not
         diceValuesOwn = new int[12];
         diceValuesOthers = new int[12];
-        for (Project project: projectList) {
-            project.doEffect(this, projectList[1].ownCount == 1);
+        for (Player player: game.getPlayers()) {
+            for (Project project: player.projectList) {
+                project.doEffect(player, projectList[1].ownCount == 1);
+            }
         }
         double back = 0;
         if (own) {

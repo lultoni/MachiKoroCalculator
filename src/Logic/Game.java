@@ -1,5 +1,7 @@
 package Logic;
 
+import java.util.ArrayList;
+
 public class Game {
 
     Player[] players;
@@ -8,7 +10,7 @@ public class Game {
 
         players = new Player[playerAmount];
         for (int i = 0; i < playerAmount; i++) {
-            players[i] = new Player(i, getProjectList());
+            players[i] = new Player(i, getProjectList(), this);
             players[i].projectList[4].ownCount++;
             players[i].projectList[5].ownCount++;
         }
@@ -50,6 +52,39 @@ public class Game {
     }
 
     public int getPlayerRank(int id) {
-        return id;
+        return id; // TODO fix this mess (use calculateScore function and sort I guess (think about 2 people having the same score))
+    }
+
+    public Project[] getBestProjects(int amount, Player player) {
+        ArrayList<Project> backList = new ArrayList<>();
+
+        double[] beforeScores = calculateScores(player);
+
+        ArrayList<double[]> values = new ArrayList<>();
+        ArrayList<Integer> ids = new ArrayList<>();
+
+        for (Project project: player.projectList) {
+            if (project.getOwnCount() < project.getMaxOwnCount()) {
+                project.setOwnCount(project.getOwnCount() + 1);
+                values.add(calculateScores(player));
+                ids.add(project.id);
+                project.setOwnCount(project.getOwnCount() - 1);
+            }
+        }
+
+        // TODO somehow work with the data to get the best amount of projects
+
+        return backList.toArray(new Project[0]);
+    }
+
+    private double[] calculateScores(Player player) {
+        Player o1 = (player.id == 0) ? players[1] : (player.id == 1) ? players[2] : (player.id == 2) ? players[3] : players[0];
+        Player o2 = (player.id == 0) ? players[2] : (player.id == 1) ? players[3] : (player.id == 2) ? players[0] : players[1];
+        Player o3 = (player.id == 0) ? players[3] : (player.id == 1) ? players[0] : (player.id == 2) ? players[1] : players[2];
+        double pScore = player.getEX(true, true) + player.getEX(true, false) + player.getEX(false, true) + player.getEX(false, false);
+        double o1Score = o1.getEX(true, true) + o1.getEX(true, false) + o1.getEX(false, true) + o1.getEX(false, false);
+        double o2Score = o2.getEX(true, true) + o2.getEX(true, false) + o2.getEX(false, true) + o2.getEX(false, false);
+        double o3Score = o3.getEX(true, true) + o3.getEX(true, false) + o3.getEX(false, true) + o3.getEX(false, false);
+        return new double[]{pScore, o1Score, o2Score, o3Score};
     }
 }

@@ -20,7 +20,7 @@ public class Project {
         this.game = game;
     }
 
-    void doEffect(Player player, boolean isGP2active) { // TODO red, purple, gp2
+    void doEffect(Player player, boolean isGP2active) {
         switch (id) {
             case 4 -> {
                 for (int i = 0; i < player.projectList[id].ownCount; i++) {
@@ -86,14 +86,22 @@ public class Project {
             case 13 -> {
                 for (int i = 0; i < player.projectList[id].ownCount; i++) {
                     for (Player p: game.getPlayers()) {
-                        p.addDiceValueOthers(new int[]{9, 10}, -2);
+                        if (p.id != player.id) {
+                            p.addDiceValueOwn(new int[]{9, 10}, -2);
+                        } else {
+                            p.addDiceValueOthers(new int[]{9, 10}, 2);
+                        }
                     }
                 }
             }
             case 14 -> {
                 for (int i = 0; i < player.projectList[id].ownCount; i++) {
                     for (Player p: game.getPlayers()) {
-                        p.addDiceValueOthers(new int[]{3}, -1);
+                        if (p.id != player.id) {
+                            p.addDiceValueOwn(new int[]{3}, -1);
+                        } else {
+                            p.addDiceValueOthers(new int[]{3}, 1);
+                        }
                     }
                 }
             }

@@ -9,6 +9,7 @@ import java.awt.*;
 public class Window extends JFrame {
 
     Game game;
+    PlayerPanel[] playerPanels;
 
     public Window(Game game) {
         this.game = game;
@@ -16,8 +17,11 @@ public class Window extends JFrame {
 
     private void init() {
         setLayout(new GridLayout(2, 0));
-        for (Player player: game.getPlayers()) {
-            PlayerPanel playerPanel = new PlayerPanel(player, game);
+        Player[] players = game.getPlayers();
+        playerPanels = new PlayerPanel[players.length];
+        for (int i = 0; i < players.length; i++) {
+            PlayerPanel playerPanel = new PlayerPanel(players[i], game, this);
+            playerPanels[i] = playerPanel;
             add(playerPanel);
         }
     }
@@ -29,5 +33,11 @@ public class Window extends JFrame {
         setExtendedState(JFrame.MAXIMIZED_BOTH);
         init();
         setVisible(true);
+    }
+
+    public void updatePlayerPanels() {
+        for (PlayerPanel panel: playerPanels) {
+            panel.updateText();
+        }
     }
 }

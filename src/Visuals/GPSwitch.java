@@ -8,16 +8,19 @@ import java.awt.*;
 public class GPSwitch extends JPanel {
 
     Project project;
+    Window window;
+    JButton switchButton;
 
-    public GPSwitch(Project project) {
+    public GPSwitch(Project project, Window window) {
         this.project = project;
+        this.window = window;
         init();
     }
 
     private void init() {
         setLayout(new GridLayout(1, 0));
         JLabel nameLabel = new JLabel(project.getName());
-        JButton switchButton = new JButton("sO: " + ((project.getOwnCount() == 0) ? "T" : "F"));
+        switchButton = new JButton("sO: " + ((project.getOwnCount() == 0) ? "T" : "F"));
         switchButton.addActionListener(e -> {
             if (project.getOwnCount() == 0) {
                 project.setOwnCount(1);
@@ -25,10 +28,15 @@ public class GPSwitch extends JPanel {
                 project.setOwnCount(0);
             }
             switchButton.setText("sO: " + ((project.getOwnCount() == 0) ? "T" : "F"));
+            window.updatePlayerPanels();
         });
         setBackground(GlobalColors.getCorrectBackgroundColor(project.getID()));
         add(nameLabel);
         add(switchButton);
+    }
+
+    public void updateText() {
+        switchButton.setText("sO: " + ((project.getOwnCount() == 0) ? "T" : "F"));
     }
 
 }

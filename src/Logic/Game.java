@@ -63,7 +63,7 @@ public class Game {
         ArrayList<double[]> values = new ArrayList<>();
         ArrayList<Integer> ids = new ArrayList<>();
 
-        for (Project project: player.projectList) {
+        for (Project project : player.projectList) {
             if (project.getOwnCount() < project.getMaxOwnCount()) {
                 project.setOwnCount(project.getOwnCount() + 1);
                 values.add(calculateScores(player));
@@ -72,9 +72,46 @@ public class Game {
             }
         }
 
-        // TODO somehow work with the data to get the best amount of projects
+        for (int i = 0; i < values.size(); i++) {
+            double[] scoreDiff = calculateScoreDifference(beforeScores, values.get(i));
+            double totalDiff = calculateTotalDifference(scoreDiff);
+
+            totalDiff -= player.projectList[ids.get(i)].cost;
+
+            if (backList.size() < amount) {
+                backList.add(player.projectList[ids.get(i)]);
+            } else {
+                for (int j = 0; j < amount; j++) {
+                    double[] existingDiff = calculateScoreDifference(beforeScores, calculateScores(player));
+
+                    existingDiff[0] -= backList.get(j).cost;
+
+                    if (calculateTotalDifference(existingDiff) < totalDiff) {
+                        backList.set(j, player.projectList[ids.get(i)]);
+                        break;
+                    }
+                }
+            }
+        }
 
         return backList.toArray(new Project[0]);
+    }
+
+
+    private double[] calculateScoreDifference(double[] before, double[] after) {
+        double[] diff = new double[before.length];
+        for (int i = 0; i < before.length; i++) {
+            diff[i] = after[i] - before[i];
+        }
+        return diff;
+    }
+
+    private double calculateTotalDifference(double[] diff) {
+        double total = 0;
+        for (double d : diff) {
+            total += d;
+        }
+        return total;
     }
 
     private double[] calculateScores(Player player) {

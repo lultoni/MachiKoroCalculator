@@ -8,8 +8,11 @@ import java.awt.*;
 public class ProjectVisual extends JPanel {
 
     Project project;
-    public ProjectVisual(Project project) {
+    Window window;
+    JLabel amountLabel;
+    public ProjectVisual(Project project, Window window) {
         this.project = project;
+        this.window = window;
         init();
     }
 
@@ -20,7 +23,7 @@ public class ProjectVisual extends JPanel {
         mainPanel.setLayout(new GridLayout(1, 0));
         mainPanel.setBackground(GlobalColors.getCorrectBackgroundColor(project.getID()));
 
-        JLabel amountLabel = new JLabel(project.getOwnCount() + "/" + project.getMaxOwnCount());
+        amountLabel = new JLabel(project.getOwnCount() + "/" + project.getMaxOwnCount());
 
         JLabel nameLabel = new JLabel(project.getName());
         Image projectIcon = new ImageIcon(project.getCategory() + ".png").getImage();
@@ -30,12 +33,12 @@ public class ProjectVisual extends JPanel {
         JButton plusButton = new JButton("+");
         plusButton.addActionListener(e -> {
              if (project.getMaxOwnCount() > project.getOwnCount()) project.setOwnCount(project.getOwnCount() + 1);
-            amountLabel.setText(project.getOwnCount() + "/" + project.getMaxOwnCount());
+            window.updatePlayerPanels();
         });
         JButton minusButton = new JButton("-");
         minusButton.addActionListener(e -> {
             if (0 < project.getOwnCount()) project.setOwnCount(project.getOwnCount() - 1);
-            amountLabel.setText(project.getOwnCount() + "/" + project.getMaxOwnCount());
+            window.updatePlayerPanels();
         });
         buttonPanel.add(plusButton);
         buttonPanel.add(minusButton);
@@ -47,4 +50,7 @@ public class ProjectVisual extends JPanel {
         add(amountLabel, BorderLayout.SOUTH);
     }
 
+    public void updateText() {
+        amountLabel.setText(project.getOwnCount() + "/" + project.getMaxOwnCount());
+    }
 }

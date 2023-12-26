@@ -8,6 +8,10 @@ import java.awt.*;
 public class EXDisplay extends JPanel {
 
     Player player;
+    JLabel c_s1;
+    JLabel c_sn1;
+    JLabel c_s2;
+    JLabel c_sn2;
 
     public EXDisplay(Player player) {
 
@@ -35,10 +39,10 @@ public class EXDisplay extends JPanel {
         t_sn2.setBackground(GlobalColors.otherEX);
         t_sn2.setOpaque(true);
 
-        JLabel c_s1 = new JLabel(String.valueOf(player.getEX(true, true)));
-        JLabel c_sn1 = new JLabel(String.valueOf(player.getEX(false, true)));
-        JLabel c_s2 = new JLabel(String.valueOf(player.getEX(true, false)));
-        JLabel c_sn2 = new JLabel(String.valueOf(player.getEX(false, false)));
+        c_s1 = new JLabel(String.valueOf(player.getEX(true, true)));
+        c_sn1 = new JLabel(String.valueOf(player.getEX(false, true)));
+        c_s2 = new JLabel(String.valueOf(player.getEX(true, false)));
+        c_sn2 = new JLabel(String.valueOf(player.getEX(false, false)));
 
         mainPanel.add(t_s1);
         mainPanel.add(c_s1);
@@ -50,16 +54,13 @@ public class EXDisplay extends JPanel {
         mainPanel.add(c_sn2);
 
         add(mainPanel, BorderLayout.CENTER);
+    }
 
-        JButton repaintButton = new JButton("Calc");
-        repaintButton.addActionListener(e -> {
-            c_s1.setText(String.valueOf(player.getEX(true, true)));
-            c_sn1.setText(String.valueOf(player.getEX(false, true)));
-            c_s2.setText(String.valueOf(player.getEX(true, false)));
-            c_sn2.setText(String.valueOf(player.getEX(false, false)));
-        });
-
-        add(repaintButton, BorderLayout.EAST);
+    public void updateText() {
+        c_s1.setText(String.valueOf(player.getEX(true, true)));
+        c_sn1.setText(String.valueOf(player.getEX(false, true)));
+        c_s2.setText(String.valueOf(player.getEX(true, false)));
+        c_sn2.setText(String.valueOf(player.getEX(false, false)));
     }
 
 }

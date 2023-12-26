@@ -9,6 +9,7 @@ public class CoinsLabel extends JPanel {
 
     Player player;
     Window window;
+    JLabel text;
 
     public CoinsLabel(Player player, Window window) {
         this.player = player;
@@ -19,7 +20,7 @@ public class CoinsLabel extends JPanel {
     private void init() {
         setLayout(new BorderLayout());
 
-        JLabel text = new JLabel();
+        text = new JLabel();
         text.setText("Coins: " + player.getCoins());
         text.setFont(GlobalColors.northFont);
 
@@ -50,4 +51,7 @@ public class CoinsLabel extends JPanel {
         add(buttonPanel, BorderLayout.EAST);
     }
 
+    public void updateText() {
+        text.setText("Coins: " + player.getCoins());
+    }
 }

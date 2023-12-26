@@ -27,7 +27,7 @@ public class ProjectVisual extends JPanel {
         mainPanel.setLayout(new GridLayout(1, 0));
         mainPanel.setBackground(GlobalColors.getCorrectBackgroundColor(project.getID()));
 
-        amountLabel = new JLabel(project.getOwnCount() + "/" + project.getMaxOwnCount(player));
+        amountLabel = new JLabel(project.getOwnCount() + "/" + project.getMaxOwnCount(player)); // TODO make percentage bar (blocks with border)
 
         JPanel infoPanel = new JPanel();
         infoPanel.setLayout(new GridLayout(0, 1));
@@ -35,7 +35,6 @@ public class ProjectVisual extends JPanel {
         JLabel nameLabel = new JLabel(project.getName());
         Image projectIcon = new ImageIcon(project.getCategory() + ".png").getImage();
         nameLabel.setIcon(new ImageIcon(projectIcon.getScaledInstance(25, 25, Image.SCALE_SMOOTH)));
-        // JLabel numberLabel = new JLabel(project.getCost() + " - " + project.getActivationString());
         JPanel numberPanel = new JPanel();
         numberPanel.setLayout(new GridLayout(1, 0));
         numberPanel.setBackground(GlobalColors.getCorrectBackgroundColor(project.getID()));
@@ -83,13 +82,21 @@ public class ProjectVisual extends JPanel {
         minusButton.setFont(GlobalColors.northFont);
         minusButton.setEnabled(project.getOwnCount() > 0);
         plusButton.addActionListener(e -> {
-            if (project.getMaxOwnCount(player) > project.getOwnCount()) project.setOwnCount(project.getOwnCount() + 1);
+            if (project.getMaxOwnCount(player) > project.getOwnCount() && player.getCoins() >= project.getCost()) {
+                project.setOwnCount(project.getOwnCount() + 1);
+                player.setCoins(player.getCoins() - project.getCost());
+            }
             minusButton.setEnabled(project.getOwnCount() > 0);
+            plusButton.setEnabled(project.getOwnCount() < project.getMaxOwnCount(player));
             window.updatePlayerPanels();
         });
         minusButton.addActionListener(e -> {
-            if (0 < project.getOwnCount()) project.setOwnCount(project.getOwnCount() - 1);
+            if (0 < project.getOwnCount()) {
+                project.setOwnCount(project.getOwnCount() - 1);
+                player.setCoins(player.getCoins() + project.getCost());
+            }
             minusButton.setEnabled(project.getOwnCount() > 0);
+            plusButton.setEnabled(project.getOwnCount() < project.getMaxOwnCount(player));
             window.updatePlayerPanels();
         });
         buttonPanel.add(plusButton);

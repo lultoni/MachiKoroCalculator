@@ -21,6 +21,7 @@ public class PlayerPanel extends JPanel {
     EXDisplay exDisplay;
     PredictionList predictionList;
     ArrayList<ProjectVisual> pvs;
+    CoinsLabel coinsLabel;
 
     public PlayerPanel(Player player, Game game, Window window) {
         this.player = player;
@@ -39,12 +40,29 @@ public class PlayerPanel extends JPanel {
         northPanel.setLayout(new GridLayout(1, 0));
         JLabel nameLabel = new JLabel(player.getName());
         nameLabel.setFont(GlobalColors.northFont);
-        CoinsLabel coinsLabel = new CoinsLabel(player, window);
+        coinsLabel = new CoinsLabel(player, window);
         rankLabel = new JLabel("Rank: " + game.getPlayerRank(player));
         rankLabel.setFont(GlobalColors.northFont);
+
+        JPanel dicePanel = new JPanel();
+        Integer[] diceNumbers = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12};
+        JComboBox<Integer> diceComboBox = new JComboBox<>(diceNumbers);
+        JButton rollButton = new JButton("Roll!");
+        rollButton.addActionListener(e -> {
+            int dn = (int) diceComboBox.getSelectedItem();
+            for (Player p1: game.getPlayers()) {
+                p1.setCoins(p1.getCoins() + p1.getDiceThrow(dn, p1.getID() == player.getID()));
+            }
+            window.updatePlayerPanels();
+        });
+
+        dicePanel.add(diceComboBox);
+        dicePanel.add(rollButton);
+
         northPanel.add(nameLabel);
         northPanel.add(coinsLabel);
         northPanel.add(rankLabel);
+        northPanel.add(dicePanel);
 
         JPanel centerPanel = new JPanel();
         centerPanel.setLayout(new BorderLayout());
@@ -83,6 +101,7 @@ public class PlayerPanel extends JPanel {
 
     public void updateText() {
         rankLabel.setText("Rank: " + game.getPlayerRank(player));
+        coinsLabel.updateText();
         gps1.updateText();
         gps2.updateText();
         gps3.updateText();

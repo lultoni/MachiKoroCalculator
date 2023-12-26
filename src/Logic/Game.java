@@ -57,20 +57,21 @@ public class Game {
     }
 
     public int[] getPlayerRanks() {
-        int[] ranks = new int[4];
+        int playerNumber = players.length;
+        int[] ranks = new int[playerNumber];
         double[] scores = calculateScores(players[0]);
         double[] sortedScores = Arrays.copyOf(scores, 4);
         Arrays.sort(sortedScores);
         sortedScores = reverse(sortedScores);
 
-        for (int i = 0; i < 4; i++) {
+        for (int i = 0; i < playerNumber; i++) {
             if (scores[i] == sortedScores[0]) {
                 ranks[i] = 1;
             } else if (scores[i] == sortedScores[1]) {
                 ranks[i] = 2;
-            } else if (scores[i] == sortedScores[2]) {
+            } else if (playerNumber >= 3 && scores[i] == sortedScores[2]) {
                 ranks[i] = 3;
-            } else if (scores[i] == sortedScores[3]) {
+            } else if (playerNumber >= 4 && scores[i] == sortedScores[3]) {
                 ranks[i] = 4;
             }
         }
@@ -138,13 +139,21 @@ public class Game {
     }
 
     private double[] calculateScores(Player player) {
-        Player o1 = (player.id == 0) ? players[1] : (player.id == 1) ? players[2] : (player.id == 2) ? players[3] : players[0];
-        Player o2 = (player.id == 0) ? players[2] : (player.id == 1) ? players[3] : (player.id == 2) ? players[0] : players[1];
-        Player o3 = (player.id == 0) ? players[3] : (player.id == 1) ? players[0] : (player.id == 2) ? players[1] : players[2];
+        int numPlayers = players.length;
+
+        int o1Index = (player.id + 1) % numPlayers;
+        int o2Index = (player.id + 2) % numPlayers;
+        int o3Index = (player.id + 3) % numPlayers;
+
+        Player o1 = players[o1Index];
+        Player o2 = players[o2Index];
+        Player o3 = players[o3Index];
+
         double pScore = player.getEX(true, true) + player.getEX(true, false) + player.getEX(false, true) + player.getEX(false, false);
         double o1Score = o1.getEX(true, true) + o1.getEX(true, false) + o1.getEX(false, true) + o1.getEX(false, false);
         double o2Score = o2.getEX(true, true) + o2.getEX(true, false) + o2.getEX(false, true) + o2.getEX(false, false);
         double o3Score = o3.getEX(true, true) + o3.getEX(true, false) + o3.getEX(false, true) + o3.getEX(false, false);
+
         return new double[]{pScore, o1Score, o2Score, o3Score};
     }
 

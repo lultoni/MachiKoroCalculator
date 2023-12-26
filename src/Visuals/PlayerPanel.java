@@ -38,8 +38,10 @@ public class PlayerPanel extends JPanel {
         northPanel.setBorder(BorderFactory.createEtchedBorder());
         northPanel.setLayout(new GridLayout(1, 0));
         JLabel nameLabel = new JLabel(player.getName());
+        nameLabel.setFont(GlobalColors.northFont);
         CoinsLabel coinsLabel = new CoinsLabel(player, window);
-        rankLabel = new JLabel("Rank: " + game.getPlayerRank(player.getID()));
+        rankLabel = new JLabel("Rank: " + game.getPlayerRank(player));
+        rankLabel.setFont(GlobalColors.northFont);
         northPanel.add(nameLabel);
         northPanel.add(coinsLabel);
         northPanel.add(rankLabel);
@@ -80,7 +82,7 @@ public class PlayerPanel extends JPanel {
     }
 
     public void updateText() {
-        rankLabel.setText("Rank: " + game.getPlayerRank(player.getID()));
+        rankLabel.setText("Rank: " + game.getPlayerRank(player));
         gps1.updateText();
         gps2.updateText();
         gps3.updateText();

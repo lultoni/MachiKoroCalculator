@@ -21,18 +21,23 @@ public class CoinsLabel extends JPanel {
 
         JLabel text = new JLabel();
         text.setText("Coins: " + player.getCoins());
+        text.setFont(GlobalColors.northFont);
 
         JButton coinsPlus = new JButton("+");
+        JButton coinsMinus = new JButton("-");
+
+        coinsMinus.setEnabled(player.getCoins() > 0);
+
         coinsPlus.addActionListener(e -> {
             player.setCoins(player.getCoins() + 1);
             text.setText("Coins: " + player.getCoins());
+            coinsMinus.setEnabled(player.getCoins() > 0);
             window.updatePlayerPanels();
         });
-
-        JButton coinsMinus = new JButton("-");
         coinsMinus.addActionListener(e -> {
             player.setCoins(player.getCoins() - 1);
             text.setText("Coins: " + player.getCoins());
+            coinsMinus.setEnabled(player.getCoins() > 0);
             window.updatePlayerPanels();
         });
 

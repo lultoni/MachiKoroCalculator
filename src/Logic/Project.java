@@ -151,4 +151,19 @@ public class Project {
         }
         return back;
     }
+
+    public int getCost() {
+        return cost;
+    }
+
+    public String getActivationString() {
+        String back = "";
+        for (int i: diceActivation) {
+            back += i;
+            if (i != diceActivation[diceActivation.length - 1]) {
+                back += ",";
+            }
+        }
+        return back;
+    }
 }

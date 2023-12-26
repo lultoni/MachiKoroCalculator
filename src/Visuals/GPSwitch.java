@@ -20,6 +20,8 @@ public class GPSwitch extends JPanel {
     private void init() {
         setLayout(new GridLayout(1, 0));
         JLabel nameLabel = new JLabel(project.getName());
+        Image projectIcon = new ImageIcon(project.getCategory() + ".png").getImage();
+        nameLabel.setIcon(new ImageIcon(projectIcon.getScaledInstance(25, 25, Image.SCALE_SMOOTH)));
         switchButton = new JButton("sO: " + ((project.getOwnCount() == 0) ? "T" : "F"));
         switchButton.addActionListener(e -> {
             if (project.getOwnCount() == 0) {

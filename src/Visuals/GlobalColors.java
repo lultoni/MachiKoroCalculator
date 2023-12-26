@@ -12,6 +12,7 @@ public class GlobalColors {
     public static Color backgroundGrey = new Color(87, 87, 87);
     public static Color myEX = new Color(149, 236, 205);
     public static Color otherEX = new Color(165, 149, 236);
+    public static Font northFont = new Font("Arial", Font.BOLD, 20);
 
     public static Color getCorrectBackgroundColor(int id) {
         Color back;

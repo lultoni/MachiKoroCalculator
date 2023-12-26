@@ -1,6 +1,7 @@
 package Logic;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 
 public class Game {
 
@@ -51,8 +52,30 @@ public class Game {
         return back;
     }
 
-    public int getPlayerRank(int id) {
-        return id; // TODO fix this mess (use calculateScore function and sort I guess (think about 2 people having the same score))
+    public int getPlayerRank(Player player) {
+        return getPlayerRanks()[player.id];
+    }
+
+    public int[] getPlayerRanks() {
+        int[] ranks = new int[4];
+        double[] scores = calculateScores(players[0]);
+        double[] sortedScores = Arrays.copyOf(scores, 4);
+        Arrays.sort(sortedScores);
+        sortedScores = reverse(sortedScores);
+
+        for (int i = 0; i < 4; i++) {
+            if (scores[i] == sortedScores[0]) {
+                ranks[i] = 1;
+            } else if (scores[i] == sortedScores[1]) {
+                ranks[i] = 2;
+            } else if (scores[i] == sortedScores[2]) {
+                ranks[i] = 3;
+            } else if (scores[i] == sortedScores[3]) {
+                ranks[i] = 4;
+            }
+        }
+
+        return ranks;
     }
 
     public Project[] getBestProjects(int amount, Player player) {
@@ -144,6 +167,20 @@ public class Game {
             project.setOwnCount(project.getOwnCount() - 1);
         }
 
+        return back;
+    }
+
+    private double[] reverse(double[] arr) {
+        double[] back = new double[arr.length];
+        for (int i = 0; i < back.length / 2; i++) {
+            double temp = arr[i];
+            back[i] = arr[back.length - i - 1];
+            back[back.length - i - 1] = temp;
+        }
+        if ((back.length % 2) != 0) {
+            int index = (back.length / 2);
+            back[index] = arr[index];
+        }
         return back;
     }
 

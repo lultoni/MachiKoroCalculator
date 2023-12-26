@@ -64,7 +64,7 @@ public class PlayerPanel extends JPanel {
         dCP.setLayout(new GridLayout(3, 0));
         Project[] projects = player.getProjects();
         for (int i = 4; i < projects.length; i++) {
-            ProjectVisual pv = new ProjectVisual(projects[i], window);
+            ProjectVisual pv = new ProjectVisual(projects[i], window, player);
             pvs.add(pv);
             dCP.add(pv);
         }

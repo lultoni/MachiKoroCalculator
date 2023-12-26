@@ -93,9 +93,9 @@ public class PredictionList extends JPanel {
     private JPanel createRank(int i, Project project, double change) {
         if (project == null) System.out.println(i);
         JPanel back = new JPanel();
-        back.setLayout(new GridLayout(1, 3));
+        back.setLayout(new BorderLayout());
 
-        JLabel rank = new JLabel(i + ".");
+        JLabel rank = new JLabel(i + "." + ((i < 10) ? "   " : " "));
         rank.setBackground(GlobalColors.getCorrectBackgroundColor(project.getID()));
         rank.setOpaque(true);
 
@@ -103,13 +103,13 @@ public class PredictionList extends JPanel {
         name.setBackground(GlobalColors.getCorrectBackgroundColor(project.getID()));
         name.setOpaque(true);
 
-        JLabel cLabel = new JLabel("(" + change + ")");
+        JLabel cLabel = new JLabel(" (" + change + ")");
         cLabel.setBackground(GlobalColors.getCorrectBackgroundColor(project.getID()));
         cLabel.setOpaque(true);
 
-        back.add(rank);
-        back.add(name);
-        back.add(cLabel);
+        back.add(rank, BorderLayout.WEST);
+        back.add(name, BorderLayout.CENTER);
+        back.add(cLabel, BorderLayout.EAST);
 
         return back;
     }

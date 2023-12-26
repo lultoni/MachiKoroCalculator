@@ -24,30 +24,30 @@ public class Game {
     private Project[] getProjectList() {
         Project[] back = new Project[19];
         // GP
-        back[0] = new Project(0, "Bahnhof", Category.OFFICE, 4, 1, this);
-        back[1] = new Project(1, "Einkaufzentrum", Category.OFFICE, 10, 1, this);
-        back[2] = new Project(2, "Freizeitpark", Category.OFFICE, 16, 1, this);
-        back[3] = new Project(3, "Funkturm", Category.OFFICE, 22, 1, this);
+        back[0] = new Project(0, "Bahnhof", Category.OFFICE, 4, 1, this, new int[]{0});
+        back[1] = new Project(1, "Einkaufzentrum", Category.OFFICE, 10, 1, this, new int[]{0});
+        back[2] = new Project(2, "Freizeitpark", Category.OFFICE, 16, 1, this, new int[]{0});
+        back[3] = new Project(3, "Funkturm", Category.OFFICE, 22, 1, this, new int[]{0});
         // Starter
-        back[4] = new Project(4, "Weizenfeld", Category.FOOD, 1, 7, this);
-        back[5] = new Project(5, "Bäckerei", Category.STORE, 1, 7, this);
+        back[4] = new Project(4, "Weizenfeld", Category.FOOD, 1, 6 + getPlayers().length, this, new int[]{1});
+        back[5] = new Project(5, "Bäckerei", Category.STORE, 1, 6 + getPlayers().length, this, new int[]{2, 3});
         // Blue
-        back[6] = new Project(6, "Apfelplantage", Category.FOOD, 3, 6, this);
-        back[11] = new Project(11, "Bauernhof", Category.ANIMAL, 1, 6, this);
-        back[12] = new Project(12, "Wald", Category.PRODUCTION, 3, 6, this);
-        back[15] = new Project(15, "Bergwerk", Category.CAFE, 6, 6, this);
+        back[6] = new Project(6, "Apfelplantage", Category.FOOD, 3, 6, this, new int[]{10});
+        back[11] = new Project(11, "Bauernhof", Category.ANIMAL, 1, 6, this, new int[]{2});
+        back[12] = new Project(12, "Wald", Category.PRODUCTION, 3, 6, this, new int[]{5});
+        back[15] = new Project(15, "Bergwerk", Category.CAFE, 6, 6, this, new int[]{9});
         // Green
-        back[7] = new Project(7, "Markthalle", Category.MARKET, 2, 6, this);
-        back[8] = new Project(8, "Molkerei", Category.FACTORY, 5, 6, this);
-        back[9] = new Project(9, "Möbelfabrik", Category.FACTORY, 3, 6, this);
-        back[10] = new Project(10, "Mini-Markt", Category.STORE, 2, 6, this);
+        back[7] = new Project(7, "Markthalle", Category.MARKET, 2, 6, this, new int[]{11, 12});
+        back[8] = new Project(8, "Molkerei", Category.FACTORY, 5, 6, this, new int[]{7});
+        back[9] = new Project(9, "Möbelfabrik", Category.FACTORY, 3, 6, this, new int[]{8});
+        back[10] = new Project(10, "Mini-Markt", Category.STORE, 2, 6, this, new int[]{4});
         // Red
-        back[13] = new Project(13, "Familienrestaurant", Category.CAFE, 3, 6, this);
-        back[14] = new Project(14, "Café", Category.CAFE, 2, 6, this);
+        back[13] = new Project(13, "Familienrestaurant", Category.CAFE, 3, 6, this, new int[]{9, 10});
+        back[14] = new Project(14, "Café", Category.CAFE, 2, 6, this, new int[]{3});
         // Purple
-        back[16] = new Project(16, "Bürohaus", Category.OFFICE, 8, 1, this);
-        back[17] = new Project(17, "Stadion", Category.OFFICE, 6, 1, this);
-        back[18] = new Project(18, "Fernsehsender", Category.OFFICE, 7, 1, this);
+        back[16] = new Project(16, "Bürohaus", Category.OFFICE, 8, 1, this, new int[]{6});
+        back[17] = new Project(17, "Stadion", Category.OFFICE, 6, 1, this, new int[]{6});
+        back[18] = new Project(18, "Fernsehsender", Category.OFFICE, 7, 1, this, new int[]{6});
         return back;
     }
 
@@ -64,7 +64,7 @@ public class Game {
         ArrayList<Integer> ids = new ArrayList<>();
 
         for (Project project : player.projectList) {
-            if (project.getOwnCount() < project.getMaxOwnCount() && project.cost <= player.coins) {
+            if (project.getOwnCount() < project.getMaxOwnCount(player) && project.cost <= player.coins) {
                 project.setOwnCount(project.getOwnCount() + 1);
                 values.add(calculateScores(player));
                 ids.add(project.id);

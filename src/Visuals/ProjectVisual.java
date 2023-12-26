@@ -1,5 +1,6 @@
 package Visuals;
 
+import Logic.Player;
 import Logic.Project;
 
 import javax.swing.*;
@@ -10,9 +11,12 @@ public class ProjectVisual extends JPanel {
     Project project;
     Window window;
     JLabel amountLabel;
-    public ProjectVisual(Project project, Window window) {
+    Player player;
+
+    public ProjectVisual(Project project, Window window, Player player) {
         this.project = project;
         this.window = window;
+        this.player = player;
         init();
     }
 
@@ -23,7 +27,7 @@ public class ProjectVisual extends JPanel {
         mainPanel.setLayout(new GridLayout(1, 0));
         mainPanel.setBackground(GlobalColors.getCorrectBackgroundColor(project.getID()));
 
-        amountLabel = new JLabel(project.getOwnCount() + "/" + project.getMaxOwnCount());
+        amountLabel = new JLabel(project.getOwnCount() + "/" + project.getMaxOwnCount(player));
 
         JLabel nameLabel = new JLabel(project.getName());
         Image projectIcon = new ImageIcon(project.getCategory() + ".png").getImage();
@@ -32,7 +36,7 @@ public class ProjectVisual extends JPanel {
         buttonPanel.setLayout(new GridLayout(0, 1));
         JButton plusButton = new JButton("+");
         plusButton.addActionListener(e -> {
-             if (project.getMaxOwnCount() > project.getOwnCount()) project.setOwnCount(project.getOwnCount() + 1);
+             if (project.getMaxOwnCount(player) > project.getOwnCount()) project.setOwnCount(project.getOwnCount() + 1);
             window.updatePlayerPanels();
         });
         JButton minusButton = new JButton("-");
@@ -51,6 +55,6 @@ public class ProjectVisual extends JPanel {
     }
 
     public void updateText() {
-        amountLabel.setText(project.getOwnCount() + "/" + project.getMaxOwnCount());
+        amountLabel.setText(project.getOwnCount() + "/" + project.getMaxOwnCount(player));
     }
 }

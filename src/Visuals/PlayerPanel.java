@@ -38,7 +38,7 @@ public class PlayerPanel extends JPanel {
         northPanel.setBorder(BorderFactory.createEtchedBorder());
         northPanel.setLayout(new GridLayout(1, 0));
         JLabel nameLabel = new JLabel(player.getName());
-        CoinsLabel coinsLabel = new CoinsLabel(player);
+        CoinsLabel coinsLabel = new CoinsLabel(player, window);
         rankLabel = new JLabel("Rank: " + game.getPlayerRank(player.getID()));
         northPanel.add(nameLabel);
         northPanel.add(coinsLabel);

@@ -64,7 +64,7 @@ public class Game {
         ArrayList<Integer> ids = new ArrayList<>();
 
         for (Project project : player.projectList) {
-            if (project.getOwnCount() < project.getMaxOwnCount()) {
+            if (project.getOwnCount() < project.getMaxOwnCount() && project.cost <= player.coins) {
                 project.setOwnCount(project.getOwnCount() + 1);
                 values.add(calculateScores(player));
                 ids.add(project.id);
@@ -76,7 +76,7 @@ public class Game {
             double[] scoreDiff = calculateScoreDifference(beforeScores, values.get(i));
             double totalDiff = calculateTotalDifference(scoreDiff);
 
-            totalDiff -= player.projectList[ids.get(i)].cost;
+            totalDiff /= player.projectList[ids.get(i)].cost;
 
             if (backList.size() < amount) {
                 backList.add(player.projectList[ids.get(i)]);
@@ -84,7 +84,7 @@ public class Game {
                 for (int j = 0; j < amount; j++) {
                     double[] existingDiff = calculateScoreDifference(beforeScores, calculateScores(player));
 
-                    existingDiff[0] -= backList.get(j).cost;
+                    existingDiff[0] /= backList.get(j).cost;
 
                     if (calculateTotalDifference(existingDiff) < totalDiff) {
                         backList.set(j, player.projectList[ids.get(i)]);
@@ -124,4 +124,27 @@ public class Game {
         double o3Score = o3.getEX(true, true) + o3.getEX(true, false) + o3.getEX(false, true) + o3.getEX(false, false);
         return new double[]{pScore, o1Score, o2Score, o3Score};
     }
+
+    public double[] getChangeArr(Project[] projects, Player player) {
+        double[] back = new double[projects.length];
+
+        double[] originalScores = calculateScores(player);
+
+        for (int i = 0; i < projects.length; i++) {
+            Project project = projects[i];
+
+            project.setOwnCount(project.getOwnCount() + 1);
+
+            double[] newScores = calculateScores(player);
+            double newPlayerScore = newScores[0];
+            double originalPlayerScore = originalScores[0];
+
+            back[i] = Math.round((newPlayerScore - originalPlayerScore) * 1000.0) / 1000.0;
+
+            project.setOwnCount(project.getOwnCount() - 1);
+        }
+
+        return back;
+    }
+
 }

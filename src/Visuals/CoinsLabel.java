@@ -8,9 +8,11 @@ import java.awt.*;
 public class CoinsLabel extends JPanel {
 
     Player player;
+    Window window;
 
-    public CoinsLabel(Player player) {
+    public CoinsLabel(Player player, Window window) {
         this.player = player;
+        this.window = window;
         init();
     }
 
@@ -24,12 +26,14 @@ public class CoinsLabel extends JPanel {
         coinsPlus.addActionListener(e -> {
             player.setCoins(player.getCoins() + 1);
             text.setText("Coins: " + player.getCoins());
+            window.updatePlayerPanels();
         });
 
         JButton coinsMinus = new JButton("-");
         coinsMinus.addActionListener(e -> {
             player.setCoins(player.getCoins() - 1);
             text.setText("Coins: " + player.getCoins());
+            window.updatePlayerPanels();
         });
 
         JPanel buttonPanel = new JPanel();

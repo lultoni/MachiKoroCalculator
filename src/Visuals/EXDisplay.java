@@ -40,9 +40,17 @@ public class EXDisplay extends JPanel {
         t_sn2.setOpaque(true);
 
         c_s1 = new JLabel(String.valueOf(player.getEX(true, true)));
+        c_s1.setBackground(GlobalColors.myEX);
+        c_s1.setOpaque(true);
         c_sn1 = new JLabel(String.valueOf(player.getEX(false, true)));
+        c_sn1.setBackground(GlobalColors.myEX);
+        c_sn1.setOpaque(true);
         c_s2 = new JLabel(String.valueOf(player.getEX(true, false)));
+        c_s2.setBackground(GlobalColors.otherEX);
+        c_s2.setOpaque(true);
         c_sn2 = new JLabel(String.valueOf(player.getEX(false, false)));
+        c_sn2.setBackground(GlobalColors.otherEX);
+        c_sn2.setOpaque(true);
 
         mainPanel.add(t_s1);
         mainPanel.add(c_s1);

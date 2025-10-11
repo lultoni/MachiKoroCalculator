@@ -48,12 +48,12 @@ public class PlayerPanel extends JPanel {
         Integer[] diceNumbers = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12};
         JComboBox<Integer> diceComboBox = new JComboBox<>(diceNumbers);
         JButton rollButton = new JButton("Roll!");
-        rollButton.addActionListener(e -> {
+        rollButton.addActionListener(_ -> {
             int dn = (int) diceComboBox.getSelectedItem();
             for (Player p1: game.getPlayers()) {
                 p1.setCoins(p1.getCoins() + p1.getDiceThrow(dn, p1.getID() == player.getID()));
             }
-            window.updatePlayerPanels();
+            window.update();
         });
 
         dicePanel.add(diceComboBox);
@@ -108,7 +108,7 @@ public class PlayerPanel extends JPanel {
         gps4.updateText();
         exDisplay.updateText();
         for (ProjectVisual pv: pvs) {
-            pv.updateText();
+            pv.update();
         }
         predictionList.updateText();
     }

@@ -33,13 +33,13 @@ public class CoinsLabel extends JPanel {
             player.setCoins(player.getCoins() + 1);
             text.setText("Coins: " + player.getCoins());
             coinsMinus.setEnabled(player.getCoins() > 0);
-            window.updatePlayerPanels();
+            window.update();
         });
         coinsMinus.addActionListener(e -> {
             player.setCoins(player.getCoins() - 1);
             text.setText("Coins: " + player.getCoins());
             coinsMinus.setEnabled(player.getCoins() > 0);
-            window.updatePlayerPanels();
+            window.update();
         });
 
         JPanel buttonPanel = new JPanel();

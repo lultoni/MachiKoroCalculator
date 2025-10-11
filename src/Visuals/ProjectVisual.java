@@ -5,13 +5,15 @@ import Logic.Project;
 
 import javax.swing.*;
 import java.awt.*;
+import java.util.SimpleTimeZone;
 
 public class ProjectVisual extends JPanel {
 
     Project project;
     Window window;
-    JLabel amountLabel;
+    AmountBar amountBar;
     Player player;
+    JButton plusButton, minusButton;
 
     public ProjectVisual(Project project, Window window, Player player) {
         this.project = project;
@@ -24,10 +26,10 @@ public class ProjectVisual extends JPanel {
         setLayout(new BorderLayout());
 
         JPanel mainPanel = new JPanel();
-        mainPanel.setLayout(new GridLayout(1, 0));
+        mainPanel.setLayout(new BorderLayout());
         mainPanel.setBackground(GlobalColors.getCorrectBackgroundColor(project.getID()));
 
-        amountLabel = new JLabel(project.getOwnCount() + "/" + project.getMaxOwnCount(player)); // TODO make percentage bar (blocks with border)
+        amountBar = new AmountBar(project.getOwnCount(), project.getMaxOwnCount(player));
 
         JPanel infoPanel = new JPanel();
         infoPanel.setLayout(new GridLayout(0, 1));
@@ -49,10 +51,10 @@ public class ProjectVisual extends JPanel {
         JPanel buttonPanel = getButtonPanel();
 
         mainPanel.add(infoPanel);
-        mainPanel.add(buttonPanel);
+        mainPanel.add(buttonPanel, BorderLayout.EAST);
 
         add(mainPanel);
-        add(amountLabel, BorderLayout.SOUTH);
+        add(amountBar, BorderLayout.SOUTH);
     }
 
     private JLabel getDiceLabel() {
@@ -76,29 +78,34 @@ public class ProjectVisual extends JPanel {
     private JPanel getButtonPanel() {
         JPanel buttonPanel = new JPanel();
         buttonPanel.setLayout(new GridLayout(0, 1));
-        JButton plusButton = new JButton("+");
+
+        plusButton = new JButton("+");
         plusButton.setFont(GlobalColors.northFont);
-        JButton minusButton = new JButton("-");
+        minusButton = new JButton("-");
         minusButton.setFont(GlobalColors.northFont);
-        minusButton.setEnabled(project.getOwnCount() > 0);
-        plusButton.addActionListener(e -> {
-            if (project.getMaxOwnCount(player) > project.getOwnCount() && player.getCoins() >= project.getCost()) {
+
+        plusButton.addActionListener(_ -> {
+            if (get_plus_action_allowed()) {
                 project.setOwnCount(project.getOwnCount() + 1);
                 player.setCoins(player.getCoins() - project.getCost());
             }
-            minusButton.setEnabled(project.getOwnCount() > 0);
-            plusButton.setEnabled(project.getOwnCount() < project.getMaxOwnCount(player));
-            window.updatePlayerPanels();
+            minusButton.setEnabled(get_minus_action_allowed());
+            plusButton.setEnabled(get_plus_action_allowed());
+            window.update();
         });
-        minusButton.addActionListener(e -> {
-            if (0 < project.getOwnCount()) {
+        minusButton.addActionListener(_ -> {
+            if (get_minus_action_allowed()) {
                 project.setOwnCount(project.getOwnCount() - 1);
                 player.setCoins(player.getCoins() + project.getCost());
             }
-            minusButton.setEnabled(project.getOwnCount() > 0);
-            plusButton.setEnabled(project.getOwnCount() < project.getMaxOwnCount(player));
-            window.updatePlayerPanels();
+            minusButton.setEnabled(get_minus_action_allowed());
+            plusButton.setEnabled(get_plus_action_allowed());
+            window.update();
         });
+
+        minusButton.setEnabled(get_minus_action_allowed());
+        plusButton.setEnabled(get_plus_action_allowed());
+
         buttonPanel.add(plusButton);
         buttonPanel.add(minusButton);
         return buttonPanel;
@@ -122,7 +129,21 @@ public class ProjectVisual extends JPanel {
         };
     }
 
-    public void updateText() {
-        amountLabel.setText(project.getOwnCount() + "/" + project.getMaxOwnCount(player));
+    public void update() {
+        amountBar.change_max(project.getMaxOwnCount(player));
+        amountBar.change_fill(project.getOwnCount());
+        minusButton.setEnabled(get_minus_action_allowed());
+        plusButton.setEnabled(get_plus_action_allowed());
+    }
+
+    private boolean get_plus_action_allowed() {
+        return project.getMaxOwnCount(player) > project.getOwnCount()
+                && player.getCoins() >= project.getCost();
+    }
+
+    private boolean get_minus_action_allowed() {
+        return 0 < project.getOwnCount()
+                && (project.getID() == 4 && project.getOwnCount() > 1 || project.getID() == 5 && project.getOwnCount() > 1
+                   || (project.getID() != 4 && project.getID() != 5));
     }
 }

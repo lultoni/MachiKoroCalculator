@@ -30,7 +30,7 @@ public class GPSwitch extends JPanel {
                 project.setOwnCount(0);
             }
             switchButton.setText("sO: " + ((project.getOwnCount() == 0) ? "T" : "F"));
-            window.updatePlayerPanels();
+            window.update();
         });
         setBackground(GlobalColors.getCorrectBackgroundColor(project.getID()));
         add(nameLabel);

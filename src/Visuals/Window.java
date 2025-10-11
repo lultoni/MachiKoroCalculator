@@ -35,7 +35,7 @@ public class Window extends JFrame {
         setVisible(true);
     }
 
-    public void updatePlayerPanels() {
+    public void update() {
         for (PlayerPanel panel: playerPanels) {
             panel.updateText();
         }

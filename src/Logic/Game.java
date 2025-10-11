@@ -36,7 +36,7 @@ public class Game {
         back[6] = new Project(6, "Apfelplantage", Category.FOOD, 3, 6, this, new int[]{10});
         back[11] = new Project(11, "Bauernhof", Category.ANIMAL, 1, 6, this, new int[]{2});
         back[12] = new Project(12, "Wald", Category.PRODUCTION, 3, 6, this, new int[]{5});
-        back[15] = new Project(15, "Bergwerk", Category.CAFE, 6, 6, this, new int[]{9});
+        back[15] = new Project(15, "Bergwerk", Category.PRODUCTION, 6, 6, this, new int[]{9});
         // Green
         back[7] = new Project(7, "Markthalle", Category.MARKET, 2, 6, this, new int[]{11, 12});
         back[8] = new Project(8, "Molkerei", Category.FACTORY, 5, 6, this, new int[]{7});

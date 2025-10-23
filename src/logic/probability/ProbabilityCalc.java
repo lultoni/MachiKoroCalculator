@@ -1,4 +1,6 @@
-package logic;
+package logic.probability;
+
+import logic.Project;
 
 import java.util.ArrayList;
 import java.util.stream.IntStream;
@@ -189,14 +191,14 @@ public class ProbabilityCalc {
                 int vmRow = projectColorIndex * ROWS_PER_COLOR + playerIndex;
 
                 if (vmRow >= valueMatrix.length) {
-                    System.out.printf("vm_row out of bounds for player %d, project=%s%n", playerIndex + 1, project.name);
+                    System.out.printf("vm_row out of bounds for player %d, project=%s%n", playerIndex + 1, project.getName());
                     continue;
                 }
 
                 for (int roll = 1; roll <= ROLL_COUNT; roll++) {
                     int increment = get_I(
                             roll,
-                            project.id,
+                            project.getID(),
                             true,
                             stats.has_einkaufszentrum_built,
                             stats.foodCount,
@@ -221,8 +223,8 @@ public class ProbabilityCalc {
         PlayerStats stats = new PlayerStats();
 
         for (Project project : projects) {
-            if (project.id == 1) stats.has_einkaufszentrum_built = true;
-            switch (project.category) {
+            if (project.getID() == 1) stats.has_einkaufszentrum_built = true;
+            switch (project.getCategory()) {
                 case FOOD -> stats.foodCount++;
                 case ANIMAL -> stats.animalCount++;
                 case PRODUCTION -> stats.productionCount++;

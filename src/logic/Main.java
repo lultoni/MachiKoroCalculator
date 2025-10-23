@@ -1,5 +1,6 @@
 package logic;
 
+import logic.probability.ProbabilityCalc;
 import visuals.boot.BootWindow;
 import visuals.game.GameWindow;
 

@@ -1,6 +1,6 @@
-package Logic;
+package logic;
 
-import Visuals.Window;
+import visuals.GameWindow;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -12,8 +12,8 @@ public class Main {
         // TODO create a boot window that lets you define player names and order
 
         Game game = new Game(2); // TODO change this to the selected from boot window
-        Window window = new Window(game); // TODO add in new params with player names
-        window.boot();
+        GameWindow gameWindow = new GameWindow(game); // TODO add in new params with player names
+        // gameWindow.boot();
 
         ArrayList<Project[]> player_projects = new ArrayList<>();
         int[] player_coins = new int[game.getPlayers().length];

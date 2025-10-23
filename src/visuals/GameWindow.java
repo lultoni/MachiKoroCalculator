@@ -1,17 +1,17 @@
-package Visuals;
+package visuals;
 
-import Logic.Game;
-import Logic.Player;
+import logic.Game;
+import logic.Player;
 
 import javax.swing.*;
 import java.awt.*;
 
-public class Window extends JFrame {
+public class GameWindow extends JFrame {
 
     Game game;
     PlayerPanel[] playerPanels;
 
-    public Window(Game game) {
+    public GameWindow(Game game) {
         this.game = game;
     }
 

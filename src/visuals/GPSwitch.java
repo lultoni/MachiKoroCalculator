@@ -1,6 +1,6 @@
-package Visuals;
+package visuals;
 
-import Logic.Project;
+import logic.Project;
 
 import javax.swing.*;
 import java.awt.*;
@@ -8,12 +8,12 @@ import java.awt.*;
 public class GPSwitch extends JPanel {
 
     Project project;
-    Window window;
+    GameWindow gameWindow;
     JButton switchButton;
 
-    public GPSwitch(Project project, Window window) {
+    public GPSwitch(Project project, GameWindow gameWindow) {
         this.project = project;
-        this.window = window;
+        this.gameWindow = gameWindow;
         init();
     }
 
@@ -30,7 +30,7 @@ public class GPSwitch extends JPanel {
                 project.setOwnCount(0);
             }
             switchButton.setText("sO: " + ((project.getOwnCount() == 0) ? "T" : "F"));
-            window.update();
+            gameWindow.update();
         });
         setBackground(GlobalColors.getCorrectBackgroundColor(project.getID()));
         add(nameLabel);

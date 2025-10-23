@@ -1,8 +1,8 @@
-package Visuals;
+package visuals;
 
-import Logic.Game;
-import Logic.Player;
-import Logic.Project;
+import logic.Game;
+import logic.Player;
+import logic.Project;
 
 import javax.swing.*;
 import java.awt.*;
@@ -12,14 +12,14 @@ import java.util.Comparator;
 public class PredictionList extends JPanel {
 
     Player player;
-    Window window;
+    GameWindow gameWindow;
     Game game;
     Project[] tempProjects;
 
-    public PredictionList(Player player, Game game, Window window) {
+    public PredictionList(Player player, Game game, GameWindow gameWindow) {
         this.player = player;
         this.game = game;
-        this.window = window;
+        this.gameWindow = gameWindow;
         init();
     }
 

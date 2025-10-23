@@ -1,23 +1,22 @@
-package Visuals;
+package visuals;
 
-import Logic.Player;
-import Logic.Project;
+import logic.Player;
+import logic.Project;
 
 import javax.swing.*;
 import java.awt.*;
-import java.util.SimpleTimeZone;
 
 public class ProjectVisual extends JPanel {
 
     Project project;
-    Window window;
+    GameWindow gameWindow;
     AmountBar amountBar;
     Player player;
     JButton plusButton, minusButton;
 
-    public ProjectVisual(Project project, Window window, Player player) {
+    public ProjectVisual(Project project, GameWindow gameWindow, Player player) {
         this.project = project;
-        this.window = window;
+        this.gameWindow = gameWindow;
         this.player = player;
         init();
     }
@@ -91,7 +90,7 @@ public class ProjectVisual extends JPanel {
             }
             minusButton.setEnabled(get_minus_action_allowed());
             plusButton.setEnabled(get_plus_action_allowed());
-            window.update();
+            gameWindow.update();
         });
         minusButton.addActionListener(_ -> {
             if (get_minus_action_allowed()) {
@@ -100,7 +99,7 @@ public class ProjectVisual extends JPanel {
             }
             minusButton.setEnabled(get_minus_action_allowed());
             plusButton.setEnabled(get_plus_action_allowed());
-            window.update();
+            gameWindow.update();
         });
 
         minusButton.setEnabled(get_minus_action_allowed());

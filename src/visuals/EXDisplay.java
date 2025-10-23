@@ -1,6 +1,6 @@
-package Visuals;
+package visuals;
 
-import Logic.Player;
+import logic.Player;
 
 import javax.swing.*;
 import java.awt.*;

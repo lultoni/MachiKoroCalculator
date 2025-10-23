@@ -1,8 +1,8 @@
-package Visuals;
+package visuals;
 
-import Logic.Game;
-import Logic.Player;
-import Logic.Project;
+import logic.Game;
+import logic.Player;
+import logic.Project;
 
 import javax.swing.*;
 import java.awt.*;
@@ -12,7 +12,7 @@ public class PlayerPanel extends JPanel {
 
     Player player;
     Game game;
-    Window window;
+    GameWindow gameWindow;
     JLabel rankLabel;
     GPSwitch gps1;
     GPSwitch gps2;
@@ -23,10 +23,10 @@ public class PlayerPanel extends JPanel {
     ArrayList<ProjectVisual> pvs;
     CoinsLabel coinsLabel;
 
-    public PlayerPanel(Player player, Game game, Window window) {
+    public PlayerPanel(Player player, Game game, GameWindow gameWindow) {
         this.player = player;
         this.game = game;
-        this.window = window;
+        this.gameWindow = gameWindow;
         pvs = new ArrayList<>();
         init();
     }
@@ -40,7 +40,7 @@ public class PlayerPanel extends JPanel {
         northPanel.setLayout(new GridLayout(1, 0));
         JLabel nameLabel = new JLabel(player.getName());
         nameLabel.setFont(GlobalColors.northFont);
-        coinsLabel = new CoinsLabel(player, window);
+        coinsLabel = new CoinsLabel(player, gameWindow);
         rankLabel = new JLabel("Rank: " + game.getPlayerRank(player));
         rankLabel.setFont(GlobalColors.northFont);
 
@@ -53,7 +53,7 @@ public class PlayerPanel extends JPanel {
             for (Player p1: game.getPlayers()) {
                 p1.setCoins(p1.getCoins() + p1.getDiceThrow(dn, p1.getID() == player.getID()));
             }
-            window.update();
+            gameWindow.update();
         });
 
         dicePanel.add(diceComboBox);
@@ -69,10 +69,10 @@ public class PlayerPanel extends JPanel {
 
         JPanel uCP = new JPanel();
         uCP.setLayout(new GridLayout(1, 0));
-        gps1 = new GPSwitch(player.getProjects()[0], window);
-        gps2 = new GPSwitch(player.getProjects()[1], window);
-        gps3 = new GPSwitch(player.getProjects()[2], window);
-        gps4 = new GPSwitch(player.getProjects()[3], window);
+        gps1 = new GPSwitch(player.getProjects()[0], gameWindow);
+        gps2 = new GPSwitch(player.getProjects()[1], gameWindow);
+        gps3 = new GPSwitch(player.getProjects()[2], gameWindow);
+        gps4 = new GPSwitch(player.getProjects()[3], gameWindow);
         exDisplay = new EXDisplay(player);
         uCP.add(gps1);
         uCP.add(gps2);
@@ -84,12 +84,12 @@ public class PlayerPanel extends JPanel {
         dCP.setLayout(new GridLayout(3, 0));
         Project[] projects = player.getProjects();
         for (int i = 4; i < projects.length; i++) {
-            ProjectVisual pv = new ProjectVisual(projects[i], window, player);
+            ProjectVisual pv = new ProjectVisual(projects[i], gameWindow, player);
             pvs.add(pv);
             dCP.add(pv);
         }
 
-        predictionList = new PredictionList(player, game, window);
+        predictionList = new PredictionList(player, game, gameWindow);
 
         centerPanel.add(uCP, BorderLayout.NORTH);
         centerPanel.add(dCP, BorderLayout.CENTER);

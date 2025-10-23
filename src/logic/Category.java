@@ -1,4 +1,4 @@
-package Logic;
+package logic;
 
 public enum Category {
     CAFE,

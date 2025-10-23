@@ -1,6 +1,6 @@
-package Visuals;
+package visuals;
 
-import Logic.Player;
+import logic.Player;
 
 import javax.swing.*;
 import java.awt.*;
@@ -8,12 +8,12 @@ import java.awt.*;
 public class CoinsLabel extends JPanel {
 
     Player player;
-    Window window;
+    GameWindow gameWindow;
     JLabel text;
 
-    public CoinsLabel(Player player, Window window) {
+    public CoinsLabel(Player player, GameWindow gameWindow) {
         this.player = player;
-        this.window = window;
+        this.gameWindow = gameWindow;
         init();
     }
 
@@ -33,13 +33,13 @@ public class CoinsLabel extends JPanel {
             player.setCoins(player.getCoins() + 1);
             text.setText("Coins: " + player.getCoins());
             coinsMinus.setEnabled(player.getCoins() > 0);
-            window.update();
+            gameWindow.update();
         });
         coinsMinus.addActionListener(e -> {
             player.setCoins(player.getCoins() - 1);
             text.setText("Coins: " + player.getCoins());
             coinsMinus.setEnabled(player.getCoins() > 0);
-            window.update();
+            gameWindow.update();
         });
 
         JPanel buttonPanel = new JPanel();

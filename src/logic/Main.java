@@ -40,9 +40,9 @@ public class Main {
             player_coins[i] = p.coins;
         }
 
-        System.out.println(Arrays.deepToString(ProbabilityCalc.values_per_r_per_p(
-                player_projects,
-                player_coins)));
+//        System.out.println(Arrays.deepToString(ProbabilityCalc.values_per_r_per_p(
+//                player_projects,
+//                player_coins)));
 
     }
 

@@ -1,7 +1,5 @@
 package logic.probability;
 
-import logic.Project;
-
 import java.util.ArrayList;
 import java.util.stream.IntStream;
 
@@ -49,68 +47,68 @@ public class ProbabilityCalc {
      * @return Auszahlung (positiv) oder Einzahlung (negativ) von einem Projekt für den Nutzer bei den Parametern bei
      * einer bestimmten Würfelzahl.
      */
-    public static int get_I(int r, int p_id, boolean oop, boolean eb, int f, int a, int p, int c, int[] co) {
+    public static int get_I(int r, String p_id, boolean oop, boolean eb, int f, int a, int p, int c, int[] co) {
         switch (p_id) {
-            case 4 -> { // Weizenfeld
+            case "weizenfeld" -> {
                 if (r != 1) return 0;
                 return 1;
             }
-            case 5 -> { // Bäckerei
+            case "bäckerei" -> {
                 if (r != 2 && r != 3) return 0;
                 if (!oop) return 0;
                 return eb ? 2 : 1;
             }
-            case 6 -> { // Apfelplantage
+            case "apfelplantage" -> {
                 if (r != 10) return 0;
                 return 3;
             }
-            case 7 -> { // Markthalle
+            case "markthalle" -> {
                 if (r != 11 && r != 12) return 0;
                 if (!oop) return 0;
                 return f * 2;
             }
-            case 8 -> { // Molkerei
+            case "molkerei" -> {
                 if (r != 7) return 0;
                 if (!oop) return 0;
                 return a * 3;
             }
-            case 9 -> { // Möbelfabrik
+            case "möbelfabrik" -> {
                 if (r != 8) return 0;
                 if (!oop) return 0;
                 return p * 3;
             }
-            case 10 -> { // Mini-Markt
+            case "mini-markt" -> {
                 if (r != 4) return 0;
                 if (!oop) return 0;
                 return eb ? 4 : 3;
             }
-            case 11 -> { // Bauernhof
+            case "bauernhof" -> {
                 if (r != 2) return 0;
                 return 1;
             }
-            case 12 -> { // Wald
+            case "wald" -> {
                 if (r != 5) return 0;
                 return 1;
             }
-            case 13 -> { // Familienrestaurant
+            case "familienrestaurant" -> {
                 if (r != 9 && r != 10) return 0;
                 if (oop) return 0;
                 int cost = eb ? -3 : -2;
                 if (Math.abs(cost) > c) return c;
                 return cost;
             }
-            case 14 -> { // Café
+            case "café" -> {
                 if (r != 3) return 0;
                 if (oop) return 0;
                 int cost = eb ? -2 : -1;
                 if (Math.abs(cost) > c) return c;
                 return cost;
             }
-            case 15 -> { // Bergwerk
+            case "bergwerk" -> {
                 if (r != 9) return 0;
                 return 5;
             }
-            case 17 -> { // Stadion
+            case "stadion" -> {
                 if (r != 6) return 0;
                 if (!oop) return 0;
                 int gain = 5;
@@ -118,7 +116,7 @@ public class ProbabilityCalc {
                 for (int i: co) mco = Math.max(i, mco);
                 return Math.min(gain, mco);
             }
-            case 18 -> { // Fernsehsender
+            case "fernsehsender" -> {
                 if (r != 6) return 0;
                 if (!oop) return 0;
                 int max_gain = 5;
@@ -130,22 +128,6 @@ public class ProbabilityCalc {
         return 0;
     }
 
-    // TODO per round perspective: also bei 4 spielern können blaue 4 mal getriggert werden
-    //      -> wenn selber eine blaue gekauft wird, dann kann sie basierend auf spieleranzahl in einer runde
-    //         mehrfach aktiviert werden, was dir, bis du wieder dran bist, mehr einkommen generieren kann
-    //         -> hier kann man also gucken wie der EV einer karte für eine ganze runde aussieht (jeder war 1 mal dran)
-    //            im vergleich zu wenn man selber nur einmal würfelt
-
-    // TODO erwartete werte für eine runde müssen die großprojekte (gp's) mit in betracht gezogen werden
-
-    // TODO einen tree search von allen möglichkeiten, wo jede aktion von spielern nach einem würfelwurf geguckt wird
-    //      und mit der wahrscheinlichkeit des wurfes kombiniert wird und dann nach dem optimalen pfad jedes spieler
-    //      geschaut werden kann
-    //      -> hier müsste man auch auf die würfelwahl achten (1 oder 2 d6), da es pro spieler bessere ergebnisse geben
-    //         könnte (man darf erst mit 2d6 würfeln, wenn man das großprojekt Bahnhof gebaut hat)
-
-    // TODO über einen zeitverlauf schauen, was dann am meisten return gibt
-
     /**
      * Gibt eine Erwartungswert-Matrix zurück, welche für jeden Spieler und jede Projekt-Farbe
      * eine Zeile mit allen Würfelzahlen enthält.
@@ -155,20 +137,20 @@ public class ProbabilityCalc {
      *
      * @param playerProjects Eine Liste der Projektlisten aller Spieler (2–4 Spieler).
      * @param playerCoins    Münzanzahlen der Spieler.
-     * @return Eine 16x12-Matrix:<p>
-     *         Zeilen 1–4: blaue Projekte,<p>
-     *         Zeilen 5–8: rote Projekte,<p>
-     *         Zeilen 9–12: grüne Projekte,<p>
-     *         Zeilen 13–16: lila Projekte.
+     * @return Eine (8/12/16)x12-Matrix:<p>
+     *         - Zeilen 1–4: blaue Projekte,<p>
+     *         - Zeilen 5–8: rote Projekte,<p>
+     *         - Zeilen 9–12: grüne Projekte,<p>
+     *         - Zeilen 13–16: lila Projekte.
      */
     public static int[][] values_per_r_per_p(ArrayList<Project[]> playerProjects, int[] playerCoins) {
         if (playerProjects == null || playerProjects.size() < 2 || playerProjects.size() > 4) {
             throw new IllegalArgumentException("Player count must be between 2 and 4.");
         }
 
-        final int PROJECT_COLORS = 4;   // blue, red, green, purple
-        final int ROWS_PER_COLOR = 4;   // max players
-        final int ROLL_COUNT = 12;      // dice values
+        final int PROJECT_COLORS = 4;                       // blue, red, green, purple
+        final int ROWS_PER_COLOR = playerProjects.size();   // player amount
+        final int ROLL_COUNT = 12;                          // dice values
 
         int[][] valueMatrix = new int[PROJECT_COLORS * ROWS_PER_COLOR][ROLL_COUNT];
 
@@ -184,21 +166,18 @@ public class ProbabilityCalc {
             int[] otherCoins = getOtherPlayerCoins(playerCoins, playerIndex);
 
             for (Project project : projects) {
-                int ownCount = project.getOwnCount();
-                if (ownCount == 0) continue;
-
-                int projectColorIndex = get_project_color(project.getID()) - 1;
+                int projectColorIndex = get_project_color_index(project.getColor());
                 int vmRow = projectColorIndex * ROWS_PER_COLOR + playerIndex;
 
                 if (vmRow >= valueMatrix.length) {
-                    System.out.printf("vm_row out of bounds for player %d, project=%s%n", playerIndex + 1, project.getName());
+                    System.out.printf("vm_row out of bounds for player %d, project=%s%n", playerIndex + 1, project.getId());
                     continue;
                 }
 
                 for (int roll = 1; roll <= ROLL_COUNT; roll++) {
                     int increment = get_I(
                             roll,
-                            project.getID(),
+                            project.getId(),
                             true,
                             stats.has_einkaufszentrum_built,
                             stats.foodCount,
@@ -206,7 +185,7 @@ public class ProbabilityCalc {
                             stats.productionCount,
                             ownCoins,
                             otherCoins
-                    ) * ownCount;
+                    );
 
                     valueMatrix[vmRow][roll - 1] += increment;
                 }
@@ -223,11 +202,11 @@ public class ProbabilityCalc {
         PlayerStats stats = new PlayerStats();
 
         for (Project project : projects) {
-            if (project.getID() == 1) stats.has_einkaufszentrum_built = true;
+            if (project.getId().equals("einkaufszentrum")) stats.has_einkaufszentrum_built = true;
             switch (project.getCategory()) {
-                case FOOD -> stats.foodCount++;
-                case ANIMAL -> stats.animalCount++;
-                case PRODUCTION -> stats.productionCount++;
+                case "food" -> stats.foodCount++;
+                case "animal" -> stats.animalCount++;
+                case "production" -> stats.productionCount++;
             }
         }
 
@@ -235,7 +214,7 @@ public class ProbabilityCalc {
     }
 
     /**
-     * (Hilfsmethode) Gibt die Münzanzahlen der anderen Spieler zurück.
+     * (Hilfsfunktion) Gibt die Münzanzahlen der anderen Spieler zurück.
      */
     private static int[] getOtherPlayerCoins(int[] playerCoins, int excludeIndex) {
         return IntStream.range(0, playerCoins.length)
@@ -254,30 +233,62 @@ public class ProbabilityCalc {
         int productionCount = 0;
     }
 
-
     /**
-     * @param project_id ID von dem Projekt
-     * @return 1 für Blau, 2 für Grün, 3 für Rot, 4 für Lila, 5 für GP, -1 als Default
+     * (Hilfsfunktion) Gibt eine Zahl für jede Projektfarbe zurück.
+     * @param project_color Color von dem Projekt
+     * @return 0 für Blau, 1 für Rot, 2 für Grün, 3 für Lila, 4 für GP, -1 als Default
      */
-    private static int get_project_color(int project_id) {
-        switch (project_id) {
-            case 4, 6, 11, 12, 15 -> {
-                return 1; // Blau
+    private static int get_project_color_index(String project_color) {
+        switch (project_color) {
+            case "blau" -> {
+                return 0; // Blau
             }
-            case 13, 14 -> {
-                return 2; // Rot
+            case "rot" -> {
+                return 1; // Rot
             }
-            case 5, 7, 8, 9, 10 -> {
-                return 3; // Grün
+            case "grün" -> {
+                return 2; // Grün
             }
-            case 16, 17, 18 -> {
-                return 4; // Lila
+            case "lila" -> {
+                return 3; // Lila
             }
-            case 0, 1, 2, 3 -> {
-                return 5; // GP
+            case "gelb" -> {
+                return 4; // GP
             }
         }
         return -1;
     }
+
+    // TODO write function docs
+    // Erwarteter Wert (Münzen) *sofort* für den Käufer, wenn er das Project kauft und danach seinen aktuellen Zug beendet.
+    // - berücksichtigt: 1d6/2d6-Option (wenn Bahnhof vorhanden wählbar), Einkaufszentrum-Effekt (über get_I),
+    // - berechnet erwarteten Ertrag **bis zum Ende dieses Zuges** (inkl. falls Freizeitpark -> Pasch Zweitwurf).
+    // TODO write function body
+    public static double immediateEV(GameState gs, int playerId, Project candidate, boolean forceUse2d6IfAvailable);
+
+    // TODO write function docs
+    // Erwarteter Netto-Ertrag des Käufers, bis alle anderen einmal dran waren (also bis zum eigenen nächsten Zug).
+    // - zählt, dass blaue Karten von anderen Spielern pro Runde mehrfach triggen (Anzahl Spieler relevant).
+    // - berücksichtigt GP-Effekte (Einkaufszentrum, Bahnhof etc.) und dass Gegner in der Simulation sinnvoll handeln.
+    // TODO write function body
+    public static double evPerRound(GameState gs, int playerId, Project candidate);
+
+    // TODO write function docs
+    // Return on Investment für Kauf von `candidate` über horizonTurns (z. B. N = 5) mit Discount factor.
+    // Gibt z.B. EV_total - cost und evPerTurn etc. zurück (als POJO/RankEntry).
+    // TODO write function body
+    public static RankEntry roiOverHorizon(GameState gs, int playerId, Project candidate, int horizonTurns, double discountFactor);
+
+    // TODO write function docs
+    // Schätzt Gewinnwahrscheinlichkeit bzw. relative Nutzendifferenz (z. B. Siegchance innerhalb M Zügen) wenn candidate gekauft wird.
+    // - kann Expectimax (optimal opponents) bis searchDepth nutzen oder Monte-Carlo (nSim simulations).
+    // TODO write function body
+    public static double estimateWinProbDelta(GameState gs, int playerId, Project candidate, int searchDepth, int mcSimulations);
+
+    // TODO write function docs
+    // Gibt sortiertes Ranking aller legalen Kaufoptionen zurück.
+    // RankEntry enthält: Project, immediateEV, evPerRound, roiOverHorizon (N), winProbDelta, variance, notes
+    // TODO write function body
+    public static ArrayList<RankEntry> rankPurchasableProjects(GameState gs, int playerId, RankingOptions opts);
 
 }

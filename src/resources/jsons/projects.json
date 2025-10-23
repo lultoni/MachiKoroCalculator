@@ -1,0 +1,154 @@
+{
+  "bahnhof": {
+    "category": "office",
+    "is_grossprojekt": true,
+    "cost": 4,
+    "dice_activation": [],
+    "color": "gelb",
+    "description": "Placeholder"
+  },
+  "einkaufszentrum": {
+    "category": "office",
+    "is_grossprojekt": true,
+    "cost": 10,
+    "dice_activation": [],
+    "color": "gelb",
+    "description": "Placeholder"
+  },
+  "freizeitpark": {
+    "category": "office",
+    "is_grossprojekt": true,
+    "cost": 16,
+    "dice_activation": [],
+    "color": "gelb",
+    "description": "Placeholder"
+  },
+  "funkturm": {
+    "category": "office",
+    "is_grossprojekt": true,
+    "cost": 22,
+    "dice_activation": [],
+    "color": "gelb",
+    "description": "Placeholder"
+  },
+  "weizenfeld": {
+    "category": "food",
+    "is_grossprojekt": false,
+    "cost": 1,
+    "dice_activation": [1],
+    "color": "blau",
+    "description": "Placeholder"
+  },
+  "bäckerei": {
+    "category": "store",
+    "is_grossprojekt": false,
+    "cost": 1,
+    "dice_activation": [2, 3],
+    "color": "grün",
+    "description": "Placeholder"
+  },
+  "apfelplantage": {
+    "category": "food",
+    "is_grossprojekt": false,
+    "cost": 3,
+    "dice_activation": [10],
+    "color": "blau",
+    "description": "Placeholder"
+  },
+  "bauernhof": {
+    "category": "animal",
+    "is_grossprojekt": false,
+    "cost": 1,
+    "dice_activation": [2],
+    "color": "blau",
+    "description": "Placeholder"
+  },
+  "wald": {
+    "category": "production",
+    "is_grossprojekt": false,
+    "cost": 3,
+    "dice_activation": [5],
+    "color": "blau",
+    "description": "Placeholder"
+  },
+  "bergwerk": {
+    "category": "production",
+    "is_grossprojekt": false,
+    "cost": 6,
+    "dice_activation": [9],
+    "color": "blau",
+    "description": "Placeholder"
+  },
+  "markthalle": {
+    "category": "market",
+    "is_grossprojekt": false,
+    "cost": 2,
+    "dice_activation": [11, 12],
+    "color": "grün",
+    "description": "Placeholder"
+  },
+  "molkerei": {
+    "category": "factory",
+    "is_grossprojekt": false,
+    "cost": 5,
+    "dice_activation": [7],
+    "color": "grün",
+    "description": "Placeholder"
+  },
+  "möbelfabrik": {
+    "category": "factory",
+    "is_grossprojekt": false,
+    "cost": 3,
+    "dice_activation": [8],
+    "color": "grün",
+    "description": "Placeholder"
+  },
+  "mini-markt": {
+    "category": "store",
+    "is_grossprojekt": false,
+    "cost": 2,
+    "dice_activation": [4],
+    "color": "grün",
+    "description": "Placeholder"
+  },
+  "familienrestaurant": {
+    "category": "cafe",
+    "is_grossprojekt": false,
+    "cost": 3,
+    "dice_activation": [9, 10],
+    "color": "rot",
+    "description": "Placeholder"
+  },
+  "café": {
+    "category": "cafe",
+    "is_grossprojekt": false,
+    "cost": 2,
+    "dice_activation": [3],
+    "color": "rot",
+    "description": "Placeholder"
+  },
+  "bürohaus": {
+    "category": "office",
+    "is_grossprojekt": false,
+    "cost": 8,
+    "dice_activation": [6],
+    "color": "lila",
+    "description": "Placeholder"
+  },
+  "stadion": {
+    "category": "office",
+    "is_grossprojekt": false,
+    "cost": 6,
+    "dice_activation": [6],
+    "color": "lila",
+    "description": "Placeholder"
+  },
+  "fernsehsender": {
+    "category": "office",
+    "is_grossprojekt": false,
+    "cost": 7,
+    "dice_activation": [6],
+    "color": "lila",
+    "description": "Placeholder"
+  }
+}

@@ -9,8 +9,9 @@ import java.awt.event.*;
 public class BootWindow extends JFrame {
 
     private static final int MIN_PLAYERS = 2;
-    private static final int MAX_PLAYERS = 4; // All 4 fields will be shown
+    private static final int MAX_PLAYERS = 4;
 
+    // These arrays are still useful for accessing fields later (like in getPlayerNames)
     private JTextField[] playerFields = new JTextField[MAX_PLAYERS];
     private JLabel[] numberLabels = new JLabel[MAX_PLAYERS];
     private JButton startButton;
@@ -32,30 +33,66 @@ public class BootWindow extends JFrame {
         JLabel titleLabel = new JLabel("Machi Koro Calculator");
         titleLabel.setFont(new Font("Arial", Font.BOLD, 30));
 
-        // Reworked subtitle to reflect that up to 4 players can be added
         JLabel subTitleLabel = new JLabel("Add player names (2 to 4 players) to start the game:");
         subTitleLabel.setFont(new Font("Arial", Font.ITALIC, 15));
 
         add(titleLabel, getGBC(0, 0, 2, 1));
         add(subTitleLabel, getGBC(0, 1, 2, 1));
 
-        // Create numbered labels + fields
-        for (int i = 0; i < MAX_PLAYERS; i++) {
-            JLabel numLabel = new JLabel((i + 1) + ".");
-            numLabel.setFont(new Font("Arial", Font.BOLD, 18));
-            // All labels are visible now
-            numberLabels[i] = numLabel;
-            add(numLabel, getGBC(0, 2 + i, 1, 1));
+        // --- Hardcoded creation of 4 numbered labels and text fields ---
 
-            JTextField field = getTextField(i);
-            // All fields are visible now
-            playerFields[i] = field;
-            add(field, getGBC(1, 2 + i, 1, 1));
-        }
+        // Player 1
+        int i = 0;
+        JLabel numLabel1 = new JLabel((i + 1) + ".");
+        numLabel1.setFont(new Font("Arial", Font.BOLD, 18));
+        numberLabels[i] = numLabel1;
+        add(numLabel1, getGBC(0, 2 + i, 1, 1));
+        JTextField field1 = new JTextField(20);
+        field1.setForeground(Color.BLACK);
+        field1.setToolTipText("Player 1's name");
+        playerFields[i] = field1;
+        add(field1, getGBC(1, 2 + i, 1, 1));
+
+        // Player 2
+        i = 1;
+        JLabel numLabel2 = new JLabel((i + 1) + ".");
+        numLabel2.setFont(new Font("Arial", Font.BOLD, 18));
+        numberLabels[i] = numLabel2;
+        add(numLabel2, getGBC(0, 2 + i, 1, 1));
+        JTextField field2 = new JTextField(20);
+        field2.setForeground(Color.BLACK);
+        field2.setToolTipText("Player 2's name");
+        playerFields[i] = field2;
+        add(field2, getGBC(1, 2 + i, 1, 1));
+
+        // Player 3
+        i = 2;
+        JLabel numLabel3 = new JLabel((i + 1) + ".");
+        numLabel3.setFont(new Font("Arial", Font.BOLD, 18));
+        numberLabels[i] = numLabel3;
+        add(numLabel3, getGBC(0, 2 + i, 1, 1));
+        JTextField field3 = new JTextField(20);
+        field3.setForeground(Color.BLACK);
+        field3.setToolTipText("Player 3's name (Optional)");
+        playerFields[i] = field3;
+        add(field3, getGBC(1, 2 + i, 1, 1));
+
+        // Player 4
+        i = 3;
+        JLabel numLabel4 = new JLabel((i + 1) + ".");
+        numLabel4.setFont(new Font("Arial", Font.BOLD, 18));
+        numberLabels[i] = numLabel4;
+        add(numLabel4, getGBC(0, 2 + i, 1, 1));
+        JTextField field4 = new JTextField(20);
+        field4.setForeground(Color.BLACK);
+        field4.setToolTipText("Player 4's name (Optional)");
+        playerFields[i] = field4;
+        add(field4, getGBC(1, 2 + i, 1, 1));
 
         // Start button
         startButton = new JButton("Start Game");
-        startButton.setEnabled(false);
+        // Start button is always enabled
+        startButton.setEnabled(true);
         startButton.addActionListener(e -> startGame());
         add(startButton, getGBC(0, 2 + MAX_PLAYERS, 2, 1));
 
@@ -65,90 +102,25 @@ public class BootWindow extends JFrame {
             if (playerFields[0] != null) {
                 playerFields[0].requestFocusInWindow();
             }
-            updateButtonState(); // run initial button logic
         });
     }
 
-    // --- Reworked getTextField(int i) ---
-    private JTextField getTextField(int i) {
-        JTextField field = new JTextField(20);
-        // Field is always visible
+    // --- getTextField method is removed as its logic is hardcoded in boot() ---
 
-        // Tooltip is kept but placeholder text and gray color are removed
-        field.setToolTipText("Player " + (i + 1) + "'s name (Optional, requires at least 2 players in total)");
-        field.setForeground(Color.BLACK); // Set text color to black by default
-
-        // Live updates when the document changes to manage button state
-        field.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
-            @Override public void insertUpdate(javax.swing.event.DocumentEvent e) { updateButtonState(); }
-            @Override public void removeUpdate(javax.swing.event.DocumentEvent e) { updateButtonState(); }
-            @Override public void changedUpdate(javax.swing.event.DocumentEvent e) { updateButtonState(); }
-        });
-
-        // Key handling: move focus on ENTER
-        field.addKeyListener(new KeyAdapter() {
-            @Override
-            public void keyPressed(KeyEvent e) {
-                if (e.getKeyCode() == KeyEvent.VK_ENTER) {
-                    if (e.isShiftDown()) {
-                        moveToPreviousField(i);
-                    } else {
-                        moveToNextField(i);
-                    }
-                }
-            }
-        });
-
-        return field;
-    }
-
-    // Simplified movement, no visibility changes or mandatory field checks needed
-    private void moveToNextField(int index) {
-        if (index + 1 < MAX_PLAYERS) {
-            playerFields[index + 1].requestFocus();
-            playerFields[index + 1].selectAll();
-        } else {
-            startButton.requestFocus();
-        }
-    }
-
-    private void moveToPreviousField(int index) {
-        if (index > 0) {
-            playerFields[index - 1].requestFocus();
-            playerFields[index - 1].selectAll();
-        }
-    }
-
-    /**
-     * Updates the Start Game button state based on the number of non-empty player fields.
-     */
-    private void updateButtonState() {
-        int filledCount = 0;
-        System.out.println("\nubs call");
-        for (JTextField f : playerFields) {
-            // Count non-empty fields
-            System.out.println(" - " + f.getText());
-            if (!f.getText().trim().isEmpty()) {
-                filledCount++;
-            }
-        }
-
-        // The button is enabled when the minimum number of players (2) is reached.
-        startButton.setEnabled(filledCount >= MIN_PLAYERS);
-        System.out.println("fc >= min_p | " + filledCount + " >= " + MIN_PLAYERS + " | res:" + (filledCount >= MIN_PLAYERS));
-        revalidate();
-        repaint();
-    }
-
-    // Removed isPlaceholder method as there are no placeholders
+    // --- updateButtonState method is removed as the button is always active ---
 
     private void startGame() {
-        // Here you might want to add a check for the player names validity (e.g., uniqueness)
-        // before setting boot_finished to true.
-        if (getPlayerNames().length >= MIN_PLAYERS) {
+        String[] names = getPlayerNames();
+
+        // Validation now happens on click
+        if (names.length >= MIN_PLAYERS) {
             Main.boot_finished = true;
         } else {
-            JOptionPane.showMessageDialog(this, "You need at least " + MIN_PLAYERS + " players to start the game!");
+            // Display message since the button is always clickable
+            JOptionPane.showMessageDialog(this,
+                    "You need at least " + MIN_PLAYERS + " players to start the game! Please fill in at least two player names.",
+                    "Cannot Start Game",
+                    JOptionPane.WARNING_MESSAGE);
         }
     }
 
@@ -169,7 +141,9 @@ public class BootWindow extends JFrame {
     public String[] getPlayerNames() {
         java.util.ArrayList<String> names = new java.util.ArrayList<>();
 
+        System.out.println("Names:");
         for (JTextField field : playerFields) {
+            System.out.println(" - " + field.getText());
             String text = field.getText().trim();
             // Only add non-empty fields
             if (!text.isEmpty()) {

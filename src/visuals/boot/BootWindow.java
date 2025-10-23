@@ -18,7 +18,6 @@ public class BootWindow extends JFrame {
 
     public BootWindow() {
         init();
-        boot();
     }
 
     private void init() {

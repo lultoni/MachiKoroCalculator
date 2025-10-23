@@ -1,5 +1,8 @@
 package Logic;
 
+import java.util.ArrayList;
+import java.util.stream.IntStream;
+
 public class ProbabilityCalc {
 
     /**
@@ -142,148 +145,113 @@ public class ProbabilityCalc {
     // TODO über einen zeitverlauf schauen, was dann am meisten return gibt
 
     /**
-     * Gibt eine Erwarte Werte-matrix zurück,
-     * welche für jeden Spieler und jede Projekt-Farbe
-     * eine Zeile mit allen Würfelzahlen zurück.
+     * Gibt eine Erwartungswert-Matrix zurück, welche für jeden Spieler und jede Projekt-Farbe
+     * eine Zeile mit allen Würfelzahlen enthält.
      * <p>
-     * Es wird nicht darauf geachtet, was dann echt an die Spieler gezahlt wird
-     * (wie sich die Coin-Anzahl real verändern wird (bei roten Projekten zum Beispiel relevant)).
-     * @param pl_p1 Projektliste vom 1. Spieler
-     * @param pl_p2 Projektliste vom 2. Spieler
-     * @param pl_p3 Projektliste vom 3. Spieler
-     * @param pl_p4 Projektliste vom 4. Spieler
-     * @param p_c Münzanzahlen von allen Spielern
-     * @return Zeile 1-4 sind blaue Projekte,<p>
-     * Zeile 5-8 sind rote Projekte,<p>
-     * Zeile 9-12 sind grüne Projekte und<p>
-     * Zeile 13-16 sind lila Projekte.
+     * Es wird nicht darauf geachtet, was dann tatsächlich an die Spieler gezahlt wird
+     * (wie sich die Coin-Anzahl real verändert, z.B. bei roten Projekten relevant).
+     *
+     * @param playerProjects Eine Liste der Projektlisten aller Spieler (2–4 Spieler).
+     * @param playerCoins    Münzanzahlen der Spieler.
+     * @return Eine 16x12-Matrix:<p>
+     *         Zeilen 1–4: blaue Projekte,<p>
+     *         Zeilen 5–8: rote Projekte,<p>
+     *         Zeilen 9–12: grüne Projekte,<p>
+     *         Zeilen 13–16: lila Projekte.
      */
-    public static int[][] values_per_r_per_p(Project[] pl_p1, Project[] pl_p2, Project[] pl_p3, Project[] pl_p4, int[] p_c) {
-        // TODO, make for every player amount versions
-        // TODO make easier to maintain and scale
-        int[][] value_matrix = new int[16][12];
-
-        boolean p1_eb = false;
-        int p1_f_c = 0;
-        int p1_a_c = 0;
-        int p1_p_c = 0;
-
-        boolean p2_eb = false;
-        int p2_f_c = 0;
-        int p2_a_c = 0;
-        int p2_p_c = 0;
-
-        boolean p3_eb = false;
-        int p3_f_c = 0;
-        int p3_a_c = 0;
-        int p3_p_c = 0;
-
-        boolean p4_eb = false;
-        int p4_f_c = 0;
-        int p4_a_c = 0;
-        int p4_p_c = 0;
-
-        for (int pl_index = 0; pl_index < pl_p1.length; pl_index++) {
-            Project p = pl_p1[pl_index];
-            if (p.id == 1) p1_eb = true;
-            if (p.category == Category.ANIMAL) p1_a_c++;
-            if (p.category == Category.PRODUCTION) p1_p_c++;
-            if (p.category == Category.FOOD) p1_f_c++;
+    public static int[][] values_per_r_per_p(ArrayList<Project[]> playerProjects, int[] playerCoins) {
+        if (playerProjects == null || playerProjects.size() < 2 || playerProjects.size() > 4) {
+            throw new IllegalArgumentException("Player count must be between 2 and 4.");
         }
 
-        for (int pl_index = 0; pl_index < pl_p2.length; pl_index++) {
-            Project p = pl_p2[pl_index];
-            if (p.id == 1) p2_eb = true;
-            if (p.category == Category.ANIMAL) p2_a_c++;
-            if (p.category == Category.PRODUCTION) p2_p_c++;
-            if (p.category == Category.FOOD) p2_f_c++;
+        final int PROJECT_COLORS = 4;   // blue, red, green, purple
+        final int ROWS_PER_COLOR = 4;   // max players
+        final int ROLL_COUNT = 12;      // dice values
+
+        int[][] valueMatrix = new int[PROJECT_COLORS * ROWS_PER_COLOR][ROLL_COUNT];
+
+        ArrayList<PlayerStats> playerStats = new ArrayList<>();
+        for (Project[] projects : playerProjects) {
+            playerStats.add(calculatePlayerStats(projects));
         }
 
-        for (int pl_index = 0; pl_index < pl_p3.length; pl_index++) {
-            Project p = pl_p3[pl_index];
-            if (p.id == 1) p3_eb = true;
-            if (p.category == Category.ANIMAL) p3_a_c++;
-            if (p.category == Category.PRODUCTION) p3_p_c++;
-            if (p.category == Category.FOOD) p3_f_c++;
-        }
+        for (int playerIndex = 0; playerIndex < playerProjects.size(); playerIndex++) {
+            Project[] projects = playerProjects.get(playerIndex);
+            PlayerStats stats = playerStats.get(playerIndex);
+            int ownCoins = playerCoins[playerIndex];
+            int[] otherCoins = getOtherPlayerCoins(playerCoins, playerIndex);
 
-        for (int pl_index = 0; pl_index < pl_p4.length; pl_index++) {
-            Project p = pl_p4[pl_index];
-            if (p.id == 1) p4_eb = true;
-            if (p.category == Category.ANIMAL) p4_a_c++;
-            if (p.category == Category.PRODUCTION) p4_p_c++;
-            if (p.category == Category.FOOD) p4_f_c++;
-        }
+            for (Project project : projects) {
+                int ownCount = project.getOwnCount();
+                if (ownCount == 0) continue;
 
-        // Player 1 Section
-        // go through pl_p1
-        // go through r 1-12
-        // per project (defines in which row of val matrix the num goes) and r (defines col of val mat) call get_I
-        for (int pl_index = 0; pl_index < pl_p1.length; pl_index++) {
-            Project p = pl_p1[pl_index];
-            int oc = p.getOwnCount();
-            if (oc == 0) continue;
-            int vm_row = (get_project_color(p.getID()) - 1) * 4;
-            if (vm_row >= 16) {
-                System.out.println("vm_row out of bounds, p1, vm_row=" + vm_row + ", p=" + p.name);
-                vm_row = 0;
-            }
+                int projectColorIndex = get_project_color(project.getID()) - 1;
+                int vmRow = projectColorIndex * ROWS_PER_COLOR + playerIndex;
 
-            for (int r = 1; r <= 12; r++) {
-                for (int i = 0; i < oc; i++) value_matrix[vm_row][r - 1] += get_I(r, p.id, true, p1_eb, p1_f_c, p1_a_c, p1_p_c, p_c[0], new int[]{p_c[1], p_c[2], p_c[3]});
+                if (vmRow >= valueMatrix.length) {
+                    System.out.printf("vm_row out of bounds for player %d, project=%s%n", playerIndex + 1, project.name);
+                    continue;
+                }
+
+                for (int roll = 1; roll <= ROLL_COUNT; roll++) {
+                    int increment = get_I(
+                            roll,
+                            project.id,
+                            true,
+                            stats.has_einkaufszentrum_built,
+                            stats.foodCount,
+                            stats.animalCount,
+                            stats.productionCount,
+                            ownCoins,
+                            otherCoins
+                    ) * ownCount;
+
+                    valueMatrix[vmRow][roll - 1] += increment;
+                }
             }
         }
 
-        // Player 2 Section
-        for (int pl_index = 0; pl_index < pl_p2.length; pl_index++) {
-            Project p = pl_p2[pl_index];
-            int oc = p.getOwnCount();
-            if (oc == 0) continue;
-            int vm_row = (get_project_color(p.getID()) - 1) * 4 + 1;
-            if (vm_row >= 16) {
-                System.out.println("vm_row out of bounds, p2, vm_row=" + vm_row + ", p=" + p.name);
-                vm_row = 0;
-            }
-
-            for (int r = 1; r <= 12; r++) {
-                for (int i = 0; i < oc; i++) value_matrix[vm_row][r - 1] += get_I(r, p.id, true, p2_eb, p2_f_c, p2_a_c, p2_p_c, p_c[1], new int[]{p_c[0], p_c[2], p_c[3]});
-            }
-        }
-
-        // Player 3 Section
-        for (int pl_index = 0; pl_index < pl_p3.length; pl_index++) {
-            Project p = pl_p3[pl_index];
-            int oc = p.getOwnCount();
-            if (oc == 0) continue;
-            int vm_row = (get_project_color(p.getID()) - 1) * 4 + 2;
-            if (vm_row >= 16) {
-                System.out.println("vm_row out of bounds, p3, vm_row=" + vm_row + ", p=" + p.name);
-                vm_row = 0;
-            }
-
-            for (int r = 1; r <= 12; r++) {
-                for (int i = 0; i < oc; i++) value_matrix[vm_row][r - 1] += get_I(r, p.id, true, p3_eb, p3_f_c, p3_a_c, p3_p_c, p_c[2], new int[]{p_c[0], p_c[1], p_c[3]});
-            }
-        }
-
-        // Player 4 Section
-        for (int pl_index = 0; pl_index < pl_p4.length; pl_index++) {
-            Project p = pl_p4[pl_index];
-            int oc = p.getOwnCount();
-            if (oc == 0) continue;
-            int vm_row = (get_project_color(p.getID()) - 1) * 4 + 3;
-            if (vm_row >= 16) {
-                System.out.println("vm_row out of bounds, p4, vm_row=" + vm_row + ", p=" + p.name);
-                vm_row = 0;
-            }
-
-            for (int r = 1; r <= 12; r++) {
-                for (int i = 0; i < oc; i++) value_matrix[vm_row][r - 1] += get_I(r, p.id, true, p4_eb, p4_f_c, p4_a_c, p4_p_c, p_c[3], new int[]{p_c[0], p_c[1], p_c[2]});
-            }
-        }
-
-        return value_matrix;
+        return valueMatrix;
     }
+
+    /**
+     * Hilfsfunktion zur Berechnung der Spielerstatistiken.
+     */
+    private static PlayerStats calculatePlayerStats(Project[] projects) {
+        PlayerStats stats = new PlayerStats();
+
+        for (Project project : projects) {
+            if (project.id == 1) stats.has_einkaufszentrum_built = true;
+            switch (project.category) {
+                case FOOD -> stats.foodCount++;
+                case ANIMAL -> stats.animalCount++;
+                case PRODUCTION -> stats.productionCount++;
+            }
+        }
+
+        return stats;
+    }
+
+    /**
+     * (Hilfsmethode) Gibt die Münzanzahlen der anderen Spieler zurück.
+     */
+    private static int[] getOtherPlayerCoins(int[] playerCoins, int excludeIndex) {
+        return IntStream.range(0, playerCoins.length)
+                .filter(i -> i != excludeIndex)
+                .map(i -> playerCoins[i])
+                .toArray();
+    }
+
+    /**
+     * (Hilfsklasse) Container für Spieler-bezogene Zählwerte.
+     */
+    private static class PlayerStats {
+        boolean has_einkaufszentrum_built = false;
+        int foodCount = 0;
+        int animalCount = 0;
+        int productionCount = 0;
+    }
+
 
     /**
      * @param project_id ID von dem Projekt

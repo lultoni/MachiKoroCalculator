@@ -1,17 +1,33 @@
 package logic;
 
-import visuals.GameWindow;
+import visuals.boot.BootWindow;
+import visuals.game.GameWindow;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 
 public class Main {
 
+    public static boolean boot_finished = false;
+
     public static void main (String[] args) {
 
-        // TODO create a boot window that lets you define player names and order
+        BootWindow bootWindow = new BootWindow();
+        bootWindow.boot();
 
-        Game game = new Game(2); // TODO change this to the selected from boot window
+        while (!boot_finished) Thread.onSpinWait();
+
+        Game game = new Game(bootWindow.getPlayerNames().length);
+
+        // TODO add in a new game window, which has better usability and information splitting.
+        //      This should have different tabs for each player where you can basically play
+        //      the game and also have a screen to see the optimal building for the current player.
+        //      You have a screen/mode where you put in the actions of the active player
+        //      and the system then on "turn done" does these actions and shows the possible actions
+        //      for the next player (so the same dynamic screen, but for a dif player).
+        //      From this screen you can also get to the probability calc quickly (and back),
+        //      which automatically runs in the background, but is not fully or directly shown.
+
         GameWindow gameWindow = new GameWindow(game); // TODO add in new params with player names
         // gameWindow.boot();
 

@@ -1,4 +1,4 @@
-package visuals;
+package visuals.game;
 
 import logic.Game;
 import logic.Player;

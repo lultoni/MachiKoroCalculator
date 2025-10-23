@@ -9,7 +9,7 @@ import java.awt.event.*;
 public class BootWindow extends JFrame {
 
     private static final int MIN_PLAYERS = 2;
-    private static final int MAX_PLAYERS = 4;
+    private static final int MAX_PLAYERS = 4; // All 4 fields will be shown
 
     private JTextField[] playerFields = new JTextField[MAX_PLAYERS];
     private JLabel[] numberLabels = new JLabel[MAX_PLAYERS];
@@ -32,7 +32,8 @@ public class BootWindow extends JFrame {
         JLabel titleLabel = new JLabel("Machi Koro Calculator");
         titleLabel.setFont(new Font("Arial", Font.BOLD, 30));
 
-        JLabel subTitleLabel = new JLabel("Add player names to start the game:");
+        // Reworked subtitle to reflect that up to 4 players can be added
+        JLabel subTitleLabel = new JLabel("Add player names (2 to 4 players) to start the game:");
         subTitleLabel.setFont(new Font("Arial", Font.ITALIC, 15));
 
         add(titleLabel, getGBC(0, 0, 2, 1));
@@ -42,12 +43,12 @@ public class BootWindow extends JFrame {
         for (int i = 0; i < MAX_PLAYERS; i++) {
             JLabel numLabel = new JLabel((i + 1) + ".");
             numLabel.setFont(new Font("Arial", Font.BOLD, 18));
-            numLabel.setVisible(i == 0);
+            // All labels are visible now
             numberLabels[i] = numLabel;
             add(numLabel, getGBC(0, 2 + i, 1, 1));
 
             JTextField field = getTextField(i);
-
+            // All fields are visible now
             playerFields[i] = field;
             add(field, getGBC(1, 2 + i, 1, 1));
         }
@@ -61,66 +62,38 @@ public class BootWindow extends JFrame {
         setVisible(true);
 
         SwingUtilities.invokeLater(() -> {
-            // Fordert den Fokus für das erste Feld an.
-            // Der FocusListener (in getTextField) kümmert sich um das Löschen des Textes.
             if (playerFields[0] != null) {
                 playerFields[0].requestFocusInWindow();
-                // Die redundante Logik wurde entfernt.
             }
-            updateVisibilityAndButton(); // run initial visibility logic
+            updateButtonState(); // run initial button logic
         });
     }
 
-    // --- replace your getTextField(int i) with this ---
+    // --- Reworked getTextField(int i) ---
     private JTextField getTextField(int i) {
         JTextField field = new JTextField(20);
-        field.setVisible(i == 0);
-        String placeholder = "Please type in Player " + (i + 1) + "'s name...";
-        field.setToolTipText(placeholder);
-        field.setText(placeholder);
-        field.setForeground(Color.GRAY);
+        // Field is always visible
 
-        int index = i;
+        // Tooltip is kept but placeholder text and gray color are removed
+        field.setToolTipText("Player " + (i + 1) + "'s name (Optional, requires at least 2 players in total)");
+        field.setForeground(Color.BLACK); // Set text color to black by default
 
-        // Focus handling: clear placeholder when focus gained
-        field.addFocusListener(new FocusAdapter() {
-            @Override
-            public void focusGained(FocusEvent e) {
-                // Wir verwenden die Original-Logik: Text löschen bei Fokus.
-                if (isPlaceholder(field)) {
-                    field.setText("");
-                    field.setForeground(Color.BLACK);
-                }
-            }
-
-            @Override
-            public void focusLost(FocusEvent e) {
-                if (field.getText().trim().isEmpty()) {
-                    field.setText(placeholder);
-                    field.setForeground(Color.GRAY);
-                }
-            }
-        });
-
-        // Live updates when the document changes
+        // Live updates when the document changes to manage button state
         field.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
-            @Override public void insertUpdate(javax.swing.event.DocumentEvent e) { updateVisibilityAndButton(); }
-            @Override public void removeUpdate(javax.swing.event.DocumentEvent e) { updateVisibilityAndButton(); }
-            @Override public void changedUpdate(javax.swing.event.DocumentEvent e) { updateVisibilityAndButton(); }
+            @Override public void insertUpdate(javax.swing.event.DocumentEvent e) { updateButtonState(); }
+            @Override public void removeUpdate(javax.swing.event.DocumentEvent e) { updateButtonState(); }
+            @Override public void changedUpdate(javax.swing.event.DocumentEvent e) { updateButtonState(); }
         });
 
-        // Key handling:
+        // Key handling: move focus on ENTER
         field.addKeyListener(new KeyAdapter() {
             @Override
             public void keyPressed(KeyEvent e) {
-                // Die Logik zum Löschen des Platzhalters wurde entfernt,
-                // da focusGained() dies bereits erledigt hat.
-
                 if (e.getKeyCode() == KeyEvent.VK_ENTER) {
                     if (e.isShiftDown()) {
-                        moveToPreviousField(index);
+                        moveToPreviousField(i);
                     } else {
-                        moveToNextField(index);
+                        moveToNextField(i);
                     }
                 }
             }
@@ -129,19 +102,9 @@ public class BootWindow extends JFrame {
         return field;
     }
 
+    // Simplified movement, no visibility changes or mandatory field checks needed
     private void moveToNextField(int index) {
-        JTextField current = playerFields[index];
-        if (isPlaceholder(current) || current.getText().trim().isEmpty()) {
-            JOptionPane.showMessageDialog(this, "Please enter Player " + (index + 1) + " name first!");
-            current.requestFocus();
-            return;
-        }
-
         if (index + 1 < MAX_PLAYERS) {
-            playerFields[index + 1].setVisible(true);
-            numberLabels[index + 1].setVisible(true);
-            revalidate();
-            repaint();
             playerFields[index + 1].requestFocus();
             playerFields[index + 1].selectAll();
         } else {
@@ -156,55 +119,37 @@ public class BootWindow extends JFrame {
         }
     }
 
-    private void updateVisibilityAndButton() {
-        // 1. Sichtbarkeit festlegen. Ein Feld ist nur sichtbar, wenn das *vorherige* gefüllt ist.
-        // P1 ist immer sichtbar.
-        for (int i = 1; i < MAX_PLAYERS; i++) {
-            JTextField prev = playerFields[i-1];
-
-            // Wenn das vorherige Feld gültig ist, zeige dieses Feld an
-            if (!isPlaceholder(prev) && !prev.getText().trim().isEmpty()) {
-                playerFields[i].setVisible(true);
-                numberLabels[i].setVisible(true);
-            } else {
-                // Wenn das vorherige Feld leer ist, verstecke dieses und alle folgenden Felder
-                for (int j = i; j < MAX_PLAYERS; j++) {
-                    playerFields[j].setVisible(false);
-                    numberLabels[j].setVisible(false);
-                }
-                break; // Die Schleife für die Sichtbarkeit kann beendet werden
-            }
-        }
-
-        // 2. Zähle die gefüllten Felder UND prüfe, ob alle *sichtbaren* Felder gefüllt sind.
+    /**
+     * Updates the Start Game button state based on the number of non-empty player fields.
+     */
+    private void updateButtonState() {
         int filledCount = 0;
-        boolean allVisibleFilled = true;
-        for (int i = 0; i < MAX_PLAYERS; i++) {
-            JTextField f = playerFields[i];
-            if (f.isVisible()) {
-                if (!isPlaceholder(f) && !f.getText().trim().isEmpty()) {
-                    filledCount++;
-                } else {
-                    // Dieses Feld ist sichtbar, aber leer (oder Platzhalter)
-                    allVisibleFilled = false;
-                }
+        System.out.println("\nubs call");
+        for (JTextField f : playerFields) {
+            // Count non-empty fields
+            System.out.println(" - " + f.getText());
+            if (!f.getText().trim().isEmpty()) {
+                filledCount++;
             }
         }
 
-        // 3. Button-Status setzen.
-        // Der Button ist aktiv, wenn die Mindestspielerzahl erreicht ist
-        // UND alle Felder, die wir sehen, auch ausgefüllt sind.
-        startButton.setEnabled(filledCount >= MIN_PLAYERS && allVisibleFilled);
+        // The button is enabled when the minimum number of players (2) is reached.
+        startButton.setEnabled(filledCount >= MIN_PLAYERS);
+        System.out.println("fc >= min_p | " + filledCount + " >= " + MIN_PLAYERS + " | res:" + (filledCount >= MIN_PLAYERS));
         revalidate();
         repaint();
     }
 
-    private boolean isPlaceholder(JTextField field) {
-        return field.getForeground().equals(Color.GRAY);
-    }
+    // Removed isPlaceholder method as there are no placeholders
 
     private void startGame() {
-        Main.boot_finished = true;
+        // Here you might want to add a check for the player names validity (e.g., uniqueness)
+        // before setting boot_finished to true.
+        if (getPlayerNames().length >= MIN_PLAYERS) {
+            Main.boot_finished = true;
+        } else {
+            JOptionPane.showMessageDialog(this, "You need at least " + MIN_PLAYERS + " players to start the game!");
+        }
     }
 
     private GridBagConstraints getGBC(int gridx, int gridy, int gridwidth, int gridheight) {
@@ -226,8 +171,8 @@ public class BootWindow extends JFrame {
 
         for (JTextField field : playerFields) {
             String text = field.getText().trim();
-            // Skip placeholder text or empty fields
-            if (!text.isEmpty() && !isPlaceholder(field)) {
+            // Only add non-empty fields
+            if (!text.isEmpty()) {
                 names.add(text);
             }
         }

@@ -30,7 +30,7 @@ public class Main {
         //      which automatically runs in the background, but is not fully or directly shown.
 
         GameWindow gameWindow = new GameWindow(game); // TODO add in new params with player names
-        // gameWindow.boot();
+        gameWindow.boot();
 
         ArrayList<Project[]> player_projects = new ArrayList<>();
         int[] player_coins = new int[game.getPlayers().length];

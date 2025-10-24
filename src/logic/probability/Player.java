@@ -29,4 +29,9 @@ public class Player {
     public ArrayList<Project> getOwned_projects() {
         return owned_projects;
     }
+
+    public boolean hasProject(String project_id) {
+        for (Project project: getOwned_projects()) if (project.getId().equals(project_id)) return true;
+        return false;
+    }
 }

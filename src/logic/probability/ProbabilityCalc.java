@@ -39,15 +39,15 @@ public class ProbabilityCalc {
      * @param p_id Die ID von dem Projekt
      * @param oop Ist der Nutzer der Besitzer des Projekts
      * @param eb Ist das Einkaufszentrum für den Besitzer gebaut
-     * @param f Projekte des Nutzers mit der Kategorie FOOD
-     * @param a Projekte des Nutzers mit der Kategorie ANIMAL
-     * @param p Projekte des Nutzers mit der Kategorie PRODUCTION
+     * @param f_c Projekte des Nutzers mit der Kategorie FOOD
+     * @param a_c Projekte des Nutzers mit der Kategorie ANIMAL
+     * @param p_c Projekte des Nutzers mit der Kategorie PRODUCTION
      * @param c Münzen die der Nutzer besitzt
      * @param co Münzen der Gegner des Nutzers
      * @return Auszahlung (positiv) oder Einzahlung (negativ) von einem Projekt für den Nutzer bei den Parametern bei
      * einer bestimmten Würfelzahl.
      */
-    public static int get_I(int r, String p_id, boolean oop, boolean eb, int f, int a, int p, int c, int[] co) {
+    public static int get_I(int r, String p_id, boolean oop, boolean eb, int f_c, int a_c, int p_c, int c, int[] co) {
         switch (p_id) {
             case "weizenfeld" -> {
                 if (r != 1) return 0;
@@ -65,17 +65,17 @@ public class ProbabilityCalc {
             case "markthalle" -> {
                 if (r != 11 && r != 12) return 0;
                 if (!oop) return 0;
-                return f * 2;
+                return f_c * 2;
             }
             case "molkerei" -> {
                 if (r != 7) return 0;
                 if (!oop) return 0;
-                return a * 3;
+                return a_c * 3;
             }
             case "möbelfabrik" -> {
                 if (r != 8) return 0;
                 if (!oop) return 0;
-                return p * 3;
+                return p_c * 3;
             }
             case "mini-markt" -> {
                 if (r != 4) return 0;
@@ -259,12 +259,62 @@ public class ProbabilityCalc {
         return -1;
     }
 
-    // TODO write function docs
+    // TODO where does the risk P(netIncome <= 0) get into play?
+
     // Erwarteter Wert (Münzen) *sofort* für den Käufer, wenn er das Project kauft und danach seinen aktuellen Zug beendet.
     // - berücksichtigt: 1d6/2d6-Option (wenn Bahnhof vorhanden wählbar), Einkaufszentrum-Effekt (über get_I),
     // - berechnet erwarteten Ertrag **bis zum Ende dieses Zuges** (inkl. falls Freizeitpark -> Pasch Zweitwurf).
-    // TODO write function body
-    public static double immediateEV(GameState gs, int playerId, Project candidate, boolean forceUse2d6IfAvailable);
+    // - rot wird nur in zügen von anderen spielern aktiviert
+    // - blau kann hier, als auch in den zügen aller anderen aktiviert werden
+    /**
+     * Diese Methode sagt aus, was der beste EV ist für einen bestimmten Spieler, nachdem ein Projekt gekauft werden würde.
+     * @param gs State, in welchem sich das Spiel gerade befindet
+     * @param playerIndex Index des Spielers in der Liste aller Spieler vom gs
+     * @param candidate Projekt, auf welches sich als 'gekauft' bezogen wird
+     * @param returnAfterCost Ob die Kosten des Projektes mit in den EV einberechnet werden sollen
+     * @return Bester Erwartungswert (EV) nach kauf des Projektes (mit 1d6/2d6 und GP Effekten in Betracht)
+     */
+    public static double immediateEV(GameState gs, int playerIndex, Project candidate, boolean returnAfterCost) {
+        GameState state = gs.copy();
+        Player player = state.getPlayers()[playerIndex];
+        player.getOwned_projects().add(candidate); // simulate buy
+        boolean hasBahnhof = player.hasProject("bahnhof");
+        boolean hasGPFreizeit = player.hasProject("freizeitpark");
+        boolean hasFunkturm = player.hasProject("funkturm");
+        boolean hasEinkaufszentrum = player.hasProject("einkaufszentrum");
+
+        double evTotal = 0.0;
+        if (!hasBahnhof) {
+            // only 1d6
+            for (int d = 1; d <= 6; d++) {
+                double p = get_P1(d);
+                int net = computeNetGainForRoll(state, playerIndex, d, /*isOrderedPair*/false);
+                evTotal += p * net;
+            }
+        } else {
+            // choose best between 1d6 and 2d6
+            double ev1 = 0.0;
+            for (int d=1; d<=6; d++){ ev1 += get_P1(d)*computeNetGainForRoll(state, playerIndex, d, false); }
+            double ev2 = 0.0;
+            for (int d1=1; d1<=6; d1++) {
+                for (int d2=1; d2<=6; d2++) {
+                    double p = 1.0/36.0;
+                    int sum = d1 + d2;
+                    int net = computeNetGainForRoll(state, playerIndex, sum, true); // true because we know pair
+                    ev2 += p * net;
+                    if (hasGPFreizeit && d1==d2) {
+                        // second roll EV (no double chaining)
+                        double evSecond = bestSecondRollEV(state, playerIndex, hasFunkturm ? 2 : -1); // if Funkturm forces same dice count
+                        ev2 += p * evSecond;
+                    }
+                }
+            }
+            evTotal = Math.max(ev1, ev2);
+        }
+
+        if (returnAfterCost) return evTotal - candidate.getCost();
+        return evTotal;
+    }
 
     // TODO write function docs
     // Erwarteter Netto-Ertrag des Käufers, bis alle anderen einmal dran waren (also bis zum eigenen nächsten Zug).
@@ -282,6 +332,8 @@ public class ProbabilityCalc {
     // TODO write function docs
     // Schätzt Gewinnwahrscheinlichkeit bzw. relative Nutzendifferenz (z. B. Siegchance innerhalb M Zügen) wenn candidate gekauft wird.
     // - kann Expectimax (optimal opponents) bis searchDepth nutzen oder Monte-Carlo (nSim simulations).
+    // - (freizeitpark) hier muss auf pasch geguckt werden auch (weil nicht jede zb 2d6 = 6 auch ein pasch ist) (es kann aber nur ein pasch passieren, nicht mehr)
+    // - (funkturm) falls erneut gewürfelt werden soll, muss gute logik dafür drin sein und auch muss mit der gleich würfelanzahl dann nochmal gewürfelt werden
     // TODO write function body
     public static double estimateWinProbDelta(GameState gs, int playerId, Project candidate, int searchDepth, int mcSimulations);
 

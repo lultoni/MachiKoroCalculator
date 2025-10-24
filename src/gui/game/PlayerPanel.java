@@ -1,4 +1,4 @@
-package visuals.game;
+package gui.game;
 
 import logic.Game;
 import logic.Player;

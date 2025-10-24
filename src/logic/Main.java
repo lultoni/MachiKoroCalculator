@@ -1,11 +1,9 @@
 package logic;
 
-import logic.probability.ProbabilityCalc;
-import visuals.boot.BootWindow;
-import visuals.game.GameWindow;
+import gui.boot.BootWindow;
+import gui.game.GameWindow;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 
 public class Main {
 

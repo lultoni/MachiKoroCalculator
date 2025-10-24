@@ -1,10 +1,9 @@
-package visuals.boot;
+package gui.boot;
 
 import logic.Main;
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.*;
 
 public class BootWindow extends JFrame {
 

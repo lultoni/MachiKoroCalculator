@@ -127,7 +127,7 @@ See `ARCHITECTURE.md §2.8` for the current approximation details.
 ### 1. Dual-Dice EV Loops (4–5 near-identical blocks)
 **Priority: High** · *ProbabilityCalc.java*
 
-- [ ] `immediateEV`, `bestSecondRollEV`, `computeNetGainForRoll`, and `computeOpponentTurnGainForRoll` all contain a loop of the form `for (int r = 0; r <= 12; r++) { double prob = hasBahnhof ? P2[r] : P1[r]; ... }`. Extract a `weightedRollSum(boolean useTwoDice, IntToDoubleFunction payoutFn)` helper (or similar) so the loop is written once.
+- [x] `immediateEV`, `bestSecondRollEV`, `computeNetGainForRoll`, and `computeOpponentTurnGainForRoll` all contained a loop of the form `for (int r = 0; r <= 12; r++) { double prob = hasBahnhof ? P2[r] : P1[r]; ... }`. Extracted `weightedRollEV(boolean use2d6, IntToDoubleFunction payoutFn)` and `bestDiceEV(boolean hasBahnhof, IntToDoubleFunction payoutFn)` helpers — the loop is now written once. *(ProbabilityCalc.java)*
 
 ### 2. `buildOpponentCoins` / `buildOtherCoins` — Identical Methods
 **Priority: High** · *MainWindow.java (×2 or SnapshotDialog.java)*

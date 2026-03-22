@@ -3,6 +3,7 @@ package logic.probability;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.IntToDoubleFunction;
 import java.util.stream.IntStream;
 
 /**
@@ -335,6 +336,49 @@ public class ProbabilityCalc {
     }
 
     // -------------------------------------------------------------------------
+    // Dice-roll EV helpers — eliminate repeated 1d6/2d6 loop boilerplate
+    // -------------------------------------------------------------------------
+
+    /**
+     * Returns the weighted sum {@code Σ P(r) × payoutFn(r)} over all possible rolls.
+     *
+     * @param use2d6    if true, uses 2d6 probabilities (P2, rolls 2–12);
+     *                  if false, uses 1d6 probabilities (P1, rolls 1–6)
+     * @param payoutFn  maps a roll result to a payout value (may return 0)
+     * @return expected payout over the roll distribution
+     */
+    private static double weightedRollEV(boolean use2d6, IntToDoubleFunction payoutFn) {
+        double ev = 0.0;
+        if (use2d6) {
+            for (int d1 = 1; d1 <= 6; d1++) {
+                for (int d2 = 1; d2 <= 6; d2++) {
+                    ev += (1.0 / 36.0) * payoutFn.applyAsDouble(d1 + d2);
+                }
+            }
+        } else {
+            for (int d = 1; d <= 6; d++) {
+                ev += P1[d] * payoutFn.applyAsDouble(d);
+            }
+        }
+        return ev;
+    }
+
+    /**
+     * Returns the expected payout for the player's best dice choice on their own turn.
+     * If the player has Bahnhof, computes both 1d6 and 2d6 EVs and returns the max.
+     * Otherwise returns the 1d6 EV.
+     *
+     * @param hasBahnhof true if the player owns Bahnhof
+     * @param payoutFn   maps a roll result to a payout value
+     * @return EV under the optimal dice choice
+     */
+    private static double bestDiceEV(boolean hasBahnhof, IntToDoubleFunction payoutFn) {
+        double ev1 = weightedRollEV(false, payoutFn);
+        if (!hasBahnhof) return ev1;
+        return Math.max(ev1, weightedRollEV(true, payoutFn));
+    }
+
+    // -------------------------------------------------------------------------
     // computeOpponentTurnGainForRoll
     // -------------------------------------------------------------------------
 
@@ -412,24 +456,13 @@ public class ProbabilityCalc {
      */
     private static double bestSecondRollEV(GameState state, int playerIndex, int forcedDiceCount) {
         boolean hasBahnhof = state.getPlayers()[playerIndex].hasProject("bahnhof");
+        // Second roll never chains (isDoubles=false)
+        IntToDoubleFunction payout = r -> computeNetGainForRoll(state, playerIndex, r, false);
 
-        double ev1 = 0.0;
-        for (int d = 1; d <= 6; d++) {
-            // isDoubles=false: second roll never chains
-            ev1 += P1[d] * computeNetGainForRoll(state, playerIndex, d, false);
-        }
-
-        double ev2 = 0.0;
-        for (int d1 = 1; d1 <= 6; d1++) {
-            for (int d2 = 1; d2 <= 6; d2++) {
-                ev2 += (1.0 / 36.0) * computeNetGainForRoll(state, playerIndex, d1 + d2, false);
-            }
-        }
-
-        if (forcedDiceCount == 1) return ev1;
-        if (forcedDiceCount == 2) return ev2;
+        if (forcedDiceCount == 1) return weightedRollEV(false, payout);
+        if (forcedDiceCount == 2) return weightedRollEV(true, payout);
         // forcedDiceCount == -1: player chooses freely (needs Bahnhof)
-        return hasBahnhof ? Math.max(ev1, ev2) : ev1;
+        return hasBahnhof ? bestDiceEV(true, payout) : weightedRollEV(false, payout);
     }
 
     // -------------------------------------------------------------------------
@@ -462,17 +495,9 @@ public class ProbabilityCalc {
         double evTotal;
 
         if (!hasBahnhof) {
-            // Only 1d6
-            evTotal = 0.0;
-            for (int d = 1; d <= 6; d++) {
-                evTotal += P1[d] * computeNetGainForRoll(state, playerIndex, d, false);
-            }
+            evTotal = weightedRollEV(false, r -> computeNetGainForRoll(state, playerIndex, r, false));
         } else {
-            // Choose best of 1d6 vs 2d6
-            double ev1 = 0.0;
-            for (int d = 1; d <= 6; d++) {
-                ev1 += P1[d] * computeNetGainForRoll(state, playerIndex, d, false);
-            }
+            double ev1 = weightedRollEV(false, r -> computeNetGainForRoll(state, playerIndex, r, false));
 
             double ev2 = 0.0;
             for (int d1 = 1; d1 <= 6; d1++) {
@@ -482,7 +507,6 @@ public class ProbabilityCalc {
                     int net = computeNetGainForRoll(state, playerIndex, d1 + d2, isDoubles);
                     ev2 += p * net;
                     if (hasFreizeitpark && isDoubles) {
-                        // Second roll EV; Funkturm forces same dice count (2) if present
                         int forcedDice = hasFunkturm ? 2 : -1;
                         ev2 += p * bestSecondRollEV(state, playerIndex, forcedDice);
                     }
@@ -531,17 +555,12 @@ public class ProbabilityCalc {
         // Own turn: blue + green + purple + red costs paid
         boolean hasBahnhof = state.getPlayers()[playerIndex].hasProject("bahnhof");
         if (!hasBahnhof) {
-            for (int d = 1; d <= 6; d++) {
-                total += P1[d] * computeNetGainForRoll(state, playerIndex, d, false);
-            }
+            total += weightedRollEV(false, r -> computeNetGainForRoll(state, playerIndex, r, false));
         } else {
-            double ev1 = 0.0;
-            for (int d = 1; d <= 6; d++) {
-                ev1 += P1[d] * computeNetGainForRoll(state, playerIndex, d, false);
-            }
-            double ev2 = 0.0;
+            double ev1 = weightedRollEV(false, r -> computeNetGainForRoll(state, playerIndex, r, false));
             boolean hasFreizeitpark = state.getPlayers()[playerIndex].hasProject("freizeitpark");
             boolean hasFunkturm    = state.getPlayers()[playerIndex].hasProject("funkturm");
+            double ev2 = 0.0;
             for (int d1 = 1; d1 <= 6; d1++) {
                 for (int d2 = 1; d2 <= 6; d2++) {
                     double p = 1.0 / 36.0;
@@ -560,28 +579,10 @@ public class ProbabilityCalc {
             if (opponentIdx == playerIndex) continue;
 
             // Assume opponents roll 1d6 unless they have Bahnhof (best case: they use 2d6 optimally).
-            // For EV purposes, use their actual dice mode.
             boolean opponentHasBahnhof = state.getPlayers()[opponentIdx].hasProject("bahnhof");
-
-            if (!opponentHasBahnhof) {
-                for (int d = 1; d <= 6; d++) {
-                    total += P1[d] * computeOpponentTurnGainForRoll(state, playerIndex, opponentIdx, d);
-                }
-            } else {
-                // Opponent chooses best dice option; we compute EV of each and take max
-                double oppEv1 = 0.0;
-                for (int d = 1; d <= 6; d++) {
-                    oppEv1 += P1[d] * computeOpponentTurnGainForRoll(state, playerIndex, opponentIdx, d);
-                }
-                double oppEv2 = 0.0;
-                for (int d1 = 1; d1 <= 6; d1++) {
-                    for (int d2 = 1; d2 <= 6; d2++) {
-                        oppEv2 += (1.0 / 36.0) * computeOpponentTurnGainForRoll(
-                                state, playerIndex, opponentIdx, d1 + d2);
-                    }
-                }
-                total += Math.max(oppEv1, oppEv2);
-            }
+            final int oppIdx = opponentIdx;
+            total += bestDiceEV(opponentHasBahnhof,
+                    r -> computeOpponentTurnGainForRoll(state, playerIndex, oppIdx, r));
         }
 
         return total;
@@ -650,16 +651,10 @@ public class ProbabilityCalc {
         if (!hasBahnhof) {
             return computeVariance1d6(state, playerIndex);
         } else {
-            double var1 = computeVariance1d6(state, playerIndex);
-            double var2 = computeVariance2d6(state, playerIndex);
             // Return variance of the dice choice that yields higher EV
-            double ev1 = 0.0, ev2 = 0.0;
-            for (int d = 1; d <= 6; d++)
-                ev1 += P1[d] * computeNetGainForRoll(state, playerIndex, d, false);
-            for (int d1 = 1; d1 <= 6; d1++)
-                for (int d2 = 1; d2 <= 6; d2++)
-                    ev2 += (1.0 / 36.0) * computeNetGainForRoll(state, playerIndex, d1 + d2, false);
-            return ev1 >= ev2 ? var1 : var2;
+            IntToDoubleFunction payout = r -> computeNetGainForRoll(state, playerIndex, r, false);
+            boolean use2d6 = weightedRollEV(true, payout) > weightedRollEV(false, payout);
+            return use2d6 ? computeVariance2d6(state, playerIndex) : computeVariance1d6(state, playerIndex);
         }
     }
 
@@ -689,37 +684,10 @@ public class ProbabilityCalc {
     /** P(earn 0 coins on own turn). */
     private static double computeProbNoIncomeOwnTurn(GameState state, int playerIndex) {
         boolean hasBahnhof = state.getPlayers()[playerIndex].hasProject("bahnhof");
-        double probZero = 0.0;
+        IntToDoubleFunction payout = r -> computeNetGainForRoll(state, playerIndex, r, false);
 
-        if (!hasBahnhof) {
-            for (int d = 1; d <= 6; d++) {
-                if (computeNetGainForRoll(state, playerIndex, d, false) == 0) probZero += P1[d];
-            }
-        } else {
-            // Under 2d6 (assume player picks the higher-EV option)
-            boolean use2d6 = false;
-            double ev1 = 0.0, ev2 = 0.0;
-            for (int d = 1; d <= 6; d++)
-                ev1 += P1[d] * computeNetGainForRoll(state, playerIndex, d, false);
-            for (int d1 = 1; d1 <= 6; d1++)
-                for (int d2 = 1; d2 <= 6; d2++)
-                    ev2 += (1.0 / 36.0) * computeNetGainForRoll(state, playerIndex, d1 + d2, false);
-            use2d6 = ev2 > ev1;
-
-            if (!use2d6) {
-                for (int d = 1; d <= 6; d++) {
-                    if (computeNetGainForRoll(state, playerIndex, d, false) == 0) probZero += P1[d];
-                }
-            } else {
-                for (int d1 = 1; d1 <= 6; d1++) {
-                    for (int d2 = 1; d2 <= 6; d2++) {
-                        if (computeNetGainForRoll(state, playerIndex, d1 + d2, false) == 0)
-                            probZero += 1.0 / 36.0;
-                    }
-                }
-            }
-        }
-        return probZero;
+        boolean use2d6 = hasBahnhof && weightedRollEV(true, payout) > weightedRollEV(false, payout);
+        return weightedRollEV(use2d6, r -> payout.applyAsDouble(r) == 0 ? 1.0 : 0.0);
     }
 
     /**
@@ -734,20 +702,9 @@ public class ProbabilityCalc {
         for (int oppIdx = 0; oppIdx < n; oppIdx++) {
             if (oppIdx == playerIndex) continue;
             boolean oppHasBahnhof = state.getPlayers()[oppIdx].hasProject("bahnhof");
-            double probZeroOppTurn = 0.0;
-            if (!oppHasBahnhof) {
-                for (int d = 1; d <= 6; d++) {
-                    if (computeOpponentTurnGainForRoll(state, playerIndex, oppIdx, d) == 0)
-                        probZeroOppTurn += P1[d];
-                }
-            } else {
-                for (int d1 = 1; d1 <= 6; d1++) {
-                    for (int d2 = 1; d2 <= 6; d2++) {
-                        if (computeOpponentTurnGainForRoll(state, playerIndex, oppIdx, d1 + d2) == 0)
-                            probZeroOppTurn += 1.0 / 36.0;
-                    }
-                }
-            }
+            final int oi = oppIdx;
+            double probZeroOppTurn = weightedRollEV(oppHasBahnhof,
+                    r -> computeOpponentTurnGainForRoll(state, playerIndex, oi, r) == 0 ? 1.0 : 0.0);
             prob *= probZeroOppTurn;
         }
         return prob;

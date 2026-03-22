@@ -4,6 +4,21 @@ All phases of the original implementation plan are complete. This file records w
 
 ---
 
+## Code Deduplication: weightedRollEV helper for dual-dice loops
+
+**Goal:** Eliminate 4–5 near-identical `for (int d = 1; d <= 6; d++) P1[d] * fn(d)` / `for (d1, d2 = 1..6) (1/36) * fn(d1+d2)` loops scattered across `ProbabilityCalc`.
+
+**What was done:**
+
+- Added `weightedRollEV(boolean use2d6, IntToDoubleFunction payoutFn)` — the single canonical dice-weighted sum. When `use2d6=false` it sums over 1d6 (rolls 1–6, uniform 1/6); when `true` it sums over 2d6 (all (d1,d2) pairs, weight 1/36). The loop is written exactly once.
+- Added `bestDiceEV(boolean hasBahnhof, IntToDoubleFunction payoutFn)` — computes 1d6 EV and, if `hasBahnhof`, returns `max(ev1, ev2)`, eliminating the repeated "if hasBahnhof compute both and take max" pattern.
+- Refactored: `bestSecondRollEV`, `immediateEV` (1d6-only branch), `evPerRound` (own-turn and all opponent-turn loops), `computeVarianceOwnTurn` (ev1/ev2 comparison), `computeProbNoIncomeOwnTurn`, `computeProbNoIncomeRound`.
+- Added `import java.util.function.IntToDoubleFunction`.
+
+**Tests:** 142/142 pass (no behaviour change).
+
+---
+
 ## Game-Over Detection
 
 **Goal:** When a player buys their 4th landmark in a live session, flag the session as finished and show a win screen instead of continuing to prompt for more turns.

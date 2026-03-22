@@ -48,6 +48,7 @@ public class RuntimeTester {
         test_buerohaus_ev_positive_when_opponents_have_good_cards();
         test_buerohaus_ev_zero_when_no_opponents_own_cards();
         test_buerohaus_swap_note_set_in_ranking();
+        test_buerohaus_swap_executed_in_simulator();
 
         System.out.println("\n=== Phase 5 Monte Carlo Tests ===\n");
         test_simulator_returns_valid_winner();
@@ -518,6 +519,27 @@ public class RuntimeTester {
         assertTrue("bürohaus notes mentions 'Swap'",
                 buerohausEntry != null && buerohausEntry.notes != null
                         && buerohausEntry.notes.contains("Swap"));
+    }
+
+    private static void test_buerohaus_swap_executed_in_simulator() {
+        // P0 owns bürohaus + weizenfeld (low EV); P1 owns bergwerk (high EV).
+        // executeBürohausSwap should swap weizenfeld → P1, bergwerk → P0.
+        GameStateBuilder b = new GameStateBuilder(2);
+        b.setPlayerName(0, "P0").setCoins(0, 5)
+         .addProject(0, "bürohaus").addProject(0, "weizenfeld");
+        b.setPlayerName(1, "P1").setCoins(1, 5).addProject(1, "bergwerk");
+        GameState gs = b.build();
+
+        ProbabilityCalc.executeBürohausSwap(gs, 0);
+
+        assertTrue("P0 now owns bergwerk after swap", gs.getPlayers()[0].hasProject("bergwerk"));
+        assertTrue("P0 no longer owns weizenfeld after swap",
+                !gs.getPlayers()[0].hasProject("weizenfeld"));
+        assertTrue("P1 now owns weizenfeld after swap", gs.getPlayers()[1].hasProject("weizenfeld"));
+        assertTrue("P1 no longer owns bergwerk after swap",
+                !gs.getPlayers()[1].hasProject("bergwerk"));
+        // Bürohaus itself must remain with P0
+        assertTrue("P0 still owns bürohaus after swap", gs.getPlayers()[0].hasProject("bürohaus"));
     }
 
     // =========================================================================

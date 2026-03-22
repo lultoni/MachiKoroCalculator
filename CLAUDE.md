@@ -153,6 +153,7 @@ The codebase is now a single active layer with no legacy code.
 - `computeNetGainForRoll` / `computeOpponentTurnGainForRoll` — per-roll coin delta for active player and passive player respectively.
 - `bürohausSwapEV(GameState, int)` — private helper that approximates the coin-equivalent EV of a bürohaus card-swap: `max(0, bestOppCardEV − worstOwnCardEV)` using `singleCardEvPerRound`.
 - `bürohausSwapNote(GameState, int)` — package-visible helper that returns a human-readable swap recommendation string (e.g. "Swap your Weizenfeld for P1's Bergwerk"), or `null` if no beneficial swap. Used to populate `RankEntry.notes` in `rankPurchasableProjects`.
+- `executeBürohausSwap(GameState, int)` — public helper that mutates `state` by performing the optimal swap: removes the active player's lowest-EV non-landmark and replaces it with the highest-EV non-landmark from any opponent. Called by `GameSimulator.applyRoll()` on roll=6 when the active player owns bürohaus.
 - `bestSecondRollEV` — EV of best re-roll after Freizeitpark doubles.
 - `immediateEV` — own-turn EV including Bahnhof/Freizeitpark/Funkturm.
 - `evPerRound` — full-round EV (own turn + N−1 opponent turns, blue and red cards).

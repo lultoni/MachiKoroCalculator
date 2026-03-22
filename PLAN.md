@@ -82,7 +82,7 @@ See `ARCHITECTURE.md §2.8` for the current approximation details.
 ### 3. GameSimulator — Bürohaus Not Executed
 **Priority: Low**
 
-- [ ] In `applyRoll()`, detect if active player owns bürohaus and roll was 6; execute swap of lowest-EV own card for highest-EV opponent card. *(GameSimulator.java)*
+- [x] In `applyRoll()`, detect if active player owns bürohaus and roll was 6; execute swap of lowest-EV own card for highest-EV opponent card via `ProbabilityCalc.executeBürohausSwap(GameState, int)`. *(GameSimulator.java, ProbabilityCalc.java)*
 
 ### 4. `evPerRound` — Static Coin Count
 **Priority: Medium**

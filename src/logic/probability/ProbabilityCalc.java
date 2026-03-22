@@ -952,6 +952,55 @@ public class ProbabilityCalc {
     }
 
     /**
+     * Executes the optimal bürohaus card swap in-place on {@code state}.
+     * Removes the active player's lowest-EV non-landmark establishment and gives it to
+     * the opponent who owns the highest-EV non-landmark establishment; that card moves
+     * to the active player. If no beneficial swap exists the state is unchanged.
+     *
+     * <p>Called by {@link GameSimulator} when the active player owns bürohaus and rolls 6.
+     *
+     * @param state       game state to mutate
+     * @param playerIndex the active player
+     */
+    public static void executeBürohausSwap(GameState state, int playerIndex) {
+        Player active = state.getPlayers()[playerIndex];
+        int n = state.getPlayers().length;
+
+        // Find the active player's worst non-landmark (excluding bürohaus itself)
+        Project worstOwn = null;
+        double worstEV = Double.MAX_VALUE;
+        for (Project p : active.getOwned_projects()) {
+            if (!p.isIs_grossprojekt() && !p.getId().equals("bürohaus")) {
+                double ev = singleCardEvPerRound(p, n);
+                if (ev < worstEV) { worstEV = ev; worstOwn = p; }
+            }
+        }
+
+        // Find the best non-landmark card any opponent owns
+        Project bestOpp = null;
+        double bestOppEV = 0.0;
+        int bestOppPlayer = -1;
+        for (int i = 0; i < n; i++) {
+            if (i == playerIndex) continue;
+            for (Project p : state.getPlayers()[i].getOwned_projects()) {
+                if (!p.isIs_grossprojekt()) {
+                    double ev = singleCardEvPerRound(p, n);
+                    if (ev > bestOppEV) { bestOppEV = ev; bestOpp = p; bestOppPlayer = i; }
+                }
+            }
+        }
+
+        if (bestOpp == null || worstOwn == null || bestOppEV <= worstEV) return;
+
+        // Execute the swap
+        Player opponent = state.getPlayers()[bestOppPlayer];
+        active.getOwned_projects().remove(worstOwn);
+        opponent.getOwned_projects().remove(bestOpp);
+        active.getOwned_projects().add(bestOpp);
+        opponent.getOwned_projects().add(worstOwn);
+    }
+
+    /**
      * Numerically stable softmax: returns the probability for index {@code i}.
      * Uses max-subtraction to prevent overflow.
      */

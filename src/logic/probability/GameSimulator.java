@@ -173,7 +173,8 @@ public class GameSimulator {
     // -------------------------------------------------------------------------
 
     /**
-     * Applies the coin effects of {@code roll} to all players.
+     * Applies the coin effects of {@code roll} to all players, then executes any
+     * bürohaus card-swap if the active player owns bürohaus and rolled exactly 6.
      * Uses {@link ProbabilityCalc#computeAllDeltasForRoll} to resolve all deltas
      * in the correct order: red card payments counter-clockwise first, then
      * blue/green/purple income.
@@ -183,6 +184,10 @@ public class GameSimulator {
         int[] deltas = ProbabilityCalc.computeAllDeltasForRoll(state, activePlayer, roll);
         for (int i = 0; i < players.length; i++) {
             players[i].setCoins(Math.max(0, players[i].getCoins() + deltas[i]));
+        }
+        // Bürohaus: on roll 6, active player swaps their worst card for the best opponent card.
+        if (roll == 6 && players[activePlayer].hasProject("bürohaus")) {
+            ProbabilityCalc.executeBürohausSwap(state, activePlayer);
         }
     }
 

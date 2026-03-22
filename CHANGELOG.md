@@ -4,7 +4,22 @@ All phases of the original implementation plan are complete. This file records w
 
 ---
 
-## Bürohaus Buy Advice in UI
+## Bürohaus swap executed in GameSimulator
+
+**Goal:** Monte Carlo simulations now correctly model bürohaus card-swaps, making win-probability estimates for bürohaus more accurate.
+
+**What was done:**
+
+- Added `ProbabilityCalc.executeBürohausSwap(GameState, int)` (public) — mutates `state` by removing the active player's lowest-EV non-landmark and adding the highest-EV non-landmark from the wealthiest opponent (same heuristic as `bürohausSwapEV`). No-ops if no beneficial swap exists.
+- `GameSimulator.applyRoll()` now calls `executeBürohausSwap` immediately after applying coin deltas when `roll == 6` and the active player owns bürohaus.
+- The `GameSimulator` Javadoc for `applyRoll` is updated to document the bürohaus behaviour.
+
+**Tests:** 150/150 pass. Five new tests in `test_buerohaus_swap_executed_in_simulator`:
+- P0 owns bürohaus + weizenfeld; P1 owns bergwerk. After `executeBürohausSwap`: P0 has bergwerk, P1 has weizenfeld, bürohaus stays with P0.
+
+---
+
+
 
 **Goal:** When bürohaus is the top recommended purchase, show actionable swap advice in the center panel: "Swap your [X] for [opponent]'s [Y]".
 

@@ -47,6 +47,7 @@ public class RuntimeTester {
         System.out.println("\n=== Phase 6 Bürohaus Tests ===\n");
         test_buerohaus_ev_positive_when_opponents_have_good_cards();
         test_buerohaus_ev_zero_when_no_opponents_own_cards();
+        test_buerohaus_swap_note_set_in_ranking();
 
         System.out.println("\n=== Phase 5 Monte Carlo Tests ===\n");
         test_simulator_returns_valid_winner();
@@ -494,6 +495,29 @@ public class RuntimeTester {
         // We're just asserting the bürohaus ADDITION is ≥ 0 (no negative swap penalty).
         assertTrue("bürohaus evPerRound ≥ 0 even when no opponents own cards (was " + ev + ")",
                 ev >= 0.0);
+    }
+
+    private static void test_buerohaus_swap_note_set_in_ranking() {
+        // When bürohaus is affordable and opponents own better cards,
+        // the RankEntry.notes should contain the swap advice string.
+        GameStateBuilder b = new GameStateBuilder(2);
+        b.setPlayerName(0, "P0").setCoins(0, 10).addProject(0, "weizenfeld");
+        b.setPlayerName(1, "P1").setCoins(1, 5).addProject(1, "bergwerk");
+        GameState gs = b.build();
+
+        RankingOptions opts = new RankingOptions();
+        ArrayList<RankEntry> ranking = ProbabilityCalc.rankPurchasableProjects(gs, 0, opts);
+
+        RankEntry buerohausEntry = null;
+        for (RankEntry e : ranking) {
+            if ("bürohaus".equals(e.project.getId())) { buerohausEntry = e; break; }
+        }
+        assertTrue("bürohaus appears in ranking when affordable", buerohausEntry != null);
+        assertTrue("bürohaus notes non-null when beneficial swap exists",
+                buerohausEntry != null && buerohausEntry.notes != null);
+        assertTrue("bürohaus notes mentions 'Swap'",
+                buerohausEntry != null && buerohausEntry.notes != null
+                        && buerohausEntry.notes.contains("Swap"));
     }
 
     // =========================================================================

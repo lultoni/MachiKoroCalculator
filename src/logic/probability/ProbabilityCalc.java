@@ -899,6 +899,59 @@ public class ProbabilityCalc {
     }
 
     /**
+     * Returns a human-readable description of the best bürohaus swap, or {@code null} if
+     * no beneficial swap exists (no opponent cards, or the player's worst card is already
+     * better than any opponent card).
+     *
+     * <p>Example: {@code "Swap your Weizenfeld for P2's Bergwerk"}.
+     *
+     * @param state       game state with bürohaus already in the active player's owned list
+     * @param playerIndex the active player
+     * @return swap description, or {@code null} if no swap is beneficial
+     */
+    static String bürohausSwapNote(GameState state, int playerIndex) {
+        Player active = state.getPlayers()[playerIndex];
+        int n = state.getPlayers().length;
+
+        // Find the player's worst non-landmark card (excluding bürohaus)
+        Project worstOwn = null;
+        double worstEV = Double.MAX_VALUE;
+        for (Project p : active.getOwned_projects()) {
+            if (!p.isIs_grossprojekt() && !p.getId().equals("bürohaus")) {
+                double ev = singleCardEvPerRound(p, n);
+                if (ev < worstEV) { worstEV = ev; worstOwn = p; }
+            }
+        }
+
+        // Find the best non-landmark card owned by any opponent
+        Project bestOpp = null;
+        double bestOppEV = 0.0;
+        int bestOppPlayer = -1;
+        for (int i = 0; i < n; i++) {
+            if (i == playerIndex) continue;
+            for (Project p : state.getPlayers()[i].getOwned_projects()) {
+                if (!p.isIs_grossprojekt()) {
+                    double ev = singleCardEvPerRound(p, n);
+                    if (ev > bestOppEV) { bestOppEV = ev; bestOpp = p; bestOppPlayer = i; }
+                }
+            }
+        }
+
+        if (bestOpp == null || worstOwn == null) return null;
+        if (bestOppEV <= worstEV) return null; // no beneficial swap
+
+        String oppName = state.getPlayers()[bestOppPlayer].getName();
+        return "Swap your " + capitalize(worstOwn.getId())
+                + " for " + oppName + "'s " + capitalize(bestOpp.getId());
+    }
+
+    /** Capitalizes the first character of a string. */
+    private static String capitalize(String s) {
+        if (s == null || s.isEmpty()) return s;
+        return Character.toUpperCase(s.charAt(0)) + s.substring(1);
+    }
+
+    /**
      * Numerically stable softmax: returns the probability for index {@code i}.
      * Uses max-subtraction to prevent overflow.
      */
@@ -954,6 +1007,13 @@ public class ProbabilityCalc {
 
             RankEntry entry = roiOverHorizon(gs, playerIndex, candidate,
                     opts.horizonTurns, opts.discountFactor);
+
+            // Bürohaus: populate notes with actionable swap advice
+            if ("bürohaus".equals(candidate.getId())) {
+                GameState stateWithBuerohaus = gs.copy();
+                stateWithBuerohaus.getPlayers()[playerIndex].getOwned_projects().add(candidate);
+                entry.notes = bürohausSwapNote(stateWithBuerohaus, playerIndex);
+            }
 
             if (opts.includeWinProbDelta) {
                 if (opts.mcSimulations > 0) {

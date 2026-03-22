@@ -540,6 +540,7 @@ public class MainWindow extends JFrame {
     // =========================================================================
 
     private String buildNote(RankEntry e) {
+        if (e.notes != null && !e.notes.isEmpty()) return e.notes;
         String name = UIUtils.capitalize(e.project.getId());
         if (e.roiOverHorizon > 0) {
             return name + ": " + fmt2(e.evPerRound) + " coins/round, ROI " + fmt2(e.roiOverHorizon);

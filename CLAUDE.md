@@ -152,6 +152,7 @@ The codebase is now a single active layer with no legacy code.
 - `get_I(r, p_id, oop, eb, f_c, a_c, p_c, c, co)` — coin income/cost for a single project on a given roll. All 19 base-game cards implemented. `bürohaus` returns 0 here; its swap EV is handled separately in `immediateEV` via `bürohausSwapEV()`.
 - `computeNetGainForRoll` / `computeOpponentTurnGainForRoll` — per-roll coin delta for active player and passive player respectively.
 - `bürohausSwapEV(GameState, int)` — private helper that approximates the coin-equivalent EV of a bürohaus card-swap: `max(0, bestOppCardEV − worstOwnCardEV)` using `singleCardEvPerRound`.
+- `bürohausSwapNote(GameState, int)` — package-visible helper that returns a human-readable swap recommendation string (e.g. "Swap your Weizenfeld for P1's Bergwerk"), or `null` if no beneficial swap. Used to populate `RankEntry.notes` in `rankPurchasableProjects`.
 - `bestSecondRollEV` — EV of best re-roll after Freizeitpark doubles.
 - `immediateEV` — own-turn EV including Bahnhof/Freizeitpark/Funkturm.
 - `evPerRound` — full-round EV (own turn + N−1 opponent turns, blue and red cards).

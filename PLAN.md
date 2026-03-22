@@ -106,7 +106,7 @@ See `ARCHITECTURE.md §2.8` for the current approximation details.
 ### 2. Bürohaus Buy Advice in UI
 **Priority: Medium**
 
-- [ ] When bürohaus is the top recommendation, show actionable advice: "Swap your [worst card] for [opponent]'s [best card]". Add a `notes` string to the `RankEntry` in `rankPurchasableProjects` (or a new helper) and display it in `MainWindow.populateCenter()`. *(ProbabilityCalc.java, MainWindow.java)*
+- [x] When bürohaus is the top recommendation, show actionable advice: "Swap your [worst card] for [opponent]'s [best card]". Added `bürohausSwapNote(GameState, int)` to `ProbabilityCalc`; `rankPurchasableProjects` populates `RankEntry.notes`; `MainWindow.buildNote()` shows `entry.notes` when present. *(ProbabilityCalc.java, MainWindow.java)*
 
 ### 3. Snapshot Dialog Validation Feedback
 **Priority: Medium**

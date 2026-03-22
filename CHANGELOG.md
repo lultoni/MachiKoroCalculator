@@ -4,6 +4,22 @@ All phases of the original implementation plan are complete. This file records w
 
 ---
 
+## Bürohaus Buy Advice in UI
+
+**Goal:** When bürohaus is the top recommended purchase, show actionable swap advice in the center panel: "Swap your [X] for [opponent]'s [Y]".
+
+**What was done:**
+
+- Added `bürohausSwapNote(GameState, int)` to `ProbabilityCalc` (package-visible) — finds the player's worst non-landmark card and the best non-landmark card owned by any opponent, returns a human-readable string like "Swap your Weizenfeld for P1's Bergwerk", or `null` if no beneficial swap exists.
+- `rankPurchasableProjects` now populates `RankEntry.notes` for bürohaus candidates by calling `bürohausSwapNote` on a state copy with the candidate added.
+- `MainWindow.buildNote()` now checks `entry.notes != null` first and shows it when present, falling back to the generic ROI message otherwise.
+- Added private `capitalize(String)` helper to `ProbabilityCalc` (same logic as `UIUtils.capitalize`; kept local to avoid cross-layer dependency).
+
+**Tests:** 145/145 pass. Three new tests added:
+- `test_buerohaus_swap_note_set_in_ranking`: bürohaus appears in ranking with `notes` containing "Swap".
+
+---
+
 ## Code Deduplication: weightedRollEV helper for dual-dice loops
 
 **Goal:** Eliminate 4–5 near-identical `for (int d = 1; d <= 6; d++) P1[d] * fn(d)` / `for (d1, d2 = 1..6) (1/36) * fn(d1+d2)` loops scattered across `ProbabilityCalc`.

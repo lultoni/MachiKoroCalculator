@@ -21,7 +21,10 @@ A decision-support tool for the base game of Machi Koro. Given the current game 
 javac -cp "src:gson-2.11.0.jar" -d out $(find src -name "*.java")
 
 # Run
-java -cp "out:gson-2.11.0.jar" logic.Main
+java -cp "out:src:gson-2.11.0.jar" logic.Main
+
+# Tests
+java -cp "out:src:gson-2.11.0.jar" Tests.RuntimeTester
 ```
 
 ## Project Structure

@@ -1,5 +1,8 @@
 package logic.probability;
 
+import java.util.Arrays;
+import java.util.Objects;
+
 public class Project {
 
     private final String id;
@@ -47,5 +50,24 @@ public class Project {
 
     public String getDescription() {
         return description;
+    }
+
+    /** Two projects are equal iff their ids are equal. */
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof Project)) return false;
+        return Objects.equals(id, ((Project) o).id);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(id);
+    }
+
+    @Override
+    public String toString() {
+        return "Project{id='" + id + "', color='" + color + "', cost=" + cost
+                + ", dice=" + Arrays.toString(dice_activation) + "}";
     }
 }

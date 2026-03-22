@@ -21,13 +21,15 @@ javac -cp "src:gson-2.11.0.jar" -d out $(find src -name "*.java")
 
 **Run main app:**
 ```bash
-java -cp "out:gson-2.11.0.jar" logic.Main
+java -cp "out:src:gson-2.11.0.jar" logic.Main
 ```
 
-**Run runtime tester:**
+**Run tests / runtime tester:**
 ```bash
-java -cp "out:gson-2.11.0.jar" Tests.RuntimeTester
+java -cp "out:src:gson-2.11.0.jar" Tests.RuntimeTester
 ```
+
+Note: `src` must be on the runtime classpath so `ClassLoader.getResourceAsStream` can locate `resources/jsons/projects.json`.
 
 Dependency: `gson-2.11.0.jar` (bundled in repo root). No other build tooling.
 
@@ -115,12 +117,13 @@ There are **two separate, incompatible implementations** of the game model:
 - `gui.*` — Swing-based UI (BootWindow, GameWindow, etc.) wired to the legacy model.
 
 **New probability layer (`src/logic/probability/`)** — the active development target:
-- `probability.Project` — immutable POJO loaded from JSON (id, category, color, cost, dice_activation, is_grossprojekt).
-- `probability.Player` — name, coins, `ArrayList<Project> owned_projects`, `hasProject(id)`.
-- `probability.GameState` — holds `Player[]` + `ArrayList<Project> unbuilt_projects`, has deep `copy()`.
-- `probability.ProjectLoader` — loads a single `Project` from `src/resources/jsons/projects.json` via Gson.
+- `probability.Project` — immutable POJO (id, category, color, cost, dice_activation, is_grossprojekt). Has `equals`/`hashCode` on `id` and `toString`. Id field is injected from the JSON key by `ProjectLoader`.
+- `probability.Player` — name, coins, `ArrayList<Project> owned_projects`. Constructor validates `coins >= 0`. Has `copy()` (shallow-copies the list — safe because `Project` is immutable).
+- `probability.GameState` — holds `Player[]` + `ArrayList<Project> unbuilt_projects`. Constructor validates 2–4 players, no nulls. `copy()` uses `Player.copy()` + `new ArrayList<>()`. `GameState.initial(numPlayers)` builds the standard starting state (each player: Weizenfeld + Bäckerei, 3 coins; 17 cards in unbuilt pool).
+- `probability.ProjectLoader` — static cache (`Map<String, Project>`) built once at class load from classpath. `getProject(id)` returns `Optional<Project>`. `getAllProjects()` returns a new `ArrayList` of all 19 projects. **`src/` must be on the runtime classpath** for resource loading to work.
 - `probability.ProbabilityCalc` — the core math class (see below).
 - `probability.RankEntry` — result POJO for rankings.
+- `probability.RankingOptions` — options for `rankPurchasableProjects` (horizonTurns, discountFactor, mcSimulations, includeWinProbDelta).
 
 ### ProbabilityCalc — what's done vs. what's TODO
 

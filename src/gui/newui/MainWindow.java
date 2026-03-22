@@ -508,7 +508,7 @@ public class MainWindow extends JFrame {
 
     private void populateCenter(RankEntry entry) {
         Project p = entry.project;
-        topCardName.setText(capitalize(p.getId()));
+        topCardName.setText(UIUtils.capitalize(p.getId()));
         topCardCost.setText("Cost: " + p.getCost() + " coin" + (p.getCost() != 1 ? "s" : ""));
         topCardEV.setText("EV / round:    " + fmt2(entry.evPerRound));
         topCardROI.setText("ROI (10 turns): " + fmt2(entry.roiOverHorizon));
@@ -547,7 +547,7 @@ public class MainWindow extends JFrame {
     // =========================================================================
 
     private String buildNote(RankEntry e) {
-        String name = capitalize(e.project.getId());
+        String name = UIUtils.capitalize(e.project.getId());
         if (e.roiOverHorizon > 0) {
             return name + ": " + fmt2(e.evPerRound) + " coins/round, ROI " + fmt2(e.roiOverHorizon);
         }
@@ -558,13 +558,8 @@ public class MainWindow extends JFrame {
         return String.format("%.2f", v);
     }
 
-    private static String capitalize(String s) {
-        if (s == null || s.isEmpty()) return s;
-        return Character.toUpperCase(s.charAt(0)) + s.substring(1);
-    }
-
     private static String labelForProject(Project p) {
-        return capitalize(p.getId()) + " (" + p.getCost() + ")";
+        return UIUtils.capitalize(p.getId()) + " (" + p.getCost() + ")";
     }
 
     /** Extracts the project ID from a combo label like "Weizenfeld (1)" or "Bahnhof (4) [GP]" */

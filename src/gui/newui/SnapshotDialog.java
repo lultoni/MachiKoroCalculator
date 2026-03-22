@@ -107,7 +107,7 @@ public class SnapshotDialog extends JDialog {
             for (int j = 0; j < allProjects.size(); j++) {
                 Project p = allProjects.get(j);
                 if (!p.getColor().equals(color)) continue;
-                JCheckBox cb = new JCheckBox(capitalize(p.getId()) + " (" + p.getCost() + ")");
+                JCheckBox cb = new JCheckBox(UIUtils.capitalize(p.getId()) + " (" + p.getCost() + ")");
                 cb.setFont(new Font("Arial", Font.PLAIN, 11));
                 projectChecks[playerIndex][j] = cb;
                 // Purple cards are unique — only one player may own each copy.
@@ -197,11 +197,6 @@ public class SnapshotDialog extends JDialog {
             case "gelb" -> "Gelb (Großprojekte)";
             default     -> color;
         };
-    }
-
-    private static String capitalize(String s) {
-        if (s == null || s.isEmpty()) return s;
-        return Character.toUpperCase(s.charAt(0)) + s.substring(1);
     }
 
     /**

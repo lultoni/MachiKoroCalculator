@@ -162,7 +162,7 @@ See `ARCHITECTURE.md §2.8` for the current approximation details.
 ### 8. `capitalize()` — Identical 4-Line Method
 **Priority: Low** · *MainWindow.java, SnapshotDialog.java*
 
-- [ ] Both files define an identical `capitalize(String s)` helper. Move to a shared `UIUtils` class (or inline if only called once each).
+- [x] Both files defined an identical `capitalize(String s)` helper. Moved to `UIUtils.capitalize()` in a new `gui.newui.UIUtils` class; both callers updated. *(UIUtils.java, MainWindow.java, SnapshotDialog.java)*
 
 ### 9. Color Label Construction
 **Priority: Low** · *MainWindow.java, SnapshotDialog.java*

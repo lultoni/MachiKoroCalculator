@@ -312,6 +312,70 @@ class CardIncome {
     }
 
     // -------------------------------------------------------------------------
+    // playerEvPerRound — synergy-aware per-round EV for softmax scoring
+    // -------------------------------------------------------------------------
+
+    /**
+     * Estimates the expected coin income per full round for {@code player}, accounting for
+     * their actual card synergies (Einkaufszentrum bonuses, category multipliers, opponent
+     * coin counts for purple cards).
+     *
+     * <p>This is used by the softmax win-probability scorer ({@link WinProbabilityCalc#computeScores})
+     * in place of the isolated {@link #singleCardEvPerRound} approach, which ignores synergies.
+     *
+     * <p>Assumptions:
+     * <ul>
+     *   <li>Scoring uses 2d6 as the canonical distribution (representative of mid/late game)
+     *       plus a 1d6 pass to capture roll-1 cards (weizenfeld).</li>
+     *   <li>Blue cards are multiplied by {@code numPlayers} (fire on every player's turn).</li>
+     *   <li>Red cards contribute positively (income on each opponent's turn × (numPlayers−1)).</li>
+     *   <li>Landmark cards ({@code gelb}) are excluded — landmarks contribute via
+     *       {@code LANDMARK_WEIGHT} in the caller, not as coin income.</li>
+     *   <li>Coins use {@code c=99} (no clamping) for the scoring pass — the relative ranking
+     *       is what matters, not the absolute coin floor.</li>
+     * </ul>
+     *
+     * @param player       the player to score
+     * @param numPlayers   total player count (affects blue and red scaling)
+     * @param opponentCoins coins of all other players (used by Stadion/Fernsehsender)
+     * @return estimated coins per round, using real synergies (≥ 0)
+     */
+    static double playerEvPerRound(Player player, int numPlayers, int[] opponentCoins) {
+        PlayerStats stats = PlayerStats.of(player);
+        double ev = 0.0;
+
+        for (Project card : player.getOwned_projects()) {
+            if ("gelb".equals(card.getColor())) continue; // landmarks scored separately
+
+            double cardEv = 0.0;
+            // 2d6 pass (rolls 2–12)
+            for (int r = 2; r <= 12; r++) {
+                int income = get_I(r, card.getId(), true, stats.hasEinkaufszentrum,
+                        stats.foodCount, stats.animalCount, stats.productionCount,
+                        99, opponentCoins);
+                if (income > 0) cardEv += P2[r] * income;
+            }
+            // 1d6 pass (rolls 1–6) to capture roll-1 activations (weizenfeld, etc.)
+            double cardEv1d6 = 0.0;
+            for (int r = 1; r <= 6; r++) {
+                int income = get_I(r, card.getId(), true, stats.hasEinkaufszentrum,
+                        stats.foodCount, stats.animalCount, stats.productionCount,
+                        99, opponentCoins);
+                if (income > 0) cardEv1d6 += P1[r] * income;
+            }
+            cardEv = Math.max(cardEv, cardEv1d6);
+
+            // Scale by turn frequency
+            switch (card.getColor()) {
+                case "blau" -> ev += cardEv * numPlayers;        // fires every player's turn
+                case "rot"  -> ev += cardEv * (numPlayers - 1);  // fires on each opponent's turn
+                default     -> ev += cardEv;                      // grün/lila: own turn only
+            }
+        }
+        return ev;
+    }
+
+    // -------------------------------------------------------------------------
     // singleCardEvPerRound — isolated card EV for scoring
     // -------------------------------------------------------------------------
 

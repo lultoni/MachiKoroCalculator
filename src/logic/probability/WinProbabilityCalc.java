@@ -111,17 +111,22 @@ class WinProbabilityCalc {
     // -------------------------------------------------------------------------
 
     /**
-     * Computes a heuristic score for each player:
-     * {@code score(p) = Σ singleCardEvPerRound × REMAINING_TURNS + Σ LANDMARK_WEIGHT}.
+     * Computes a heuristic score for each player using synergy-aware per-round EV:
+     * {@code score(p) = playerEvPerRound(p) × REMAINING_TURNS + Σ LANDMARK_WEIGHT}.
+     *
+     * <p>Unlike the previous isolated {@code singleCardEvPerRound} approach, this accounts
+     * for each player's actual card synergies (Einkaufszentrum bonuses, category multipliers
+     * for Molkerei/Möbelfabrik/Markthalle, and opponent coin counts for Stadion/Fernsehsender).
      */
     static double[] computeScores(GameState gs) {
         Player[] players = gs.getPlayers();
         double[] scores = new double[players.length];
 
         for (int i = 0; i < players.length; i++) {
-            double score = 0.0;
+            int[] opponentCoins = CardIncome.buildOpponentCoins(players, i);
+            double score = CardIncome.playerEvPerRound(players[i], players.length, opponentCoins)
+                    * REMAINING_TURNS_ESTIMATE;
             for (Project p : players[i].getOwned_projects()) {
-                score += CardIncome.singleCardEvPerRound(p, players.length) * REMAINING_TURNS_ESTIMATE;
                 if (p.isIs_grossprojekt()) score += LANDMARK_WEIGHT;
             }
             scores[i] = score;

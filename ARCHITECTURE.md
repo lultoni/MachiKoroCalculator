@@ -56,7 +56,7 @@ This is the **primary sort key** used by `rankPurchasableProjects`.
 
 Used in `estimateWinProbDelta` when `mcSimulations == 0`:
 ```
-score(player p) = Σ_{owned card c} singleCardEvPerRound(c) × REMAINING_TURNS_ESTIMATE
+score(player p) = playerEvPerRound(p) × REMAINING_TURNS_ESTIMATE
                 + Σ_{built landmark} LANDMARK_WEIGHT
 
 P_win(player i) = exp(score_i) / Σ_j exp(score_j)
@@ -64,7 +64,9 @@ P_win(player i) = exp(score_i) / Σ_j exp(score_j)
 winProbDelta(candidate) = P_win(state_after_buy, i) − P_win(state_before_buy, i)
 ```
 
-Constants in `ProbabilityCalc`:
+`playerEvPerRound` uses the player's actual `PlayerStats` (Einkaufszentrum, food/animal/production counts) and real opponent coin counts, so category multipliers (Molkerei, Möbelfabrik, Markthalle) and purple card values (Stadion, Fernsehsender) are scored correctly.
+
+Constants in `WinProbabilityCalc`:
 - `REMAINING_TURNS_ESTIMATE` — fixed estimate of turns left in the game
 - `LANDMARK_WEIGHT` — bonus added per completed landmark
 

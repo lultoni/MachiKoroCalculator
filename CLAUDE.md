@@ -149,7 +149,7 @@ The codebase is now a single active layer with no legacy code.
 ### ProbabilityCalc — all methods implemented (Phase 2 complete)
 
 Implementation is split across three files in `src/logic/probability/`:
-- **`CardIncome.java`** (package-private) — `P1`/`P2`, `get_I`, `PlayerStats`, `buildOpponentCoins`, `sumColorIncome`, `weightedRollEV`, `bestDiceEV`, `estimateUncappedOwnTurnEV`, `singleCardEvPerRound`. Pure math primitives, no external state.
+- **`CardIncome.java`** (package-private) — `P1`/`P2`, `get_I`, `PlayerStats`, `buildOpponentCoins`, `sumColorIncome`, `weightedRollEV`, `bestDiceEV`, `estimateUncappedOwnTurnEV`, `playerEvPerRound`, `singleCardEvPerRound`. Pure math primitives, no external state.
 - **`WinProbabilityCalc.java`** (package-private) — `computeScores`, `softmaxEntry`, `computeBaselineWinProb`, `estimateWinProbDelta`, `mcWinRate`.
 - **`ProbabilityCalc.java`** (public facade) — all public API methods plus `computeNetGainForRoll`, `computeOpponentTurnGainForRoll`, `immediateEV`, `evPerRound`, `roiOverHorizon`, `rankPurchasableProjects`, `computeAllDeltasForRoll`, bürohaus helpers, legacy matrix method, deprecated bridges.
 

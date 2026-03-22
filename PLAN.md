@@ -92,7 +92,7 @@ See `ARCHITECTURE.md §2.8` for the current approximation details.
 ### 5. `singleCardEvPerRound` — No Synergy in Softmax Scores
 **Priority: Low**
 
-- [ ] `computeScores()` calls `singleCardEvPerRound` with a neutral state (1 food, 1 animal, 1 production). Players with synergy-heavy builds get no credit. Makes `estimateWinProbDelta` less accurate for those builds.
+- [x] `computeScores()` now calls `CardIncome.playerEvPerRound(player, numPlayers, opponentCoins)` instead of summing `singleCardEvPerRound` per card. The new method uses the player's actual `PlayerStats` (Einkaufszentrum, food/animal/production counts) and real opponent coin counts, so Molkerei/Möbelfabrik/Markthalle multipliers and purple card values are scored correctly. *(WinProbabilityCalc.java, CardIncome.java)*
 
 ---
 
@@ -213,4 +213,4 @@ See `ARCHITECTURE.md §2.8` for the current approximation details.
 - [ ] All simulated players use the same greedy policy. Simulating different archetypes (aggressive landmark buyer vs. income maximizer) would produce more realistic win rates.
 
 ### Session Persistence
-- [ ] Export/import `GameSession` to a file so a game can be resumed across app sessions.
+- [x] `GameSession.save(Path)` serializes player names + turn history to a compact JSON file (`.mkoro`). `GameSession.load(Path)` restores the session by replaying the history from the initial state — no stored game state, just the event log. `MainWindow` has Save/Load buttons backed by `JFileChooser`. *(GameSession.java, MainWindow.java)*

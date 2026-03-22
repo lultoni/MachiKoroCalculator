@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Implementation Plan
 
-See `PLAN.md` for the full phase-by-phase implementation roadmap, from clean-up through final UI. Always check which phase is current before starting new work.
+See `PLAN.md` for the active backlog of known limitations and planned improvements.
+See `CHANGELOG.md` for the history of what was built and why.
+See `ARCHITECTURE.md` for mathematical formulas, card rule conventions, and design rationales.
 
 ## Project Goal
 
@@ -95,6 +97,19 @@ After finishing any task, update all of the following that are affected by the c
 - The status of stub methods in `ProbabilityCalc` changes (implemented vs. TODO)
 - New design decisions are made that future Claude instances need to know
 
+**`ARCHITECTURE.md`** — Update if:
+- A formula changes or a new one is added
+- A card rule convention changes (get_I perspective, red card payment, special cards)
+- A new data model design decision is made
+
+**`CHANGELOG.md`** — Update when:
+- A meaningful feature or fix is shipped (add an entry under a new heading)
+
+**`PLAN.md`** — Update if:
+- A known issue is fixed (remove it from the backlog)
+- A new limitation is discovered (add it)
+- A future feature is approved for implementation (move it to a task)
+
 **Javadoc in source files** — Update if:
 - A method's parameters, return value, or behavior changes
 - A new public/package-private method is added (add a Javadoc block)
@@ -134,7 +149,7 @@ The codebase is now a single active layer with no legacy code.
 ### ProbabilityCalc — all methods implemented (Phase 2 complete)
 
 - `get_P1(r)` / `get_P2(r)` — 1d6 / 2d6 probabilities (pre-computed arrays).
-- `get_I(r, p_id, oop, eb, f_c, a_c, p_c, c, co)` — coin income/cost for a single project on a given roll. All 19 base-game cards implemented. `bürohaus` returns 0 (non-monetary card-swap; FIXME Phase 6).
+- `get_I(r, p_id, oop, eb, f_c, a_c, p_c, c, co)` — coin income/cost for a single project on a given roll. All 19 base-game cards implemented. `bürohaus` returns 0 here; its swap EV is handled separately in `immediateEV` via `bürohausSwapEV()`.
 - `computeNetGainForRoll` / `computeOpponentTurnGainForRoll` — per-roll coin delta for active player and passive player respectively.
 - `bürohausSwapEV(GameState, int)` — private helper that approximates the coin-equivalent EV of a bürohaus card-swap: `max(0, bestOppCardEV − worstOwnCardEV)` using `singleCardEvPerRound`.
 - `bestSecondRollEV` — EV of best re-roll after Freizeitpark doubles.

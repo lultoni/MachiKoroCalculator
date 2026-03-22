@@ -13,6 +13,15 @@ A decision-support tool for the base game of Machi Koro. Given the current game 
 - **Deep Analysis mode**: 1000 Monte Carlo game simulations per candidate for accurate win-probability deltas (< 100ms with parallelStream); toggled via "Deep Analysis" button
 - Three-column Swing GUI: turn input | top recommendation | full ranked table
 
+## Documentation
+
+| File | Purpose |
+|------|---------|
+| `CLAUDE.md` | Agent/developer guidance: architecture, coding conventions, workflow |
+| `ARCHITECTURE.md` | Mathematical formulas, card rule conventions, design rationales |
+| `CHANGELOG.md` | Implementation history: what was built, why, and what decisions were made |
+| `PLAN.md` | Active backlog: known limitations and planned improvements |
+
 ## Requirements
 
 - Java 17+

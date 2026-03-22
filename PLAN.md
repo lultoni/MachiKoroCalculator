@@ -1,488 +1,161 @@
-# PLAN.md — MachiKoroCalculator Implementation Roadmap
+# PLAN.md — MachiKoroCalculator Active Backlog
 
-**North Star:** A fast, mathematically rigorous tool that, given any Machi Koro base-game state, instantly recommends the single best project to buy — with transparent reasoning (EV, ROI, win probability delta) — displayed in a clean, fast-to-update GUI.
+All 6 original implementation phases are complete. This file now tracks **known limitations, bugs, and planned improvements** — the items to fix next.
 
----
-
-## Progress Tracker
-
-| Phase | Status | Commit | Notes |
-|-------|--------|--------|-------|
-| 0 — Deep Clean & Audit | ✅ Done | `48a965e` | Compiles clean, all TODOs → FIXME, legacy tagged |
-| 1 — Solid Data Model | ✅ Done | `c0d15dd` | 31/31 tests pass, ProjectLoader cached, GameState.initial() |
-| 2 — Core Math Engine | ✅ Done | — | 108/108 tests pass, 0.18 ms/call; EV, ROI, variance, ranking, win prob delta |
-| 3 — Game State Config UI | ✅ Done | — | Turn-by-turn + snapshot mode; SetupWindow, MainWindow, SnapshotDialog, GameStateBuilder, GameSession |
-| 4 — Remove Legacy Code | ✅ Done | — | 14 legacy files deleted; Main.java clean; zero warnings |
-| 5 — Monte Carlo Deep Mode | ✅ Done | — | 128/128 tests pass, 56ms/1000 sims; GameSimulator, SwingWorker UI, Deep Analysis toggle |
-| 6 — Polish & Final Integration | ✅ Done | — | 130/130 tests pass; bürohaus EV heuristic, full Javadoc, final benchmarks |
+For historical context (what was built and why), see `CHANGELOG.md`.
+For mathematical foundations and design rationales, see `ARCHITECTURE.md`.
 
 ---
 
-## How to Use This Plan
+## Supply / Ownership Rules Bug
 
-Work through phases top-to-bottom. Each phase has:
-- **Goal** — what the codebase looks like when this phase is done
-- **Steps** — concrete, ordered tasks
-- **Testing checkpoint** — what must pass before moving to the next phase
-- **Commit point** — when to commit (logical unit boundary)
+**Priority: High — correctness issue**
 
-If any step introduces a design question not answered here, **stop and ask the user** before proceeding.
+The current model does not correctly enforce Machi Koro's per-player ownership limits:
 
----
+- **Purple (lila) cards** (Stadion, Fernsehsender, Bürohaus): each player may own **at most 1 copy**. These are unique cards.
+- **Landmarks (gelb)**: each player owns their own set; not shared between players.
+- **All other establishments (blau, grün, rot)**: up to **6 copies total** exist in the market, shared across all players. Multiple players *can* own the same card type, and one player can own multiple copies of the same non-purple card (up to the shared supply of 6).
 
-## ✅ Phase 0 — Deep Clean & Audit (COMPLETE — commit `48a965e`)
+**Current state:**
+- `GameState.unbuilt_projects` stores one entry per card *type* (since `Project.equals` is id-based). This means the supply model treats each card type as having exactly 1 remaining copy, not 6.
+- `GameSimulator` has a separate `Map<String,Integer>` supply counter (6 copies per non-landmark) which *is* correct for simulation purposes.
+- `rankPurchasableProjects` uses `unbuilt_projects` to determine what cards are available — so it only shows a card as available if any copy remains, but does not account for the player already owning N copies toward the supply limit.
+- The `SnapshotDialog` and `GameStateBuilder` allow adding multiple copies of the same card to a player (no uniqueness enforcement for purple cards).
 
-**Goal:** Eliminate dead code, compile errors, and architectural confusion so the codebase is a clean, stable foundation.
+**What needs fixing:**
+1. `rankPurchasableProjects` should exclude purple cards the active player already owns (unique cards).
+2. The snapshot dialog should prevent checking a purple card for a player who already owns one.
+3. `GameState.unbuilt_projects` semantics should be clarified (or changed) to reflect supply counts, not just presence.
+4. `GameStateBuilder` should throw if a purple card is added twice to the same player.
 
-### 0.1 Fix compilation errors
-
-The codebase currently **does not compile** due to missing method bodies referenced in `ProbabilityCalc.java`:
-- `computeNetGainForRoll()` (called at line 291, 297, 303)
-- `bestSecondRollEV()` (called at line 307)
-- `RankingOptions` class (used in `rankPurchasableProjects` signature)
-
-**Action:** Add empty stubs with `throw new UnsupportedOperationException("not yet implemented")` so the project compiles cleanly. Do not implement logic yet.
-
-### 0.2 Remove dead code from legacy layer
-
-The `src/logic/` package (non-probability) contains the original EV model that has been superseded. It contains known bugs, hardcoded array indices, and incorrect probability math. Mark each class explicitly:
-- Add a top-of-file comment: `// LEGACY — to be removed once the probability layer is complete.`
-- Do **not** delete yet — the GUI still depends on it. Deletion happens in Phase 4.
-
-### 0.3 Fix the one live bug affecting Main.java
-
-`Main.java` lines 41–43 are dead commented-out code. Remove the block.
-The `Main.java` `while (!boot_finished) Thread.onSpinWait()` busy-loop is fine for now — note it as a known smell to fix in Phase 4 when the UI is rebuilt.
-
-### 0.4 Document all known issues inline
-
-Every `TODO`, broken logic, and stub must have a comment of the form:
-```java
-// FIXME [Phase X]: <description of what needs to happen>
-```
-This turns the audit into a tracked, phase-linked work list.
-
-**Testing checkpoint 0:**
-- Project compiles with zero errors.
-- `Tests/RuntimeTester.java` runs without crashing (even if output is wrong).
-
-**Commit point:** `Clean up dead code and add compile stubs for missing probability methods`
+**Files affected:** `ProbabilityCalc.java` (`rankPurchasableProjects`), `GameStateBuilder.java`, `SnapshotDialog.java`, `GameState.java`
 
 ---
 
-## ✅ Phase 1 — Solid Data Model (COMPLETE — commit `c0d15dd`)
+## Known Approximations to Improve
 
-**Goal:** The `logic.probability` package has a complete, correct, immutable data model that can represent any valid base-game state. No legacy dependency.
+### 1. Bürohaus — Heuristic Model
+**Priority: Low**
 
-### 1.1 Finalize `Project` (probability layer)
+`bürohausSwapEV` assumes the player always makes the optimal swap on every activation. In reality:
+- The swap is optional (player can decline)
+- The value depends on game context (late game when opponents have high-EV cards is very different from early game)
+- After swapping, the player's own card composition changes, affecting future EV
 
-`logic.probability.Project` is already correct and immutable. **Additions needed:**
-- Add `equals()` and `hashCode()` based on `id` (required for collections and deduplication).
-- Add a `toString()` returning the ID for debug output.
+A more accurate model would require a state-lookahead pass, which is a design-level change.
 
-### 1.2 Finalize `Player` (probability layer)
+See `ARCHITECTURE.md §2.5` for the current approximation details.
 
-`logic.probability.Player` needs:
-- Validate in constructor: `coins >= 0`, `owned_projects != null`.
-- Add `copy()` method (shallow-copy of owned_projects list with same Project references — Projects are immutable so sharing is safe).
+### 2. GameSimulator — Bahnhof Always Uses 2d6
+**Priority: Medium**
 
-### 1.3 Finalize `GameState`
+`GameSimulator.rollDice()` always picks 2d6 when the player has Bahnhof. In early game, 1d6 can be better if the player's cards activate on rolls 1–4. This slightly overestimates Bahnhof owners' income in simulation, leading to marginally optimistic win-rate estimates for them.
 
-- Add constructor validation: `players.length >= 2 && players.length <= 4`, no null players.
-- The existing `copy()` is already a correct deep copy — add a Javadoc block explaining this.
-- Add a factory method `GameState.initial(int numPlayers)` that builds the standard starting state (each player has Weizenfeld + Bäckerei, 3 coins, all other cards in the unbuilt pool).
+**Fix:** In `rollDice()`, compute expected income for both 1d6 and 2d6 across the player's owned cards and choose the higher-EV option. This is the same logic as `immediateEV` uses for the analytical model.
 
-### 1.4 Fix `ProjectLoader`
+**Files affected:** `GameSimulator.java` (`rollDice()`)
 
-Current problem: uses a relative path `src/resources/jsons/projects.json` — will break outside IntelliJ.
+### 3. GameSimulator — Bürohaus Not Executed
+**Priority: Low**
 
-**Fix:** Load from classpath using `ProjectLoader.class.getResourceAsStream("/resources/jsons/projects.json")`.
+The greedy buy policy buys bürohaus if it has the highest `STATIC_EV_PER_COST` score, but the simulation never executes the card-swap effect when the card activates. This means bürohaus owners play suboptimally in simulation.
 
-**Also add:**
-- `getAllProjects()` returning `ArrayList<Project>` — loads all projects from the JSON. This is needed for building the initial unbuilt pool.
-- Cache the loaded project map after first load (static `Map<String, Project>`) to avoid re-reading the file every call. This is important — `ProjectLoader.getProject()` is called in hot loops.
+**Fix:** In `applyRoll()` (or as a post-roll step), detect if active player owns bürohaus and roll was 6; execute a swap of lowest-EV own card for highest-EV opponent card.
 
-### 1.5 Create `RankingOptions`
+**Files affected:** `GameSimulator.java`
 
-The `rankPurchasableProjects` stub references `RankingOptions`. Create this class:
-```java
-public class RankingOptions {
-    public int horizonTurns = 10;       // turns to look ahead for ROI
-    public double discountFactor = 0.95; // gamma per turn
-    public int mcSimulations = 0;        // 0 = analytical only, >0 enables Monte Carlo
-    public boolean includeWinProbDelta = false; // expensive, off by default
-}
-```
+### 4. `evPerRound` — Static Coin Count
+**Priority: Medium**
 
-### 1.6 Validate `projects.json` completeness
+`evPerRound` evaluates all turns using the player's *current* coin count. It does not model:
+- Coin accumulation between turns (player has more coins in turn 3 than turn 1)
+- Red card losses changing the effective coin count for subsequent card evaluations in the same turn
 
-Cross-check that:
-- Every project ID in `get_I()` exists in the JSON.
-- `bürohaus` has no `get_I` case — add a `FIXME [Phase 2]` comment.
-- All 19 cards are present.
+This means the model is slightly optimistic for players with few coins (red card losses are capped lower than reality) and slightly off for multi-card interactions within one turn.
 
-**Testing checkpoint 1:**
-- Write a small inline test in `RuntimeTester` (or a new `ModelTest` class) that:
-  - Loads all 19 projects via `ProjectLoader.getAllProjects()`, asserts count = 19.
-  - Builds a `GameState.initial(4)` and asserts each player has 2 starter cards and 3 coins.
-  - Calls `gs.copy()` and asserts the copy is equal but not the same object.
+### 5. `singleCardEvPerRound` — No Synergy in Softmax Scores
+**Priority: Low**
 
-**Commit point:** `Complete probability data model: Project, Player, GameState, ProjectLoader, RankingOptions`
+`computeScores()` (used for analytical win-prob softmax) calls `singleCardEvPerRound` with a neutral state (1 food, 1 animal, 1 production). A player who owns 3 food cards gets no synergy credit in their win-probability score, making `estimateWinProbDelta` less accurate for synergy-heavy builds.
 
 ---
 
-## Phase 2 — Core Math Engine
+## Missing UI Features
 
-**Goal:** `ProbabilityCalc` correctly computes all four metrics for any game state. This is the heart of the program.
+### 1. Game-Over Detection
+**Priority: High**
 
-### 2.1 Pre-compute probability tables
+`GameSimulator.hasWon()` exists but is not called anywhere in the live game flow. After a player buys their 4th landmark, `MainWindow` continues showing a ranking table as if the game is still ongoing.
 
-Replace the switch-based `get_P1` and `get_P2` with pre-computed constant arrays:
-```java
-private static final double[] P1 = new double[13]; // P1[r] = 1/6 for r in 1..6
-private static final double[] P2 = new double[13]; // P2[r] = (6-|r-7|)/36 for r in 2..12
-static {
-    for (int r = 1; r <= 6; r++)  P1[r] = 1.0 / 6.0;
-    for (int r = 2; r <= 12; r++) P2[r] = (6.0 - Math.abs(r - 7)) / 36.0;
-}
-```
-This eliminates a switch lookup on every probability query in the hot loop.
+**Fix:** In `GameSession.applyTurn()`, after processing a landmark purchase, check `GameSimulator.hasWon()` and flag the session as finished. `MainWindow` should detect this flag and show a "Player X wins!" message instead of the ranking table.
 
-### 2.2 Fix `get_I` — correctness audit
+**Files affected:** `GameSession.java`, `MainWindow.java`
 
-Go through every case in `get_I` and verify against the official Machi Koro base game rules:
+### 2. Bürohaus Buy Advice in UI
+**Priority: Medium**
 
-- **`café` (rot, roll 3):** `oop=false` means the current player is NOT the owner — owner receives the payment. The current code has the sign and `oop` condition correct for the perspective of `get_I` being called from the roller's POV. Verify and document this convention clearly.
-- **`familienrestaurant` (rot, rolls 9–10):** Same convention. Verify.
-- **`stadion` (lila, roll 6):** Takes from each opponent up to 2 coins, max 5 total. The current code takes from richest opponent only — **this is wrong**. Fix to iterate all opponents and sum `min(2, opponent_coins)`, cap at 5.
-- **`fernsehsender` (lila, roll 6):** Takes 5 coins from one chosen opponent (richest). Current code sums 2 from each — **this is wrong** per base rules. Fix: take `min(5, richest_opponent_coins)`.
-- **`bürohaus` (lila, roll 6):** Not implemented. Add a `FIXME [Phase 2]` until rules are confirmed with user — bürohaus swaps a card with an opponent, which is non-monetary and needs a different return type or convention. **Ask the user how to handle this before implementing.**
-- Verify all multiplier cards (molkerei, möbelfabrik, markthalle) correctly use `f_c`, `a_c`, `p_c`.
+When bürohaus is the top recommendation, the center panel shows an EV number but gives no actionable advice. The player needs to know: "swap your [worst card] for [opponent]'s [best card]".
 
-### 2.3 Implement `computeNetGainForRoll`
+**Fix:** In `MainWindow.populateCenter()`, detect if the top card is bürohaus and add a `notes` string to its `RankEntry` (e.g. "Swap your Weizenfeld for Player 2's Bergwerk").
 
-This is called by `immediateEV` and computes the net coin change for the active player when a given roll occurs. It must:
-1. Sum income from all blue cards (all players' blue cards that activate, owner gets paid by bank).
-2. Add green card income if `isOwnTurn=true`.
-3. Add purple card income if `isOwnTurn=true`.
-4. Subtract red card costs (opponents' red cards that activate on this roll — player loses coins).
-5. Enforce inability-to-pay: if cost exceeds `player.coins`, clamp to `player.coins`.
+**Files affected:** `ProbabilityCalc.java` (`rankPurchasableProjects` or a new helper), `MainWindow.java`
 
-Signature:
-```java
-private static int computeNetGainForRoll(GameState state, int playerIndex, int roll, boolean isOrderedPair)
-```
-`isOrderedPair` is used to detect a doubles roll (Freizeitpark trigger) — it is `true` when both dice show the same value.
+### 3. Snapshot Dialog Validation Feedback
+**Priority: Medium**
 
-### 2.4 Implement `bestSecondRollEV`
+Invalid states (e.g. same purple card owned by two players) produce a Java exception rather than a friendly error message in the dialog.
 
-Called when Freizeitpark triggers (player rolled doubles). Returns the EV of the best possible re-roll:
-```java
-private static double bestSecondRollEV(GameState state, int playerIndex, int forcedDiceCount)
-```
-`forcedDiceCount`: -1 = player chooses freely (Bahnhof present), 1 = must roll 1 die, 2 = must roll 2 dice (Funkturm forces same count as previous roll).
+**Fix:** Validate uniqueness constraints in `GameStateBuilder.build()` (or in `SnapshotDialog.onApply()`) and show a `JOptionPane` error instead of letting the exception propagate.
 
-Implementation: enumerate all possible re-roll outcomes, weight by probability, return expected net gain. No doubles chaining on second roll.
+**Files affected:** `GameStateBuilder.java`, `SnapshotDialog.java`
 
-### 2.5 Implement `evPerRound`
+### 4. "Current Win Probability" Summary
+**Priority: Low**
 
-EV until all other players have completed one turn. This accounts for blue cards being triggered on opponents' turns.
+The win-prob column shows delta-per-card but there is no overall "your current win probability is X%" displayed prominently. This would be the most immediately useful number for the player.
 
-Algorithm:
-1. Compute EV for the current player's own turn (already done via `immediateEV`).
-2. For each opponent turn (N-1 turns), compute blue card EV for the current player triggered by that opponent's roll.
-   - Red cards: current player may lose coins on opponents' turns — subtract expected red card losses.
-3. Sum all N partial EVs.
+**Fix:** In `refreshAll()`, call `estimateWinProbDelta` (or `mcWinRate`) with a null candidate to get the baseline win probability; display it in the center panel header.
 
-```java
-public static double evPerRound(GameState gs, int playerIndex, Project candidate)
-```
-
-The candidate has already been "bought" (simulate: add to player's owned_projects in a copy of the state).
-
-### 2.6 Implement `roiOverHorizon`
-
-Discounted return on investment over `horizonTurns` turns:
-```java
-public static RankEntry roiOverHorizon(GameState gs, int playerIndex, Project candidate, int horizonTurns, double discountFactor)
-```
-
-Formula:
-```
-ROI = sum_{t=1}^{horizonTurns} discountFactor^t * evPerRound(state_after_buy) - candidate.getCost()
-```
-
-Simplified (evPerRound is constant, ignoring coin changes): this is a geometric series:
-```
-ROI = evPerRound * discountFactor * (1 - discountFactor^horizonTurns) / (1 - discountFactor) - cost
-```
-
-Populate and return a `RankEntry` with `immediateEV`, `evPerRound`, `roiOverHorizon`, `variance` fields.
-
-**Variance** = variance of the per-turn net gain distribution. Computed analytically:
-```
-Var = sum_r P(r) * gain(r)^2 - EV^2
-```
-High variance cards (stadion, bergwerk) are risky. Report it in `RankEntry`.
-
-### 2.7 Implement `rankPurchasableProjects`
-
-Enumerate all projects in `gs.unbuilt_projects` that the player can afford, call `roiOverHorizon` on each, sort by ROI descending, return the list.
-
-```java
-public static ArrayList<RankEntry> rankPurchasableProjects(GameState gs, int playerIndex, RankingOptions opts)
-```
-
-Also: for each candidate, compute `probNoIncomeOwnTurn` = probability that the player earns 0 coins on their own turn after buying this card. This is the risk metric shown in the UI.
-
-### 2.8 Implement `estimateWinProbDelta` (analytical, no MC yet)
-
-Use the softmax score approximation:
-```java
-double score(Player p) = sum_over_owned_cards(evPerRound(card) * remainingTurnsEstimate)
-                        + sum_over_built_landmarks(landmarkWeight)
-```
-
-Win probability for player i:
-```
-P_i = exp(score_i) / sum_j exp(score_j)
-```
-
-`winProbDelta(candidate) = P_i(state_after_buy) - P_i(current_state)`
-
-Populate `RankEntry.winProbDelta`.
-
-**Testing checkpoint 2:**
-- Unit tests for `get_P1`, `get_P2`: verify probabilities sum to 1.0 for each dice mode.
-- Unit test `get_I` for each card: at least one roll that should trigger and one that should not.
-- Unit test `immediateEV` for a known minimal game state (e.g. 2 players, player 0 has only Weizenfeld, no landmarks): EV should equal `(1/6) * 1 = 0.167` approximately.
-- Unit test `evPerRound` for the same state with N=2 players: should be roughly `2 * 0.167 = 0.333` (blue triggers on both turns).
-- Verify `rankPurchasableProjects` returns a non-empty list for a standard starting state.
-
-**Architecture analysis checkpoint:** Before writing Phase 3, verify:
-- `ProbabilityCalc` has zero imports from `logic.*` (legacy layer). Pure dependency on `logic.probability.*` only.
-- No I/O calls in `ProbabilityCalc`.
-- All public methods are stateless (no static mutable fields).
-
-**Runtime analysis checkpoint:** Run `RuntimeTester` with a benchmark for `rankPurchasableProjects` on a 4-player game. Target: < 5ms per full ranking call. If over 5ms, profile and optimize before Phase 3.
-
-**Commit point:** `Implement complete math engine: get_I correctness, all ProbabilityCalc methods, EV/ROI/winProbDelta`
+**Files affected:** `MainWindow.java`, `ProbabilityCalc.java`
 
 ---
 
-## Phase 3 — Game State Configuration UI
+## Code Quality
 
-**Goal:** The player can quickly input the current game state via a simple form, and the calculator instantly shows the ranked recommendation.
+### 1. `ProbabilityCalc` Split
+**Priority: Low**
 
-### 3.1 Design the state input model
+`ProbabilityCalc.java` is ~1000 lines. It could be split into:
+- `CardIncome` — `get_I`, `P1`, `P2`, `PlayerStats`
+- `EVCalculator` — `immediateEV`, `evPerRound`, `bestSecondRollEV`
+- `RankingEngine` — `rankPurchasableProjects`, `roiOverHorizon`
+- `WinProbability` — `estimateWinProbDelta`, `mcWinRate`, `computeScores`
 
-Ask the user how they want to configure the game state before building UI. The two main options:
-- **Turn-by-turn tracking**: Player tracks every action in the app throughout the game. More accurate, more upfront work.
-- **Snapshot entry**: Player opens the app mid-game and quickly enters current state. Less accurate (no history), much faster to use.
+This is a refactor with no behaviour change.
 
-**Stop and ask the user which model they want before implementing any UI.**
+### 2. `MainWindow` Controller/View Separation
+**Priority: Low**
 
-### 3.2 Build `GameStateBuilder`
+`MainWindow.java` mixes UI layout, event handling, SwingWorker lifecycle, and game logic (turn application, ranking display). Extracting a thin controller would improve testability.
 
-A simple Java class (not UI) for constructing a `GameState` from user inputs:
-```java
-GameStateBuilder builder = new GameStateBuilder(numPlayers);
-builder.setCoins(playerIndex, amount);
-builder.addProject(playerIndex, projectId);
-builder.setLandmark(playerIndex, landmarkId, true);
-GameState state = builder.build();
-```
+### 3. MC Timeout Logging
+**Priority: Low**
 
-Validates inputs and throws `IllegalArgumentException` on invalid state (e.g. a project owned by two non-office players).
-
-### 3.3 Build the new Swing UI
-
-Structure (three panels, no tabs for simplicity):
-
-**Left panel — Game State Input:**
-- Player count selector (2/3/4, dropdown)
-- For each player: coin spinner + checkbox grid for all 19 cards (grouped by color, small icons)
-- "My player" indicator (which player the recommendation is for)
-- "Calculate" button
-
-**Center panel — Recommendation:**
-- Large card showing the top recommendation: card name, icon, cost, EV/round, ROI, win prob delta
-- Small note explaining the reasoning in one sentence (e.g. "Highest ROI over 10 turns with your current ranch synergy")
-
-**Right panel — Full Ranking:**
-- Scrollable list of all affordable cards sorted by ROI
-- Each row: card name, cost, EV/round, ROI, risk (variance / P(zero income))
-- Clicking a row highlights it in the center panel
-
-The UI calls `ProbabilityCalc.rankPurchasableProjects()` on every state change (debounced 200ms). It does **not** call legacy `logic.*` code.
-
-### 3.4 Wire up state changes
-
-Each input change triggers:
-1. Rebuild `GameState` from current inputs via `GameStateBuilder`.
-2. Call `rankPurchasableProjects(gs, myPlayerIndex, defaultOpts)`.
-3. Render results in center and right panels.
-
-### 3.5 Delete legacy UI
-
-Remove `gui.boot.BootWindow`, `gui.game.*`. Update `Main.main()` to launch only the new UI.
-
-**Testing checkpoint 3:**
-- Manually test a 2-player starting state — recommendations should match hand calculations from Phase 2 tests.
-- Test with a player having 0 coins — ranking list should be empty (no affordable cards).
-- Test with a player who has all landmarks built — state is invalid, app should show a "player has won" message.
-
-**Runtime analysis checkpoint:** The UI must feel instant. Full ranking call must remain < 5ms. If adding the softmax win-probability delta makes it slower, make `includeWinProbDelta` opt-in (toggle in UI).
-
-**Commit point:** `Add GameStateBuilder and new recommendation UI; remove legacy GUI`
+`GameSimulator.simulate()` returns -1 on timeout (> 200 turns). These are silently ignored in win-rate computation (`mcWinRate` just doesn't count them). A counter or log line when timeouts exceed 1% of simulations would help detect degenerate states.
 
 ---
 
-## Phase 4 — Remove Legacy Code
+## Future Features
 
-**Goal:** The `src/logic/` package (non-probability) is completely removed. Zero legacy code remains.
+### Expansion Support
+The architecture is ready: `ProjectLoader` is JSON-driven, `get_I` dispatches by card ID, and `projects.json` can be extended. Adding harbour/millionaire's row expansion cards requires:
+1. New entries in `projects.json`
+2. New `case "..."` blocks in `get_I`
+3. Updating `GameState.initial()` for the new starting state
 
-### 4.1 Verify nothing in the new UI imports legacy classes
+### Opponent Modeling
+Currently all simulated players use the same greedy policy. Simulating different archetypes (aggressive landmark buyer vs. income maximizer) would produce more realistic win rates.
 
-Grep for any import of `logic.Game`, `logic.Player`, `logic.Project`, `logic.Category` in the new code. If found, replace with probability-layer equivalents.
-
-### 4.2 Delete legacy files
-
-- `src/logic/Game.java`
-- `src/logic/Player.java`
-- `src/logic/Project.java`
-- `src/logic/Category.java`
-- `src/logic/Main.java` (replaced)
-
-### 4.3 Update `Main.java`
-
-Single entry point: initialize the new UI, load all projects from JSON, build initial game state, show the window.
-
-**Testing checkpoint 4:**
-- Project compiles with zero warnings after removing legacy code.
-- Run the full suite from `RuntimeTester`.
-- Re-run the Phase 2 unit tests to confirm nothing broke.
-
-**Commit point:** `Remove legacy logic layer; new probability layer is the only backend`
-
----
-
-## Phase 5 — Monte Carlo Validation & Deep Mode (Optional)
-
-**Goal:** Implement the MC simulation path in `estimateWinProbDelta` and validate that the analytical model from Phase 2 is within ±5% of MC win rates.
-
-### 5.1 Implement a lean game simulator
-
-A stateless `GameSimulator` class that takes a `GameState` and simulates one full game using a greedy-EV rollout policy:
-```java
-public class GameSimulator {
-    public static int simulate(GameState gs, Random rng); // returns winner index
-}
-```
-
-Rollout policy: each player buys the highest-ROI card they can afford. If nothing is affordable, save. Simulate until one player has all 4 landmarks.
-
-### 5.2 Implement MC in `estimateWinProbDelta`
-
-```java
-// opts.mcSimulations > 0 enables this path
-for (Project candidate : candidates) {
-    int wins = 0;
-    for (int i = 0; i < opts.mcSimulations; i++) {
-        GameState sim = stateAfterBuying(gs, playerIndex, candidate).copy();
-        if (GameSimulator.simulate(sim, rng) == playerIndex) wins++;
-    }
-    entry.winProbDelta = (double) wins / opts.mcSimulations - baselineWinRate;
-}
-```
-
-Run in parallel using `ForkJoinPool` — each candidate's simulations are independent.
-
-### 5.3 Validate analytical vs. MC
-
-Run both models on 10 different representative game states. If analytical win-prob delta disagrees with MC by > 5 percentage points consistently, tune the softmax score function weights.
-
-### 5.4 Expose in UI
-
-Add a "Deep Analysis" toggle in the UI. When enabled: `opts.mcSimulations = 1000`, re-run ranking, show MC win-rate alongside analytical result, show a loading indicator during computation (< 2 seconds target on modern hardware).
-
-**Runtime analysis checkpoint:** 1000 simulations × 10–15 candidates × avg 20-turn games × 4 players = ~800k game-state steps. Profiling target: < 1.5 seconds with parallel execution. If over, reduce to 500 simulations or optimize the game simulator inner loop.
-
-**Commit point:** `Add Monte Carlo deep analysis mode with analytical validation`
-
----
-
-## Phase 6 — Polish & Final Integration
-
-**Goal:** The app is clean, documented, and correct end-to-end.
-
-### 6.1 Complete all remaining `get_I` cases
-
-- `bürohaus`: Ask user how card swapping should be modeled (its effect is non-monetary). Implement based on answer.
-- Audit for any other cards added to `projects.json` but missing in `get_I`.
-
-### 6.2 ~~Complete `projects.json` descriptions~~ (done in Phase 1)
-
-All 19 card descriptions were filled in during Phase 1. `bürohaus` has a FIXME note about its non-monetary effect pending Phase 2 design decision.
-
-### 6.3 Final documentation pass
-
-- All public methods in `logic.probability.*` have complete Javadoc.
-- `README.md` updated to reflect the final feature set.
-- `CLAUDE.md` updated: mark all stub methods as implemented, update architecture section to reflect removal of legacy layer.
-
-### 6.4 Final runtime analysis
-
-Run `RuntimeTester` extended with benchmarks for:
-- `rankPurchasableProjects` (analytical, 4 players, mid-game state)
-- `estimateWinProbDelta` (MC, 500 sims, 4 players)
-- `ProjectLoader.getAllProjects()` (cached vs. cold)
-
-Record results in a comment in `RuntimeTester.java`.
-
-**Testing checkpoint 6 (final):**
-- All unit tests pass.
-- Manual playthrough: enter a real mid-game state, verify the recommendation is consistent with known Machi Koro strategy (e.g. in a 4-player game with Bahnhof and two ranches, Cheese Factory should rank highly).
-- No `TODO` or `FIXME` comments remain without a linked phase (all remaining known gaps should be in a `BACKLOG.md`).
-
-**Final commit point:** `Phase 6 complete: fully functional calculator with analytical + MC ranking and clean documentation`
-
----
-
-## Appendix: Key Formulas Reference
-
-**2-dice probabilities:**
-```
-P(roll=k | 2d6) = (6 - |k - 7|) / 36   for k ∈ {2..12}
-```
-
-**Blue card EV per round (N players):**
-```
-EV_round(blue) = payout * P(activation_roll) * N
-```
-
-**Discounted ROI over T turns:**
-```
-ROI = EV_round * γ * (1 - γ^T) / (1 - γ) - cost     where γ = discountFactor
-```
-
-**Win probability softmax:**
-```
-score(player) = Σ EV_round(owned_card) * T_remaining + Σ landmark_weight(built_landmark)
-P_win(player i) = exp(score_i) / Σ_j exp(score_j)
-```
-
-**Variance of per-turn net gain:**
-```
-Var = Σ_r P(r) * gain(r)² - EV²
-```
-
----
-
-## Appendix: Known Design Questions (ask user before implementing)
-
-1. **bürohaus card**: Its effect is card-swapping, not coin-based. How should it be modeled in `get_I` and the EV framework?
-2. **UI model**: Turn-by-turn tracking vs. snapshot entry (Phase 3.1)?
-3. **Discount factor default**: 0.95 per turn is a reasonable starting point — confirm or adjust?
-4. **Monte Carlo in default mode**: Should MC simulations be on by default, or opt-in only?
-5. **Multiple copies of non-blue cards**: In the base game, each non-office card has limited supply. The current model tracks `unbuilt_projects` — confirm this is the intended availability model.
+### Session Persistence
+Export/import `GameSession` to a file so a game can be resumed across app sessions.

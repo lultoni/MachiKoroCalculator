@@ -1,6 +1,6 @@
 # PLAN.md — MachiKoroCalculator Active Backlog
 
-All 6 original implementation phases are complete. This file tracks **known limitations, bugs, and planned improvements**.
+All 6 original implementation phases are complete. This file tracks **known limitations, bugs, and planned improvements** — open items only.
 
 For historical context (what was built and why), see `CHANGELOG.md`.
 For mathematical foundations and design rationales, see `ARCHITECTURE.md`.
@@ -9,198 +9,117 @@ Progress key: `[ ]` open · `[~]` in progress · `[x]` done
 
 ---
 
-## Supply / Ownership Rules Bug
+## Supply Model Bugs
 
+These are correctness issues in the live game path that affect what cards appear as purchasable.
+
+### 1. Card Disappears From Market After First Purchase
 **Priority: High — correctness issue**
 
-The current model does not correctly enforce Machi Koro's per-player ownership limits:
+Non-purple, non-landmark cards have **6 physical copies** shared across all players. Buying one copy should reduce supply by 1, leaving 5 copies still available. Instead, the card vanishes from the market entirely after the first purchase by any player.
 
-- **Purple (lila) cards** (Stadion, Fernsehsender, Bürohaus): each player may own **at most 1 copy**. These are unique cards.
-- **Landmarks (gelb)**: each player owns their own set; not shared between players.
-- **All other establishments (blau, grün, rot)**: up to **6 copies total** exist in the market, shared across all players. Multiple players *can* own the same card type, and one player can own multiple copies of the same non-purple card (up to the shared supply of 6).
+**Root cause — `GameSession.applyTurn` (GameSession.java ~line 94):**
+```java
+boolean inPool = state.getUnbuilt_projects().remove(card);
+```
+`unbuilt_projects` stores one entry per card *type* (because `Project.equals` is id-based). Calling `remove(card)` on the first purchase removes the type entry — silently making the card unavailable for the remaining 5 copies.
 
-**Current state:**
-- `GameState.unbuilt_projects` stores one entry per card *type* (since `Project.equals` is id-based). This means the supply model treats each card type as having exactly 1 remaining copy, not 6.
-- `GameSimulator` has a separate `Map<String,Integer>` supply counter (6 copies per non-landmark) which *is* correct for simulation purposes.
-- `rankPurchasableProjects` uses `unbuilt_projects` to determine what cards are available — so it only shows a card as available if any copy remains, but does not account for the player already owning N copies toward the supply limit.
-- The `SnapshotDialog` and `GameStateBuilder` allow adding multiple copies of the same card to a player (no uniqueness enforcement for purple cards).
+**Root cause — `GameStateBuilder.build()` (GameStateBuilder.java ~line 110):**
+```java
+for (Project p : allProjects) {
+    if (!allOwned.contains(p)) unbuilt.add(p);  // id-based equals
+}
+```
+`allOwned` collects every player's owned cards; `contains(p)` uses id-based equals — so if *any* player owns a card type, it is excluded from `unbuilt`, even if only 1 of 6 copies is taken.
 
 **What needs fixing:**
+- [ ] `GameSession.applyTurn`: Only remove a card type from `unbuilt_projects` when the total number of copies owned across all players reaches 6 (not on the first purchase). *(GameSession.java)*
+- [ ] `GameStateBuilder.build()`: Compute per-type owned counts and exclude a card type only when owned count ≥ 6. *(GameStateBuilder.java)*
+- [ ] `GameState.unbuilt_projects` semantics: Consider whether to keep the one-entry-per-type model with explicit supply-count tracking, or store 6 entries per non-landmark card type. The one-per-type + count approach avoids bloating the list. *(GameState.java, GameStateBuilder.java)*
+- [ ] Update `rankPurchasableProjects` and `MainWindow.rebuildBuyCombo` if the semantics change — both currently source from `unbuilt_projects` to determine what is purchasable. *(ProbabilityCalc.java, MainWindow.java)*
 
-- [x] `rankPurchasableProjects` should exclude purple cards the active player already owns (unique cards). *(ProbabilityCalc.java)*
-- [x] The snapshot dialog should prevent checking a purple card for a player who already owns one. *(SnapshotDialog.java)*
-- [x] `GameState.unbuilt_projects` semantics clarified in Javadoc: the list stores one entry per card *type* (presence), not per copy. Per-copy supply counts are tracked separately by `GameSimulator`. The distinction between "available types" and "copies remaining" is documented on the field and `getUnbuilt_projects()`. *(GameState.java)*
-- [x] `GameStateBuilder` should throw if a purple card is added twice to the same player. *(GameStateBuilder.java)*
+**Note on starter cards:** Weizenfeld and Bäckerei are given to each player at game start — they never enter the shared buyable pool. Their 6 physical copies exist in the pool independently of what players start with.
+
+### 2. SnapshotDialog Shows Binary Ownership for Multi-Copy Cards
+**Priority: High — correctness issue**
+
+The snapshot dialog uses `JCheckBox[player][card]` — strictly 0 or 1 per card per player. For blau, grün, and rot cards, a player can legitimately own multiple copies (e.g. 3× Mini-Markt). The binary model prevents this from being accurately entered.
+
+**Root cause — `SnapshotDialog.java` (loadCurrentState ~line 185, onApply ~line 205):**
+```java
+// loadCurrentState — binary: hasProject returns true/false
+projectChecks[i][j].setSelected(
+        players[i].hasProject(allProjects.get(j).getId()));
+
+// onApply — adds exactly one copy per checked box
+if (projectChecks[i][j] != null && projectChecks[i][j].isSelected()) {
+    builder.addProject(i, allProjects.get(j).getId());
+}
+```
+A player owning 3× Mini-Markt would display as "1×" and round-trip to 1 copy on apply.
+
+**What needs fixing:**
+- [ ] Replace `JCheckBox` with `JSpinner(0..6)` for blau/grün/rot cards. Purple (lila) cards remain binary checkboxes (max 1 per player). Landmarks (gelb) remain binary checkboxes (owned or not, per player, independent). *(SnapshotDialog.java)*
+- [ ] `loadCurrentState`: Count owned copies with something like `Collections.frequency(ownedIds, cardId)` instead of `hasProject`. *(SnapshotDialog.java)*
+- [ ] `onApply`: Call `builder.addProject(i, id)` N times where N is the spinner value. *(SnapshotDialog.java)*
+- [ ] Spinner upper bound: For a given card type, the total across all players cannot exceed 6. Optionally enforce this per-spinner or in `GameStateBuilder.build()` validation. *(SnapshotDialog.java or GameStateBuilder.java)*
 
 ---
 
-## Rules Correctness Bugs
+## Known Approximations (Accepted)
 
-These are deviations from the official rules that affect the accuracy of EV recommendations.
+These are documented deviations from optimal accuracy that have been reviewed and accepted.
 
-### 1. Income Processing Order: Red → Blue/Green → Purple
-**Priority: High — correctness issue**
-
-RULES.md: *"Rot → Blau & Grün → Violett"* — red card payments must be resolved **first**, before the active player receives any blue or green income.
-
-**Current state:** `computeNetGainForRoll` processes Blue → Green → Purple → Red. Because blue and green income is credited before red costs are deducted, the active player appears richer when red card clamping is evaluated. This means the model underestimates how often the active player cannot fully pay red card demands — making red cards look slightly weaker (to their owners) and slightly cheaper (to the roller) than they really are.
-
-**What needs fixing:**
-- [x] Reorder `computeNetGainForRoll` to process: Red first (against `activeCoins` before any income), then Blue, then Green, then Purple. *(ProbabilityCalc.java)*
-- [x] `computeNetGainForRoll` currently tracks `remainingCoins` for sequential red deductions. After the reorder, `remainingCoins` for red should start at `activeCoins` (not `activeCoins + net`). *(ProbabilityCalc.java)*
-- [x] `GameSession.applyTurn` computes all deltas simultaneously using `computeNetGainForRollPublic`. After the fix, verify that `applyTurn` produces the same result as the corrected EV model so the live game tracking stays consistent. *(GameSession.java)*
-- [x] Update `ARCHITECTURE.md` to document the correct processing order. *(ARCHITECTURE.md)*
-
-### 2. Counter-Clockwise Red Card Payment Order
-**Priority: Medium — correctness issue**
-
-RULES.md: *"Sollten sich aufgrund eines Würfelwurfs mehrere Ansprüche ergeben, werden sie **gegen den Uhrzeigersinn** abgehandelt."* — when multiple red card owners trigger on the same roll, they are paid in counter-clockwise order from the active player. This matters when the active player has fewer coins than the total demand: earlier claimants in counter-clockwise order get paid in full; later claimants get whatever remains.
-
-**Current state:** `computeNetGainForRoll` iterates opponents in ascending index order (0, 1, 2, 3). When the active player is, say, player 2 in a 4-player game, the correct counter-clockwise order is 1, 0, 3 — not 0, 1, 3.
-
-**What needs fixing:**
-- [x] In `computeNetGainForRoll`, build the opponent iteration order as counter-clockwise from the active player: starting at `(playerIndex - 1 + n) % n`, stepping down by 1 mod n, until all opponents are covered. *(ProbabilityCalc.java)*
-- [x] In `GameSession.applyTurn`, when computing red card deltas, apply the same counter-clockwise iteration order so the live tracking matches the corrected EV model. Implemented via new `computeAllDeltasForRoll` which replaced the old simultaneous-delta approach. *(GameSession.java)*
-- [x] In `GameSimulator.applyRoll`, updated to use `computeAllDeltasForRoll`. *(GameSimulator.java)*
-
----
-
-## Known Approximations to Improve
-
-### 1. Bürohaus — Heuristic Model
+### 1. Bürohaus — Optimal-Swap Assumption
 **Priority: Low**
 
-- [ ] `bürohausSwapEV` assumes optimal swap on every activation. A more accurate model would require a state-lookahead pass (design-level change). Acceptable approximation for now.
+`bürohausSwapEV` assumes the player always makes the optimal swap on every activation. In reality the swap is optional. Acceptable heuristic. See `ARCHITECTURE.md §2.8`.
 
-See `ARCHITECTURE.md §2.8` for the current approximation details.
-
-### 2. GameSimulator — Bahnhof Always Uses 2d6
-**Priority: Medium**
-
-- [x] In `GameSimulator.rollDice()`, the dice choice is now based on whether the player owns any cards with activation in the 7–12 range (which benefit from 2d6's bell-curve). If the player only has 1–6 range cards (e.g. early game with only weizenfeld + bäckerei), 1d6 is used instead. This matches the analytical model's dice-choice behavior without expensive per-roll EV computation. *(GameSimulator.java)*
-
-### 3. GameSimulator — Bürohaus Not Executed
+### 2. GameSimulator — Static EV/Cost Table Ignores Synergy
 **Priority: Low**
 
-- [x] In `applyRoll()`, detect if active player owns bürohaus and roll was 6; execute swap of lowest-EV own card for highest-EV opponent card via `ProbabilityCalc.executeBürohausSwap(GameState, int)`. *(GameSimulator.java, ProbabilityCalc.java)*
+`STATIC_EV_PER_COST` is precomputed from a neutral reference state; synergy-heavy builds (e.g. many food cards with Markthalle) make suboptimal buy decisions during simulation. Acceptable for win-rate estimation. See `ARCHITECTURE.md §4.2`.
 
-### 4. `evPerRound` — Static Coin Count
-**Priority: Medium**
-
-- [x] `evPerRound` now projects each player's coins forward by their expected blue+green per-turn income before evaluating red card clamping. `immediateEV` is unaffected (models current turn with actual coins). See `ARCHITECTURE.md §2.4b`. *(ProbabilityCalc.java, CardIncome.java)*
-
-### 5. `singleCardEvPerRound` — No Synergy in Softmax Scores
+### 3. `evPerRound` — Projected Coin Correction is Approximate
 **Priority: Low**
 
-- [x] `computeScores()` now calls `CardIncome.playerEvPerRound(player, numPlayers, opponentCoins)` instead of summing `singleCardEvPerRound` per card. The new method uses the player's actual `PlayerStats` (Einkaufszentrum, food/animal/production counts) and real opponent coin counts, so Molkerei/Möbelfabrik/Markthalle multipliers and purple card values are scored correctly. *(WinProbabilityCalc.java, CardIncome.java)*
+`evPerRound` projects each player's coins forward by `estimateUncappedOwnTurnEV` before evaluating red card clamping. This is a single-step projection (one turn of blue+green income), not a full multi-turn model. Accepted approximation. See `ARCHITECTURE.md §2.4b`.
 
 ---
 
 ## Missing UI Features
 
-### 1. Game-Over Detection
-**Priority: High**
-
-- [x] `GameSimulator.hasWon()` exists but is never called in the live game flow. After buying the 4th landmark the app still shows the ranking table. Fix: in `GameSession.applyTurn()`, check `hasWon()` after a landmark purchase and flag the session as finished. `MainWindow` should show "Player X wins!" instead of the ranking table. *(GameSession.java, MainWindow.java)*
-
-### 2. Bürohaus Buy Advice in UI
+### 1. Roll Outcome Display in Turn Tracker
 **Priority: Medium**
 
-- [x] When bürohaus is the top recommendation, show actionable advice: "Swap your [worst card] for [opponent]'s [best card]". Added `bürohausSwapNote(GameState, int)` to `ProbabilityCalc`; `rankPurchasableProjects` populates `RankEntry.notes`; `MainWindow.buildNote()` shows `entry.notes` when present. *(ProbabilityCalc.java, MainWindow.java)*
+After a roll is entered in the turn input, the center panel should show which coins each player will gain or lose from that roll — so the user can verify the calculation matches what happened on the physical table. Currently the panel only updates after `Confirm Turn` is pressed.
 
-### 3. Snapshot Dialog Validation Feedback
-**Priority: Medium**
-
-- [x] Invalid states (e.g. same purple card owned by two players) currently produce a Java exception. Fix: validate uniqueness constraints in `GameStateBuilder.build()` or `SnapshotDialog.onApply()` and show a `JOptionPane` error instead. *(GameStateBuilder.java, SnapshotDialog.java)*
-
-### 4. "Current Win Probability" Summary
-**Priority: Low**
-
-- [x] Center panel now shows "Current win prob: X.X%" using the analytical softmax baseline. `ProbabilityCalc.computeBaselineWinProb(GameState, int)` exposes the softmax score. `refreshAll()` calls it on every refresh (analytical path, fast). On game over, shows "Current win prob: 100%". *(MainWindow.java, ProbabilityCalc.java)*
-
----
-
-## Code Deduplication & Refactoring
-
-**Goal:** Remove all cases where equivalent logic is written twice. Each item below identifies a concrete duplication, what to extract, and where it lives.
-
-### 1. Dual-Dice EV Loops (4–5 near-identical blocks)
-**Priority: High** · *ProbabilityCalc.java*
-
-- [x] `immediateEV`, `bestSecondRollEV`, `computeNetGainForRoll`, and `computeOpponentTurnGainForRoll` all contained a loop of the form `for (int r = 0; r <= 12; r++) { double prob = hasBahnhof ? P2[r] : P1[r]; ... }`. Extracted `weightedRollEV(boolean use2d6, IntToDoubleFunction payoutFn)` and `bestDiceEV(boolean hasBahnhof, IntToDoubleFunction payoutFn)` helpers — the loop is now written once. *(ProbabilityCalc.java)*
-
-### 2. `buildOpponentCoins` / `buildOtherCoins` — Identical Methods
-**Priority: High** · *ProbabilityCalc.java*
-
-- [x] `buildOtherCoins(int[], int)` (legacy matrix method) and `buildOpponentCoins(Player[], int)` performed the same exclusion algorithm with different input types. Replaced with an overloaded `buildOpponentCoins(int[], int)` and deleted `buildOtherCoins`; the legacy caller now uses the overload. *(ProbabilityCalc.java)*
-
-### 3. Blue/Red Card Income Loops
-**Priority: Medium** · *ProbabilityCalc.java*
-
-- [x] `computeNetGainForRoll` and `computeOpponentTurnGainForRoll` both iterated over a player's owned cards and called `get_I`. The blue card filter-and-sum loop was written 3 times (also in `computeAllDeltasForRoll`). Extracted `sumColorIncome(Player, String color, int roll, PlayerStats, int coins, int[] oppCoins)` helper used by all three callers. *(ProbabilityCalc.java)*
-
-### 4. Initial Game State Setup — 3 Sites
-**Priority: Medium** · *GameState.java, GameSession.java, GameSimulator.java*
-
-- [x] The standard starting state (each player: Weizenfeld + Bäckerei, 3 coins, no landmarks) is constructed in at least 3 places. Audited: all callers use `GameState.initial()` except `undoLastTurn` which must inject custom player names — `GameState.initial()` cannot be used there directly (names default to "Player N"). The `GameStateBuilder` approach in `undoLastTurn` is the correct pattern for that site. *(no change needed)*
-
-### 5. Bahnhof Dice-Choice Pattern
-**Priority: Medium** · *ProbabilityCalc.java*
-
-- [x] The pattern `double p = hasBahnhof ? P2[r] : P1[r]` (or `ev1 vs ev2` EV comparison for 1d6 vs 2d6) appears in at least 3 places. Replaced by `weightedRollEV(boolean use2d6, IntToDoubleFunction)` and `bestDiceEV(boolean hasBahnhof, IntToDoubleFunction)` helpers (see dedup item #1 above). *(ProbabilityCalc.java)*
-
-### 6. `PlayerStats` Computation Duplicated
-**Priority: Medium** · *ProbabilityCalc.java*
-
-- [x] `PlayerStats.of(player)` is called in the hot loop inside `rankPurchasableProjects` but also constructed ad hoc in at least one other location. Verified: all usages are via `PlayerStats.of()` — no inline duplicates. *(ProbabilityCalc.java)*
-
-### 7. `colorForCard()` — Two Versions
-**Priority: Medium** · *MainWindow.java*
-
-- [x] `MainWindow` contained two private methods that map card color strings to `Color` values — one for the table cell renderer (pastel, for backgrounds) and one for the center panel (saturated, for color bars). Consolidated into `colorForCard(String colorId, boolean saturated)` with a one-line wrapper `colorForCard(Project p)`. *(MainWindow.java)*
-
-### 8. `capitalize()` — Identical 4-Line Method
-**Priority: Low** · *MainWindow.java, SnapshotDialog.java*
-
-- [x] Both files defined an identical `capitalize(String s)` helper. Moved to `UIUtils.capitalize()` in a new `gui.newui.UIUtils` class; both callers updated. *(UIUtils.java, MainWindow.java, SnapshotDialog.java)*
-
-### 9. Color Label Construction
-**Priority: Low** · *MainWindow.java, SnapshotDialog.java*
-
-- [x] `colorLabel(String color)` exists only in `SnapshotDialog` (not duplicated in `MainWindow`). No change needed — the PLAN description was inaccurate. *(no change needed)*
-
-### 10. Table Cell Renderer Setup
-**Priority: Low** · *MainWindow.java*
-
-- [x] The redundant renderer setup in `buildRightPanel()` (right-align + `CardNameRenderer`) was removed; `rebuildTable()` is the single site that applies all column renderers and widths. *(MainWindow.java)*
-
-### 11. Supply Deduction Loop
-**Priority: Low** · *GameSimulator.java*
-
-- [x] `GameSimulator.purchase()` already handles supply decrement via `supply.merge(card.getId(), -1, Integer::sum)`. Only called once — no extraction needed; it's already correct and clear. *(no change needed)*
+**What needs fixing:**
+- [ ] When the roll spinner changes (or on a "Preview" button click), call `ProbabilityCalc.computeAllDeltasForRoll(state, activePlayer, roll)` and display per-player deltas in the center panel. *(MainWindow.java)*
+- [ ] Show: "Roll [N]: Player X +3, Player Y −1 (café)" so the user can immediately see and verify the outcome before confirming.
 
 ---
 
 ## Code Quality
 
-### 1. `ProbabilityCalc` Split
-**Priority: Low**
+### 1. File Split Analysis
+**Priority: High**
 
-- [x] `ProbabilityCalc.java` (was 1283 lines) split into three files:
-  - `CardIncome.java` (313 lines) — `P1`/`P2`, `get_I`, `PlayerStats`, `buildOpponentCoins`, `sumColorIncome`, `weightedRollEV`, `bestDiceEV`, `singleCardEvPerRound`. All package-private, pure primitives.
-  - `WinProbabilityCalc.java` (145 lines) — `computeScores`, `softmaxEntry`, `computeBaselineWinProb`, `estimateWinProbDelta`, `mcWinRate`. All package-private.
-  - `ProbabilityCalc.java` (855 lines) — public API facade + `computeNetGainForRoll`, `computeOpponentTurnGainForRoll`, `immediateEV`, `evPerRound`, `roiOverHorizon`, `rankPurchasableProjects`, `computeAllDeltasForRoll`, bürohaus helpers, legacy matrix method, deprecated bridges.
-  Public API and behaviour unchanged. 152/152 tests pass.
+Several source files have grown large enough that they likely warrant splitting. Before doing any split, conduct a deep analysis pass across the whole `src/` tree to identify candidates — looking at line count, number of distinct responsibilities per file, and test coverage boundaries.
+
+Known candidates from prior work:
+- `src/Tests/RuntimeTester.java` — a single ~1800-line class containing all tests, benchmarks, and helpers. Should be split by domain (data-model tests, EV/probability tests, simulation tests, UI/session tests, benchmarks) into separate test classes, ideally under a proper test source root.
+- `src/gui/newui/MainWindow.java` — mixes UI layout, event handling, SwingWorker lifecycle, and game-state read calls. A controller/presenter separation would make event logic independently testable.
+
+**What needs doing:**
+- [ ] Audit every file in `src/` for line count and responsibility count. Produce a prioritised list of split candidates with proposed target structure. *(analysis only — no code changes)*
+- [ ] Split `RuntimeTester.java` into per-domain test classes. *(Tests/)*
+- [ ] Extract a thin `GameController` from `MainWindow` handling turn application, undo, snapshot, and session save/load. *(gui/newui/)*
 
 ### 2. `MainWindow` Controller/View Separation
 **Priority: Low**
 
-- [ ] `MainWindow.java` mixes UI layout, event handling, SwingWorker lifecycle, and game logic. Extracting a thin controller would improve testability.
-
-### 3. MC Timeout Logging
-**Priority: Low**
-
-- [x] `mcWinRate` now collects outcomes into `int[]`, counts timeouts, logs a warning to stderr when timeouts exceed 1% of simulations, and increments `GameSimulator.TIMEOUT_COUNT`. *(ProbabilityCalc.java, GameSimulator.java)*
+Covered under File Split Analysis above — tracked separately so the controller extraction can be done independently of the broader audit.
 
 ---
 
@@ -211,6 +130,3 @@ See `ARCHITECTURE.md §2.8` for the current approximation details.
 
 ### Opponent Modeling
 - [ ] All simulated players use the same greedy policy. Simulating different archetypes (aggressive landmark buyer vs. income maximizer) would produce more realistic win rates.
-
-### Session Persistence
-- [x] `GameSession.save(Path)` serializes the initial state snapshot + turn history to a compact JSON file (`.mkoro`). `GameSession.load(Path)` reconstructs the initial state from the snapshot (not always `GameState.initial()`) and replays turns — correctly handles sessions rooted at mid-game snapshots from `SnapshotDialog`. `MainWindow` has Save/Load buttons backed by `JFileChooser`. *(GameSession.java, MainWindow.java)*

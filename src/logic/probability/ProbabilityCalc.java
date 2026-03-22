@@ -287,26 +287,10 @@ public class ProbabilityCalc {
 
         // --- Blue cards: own blue cards pay from the bank regardless of red losses.
         int[] opponentCoins = buildOpponentCoins(players, playerIndex);
-        for (Project p : activePlayer.getOwned_projects()) {
-            if ("blau".equals(p.getColor())) {
-                net += get_I(roll, p.getId(), true,
-                        activeStats.hasEinkaufszentrum,
-                        activeStats.foodCount, activeStats.animalCount,
-                        activeStats.productionCount,
-                        activeCoins, opponentCoins);
-            }
-        }
+        net += sumColorIncome(activePlayer, "blau", roll, activeStats, activeCoins, opponentCoins);
 
         // --- Green cards: own-turn only, pay from bank.
-        for (Project p : activePlayer.getOwned_projects()) {
-            if ("grün".equals(p.getColor())) {
-                net += get_I(roll, p.getId(), true,
-                        activeStats.hasEinkaufszentrum,
-                        activeStats.foodCount, activeStats.animalCount,
-                        activeStats.productionCount,
-                        activeCoins, opponentCoins);
-            }
-        }
+        net += sumColorIncome(activePlayer, "grün", roll, activeStats, activeCoins, opponentCoins);
 
         // --- Purple cards: own-turn only, fire last.
         //     Stadion/Fernsehsender steal from opponents; re-read opponent coins each time
@@ -343,6 +327,32 @@ public class ProbabilityCalc {
             if (i != excludeIndex) result[idx++] = coins[i];
         }
         return result;
+    }
+
+    /**
+     * Sums {@link #get_I} income for all cards owned by {@code player} that match {@code color}
+     * on the given roll. Used to avoid repeating the filter-and-sum loop for each color.
+     *
+     * @param player   the player whose owned cards to inspect
+     * @param color    card color string to match ("blau", "grün", "lila", etc.)
+     * @param roll     the dice result
+     * @param stats    pre-computed stats for the player
+     * @param coins    current coin count used by {@code get_I} for clamping / synergy
+     * @param oppCoins coins of other players (passed through to {@code get_I})
+     * @return sum of income values for matching cards
+     */
+    private static int sumColorIncome(Player player, String color, int roll,
+                                       PlayerStats stats, int coins, int[] oppCoins) {
+        int net = 0;
+        for (Project p : player.getOwned_projects()) {
+            if (color.equals(p.getColor())) {
+                net += get_I(roll, p.getId(), true,
+                        stats.hasEinkaufszentrum,
+                        stats.foodCount, stats.animalCount, stats.productionCount,
+                        coins, oppCoins);
+            }
+        }
+        return net;
     }
 
     // -------------------------------------------------------------------------
@@ -420,15 +430,8 @@ public class ProbabilityCalc {
         int net = 0;
 
         // Blue cards: tracked player earns from their own blue cards
-        for (Project p : trackedPlayer.getOwned_projects()) {
-            if ("blau".equals(p.getColor())) {
-                net += get_I(roll, p.getId(), true,
-                        trackedStats.hasEinkaufszentrum,
-                        trackedStats.foodCount, trackedStats.animalCount,
-                        trackedStats.productionCount,
-                        trackedCoins, new int[]{rollerCoins});
-            }
-        }
+        net += sumColorIncome(trackedPlayer, "blau", roll, trackedStats,
+                trackedCoins, new int[]{rollerCoins});
 
         // Red cards: tracked player earns from their own red cards (roller pays them)
         for (Project p : trackedPlayer.getOwned_projects()) {
@@ -1078,28 +1081,15 @@ public class ProbabilityCalc {
             Player player = players[i];
             PlayerStats stats = PlayerStats.of(player);
             int[] otherCoins = buildOpponentCoins(players, i);
-            for (Project p : player.getOwned_projects()) {
-                if ("blau".equals(p.getColor())) {
-                    deltas[i] += get_I(roll, p.getId(), true,
-                            stats.hasEinkaufszentrum,
-                            stats.foodCount, stats.animalCount, stats.productionCount,
-                            player.getCoins(), otherCoins);
-                }
-            }
+            deltas[i] += sumColorIncome(player, "blau", roll, stats, player.getCoins(), otherCoins);
         }
 
         // --- Step 3: Green and purple income for the active player (own-turn only).
         Player active = players[activePlayer];
         PlayerStats activeStats = PlayerStats.of(active);
         int[] opponentCoins = buildOpponentCoins(players, activePlayer);
-        for (Project p : active.getOwned_projects()) {
-            if ("grün".equals(p.getColor())) {
-                deltas[activePlayer] += get_I(roll, p.getId(), true,
-                        activeStats.hasEinkaufszentrum,
-                        activeStats.foodCount, activeStats.animalCount, activeStats.productionCount,
-                        active.getCoins(), opponentCoins);
-            }
-        }
+        deltas[activePlayer] += sumColorIncome(active, "grün", roll, activeStats,
+                active.getCoins(), opponentCoins);
         // Purple: re-read opponent coins for each purple card (sequential stealing)
         for (Project p : active.getOwned_projects()) {
             if ("lila".equals(p.getColor())) {

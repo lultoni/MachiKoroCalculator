@@ -137,7 +137,7 @@ See `ARCHITECTURE.md §2.8` for the current approximation details.
 ### 3. Blue/Red Card Income Loops
 **Priority: Medium** · *ProbabilityCalc.java*
 
-- [ ] `computeNetGainForRoll` and `computeOpponentTurnGainForRoll` both iterate over a player's owned cards and call `get_I`. The structure is near-identical. Extract a `sumCardIncome(Player p, int roll, boolean ownTurn, ...)` helper to reduce duplication.
+- [x] `computeNetGainForRoll` and `computeOpponentTurnGainForRoll` both iterated over a player's owned cards and called `get_I`. The blue card filter-and-sum loop was written 3 times (also in `computeAllDeltasForRoll`). Extracted `sumColorIncome(Player, String color, int roll, PlayerStats, int coins, int[] oppCoins)` helper used by all three callers. *(ProbabilityCalc.java)*
 
 ### 4. Initial Game State Setup — 3 Sites
 **Priority: Medium** · *GameState.java, GameSession.java, GameSimulator.java*

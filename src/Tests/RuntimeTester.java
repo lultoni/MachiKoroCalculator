@@ -43,6 +43,7 @@ public class RuntimeTester {
         test_rank_sorted_descending();
         test_rank_excludes_unaffordable();
         test_win_prob_delta_buying_improves_score();
+        test_baseline_win_prob_sums_to_one();
 
         System.out.println("\n=== Phase 6 Bürohaus Tests ===\n");
         test_buerohaus_ev_positive_when_opponents_have_good_cards();
@@ -459,6 +460,20 @@ public class RuntimeTester {
         // At least one card should have a non-negative winProbDelta
         boolean anyPositive = ranking.stream().anyMatch(e -> e.winProbDelta >= -0.01);
         assertTrue("at least one card has non-negative winProbDelta", anyPositive);
+    }
+
+    private static void test_baseline_win_prob_sums_to_one() {
+        // In a symmetric 4-player starting state, win probs should sum to ~1.0
+        GameState gs = GameState.initial(4);
+        double sum = 0.0;
+        for (int i = 0; i < 4; i++) {
+            sum += ProbabilityCalc.computeBaselineWinProb(gs, i);
+        }
+        assertDoubleEq("baseline win probs sum to 1.0 over 4 players", 1.0, sum, 1e-9);
+        // In a symmetric state each player should have equal probability (~0.25)
+        double p0 = ProbabilityCalc.computeBaselineWinProb(gs, 0);
+        assertTrue("each player in symmetric state has ~0.25 win prob (was " + p0 + ")",
+                Math.abs(p0 - 0.25) < 0.01);
     }
 
     // =========================================================================

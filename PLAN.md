@@ -116,7 +116,7 @@ See `ARCHITECTURE.md §2.8` for the current approximation details.
 ### 4. "Current Win Probability" Summary
 **Priority: Low**
 
-- [ ] The win-prob column shows delta-per-card but no overall baseline win probability. Fix: in `refreshAll()`, call `estimateWinProbDelta` (or `mcWinRate`) with a null candidate to get the baseline; display it in the center panel header. *(MainWindow.java, ProbabilityCalc.java)*
+- [x] Center panel now shows "Current win prob: X.X%" using the analytical softmax baseline. `ProbabilityCalc.computeBaselineWinProb(GameState, int)` exposes the softmax score. `refreshAll()` calls it on every refresh (analytical path, fast). On game over, shows "Current win prob: 100%". *(MainWindow.java, ProbabilityCalc.java)*
 
 ---
 
@@ -202,7 +202,7 @@ See `ARCHITECTURE.md §2.8` for the current approximation details.
 ### 3. MC Timeout Logging
 **Priority: Low**
 
-- [ ] `GameSimulator.simulate()` returns -1 on timeout (> 200 turns). These are silently discarded. Add a counter/log line when timeouts exceed 1% of simulations to detect degenerate states. *(GameSimulator.java)*
+- [x] `mcWinRate` now collects outcomes into `int[]`, counts timeouts, logs a warning to stderr when timeouts exceed 1% of simulations, and increments `GameSimulator.TIMEOUT_COUNT`. *(ProbabilityCalc.java, GameSimulator.java)*
 
 ---
 

@@ -728,6 +728,21 @@ public class ProbabilityCalc {
     // -------------------------------------------------------------------------
 
     /**
+     * Returns the baseline win probability for {@code playerIndex} in the current state,
+     * using the analytical softmax score approximation (no Monte Carlo).
+     *
+     * <p>This is the same scoring function used internally by {@link #estimateWinProbDelta}:
+     * {@code score(p) = Σ singleCardEvPerRound × REMAINING_TURNS + Σ LANDMARK_WEIGHT}.
+     *
+     * @param gs          current game state
+     * @param playerIndex the player whose win probability to estimate
+     * @return estimated win probability in [0, 1]
+     */
+    public static double computeBaselineWinProb(GameState gs, int playerIndex) {
+        return softmaxEntry(computeScores(gs), playerIndex);
+    }
+
+    /**
      * Estimates the change in win probability for playerIndex from buying {@code candidate}.
      *
      * <h3>Analytical mode ({@code mcSimulations == 0})</h3>

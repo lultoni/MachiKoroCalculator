@@ -160,6 +160,7 @@ The codebase is now a single active layer with no legacy code.
 - `roiOverHorizon` — geometric-series discounted ROI + variance + probNoIncome, returns `RankEntry`.
 - `estimateWinProbDelta` — analytical softmax win-probability delta; also accepts MC path when `mcSimulations > 0`.
 - `rankPurchasableProjects` — sorted list of all affordable cards by ROI; computes MC baseline once and reuses it across all candidates.
+- `computeBaselineWinProb(GameState, int)` — public method returning the analytical softmax win probability for a player in the current state (no MC). Used by `MainWindow.refreshAll()` to display "Current win prob: X.X%".
 - `public static mcWinRate(GameState, int, int)` — runs N parallel Monte Carlo simulations via `IntStream.parallel()` + `ThreadLocalRandom`; returns win rate in [0, 1].
 - Package-visible bridges: `computeNetGainForRollPublic`, `computeOpponentTurnGainForRollPublic` — used by `GameSession.applyTurn` and `GameSimulator`.
 

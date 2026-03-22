@@ -4,7 +4,24 @@ All phases of the original implementation plan are complete. This file records w
 
 ---
 
-## Bürohaus swap executed in GameSimulator
+## Baseline win probability display in center panel
+
+**Goal:** Show each player's current estimated win probability in the center panel so the player can gauge their overall position without having to buy a specific card first.
+
+**What was done:**
+
+- Added `ProbabilityCalc.computeBaselineWinProb(GameState, int)` (public) — returns the analytical softmax win probability for the active player based on current card ownership and landmark count. Backed by the same `computeScores` + `softmaxEntry` path used by `estimateWinProbDelta`.
+- `MainWindow.refreshAll()` calls `computeBaselineWinProb` on every refresh (analytical, always fast) and updates a new `baselineWinProbLabel` in the center panel with "Current win prob: X.X%".
+- On game over, the label shows "Current win prob: 100%".
+- In a symmetric 4-player starting state each player shows ~25%.
+
+**Tests:** 152/152 pass. Two new tests in `test_baseline_win_prob_sums_to_one`:
+- Sum of baseline win probs over all 4 players = 1.0 exactly.
+- Each player in symmetric state has ~0.25 win prob.
+
+---
+
+
 
 **Goal:** Monte Carlo simulations now correctly model bürohaus card-swaps, making win-probability estimates for bürohaus more accurate.
 

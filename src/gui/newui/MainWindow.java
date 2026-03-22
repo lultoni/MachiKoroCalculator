@@ -58,6 +58,7 @@ public class MainWindow extends JFrame {
     private JLabel topCardWinProb;
     private JLabel topCardNote;
     private JPanel topCardColorBar;
+    private JLabel baselineWinProbLabel;
 
     // ---- right panel components ----
     private DefaultTableModel tableModel;
@@ -224,6 +225,13 @@ public class MainWindow extends JFrame {
         panel.add(wrap(topCardRisk));
         panel.add(wrap(topCardWinProb));
 
+        panel.add(Box.createVerticalStrut(6));
+
+        baselineWinProbLabel = new JLabel("Current win prob: —");
+        baselineWinProbLabel.setFont(new Font("Arial", Font.BOLD, 12));
+        baselineWinProbLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        panel.add(wrap(baselineWinProbLabel));
+
         panel.add(Box.createVerticalStrut(12));
 
         topCardNote = new JLabel("<html><i>—</i></html>");
@@ -379,6 +387,7 @@ public class MainWindow extends JFrame {
         topCardROI.setText("");
         topCardRisk.setText("");
         topCardWinProb.setVisible(false);
+        baselineWinProbLabel.setText("Current win prob: 100%");
         topCardNote.setText("<html><i>Game over. Use Undo to continue or close the window.</i></html>");
 
         // Clear the ranking table — no more purchases
@@ -405,6 +414,10 @@ public class MainWindow extends JFrame {
         // History and undo must always update immediately
         refreshHistory();
         undoBtn.setEnabled(!session.getHistory().isEmpty());
+
+        // Baseline win probability (analytical, always fast — shown regardless of MC mode)
+        double baselineWinProb = ProbabilityCalc.computeBaselineWinProb(session.getState(), pi);
+        baselineWinProbLabel.setText(String.format("Current win prob: %.1f%%", baselineWinProb * 100));
 
         if (rankOpts.mcSimulations > 0) {
             // MC path: run ranking on background thread to keep UI responsive

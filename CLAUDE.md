@@ -112,32 +112,39 @@ Do not batch documentation updates — apply them as part of the same change tha
 
 There are **two separate, incompatible implementations** of the game model:
 
-**Legacy layer (`src/logic/`)** — the old system, not yet removed:
-- `logic.Game` / `logic.Player` / `logic.Project` / `logic.Category` — project data is hardcoded as a fixed array of 19 entries (index-based, not ID-based). EV is computed via `Player.getEX()` using mutable `diceValuesOwn`/`diceValuesOthers` arrays and `Project.doEffect()` side effects. `Game.getBestProjects()` does a naive score-diff approach without proper probability math.
-- `gui.*` — Swing-based UI (BootWindow, GameWindow, etc.) wired to the legacy model.
+**Legacy layer (`src/logic/`)** — tagged for deletion in Phase 4:
+- `logic.Game` / `logic.Player` / `logic.Project` / `logic.Category` — project data is hardcoded as a fixed array of 19 entries. Marked `// LEGACY — to be removed in Phase 4`.
+- `gui.boot.*` / `gui.game.*` — old Swing UI wired to the legacy model. These compile but are no longer launched by `Main.main()`.
 
-**New probability layer (`src/logic/probability/`)** — the active development target:
+**New probability layer (`src/logic/probability/`)** — active development target:
 - `probability.Project` — immutable POJO (id, category, color, cost, dice_activation, is_grossprojekt). Has `equals`/`hashCode` on `id` and `toString`. Id field is injected from the JSON key by `ProjectLoader`.
 - `probability.Player` — name, coins, `ArrayList<Project> owned_projects`. Constructor validates `coins >= 0`. Has `copy()` (shallow-copies the list — safe because `Project` is immutable).
 - `probability.GameState` — holds `Player[]` + `ArrayList<Project> unbuilt_projects`. Constructor validates 2–4 players, no nulls. `copy()` uses `Player.copy()` + `new ArrayList<>()`. `GameState.initial(numPlayers)` builds the standard starting state (each player: Weizenfeld + Bäckerei, 3 coins; 17 cards in unbuilt pool).
 - `probability.ProjectLoader` — static cache (`Map<String, Project>`) built once at class load from classpath. `getProject(id)` returns `Optional<Project>`. `getAllProjects()` returns a new `ArrayList` of all 19 projects. **`src/` must be on the runtime classpath** for resource loading to work.
+- `probability.GameStateBuilder` — fluent builder for constructing a `GameState` from user inputs (setCoins, addProject, build). Used by the UI and snapshot dialog.
+- `probability.TurnRecord` — immutable record of one turn (playerIndex, roll, bought project or null).
+- `probability.GameSession` — wraps a mutable `GameState` with a full `ArrayList<TurnRecord>` history. Methods: `applyTurn`, `undoLastTurn`, `toSnapshot` (→ builder), `fromSnapshot` (builder → new session), `nextPlayerIndex`. Bidirectional turn-by-turn ↔ snapshot conversion.
 - `probability.ProbabilityCalc` — the core math class (see below).
 - `probability.RankEntry` — result POJO for rankings.
 - `probability.RankingOptions` — options for `rankPurchasableProjects` (horizonTurns, discountFactor, mcSimulations, includeWinProbDelta).
 
-### ProbabilityCalc — what's done vs. what's TODO
+**New UI (`src/gui/newui/`)** — launched by `logic.Main.main()`:
+- `gui.newui.SetupWindow` — game setup screen (player count, names, Start button). Builds the initial `GameSession` from a `GameStateBuilder` and opens `MainWindow`.
+- `gui.newui.MainWindow` — three-column window: left = turn input (roll spinner, buy dropdown, Confirm Turn, Undo, Snapshot button, history log); center = top recommendation (card name, EV/round, ROI, risk, optional win-prob delta); right = full ranking table (sorted by ROI, color-coded by card type). Win-probability delta is on-demand (toggle button, not shown by default).
+- `gui.newui.SnapshotDialog` — modal dialog for editing the full game state mid-session (tabs per player with coin spinner + checkbox grid of all 19 cards). On apply, calls `MainWindow.replaceSession()` to re-root the session at the snapshot.
 
-**Implemented:**
-- `get_P1(r)` / `get_P2(r)` — 1d6 / 2d6 probabilities.
-- `get_I(r, p_id, oop, eb, f_c, a_c, p_c, c, co)` — coin income/cost for a single project on a given roll. Encodes all base-game card effects as a switch on string ID.
-- `values_per_r_per_p(playerProjects, playerCoins)` — builds a (players×4 colors) × 12 roll matrix of total income values.
-- `immediateEV(gs, playerIndex, candidate, returnAfterCost)` — expected coins gained in the buyer's *current turn* after simulating a purchase. Handles 1d6 vs. 2d6 choice (Bahnhof), Freizeitpark double-roll EV, Funkturm. Calls `computeNetGainForRoll` (not yet visible in file — expected to exist) and `bestSecondRollEV`.
+### ProbabilityCalc — all methods implemented (Phase 2 complete)
 
-**Stub methods (TODO — bodies missing):**
-- `evPerRound` — EV until all other players have had one turn (blue cards trigger on others' turns).
-- `roiOverHorizon` — discounted ROI over N turns, returns `RankEntry`.
-- `estimateWinProbDelta` — Expectimax or Monte Carlo win probability delta.
-- `rankPurchasableProjects` — ranked list of all affordable projects using the above metrics.
+- `get_P1(r)` / `get_P2(r)` — 1d6 / 2d6 probabilities (pre-computed arrays).
+- `get_I(r, p_id, oop, eb, f_c, a_c, p_c, c, co)` — coin income/cost for a single project on a given roll. All 19 base-game cards implemented. `bürohaus` returns 0 (non-monetary card-swap; FIXME Phase 6).
+- `computeNetGainForRoll` / `computeOpponentTurnGainForRoll` — per-roll coin delta for active player and passive player respectively.
+- `bestSecondRollEV` — EV of best re-roll after Freizeitpark doubles.
+- `immediateEV` — own-turn EV including Bahnhof/Freizeitpark/Funkturm.
+- `evPerRound` — full-round EV (own turn + N−1 opponent turns, blue and red cards).
+- `roiOverHorizon` — geometric-series discounted ROI + variance + probNoIncome, returns `RankEntry`.
+- `estimateWinProbDelta` — analytical softmax win-probability delta.
+- `rankPurchasableProjects` — sorted list of all affordable cards by ROI.
+- Package-visible bridges: `computeNetGainForRollPublic`, `computeOpponentTurnGainForRollPublic` — used by `GameSession.applyTurn`.
 
 ### Project data
 
@@ -151,4 +158,5 @@ All 19 base-game cards are defined in `src/resources/jsons/projects.json` with f
 
 ### `get_I` note
 
-`get_I` uses German string IDs (e.g. `"weizenfeld"`, `"café"`, `"möbelfabrik"`). These must match exactly the `id` keys in `projects.json`. The `bürohaus` card exists in the JSON but has no case in `get_I` yet.
+`get_I` uses German string IDs (e.g. `"weizenfeld"`, `"café"`, `"möbelfabrik"`). These must match exactly the `id` keys in `projects.json`. `bürohaus` has a case that returns 0 — its non-monetary effect is deferred to Phase 6.
+

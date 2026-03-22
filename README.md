@@ -4,10 +4,13 @@ A decision-support tool for the base game of Machi Koro. Given the current game 
 
 ## Features
 
+- Turn-by-turn game tracking with full undo history
+- Snapshot mode: enter or edit the game state at any point; continue turn-by-turn from a snapshot
 - Expected value calculation per project per game state
 - Considers 1d6 vs. 2d6 choice (Bahnhof), Einkaufszentrum bonuses, Freizeitpark double-roll, Funkturm re-roll
-- Ranks all affordable projects by immediate EV, ROI over N turns, and win probability delta
-- Swing-based GUI for live game tracking
+- Ranks all affordable projects by EV/round, ROI over 10 turns (discounted), and risk (P=0 income)
+- Optional win-probability delta column (toggle button)
+- Three-column Swing GUI: turn input | top recommendation | full ranked table
 
 ## Requirements
 
@@ -31,11 +34,23 @@ java -cp "out:src:gson-2.11.0.jar" Tests.RuntimeTester
 
 ```
 src/
-  logic/                    # Legacy game model (not yet removed)
-  logic/probability/        # Active development — math engine
-  gui/                      # Swing UI (wired to legacy model)
+  logic/                    # Legacy game model (tagged for removal in Phase 4)
+  logic/probability/        # Active probability layer — math engine + data model
+    GameState.java          # Mutable game state (Player[] + unbuilt pool)
+    GameStateBuilder.java   # Fluent builder for constructing GameState from user inputs
+    GameSession.java        # Turn-by-turn tracker with undo + snapshot conversion
+    TurnRecord.java         # Immutable record of one turn (roll + purchase)
+    ProbabilityCalc.java    # Pure-static math engine (EV, ROI, variance, rankings)
+    ProjectLoader.java      # JSON loader with static cache
+    RankEntry.java          # Result POJO for ranked recommendations
+    RankingOptions.java     # Options (horizon, discount factor, win-prob flag)
+  gui/newui/                # New Swing UI (launched by Main)
+    SetupWindow.java        # New game setup (player count + names)
+    MainWindow.java         # Main three-column game window
+    SnapshotDialog.java     # Mid-game snapshot editor
+  gui/boot/, gui/game/      # Legacy Swing UI (not launched; removed in Phase 4)
   resources/jsons/          # projects.json — all 19 base-game cards
-  Tests/                    # Runtime performance tests
+  Tests/                    # RuntimeTester — 108 unit tests + benchmarks
 ```
 
 ## Cards (Base Game)
@@ -49,3 +64,4 @@ All 19 cards from the Machi Koro base game are supported. Project data lives in 
 | Rot    | Opponents' turns   | Café, Familienrestaurant          |
 | Lila   | Own turn, unique   | Stadion, Fernsehsender, Bürohaus  |
 | Gelb   | Landmarks (GP)     | Bahnhof, Einkaufszentrum, …       |
+

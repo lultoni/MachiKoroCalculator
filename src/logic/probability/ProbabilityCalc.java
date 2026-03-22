@@ -943,6 +943,27 @@ public class ProbabilityCalc {
         return result;
     }
 
+    // -------------------------------------------------------------------------
+    // Package-visible bridges for GameSession (turn simulation)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Package-visible wrapper so {@link GameSession} can compute the coin delta
+     * for the active player on their own turn without going through immediateEV.
+     */
+    static int computeNetGainForRollPublic(GameState state, int playerIndex, int roll) {
+        return computeNetGainForRoll(state, playerIndex, roll, false);
+    }
+
+    /**
+     * Package-visible wrapper so {@link GameSession} can compute the coin delta
+     * for a tracked player on an opponent's turn.
+     */
+    static int computeOpponentTurnGainForRollPublic(GameState state, int playerIndex,
+                                                     int activeRollerIndex, int roll) {
+        return computeOpponentTurnGainForRoll(state, playerIndex, activeRollerIndex, roll);
+    }
+
     /**
      * Maps a color string to an index: blau=0, rot=1, grün=2, lila=3, gelb=4, unknown=-1.
      */

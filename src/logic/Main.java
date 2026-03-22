@@ -1,36 +1,18 @@
 package logic;
 
-import gui.boot.BootWindow;
-import gui.game.GameWindow;
+import gui.newui.SetupWindow;
 
-import java.util.ArrayList;
+import javax.swing.*;
 
+// LEGACY — to be removed in Phase 4 once the probability layer and new UI are complete.
 public class Main {
 
+    /** @deprecated LEGACY — referenced only by legacy BootWindow; will be removed in Phase 4. */
+    @Deprecated
     public static boolean boot_finished = false;
 
-    public static void main (String[] args) {
-
-        BootWindow bootWindow = new BootWindow();
-        bootWindow.boot();
-
-        while (!boot_finished) Thread.onSpinWait();
-
-        Game game = new Game(bootWindow.getPlayerNames().length);
-
-        // FIXME [Phase 3]: Replace legacy UI with new GameState-driven window.
-
-        GameWindow gameWindow = new GameWindow(game); // FIXME [Phase 3]: Pass player names to new UI.
-        gameWindow.boot();
-
-        ArrayList<Project[]> player_projects = new ArrayList<>();
-        int[] player_coins = new int[game.getPlayers().length];
-        for (int i = 0; i < game.getPlayers().length; i++) {
-            Player p = game.getPlayers()[i];
-            player_projects.add(p.getProjects());
-            player_coins[i] = p.coins;
-        }
-
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(SetupWindow::new);
     }
 
 }

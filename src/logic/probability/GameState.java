@@ -6,6 +6,26 @@ import java.util.Objects;
 public class GameState {
 
     private final Player[] players;
+    /**
+     * List of card types available for purchase in the current game state.
+     *
+     * <p><b>Semantics:</b> Each entry represents a card <em>type</em> that is still available
+     * in the market (i.e. at least one copy remains). The list does <em>not</em> track how many
+     * physical copies of each type remain — that per-copy supply count is maintained separately
+     * by {@link GameSimulator} (via its {@code Map<String,Integer>} supply map, 6 copies per card).
+     *
+     * <p>Consequences:
+     * <ul>
+     *   <li>A card type appears at most once in this list regardless of how many copies are owned.</li>
+     *   <li>{@link logic.probability.ProbabilityCalc#rankPurchasableProjects} uses this list to
+     *       determine which card types are candidates for purchase; it relies on the supply map
+     *       inside {@link GameSimulator} for copy-count enforcement.</li>
+     *   <li>When a card type is fully exhausted (all 6 copies owned), it should be removed from
+     *       this list to stop appearing as a purchase candidate. Currently the UI's
+     *       {@link GameStateBuilder} does not enforce this automatically — it is the caller's
+     *       responsibility to keep this list consistent with player ownership.</li>
+     * </ul>
+     */
     private final ArrayList<Project> unbuilt_projects;
 
     /**
@@ -34,8 +54,9 @@ public class GameState {
     }
 
     /**
-     * Returns the mutable list of projects not yet purchased by any player.
-     * Projects in this list are available for purchase in the current game state.
+     * Returns the mutable list of card types still available in the market (at least one copy
+     * remains). Each card type appears at most once. See field-level Javadoc for the distinction
+     * between this "available types" model and the per-copy supply count in {@link GameSimulator}.
      */
     public ArrayList<Project> getUnbuilt_projects() {
         return unbuilt_projects;

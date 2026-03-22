@@ -29,7 +29,7 @@ The current model does not correctly enforce Machi Koro's per-player ownership l
 
 - [x] `rankPurchasableProjects` should exclude purple cards the active player already owns (unique cards). *(ProbabilityCalc.java)*
 - [x] The snapshot dialog should prevent checking a purple card for a player who already owns one. *(SnapshotDialog.java)*
-- [ ] `GameState.unbuilt_projects` semantics should be clarified (or changed) to reflect supply counts, not just presence. *(GameState.java)*
+- [x] `GameState.unbuilt_projects` semantics clarified in Javadoc: the list stores one entry per card *type* (presence), not per copy. Per-copy supply counts are tracked separately by `GameSimulator`. The distinction between "available types" and "copies remaining" is documented on the field and `getUnbuilt_projects()`. *(GameState.java)*
 - [x] `GameStateBuilder` should throw if a purple card is added twice to the same player. *(GameStateBuilder.java)*
 
 ---

@@ -142,7 +142,7 @@ See `ARCHITECTURE.md §2.8` for the current approximation details.
 ### 4. Initial Game State Setup — 3 Sites
 **Priority: Medium** · *GameState.java, GameSession.java, GameSimulator.java*
 
-- [ ] The standard starting state (each player: Weizenfeld + Bäckerei, 3 coins, no landmarks) is constructed in at least 3 places. Centralise into `GameState.initial(int numPlayers)` (already exists); audit all sites to ensure they use only this factory method.
+- [x] The standard starting state (each player: Weizenfeld + Bäckerei, 3 coins, no landmarks) is constructed in at least 3 places. Audited: all callers use `GameState.initial()` except `undoLastTurn` which must inject custom player names — `GameState.initial()` cannot be used there directly (names default to "Player N"). The `GameStateBuilder` approach in `undoLastTurn` is the correct pattern for that site. *(no change needed)*
 
 ### 5. Bahnhof Dice-Choice Pattern
 **Priority: Medium** · *ProbabilityCalc.java*
@@ -167,17 +167,17 @@ See `ARCHITECTURE.md §2.8` for the current approximation details.
 ### 9. Color Label Construction
 **Priority: Low** · *MainWindow.java, SnapshotDialog.java*
 
-- [ ] `colorLabel(String color)` (or equivalent logic that returns a colored `JLabel` or string for a card's color) is duplicated across files. Centralise into `UIUtils.colorLabel(String color)`.
+- [x] `colorLabel(String color)` exists only in `SnapshotDialog` (not duplicated in `MainWindow`). No change needed — the PLAN description was inaccurate. *(no change needed)*
 
 ### 10. Table Cell Renderer Setup
 **Priority: Low** · *MainWindow.java*
 
-- [ ] Two blocks in `buildRightPanel()` and `rebuildTable()` both set up the same custom `DefaultTableCellRenderer` with color-coded rows. Extract a `makeColoredRenderer(...)` factory method.
+- [x] The redundant renderer setup in `buildRightPanel()` (right-align + `CardNameRenderer`) was removed; `rebuildTable()` is the single site that applies all column renderers and widths. *(MainWindow.java)*
 
 ### 11. Supply Deduction Loop
 **Priority: Low** · *GameSimulator.java*
 
-- [ ] The loop that decrements supply counts after a purchase is written inline. Consider extracting `decrementSupply(Map<String,Integer> supply, String cardId)` for clarity even if it's currently only called once.
+- [x] `GameSimulator.purchase()` already handles supply decrement via `supply.merge(card.getId(), -1, Integer::sum)`. Only called once — no extraction needed; it's already correct and clear. *(no change needed)*
 
 ---
 

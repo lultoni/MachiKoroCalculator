@@ -252,17 +252,10 @@ public class MainWindow extends JFrame {
             if (!e.getValueIsAdjusting()) onTableSelect();
         });
 
-        // Right-align numeric columns
-        DefaultTableCellRenderer rightAlign = new DefaultTableCellRenderer();
-        rightAlign.setHorizontalAlignment(SwingConstants.RIGHT);
-        for (int c = 1; c <= 5; c++) rankTable.getColumnModel().getColumn(c).setCellRenderer(rightAlign);
-
-        // Column widths
+        // Right-align numeric columns and card name color renderer are applied in rebuildTable().
+        // Column widths (fixed initial values; rebuildTable also restores these)
         rankTable.getColumnModel().getColumn(0).setPreferredWidth(110);
         for (int c = 1; c <= 5; c++) rankTable.getColumnModel().getColumn(c).setPreferredWidth(55);
-
-        // Color renderer for card name column
-        rankTable.getColumnModel().getColumn(0).setCellRenderer(new CardNameRenderer());
 
         panel.add(new JScrollPane(rankTable), BorderLayout.CENTER);
 

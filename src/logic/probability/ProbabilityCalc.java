@@ -179,8 +179,8 @@ public class ProbabilityCalc {
                 return Math.min(5, richest);
             }
             case "bürohaus" -> {
-                // Card-swap effect — non-monetary, cannot be modelled as a coin delta.
-                // FIXME [Phase 6]: model bürohaus after design decision with user.
+                // Card-swap effect modelled separately in immediateEV via bürohausSwapEV().
+                // Returns 0 here because get_I only handles coin deltas per roll.
                 return 0;
             }
         }
@@ -492,6 +492,15 @@ public class ProbabilityCalc {
             }
 
             evTotal = Math.max(ev1, ev2);
+        }
+
+        // Bürohaus card-swap EV: fires on own turn when roll = 6 (lila, own-turn only).
+        // bürohausSwapEV() approximates the net EV gain from trading the player's lowest-EV
+        // non-landmark for the opponent's highest-EV non-landmark.
+        if (player.hasProject("bürohaus")) {
+            double swapEV = bürohausSwapEV(state, playerIndex);
+            double p6 = hasBahnhof ? P2[6] : P1[6];
+            evTotal += p6 * swapEV;
         }
 
         if (returnAfterCost) return evTotal - candidate.getCost();
@@ -863,6 +872,48 @@ public class ProbabilityCalc {
             ev *= numPlayers;
         }
         return ev;
+    }
+
+    /**
+     * Approximates the coin-equivalent EV of a bürohaus card-swap for the active player.
+     * <p>
+     * The heuristic assumes the player makes the optimal swap: they trade their
+     * lowest-EV owned non-landmark establishment for the highest-EV non-landmark
+     * establishment owned by any opponent. The bürohaus itself is excluded from the
+     * "trade away" candidates since it is the trigger card.
+     * <p>
+     * Returns 0 if the swap would be neutral or unfavourable (e.g. the player already owns
+     * better cards than any opponent, or opponents own no non-landmark cards).
+     *
+     * @param state       game state with the candidate card (bürohaus) already in the player's list
+     * @param playerIndex the active player
+     * @return per-activation EV gain (≥ 0; clamped below by 0)
+     */
+    private static double bürohausSwapEV(GameState state, int playerIndex) {
+        Player active = state.getPlayers()[playerIndex];
+        int n = state.getPlayers().length;
+
+        // Worst owned non-landmark the player might give away (exclude bürohaus itself)
+        double worstOwnEV = Double.MAX_VALUE;
+        for (Project p : active.getOwned_projects()) {
+            if (!p.isIs_grossprojekt() && !p.getId().equals("bürohaus")) {
+                worstOwnEV = Math.min(worstOwnEV, singleCardEvPerRound(p, n));
+            }
+        }
+        if (worstOwnEV == Double.MAX_VALUE) worstOwnEV = 0.0; // nothing to trade away
+
+        // Best non-landmark card any opponent owns (the card to take)
+        double bestOppEV = 0.0;
+        for (int i = 0; i < n; i++) {
+            if (i == playerIndex) continue;
+            for (Project p : state.getPlayers()[i].getOwned_projects()) {
+                if (!p.isIs_grossprojekt()) {
+                    bestOppEV = Math.max(bestOppEV, singleCardEvPerRound(p, n));
+                }
+            }
+        }
+
+        return Math.max(0.0, bestOppEV - worstOwnEV);
     }
 
     /**

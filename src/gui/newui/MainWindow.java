@@ -69,6 +69,11 @@ public class MainWindow extends JFrame {
     // ---- snapshot / live state for the current-player recommendation ----
     private ArrayList<RankEntry> lastRanking = new ArrayList<>();
 
+    /**
+     * Constructs and displays the main game window for the given session.
+     *
+     * @param session active game session (turn history + current state)
+     */
     public MainWindow(GameSession session) {
         this.session = session;
         setTitle("Machi Koro Calculator");

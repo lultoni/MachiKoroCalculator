@@ -24,6 +24,7 @@ public class SetupWindow extends JFrame {
     private JPanel nameFieldPanel;
     private final JTextField[] nameFields = new JTextField[4];
 
+    /** Constructs and displays the setup window on the EDT. */
     public SetupWindow() {
         setTitle("Machi Koro Calculator — New Game");
         setDefaultCloseOperation(EXIT_ON_CLOSE);

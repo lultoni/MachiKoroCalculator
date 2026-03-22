@@ -133,7 +133,7 @@
     "cost": 8,
     "dice_activation": [6],
     "color": "lila",
-    "description": "Tausche ein beliebiges Nicht-Großprojekt-Gebäude mit einem Mitspieler. (Nur in deinem Zug) [FIXME Phase 2: non-monetary effect not yet modelled in get_I]"
+    "description": "Tausche ein beliebiges Nicht-Großprojekt-Gebäude mit einem Mitspieler. (Nur in deinem Zug)"
   },
   "stadion": {
     "category": "office",

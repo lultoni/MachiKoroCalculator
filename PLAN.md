@@ -14,7 +14,7 @@
 | 3 — Game State Config UI | ✅ Done | — | Turn-by-turn + snapshot mode; SetupWindow, MainWindow, SnapshotDialog, GameStateBuilder, GameSession |
 | 4 — Remove Legacy Code | ✅ Done | — | 14 legacy files deleted; Main.java clean; zero warnings |
 | 5 — Monte Carlo Deep Mode | ✅ Done | — | 128/128 tests pass, 56ms/1000 sims; GameSimulator, SwingWorker UI, Deep Analysis toggle |
-| 6 — Polish & Final Integration | ⬜ Pending | — | Blocked on Phase 5 |
+| 6 — Polish & Final Integration | ✅ Done | — | 130/130 tests pass; bürohaus EV heuristic, full Javadoc, final benchmarks |
 
 ---
 

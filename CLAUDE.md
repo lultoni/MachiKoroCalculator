@@ -136,6 +136,7 @@ The codebase is now a single active layer with no legacy code.
 - `get_P1(r)` / `get_P2(r)` — 1d6 / 2d6 probabilities (pre-computed arrays).
 - `get_I(r, p_id, oop, eb, f_c, a_c, p_c, c, co)` — coin income/cost for a single project on a given roll. All 19 base-game cards implemented. `bürohaus` returns 0 (non-monetary card-swap; FIXME Phase 6).
 - `computeNetGainForRoll` / `computeOpponentTurnGainForRoll` — per-roll coin delta for active player and passive player respectively.
+- `bürohausSwapEV(GameState, int)` — private helper that approximates the coin-equivalent EV of a bürohaus card-swap: `max(0, bestOppCardEV − worstOwnCardEV)` using `singleCardEvPerRound`.
 - `bestSecondRollEV` — EV of best re-roll after Freizeitpark doubles.
 - `immediateEV` — own-turn EV including Bahnhof/Freizeitpark/Funkturm.
 - `evPerRound` — full-round EV (own turn + N−1 opponent turns, blue and red cards).
@@ -170,5 +171,5 @@ All 19 base-game cards are defined in `src/resources/jsons/projects.json` with f
 
 ### `get_I` note
 
-`get_I` uses German string IDs (e.g. `"weizenfeld"`, `"café"`, `"möbelfabrik"`). These must match exactly the `id` keys in `projects.json`. `bürohaus` has a case that returns 0 — its non-monetary effect is deferred to Phase 6.
+`get_I` uses German string IDs (e.g. `"weizenfeld"`, `"café"`, `"möbelfabrik"`). These must match exactly the `id` keys in `projects.json`. `bürohaus` returns 0 in `get_I` because its card-swap effect is non-monetary; the EV contribution is computed separately in `immediateEV` via `bürohausSwapEV()` and added as `P(roll=6) × swapEV`.
 

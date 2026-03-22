@@ -29,6 +29,12 @@ public class SnapshotDialog extends JDialog {
     private final JCheckBox[][] projectChecks;  // [player][projectIndex]
     private final ArrayList<Project> allProjects;
 
+    /**
+     * Constructs and displays the snapshot editor as a modal dialog.
+     *
+     * @param parent  owning main window (used for dialog ownership and session replacement)
+     * @param session the current game session whose state is pre-loaded into the form
+     */
     public SnapshotDialog(MainWindow parent, GameSession session) {
         super(parent, "Edit Snapshot", true);
         this.parent = parent;

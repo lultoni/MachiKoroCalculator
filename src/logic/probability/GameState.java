@@ -25,10 +25,18 @@ public class GameState {
         this.unbuilt_projects = unbuilt_projects;
     }
 
+    /**
+     * Returns the player array (not a copy — mutating players' coins or projects is visible
+     * to all holders of this state).
+     */
     public Player[] getPlayers() {
         return players;
     }
 
+    /**
+     * Returns the mutable list of projects not yet purchased by any player.
+     * Projects in this list are available for purchase in the current game state.
+     */
     public ArrayList<Project> getUnbuilt_projects() {
         return unbuilt_projects;
     }

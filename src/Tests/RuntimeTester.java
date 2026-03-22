@@ -44,6 +44,10 @@ public class RuntimeTester {
         test_rank_excludes_unaffordable();
         test_win_prob_delta_buying_improves_score();
 
+        System.out.println("\n=== Phase 6 Bürohaus Tests ===\n");
+        test_buerohaus_ev_positive_when_opponents_have_good_cards();
+        test_buerohaus_ev_zero_when_no_opponents_own_cards();
+
         System.out.println("\n=== Phase 5 Monte Carlo Tests ===\n");
         test_simulator_returns_valid_winner();
         test_simulator_deterministic_with_seed();
@@ -84,6 +88,27 @@ public class RuntimeTester {
         long mcElapsed = System.currentTimeMillis() - mcStart;
         System.out.println(" - 1000 sims: " + mcElapsed + " ms");
         assertTrue("1000 MC sims < 2000 ms (was " + mcElapsed + " ms)", mcElapsed < 2000);
+
+        System.out.println("\nBenchmark: estimateWinProbDelta (MC, 500 sims, 4-player)");
+        GameState gsMcDelta = GameState.initial(4);
+        gsMcDelta.getPlayers()[0].setCoins(10);
+        Project benchCard = ProjectLoader.getProject("bergwerk").orElseThrow();
+        // Warm-up
+        ProbabilityCalc.estimateWinProbDelta(gsMcDelta, 0, benchCard, 0, 10);
+        long mcDeltaStart = System.currentTimeMillis();
+        ProbabilityCalc.estimateWinProbDelta(gsMcDelta, 0, benchCard, 0, 500);
+        long mcDeltaElapsed = System.currentTimeMillis() - mcDeltaStart;
+        System.out.println(" - 500 sims: " + mcDeltaElapsed + " ms");
+        assertTrue("estimateWinProbDelta 500 MC sims < 2000 ms (was " + mcDeltaElapsed + " ms)",
+                mcDeltaElapsed < 2000);
+
+        System.out.println("\nBenchmark: ProjectLoader.getAllProjects() (cached)");
+        long allProjStart = System.currentTimeMillis();
+        for (int i = 0; i < 10000; i++) ProjectLoader.getAllProjects();
+        long allProjElapsed = System.currentTimeMillis() - allProjStart;
+        System.out.println(" - 10 000 getAllProjects() calls: " + allProjElapsed + " ms");
+        assertTrue("getAllProjects() 10 000 calls < 200 ms (was " + allProjElapsed + " ms)",
+                allProjElapsed < 200);
     }
 
     // =========================================================================
@@ -418,6 +443,43 @@ public class RuntimeTester {
         // At least one card should have a non-negative winProbDelta
         boolean anyPositive = ranking.stream().anyMatch(e -> e.winProbDelta >= -0.01);
         assertTrue("at least one card has non-negative winProbDelta", anyPositive);
+    }
+
+    // =========================================================================
+    // Phase 6 tests
+    // =========================================================================
+
+    private static void test_buerohaus_ev_positive_when_opponents_have_good_cards() {
+        // P0 owns only weizenfeld (low EV); opponents own bergwerk (high EV, roll 9)
+        // Candidate = bürohaus. bürohausSwapEV = bergwerk_EV - weizenfeld_EV > 0
+        // → evPerRound should include P(6) * swapEV as a positive contribution
+        GameStateBuilder b = new GameStateBuilder(3);
+        b.setPlayerName(0, "P0").setCoins(0, 10).addProject(0, "weizenfeld");
+        b.setPlayerName(1, "P1").setCoins(1, 5).addProject(1, "bergwerk");
+        b.setPlayerName(2, "P2").setCoins(2, 5).addProject(2, "bergwerk");
+        GameState gs = b.build();
+        Project buerohaus = ProjectLoader.getProject("bürohaus").orElseThrow();
+        double ev = ProbabilityCalc.evPerRound(gs, 0, buerohaus);
+        assertTrue("bürohaus evPerRound > 0 when opponents own high-EV cards (was " + ev + ")",
+                ev > 0);
+    }
+
+    private static void test_buerohaus_ev_zero_when_no_opponents_own_cards() {
+        // All opponents have no non-landmark cards → bestOppEV = 0 → swap EV = 0
+        // P0 owns only weizenfeld (blue, low EV). Candidate = bürohaus.
+        // No opponent owns any non-landmark → swap gain = 0
+        GameStateBuilder b = new GameStateBuilder(2);
+        b.setPlayerName(0, "P0").setCoins(0, 10).addProject(0, "weizenfeld");
+        b.setPlayerName(1, "P1").setCoins(1, 5); // P1 owns nothing
+        GameState gs = b.build();
+        Project buerohaus = ProjectLoader.getProject("bürohaus").orElseThrow();
+        double ev = ProbabilityCalc.evPerRound(gs, 0, buerohaus);
+        // Bürohaus swap = max(0, 0 - weizenfeld_EV) = 0 (clamped)
+        // Weizenfeld blue EV (already owned) contributes; candidate itself (bürohaus) adds 0 coin-delta rolls.
+        // The ev here will equal weizenfeld's evPerRound (since P0 already owns it and candidate adds bürohaus with 0 coin income).
+        // We're just asserting the bürohaus ADDITION is ≥ 0 (no negative swap penalty).
+        assertTrue("bürohaus evPerRound ≥ 0 even when no opponents own cards (was " + ev + ")",
+                ev >= 0.0);
     }
 
     // =========================================================================

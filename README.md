@@ -7,7 +7,7 @@ A decision-support tool for the base game of Machi Koro. Given the current game 
 - Turn-by-turn game tracking with full undo history
 - Snapshot mode: enter or edit the game state at any point; continue turn-by-turn from a snapshot
 - Expected value calculation per project per game state
-- Considers 1d6 vs. 2d6 choice (Bahnhof), Einkaufszentrum bonuses, Freizeitpark double-roll, Funkturm re-roll
+- Considers 1d6 vs. 2d6 choice (Bahnhof), Einkaufszentrum bonuses, Freizeitpark double-roll, Funkturm re-roll, and Bürohaus card-swap EV heuristic
 - Ranks all affordable projects by EV/round, ROI over 10 turns (discounted), and risk (P=0 income)
 - Optional win-probability delta column: analytical (softmax) or Monte Carlo (toggle button)
 - **Deep Analysis mode**: 1000 Monte Carlo game simulations per candidate for accurate win-probability deltas (< 100ms with parallelStream); toggled via "Deep Analysis" button
@@ -51,7 +51,7 @@ src/
     MainWindow.java         # Main three-column game window
     SnapshotDialog.java     # Mid-game snapshot editor
   resources/jsons/          # projects.json — all 19 base-game cards
-  Tests/                    # RuntimeTester — 108 unit tests + benchmarks
+  Tests/                    # RuntimeTester — 130 unit tests + benchmarks
 ```
 
 ## Cards (Base Game)

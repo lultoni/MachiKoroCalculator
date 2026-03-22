@@ -130,9 +130,9 @@ See `ARCHITECTURE.md §2.8` for the current approximation details.
 - [x] `immediateEV`, `bestSecondRollEV`, `computeNetGainForRoll`, and `computeOpponentTurnGainForRoll` all contained a loop of the form `for (int r = 0; r <= 12; r++) { double prob = hasBahnhof ? P2[r] : P1[r]; ... }`. Extracted `weightedRollEV(boolean use2d6, IntToDoubleFunction payoutFn)` and `bestDiceEV(boolean hasBahnhof, IntToDoubleFunction payoutFn)` helpers — the loop is now written once. *(ProbabilityCalc.java)*
 
 ### 2. `buildOpponentCoins` / `buildOtherCoins` — Identical Methods
-**Priority: High** · *MainWindow.java (×2 or SnapshotDialog.java)*
+**Priority: High** · *ProbabilityCalc.java*
 
-- [ ] Two methods with different names perform the same operation: building a coins array from all players except the active one. Consolidate into one method (e.g. `getCoinsExcluding(Player[] players, int excludeIdx)`), possibly moved to a static utility or `GameState`.
+- [x] `buildOtherCoins(int[], int)` (legacy matrix method) and `buildOpponentCoins(Player[], int)` performed the same exclusion algorithm with different input types. Replaced with an overloaded `buildOpponentCoins(int[], int)` and deleted `buildOtherCoins`; the legacy caller now uses the overload. *(ProbabilityCalc.java)*
 
 ### 3. Blue/Red Card Income Loops
 **Priority: Medium** · *ProbabilityCalc.java*

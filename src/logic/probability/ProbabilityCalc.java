@@ -335,6 +335,16 @@ public class ProbabilityCalc {
         return coins;
     }
 
+    /** Builds a sub-array excluding the element at excludeIndex (overload for raw coin arrays). */
+    private static int[] buildOpponentCoins(int[] coins, int excludeIndex) {
+        int[] result = new int[coins.length - 1];
+        int idx = 0;
+        for (int i = 0; i < coins.length; i++) {
+            if (i != excludeIndex) result[idx++] = coins[i];
+        }
+        return result;
+    }
+
     // -------------------------------------------------------------------------
     // Dice-roll EV helpers — eliminate repeated 1d6/2d6 loop boilerplate
     // -------------------------------------------------------------------------
@@ -975,7 +985,7 @@ public class ProbabilityCalc {
         for (int playerIndex = 0; playerIndex < playerProjects.size(); playerIndex++) {
             Project[] projects = playerProjects.get(playerIndex);
             int ownCoins = playerCoins[playerIndex];
-            int[] otherCoins = buildOtherCoins(playerCoins, playerIndex);
+            int[] otherCoins = buildOpponentCoins(playerCoins, playerIndex);
 
             // Count synergy categories for this player
             boolean hasEB = false;
@@ -1003,15 +1013,6 @@ public class ProbabilityCalc {
             }
         }
         return valueMatrix;
-    }
-
-    private static int[] buildOtherCoins(int[] coins, int excludeIndex) {
-        int[] result = new int[coins.length - 1];
-        int idx = 0;
-        for (int i = 0; i < coins.length; i++) {
-            if (i != excludeIndex) result[idx++] = coins[i];
-        }
-        return result;
     }
 
     // -------------------------------------------------------------------------

@@ -101,7 +101,7 @@ rollSpinner = new JSpinner(new SpinnerNumberModel(7, 1, 12, 1));
 Range is never updated when the turn changes to a player without Bahnhof.
 
 **What needs fixing:**
-- [ ] On every turn change (after `Confirm Turn`, after `Undo`, after `replaceSession`), update the spinner model: `max = activePlayer.hasProject("bahnhof") ? 12 : 6`, `min = activePlayer.hasProject("bahnhof") ? 2 : 1`. Clamp the current spinner value into the new range if it is out of bounds. *(MainWindow.java)*
+- [ ] On every turn change (after `Confirm Turn`, after `Undo`, after `replaceSession`), update the spinner model: `max = activePlayer.hasProject("bahnhof") ? 12 : 6`, `min = 1` always (player with Bahnhof may still choose to roll 1d6). Clamp the current spinner value into the new range if it is out of bounds. *(MainWindow.java)*
 - [ ] Default the spinner to a sensible value on turn change: e.g. `7` when Bahnhof is owned (mode of 2d6), `3` or `4` when not (middle of 1d6). *(MainWindow.java)*
 
 ### 2. Roll Outcome Display in Turn Tracker

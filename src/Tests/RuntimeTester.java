@@ -2,6 +2,8 @@ package Tests;
 
 import logic.probability.*;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Optional;
 
@@ -10,7 +12,7 @@ public class RuntimeTester {
     private static int passed = 0;
     private static int failed = 0;
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws Exception {
         System.out.println("\n=== Phase 1 Model Tests ===\n");
         test_project_loader_count();
         test_project_loader_known_project();
@@ -70,6 +72,11 @@ public class RuntimeTester {
         System.out.println("\n=== Game-Over Detection Tests ===\n");
         test_game_over_on_fourth_landmark();
         test_no_game_over_before_fourth_landmark();
+
+        System.out.println("\n=== Session Persistence Tests ===\n");
+        test_save_and_load_roundtrip();
+        test_load_restores_player_names_and_history_size();
+        test_load_invalid_file_throws();
 
         System.out.println("\n--- Results: " + passed + " passed, " + failed + " failed ---");
 
@@ -789,6 +796,70 @@ public class RuntimeTester {
 
         assertTrue("session.isFinished() is false after only 3 landmarks", !session.isFinished());
         assertTrue("session.getWinnerIndex() == -1 when game not finished", session.getWinnerIndex() == -1);
+    }
+
+    private static void test_save_and_load_roundtrip() throws Exception {
+        // Start from a fresh 2-player initial state (matches what load() reconstructs)
+        GameSession session = new GameSession(GameState.initial(2), new String[]{"Alice", "Bob"});
+        session.applyTurn(new TurnRecord(0, 1, null));
+        // Bob buys bauernhof (cost 1, in unbuilt pool)
+        Project bauernhof = ProjectLoader.getProject("bauernhof").orElseThrow();
+        session.applyTurn(new TurnRecord(1, 2, bauernhof));
+
+        // Save and reload
+        Path tmp = Files.createTempFile("mkoro_test_", ".mkoro");
+        try {
+            session.save(tmp);
+            GameSession loaded = GameSession.load(tmp);
+            assertTrue("roundtrip: nextPlayerIndex matches",
+                    loaded.nextPlayerIndex() == session.nextPlayerIndex());
+            assertTrue("roundtrip: history size matches",
+                    loaded.getHistory().size() == session.getHistory().size());
+            assertTrue("roundtrip: Alice coins match after roll 1",
+                    loaded.getState().getPlayers()[0].getCoins()
+                            == session.getState().getPlayers()[0].getCoins());
+            assertTrue("roundtrip: Bob owns bauernhof after load",
+                    loaded.getState().getPlayers()[1].hasProject("bauernhof"));
+        } finally {
+            Files.deleteIfExists(tmp);
+        }
+    }
+
+    private static void test_load_restores_player_names_and_history_size() throws Exception {
+        GameSession session = new GameSession(
+                GameState.initial(3), new String[]{"Spieler1", "Spieler2", "Spieler3"});
+        session.applyTurn(new TurnRecord(0, 5, null));
+        session.applyTurn(new TurnRecord(1, 2, null));
+
+        Path tmp = Files.createTempFile("mkoro_test2_", ".mkoro");
+        try {
+            session.save(tmp);
+            GameSession loaded = GameSession.load(tmp);
+            assertTrue("names restored: Spieler1",
+                    "Spieler1".equals(loaded.getPlayerNames()[0]));
+            assertTrue("names restored: Spieler3",
+                    "Spieler3".equals(loaded.getPlayerNames()[2]));
+            assertTrue("history size 2 after load",
+                    loaded.getHistory().size() == 2);
+        } finally {
+            Files.deleteIfExists(tmp);
+        }
+    }
+
+    private static void test_load_invalid_file_throws() throws Exception {
+        Path tmp = Files.createTempFile("mkoro_bad_", ".mkoro");
+        try {
+            Files.writeString(tmp, "{\"playerNames\":[\"A\"],\"turns\":[{\"playerIndex\":0,\"roll\":7,\"boughtId\":\"no_such_card\"}]}");
+            boolean threw = false;
+            try {
+                GameSession.load(tmp);
+            } catch (IllegalArgumentException ex) {
+                threw = true;
+            }
+            assertTrue("load with unknown card id throws IllegalArgumentException", threw);
+        } finally {
+            Files.deleteIfExists(tmp);
+        }
     }
 
     private static void assertTrue(String label, boolean condition) {

@@ -4,10 +4,12 @@ import logic.probability.*;
 
 import javax.swing.*;
 import javax.swing.border.TitledBorder;
+import javax.swing.filechooser.FileNameExtensionFilter;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.awt.event.ActionEvent;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -170,6 +172,23 @@ public class MainWindow extends JFrame {
         snapshotBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 34));
         snapshotBtn.addActionListener(this::onOpenSnapshot);
         panel.add(snapshotBtn);
+
+        panel.add(Box.createVerticalStrut(6));
+
+        // Save / Load buttons
+        JButton saveBtn = new JButton("Save Game…");
+        saveBtn.setAlignmentX(Component.LEFT_ALIGNMENT);
+        saveBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 34));
+        saveBtn.addActionListener(this::onSave);
+        panel.add(saveBtn);
+
+        panel.add(Box.createVerticalStrut(4));
+
+        JButton loadBtn = new JButton("Load Game…");
+        loadBtn.setAlignmentX(Component.LEFT_ALIGNMENT);
+        loadBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 34));
+        loadBtn.addActionListener(this::onLoad);
+        panel.add(loadBtn);
 
         panel.add(Box.createVerticalStrut(14));
 
@@ -372,6 +391,39 @@ public class MainWindow extends JFrame {
     private void onOpenSnapshot(ActionEvent e) {
         new SnapshotDialog(this, session).setVisible(true);
         refreshAll();
+    }
+
+    private void onSave(ActionEvent e) {
+        JFileChooser fc = new JFileChooser();
+        fc.setDialogTitle("Save Game");
+        fc.setFileFilter(new FileNameExtensionFilter("Machi Koro save files (*.mkoro)", "mkoro"));
+        fc.setSelectedFile(new java.io.File("game.mkoro"));
+        if (fc.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) return;
+        Path path = fc.getSelectedFile().toPath();
+        if (!path.toString().endsWith(".mkoro")) {
+            path = path.resolveSibling(path.getFileName() + ".mkoro");
+        }
+        try {
+            session.save(path);
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, "Could not save: " + ex.getMessage(),
+                    "Save Failed", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void onLoad(ActionEvent e) {
+        JFileChooser fc = new JFileChooser();
+        fc.setDialogTitle("Load Game");
+        fc.setFileFilter(new FileNameExtensionFilter("Machi Koro save files (*.mkoro)", "mkoro"));
+        if (fc.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) return;
+        Path path = fc.getSelectedFile().toPath();
+        try {
+            GameSession loaded = GameSession.load(path);
+            replaceSession(loaded);
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, "Could not load: " + ex.getMessage(),
+                    "Load Failed", JOptionPane.ERROR_MESSAGE);
+        }
     }
 
     private void showGameOver(String winnerName) {

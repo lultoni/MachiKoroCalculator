@@ -1,5 +1,18 @@
 package logic.probability;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+
+import java.io.IOException;
+import java.io.Reader;
+import java.io.Writer;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -197,4 +210,107 @@ public class GameSession {
     public int getWinnerIndex() {
         return winnerIndex;
     }
+
+    // -------------------------------------------------------------------------
+    // Persistence — save / load
+    // -------------------------------------------------------------------------
+
+    /**
+     * Saves this session to a JSON file at {@code path}.
+     *
+     * <p>The file stores the player names and the full turn history. The live game state is
+     * not stored directly — it is reconstructed on load by replaying the turns from the
+     * initial state. This keeps the file compact and self-consistent.
+     *
+     * <p>File format:
+     * <pre>
+     * {
+     *   "playerNames": ["Alice", "Bob"],
+     *   "turns": [
+     *     {"playerIndex": 0, "roll": 7, "boughtId": "bäckerei"},
+     *     {"playerIndex": 1, "roll": 3, "boughtId": null}
+     *   ]
+     * }
+     * </pre>
+     *
+     * @param path destination file path (created or overwritten)
+     * @throws IOException if the file cannot be written
+     */
+    public void save(Path path) throws IOException {
+        Gson gson = new GsonBuilder().setPrettyPrinting().create();
+        JsonObject root = new JsonObject();
+
+        JsonArray names = new JsonArray();
+        for (String n : playerNames) names.add(n);
+        root.add("playerNames", names);
+
+        JsonArray turns = new JsonArray();
+        for (TurnRecord t : history) {
+            JsonObject turn = new JsonObject();
+            turn.addProperty("playerIndex", t.playerIndex);
+            turn.addProperty("roll", t.roll);
+            if (t.bought != null) {
+                turn.addProperty("boughtId", t.bought.getId());
+            } else {
+                turn.add("boughtId", com.google.gson.JsonNull.INSTANCE);
+            }
+            turns.add(turn);
+        }
+        root.add("turns", turns);
+
+        try (Writer w = Files.newBufferedWriter(path, StandardCharsets.UTF_8)) {
+            gson.toJson(root, w);
+        }
+    }
+
+    /**
+     * Loads a previously saved session from a JSON file.
+     *
+     * <p>Reconstructs the live game state by replaying all stored turns from the initial
+     * game state. The returned session's history will match the turns in the file.
+     *
+     * @param path source file path
+     * @return restored session
+     * @throws IOException              if the file cannot be read
+     * @throws IllegalArgumentException if the file is malformed or contains invalid turns
+     */
+    public static GameSession load(Path path) throws IOException {
+        try (Reader r = Files.newBufferedReader(path, StandardCharsets.UTF_8)) {
+            JsonObject root = JsonParser.parseReader(r).getAsJsonObject();
+
+            JsonArray namesArr = root.getAsJsonArray("playerNames");
+            String[] names = new String[namesArr.size()];
+            for (int i = 0; i < names.length; i++) {
+                names[i] = namesArr.get(i).getAsString();
+            }
+
+            GameStateBuilder builder = new GameStateBuilder(names.length);
+            for (int i = 0; i < names.length; i++) {
+                builder.setPlayerName(i, names[i]);
+                builder.setCoins(i, 3);
+                builder.addProject(i, "weizenfeld");
+                builder.addProject(i, "bäckerei");
+            }
+            GameSession session = new GameSession(builder.build(), names);
+
+            JsonArray turnsArr = root.getAsJsonArray("turns");
+            for (JsonElement el : turnsArr) {
+                JsonObject t = el.getAsJsonObject();
+                int pi = t.get("playerIndex").getAsInt();
+                int roll = t.get("roll").getAsInt();
+                JsonElement boughtEl = t.get("boughtId");
+                Project bought = null;
+                if (boughtEl != null && !boughtEl.isJsonNull()) {
+                    String id = boughtEl.getAsString();
+                    bought = ProjectLoader.getProject(id)
+                            .orElseThrow(() -> new IllegalArgumentException(
+                                    "Unknown project id in save file: " + id));
+                }
+                session.applyTurn(new TurnRecord(pi, roll, bought));
+            }
+            return session;
+        }
+    }
 }
+
+

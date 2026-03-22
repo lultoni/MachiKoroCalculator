@@ -64,6 +64,10 @@ public class RuntimeTester {
         test_red_fires_before_green_income();
         test_red_payment_counter_clockwise_order();
 
+        System.out.println("\n=== Game-Over Detection Tests ===\n");
+        test_game_over_on_fourth_landmark();
+        test_no_game_over_before_fourth_landmark();
+
         System.out.println("\n--- Results: " + passed + " passed, " + failed + " failed ---");
 
         System.out.println("\n=== Runtime Benchmarks ===\n");
@@ -680,6 +684,51 @@ public class RuntimeTester {
     }
 
 
+
+    // =========================================================================
+    // Game-Over Detection Tests
+    // =========================================================================
+
+    private static void test_game_over_on_fourth_landmark() {
+        // Player 0 already owns 3 landmarks; buying the 4th should mark the session as finished.
+        GameStateBuilder b = new GameStateBuilder(2);
+        b.setPlayerName(0, "P0").setCoins(0, 25)  // 25 coins — enough for funkturm (22)
+                .addProject(0, "weizenfeld")
+                .addProject(0, "bahnhof")
+                .addProject(0, "einkaufszentrum")
+                .addProject(0, "freizeitpark");
+        b.setPlayerName(1, "P1").setCoins(1, 3).addProject(1, "weizenfeld");
+        GameState gs = b.build();
+
+        logic.probability.GameSession session =
+                new logic.probability.GameSession(gs, new String[]{"P0", "P1"});
+        Project funkturm = ProjectLoader.getProject("funkturm").orElseThrow();
+        logic.probability.TurnRecord turn = new logic.probability.TurnRecord(0, 7, funkturm);
+        session.applyTurn(turn);
+
+        assertTrue("session.isFinished() after 4th landmark", session.isFinished());
+        assertTrue("session.getWinnerIndex() == 0", session.getWinnerIndex() == 0);
+    }
+
+    private static void test_no_game_over_before_fourth_landmark() {
+        // Player 0 buys their 3rd landmark — game should NOT be over yet.
+        GameStateBuilder b = new GameStateBuilder(2);
+        b.setPlayerName(0, "P0").setCoins(0, 20)
+                .addProject(0, "weizenfeld")
+                .addProject(0, "bahnhof")
+                .addProject(0, "einkaufszentrum");
+        b.setPlayerName(1, "P1").setCoins(1, 3).addProject(1, "weizenfeld");
+        GameState gs = b.build();
+
+        logic.probability.GameSession session =
+                new logic.probability.GameSession(gs, new String[]{"P0", "P1"});
+        Project freizeitpark = ProjectLoader.getProject("freizeitpark").orElseThrow();
+        logic.probability.TurnRecord turn = new logic.probability.TurnRecord(0, 7, freizeitpark);
+        session.applyTurn(turn);
+
+        assertTrue("session.isFinished() is false after only 3 landmarks", !session.isFinished());
+        assertTrue("session.getWinnerIndex() == -1 when game not finished", session.getWinnerIndex() == -1);
+    }
 
     private static void assertTrue(String label, boolean condition) {
         if (condition) {

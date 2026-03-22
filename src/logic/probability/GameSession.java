@@ -21,6 +21,8 @@ public class GameSession {
     private GameState state;
     private final ArrayList<TurnRecord> history = new ArrayList<>();
     private final String[] playerNames;
+    private boolean finished = false;
+    private int winnerIndex = -1;
 
     /**
      * Creates a new session from an initial game state.
@@ -82,6 +84,12 @@ public class GameSession {
 
             buyer.getOwned_projects().add(card);
             buyer.setCoins(buyer.getCoins() - card.getCost());
+
+            // Check win condition: owning all 4 landmarks ends the game immediately
+            if (GameSimulator.hasWon(buyer)) {
+                finished = true;
+                winnerIndex = pi;
+            }
         }
 
         history.add(record);
@@ -113,6 +121,10 @@ public class GameSession {
             builder.addProject(i, "bäckerei");
         }
         this.state = builder.build();
+
+        // Reset win state — will be re-set if the replayed turns include a win
+        finished = false;
+        winnerIndex = -1;
 
         ArrayList<TurnRecord> toReplay = new ArrayList<>(history.subList(0, history.size() - 1));
         history.clear();
@@ -174,5 +186,15 @@ public class GameSession {
     /** Returns the index of the player whose turn comes next (round-robin). */
     public int nextPlayerIndex() {
         return history.size() % state.getPlayers().length;
+    }
+
+    /** Returns true if a player has won the game (all 4 landmarks purchased). */
+    public boolean isFinished() {
+        return finished;
+    }
+
+    /** Returns the index of the winning player, or -1 if the game is not yet finished. */
+    public int getWinnerIndex() {
+        return winnerIndex;
     }
 }

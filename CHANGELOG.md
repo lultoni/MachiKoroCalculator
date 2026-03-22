@@ -4,6 +4,24 @@ All phases of the original implementation plan are complete. This file records w
 
 ---
 
+## Game-Over Detection
+
+**Goal:** When a player buys their 4th landmark in a live session, flag the session as finished and show a win screen instead of continuing to prompt for more turns.
+
+**What was done:**
+
+- `GameSession` now has `private boolean finished` and `private int winnerIndex` (both reset on `undoLastTurn`).
+- `applyTurn()` calls `GameSimulator.hasWon(buyer)` after any landmark purchase; if true, sets `finished = true` and `winnerIndex = pi`.
+- Two new accessors: `isFinished()` and `getWinnerIndex()`.
+- `MainWindow.onConfirmTurn()` checks `session.isFinished()` after applying the turn; if true, calls `showGameOver(winnerName)` instead of `refreshAll()`.
+- `MainWindow.showGameOver(String)` disables the Confirm button, updates the center panel with a "Player X wins!" message and a gold color bar, clears the ranking table, and sets the status label to "Game over!". Undo remains enabled so players can verify the final state.
+
+**Tests:** 142/142 pass. Two new tests added:
+- `test_game_over_on_fourth_landmark`: P0 owns 3 landmarks; buys Funkturm → `isFinished()` true, `getWinnerIndex()` == 0.
+- `test_no_game_over_before_fourth_landmark`: P0 buys 3rd landmark → `isFinished()` false.
+
+---
+
 ## Rules Correctness: Income Order and Counter-Clockwise Payment
 
 **Goal:** Make the EV model and live game tracking fully conform to the official rules.

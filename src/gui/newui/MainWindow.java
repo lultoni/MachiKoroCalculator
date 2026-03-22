@@ -308,6 +308,12 @@ public class MainWindow extends JFrame {
             return;
         }
 
+        if (session.isFinished()) {
+            String winner = session.getPlayerNames()[session.getWinnerIndex()];
+            showGameOver(winner);
+            return;
+        }
+
         refreshAll();
     }
 
@@ -365,6 +371,26 @@ public class MainWindow extends JFrame {
     private void onOpenSnapshot(ActionEvent e) {
         new SnapshotDialog(this, session).setVisible(true);
         refreshAll();
+    }
+
+    private void showGameOver(String winnerName) {
+        // Disable further input
+        confirmBtn.setEnabled(false);
+        undoBtn.setEnabled(true);
+
+        // Replace center panel content with a win message
+        topCardColorBar.setBackground(CARD_COLORS[4]); // gelb — landmark color
+        topCardName.setText(winnerName + " wins!");
+        topCardCost.setText("");
+        topCardEV.setText("All 4 landmarks built.");
+        topCardROI.setText("");
+        topCardRisk.setText("");
+        topCardWinProb.setVisible(false);
+        topCardNote.setText("<html><i>Game over. Use Undo to continue or close the window.</i></html>");
+
+        // Clear the ranking table — no more purchases
+        tableModel.setRowCount(0);
+        statusLabel.setText("Game over!");
     }
 
     // =========================================================================

@@ -101,7 +101,7 @@ See `ARCHITECTURE.md §2.8` for the current approximation details.
 ### 1. Game-Over Detection
 **Priority: High**
 
-- [ ] `GameSimulator.hasWon()` exists but is never called in the live game flow. After buying the 4th landmark the app still shows the ranking table. Fix: in `GameSession.applyTurn()`, check `hasWon()` after a landmark purchase and flag the session as finished. `MainWindow` should show "Player X wins!" instead of the ranking table. *(GameSession.java, MainWindow.java)*
+- [x] `GameSimulator.hasWon()` exists but is never called in the live game flow. After buying the 4th landmark the app still shows the ranking table. Fix: in `GameSession.applyTurn()`, check `hasWon()` after a landmark purchase and flag the session as finished. `MainWindow` should show "Player X wins!" instead of the ranking table. *(GameSession.java, MainWindow.java)*
 
 ### 2. Bürohaus Buy Advice in UI
 **Priority: Medium**

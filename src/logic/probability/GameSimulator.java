@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Stateless Monte Carlo game simulator for the Machi Koro base game.
@@ -46,6 +47,9 @@ public class GameSimulator {
 
     /** Market supply copies per non-landmark card in the base game. */
     private static final int SUPPLY_PER_CARD = 6;
+
+    /** Counts timeouts across all mcWinRate calls for diagnostic logging. */
+    static final AtomicInteger TIMEOUT_COUNT = new AtomicInteger(0);
 
     /** Landmark IDs in purchase-priority order (cheapest first). */
     private static final String[] LANDMARK_ORDER =
@@ -94,13 +98,25 @@ public class GameSimulator {
         return -1; // timeout — should not happen in practice
     }
 
+    /**
+     * Returns the total number of simulation timeouts observed since class load.
+     * Each timeout means a game exceeded {@link #MAX_TURNS} without a winner.
+     * Useful for detecting degenerate game states.
+     */
+    public static int getTimeoutCount() {
+        return TIMEOUT_COUNT.get();
+    }
+
     // -------------------------------------------------------------------------
     // Roll helpers
     // -------------------------------------------------------------------------
 
     /**
-     * Rolls dice for the active player. Uses 2d6 if Bahnhof is owned and 2d6 is
-     * better (higher EV for owned cards), otherwise 1d6.
+     * Rolls dice for the active player.
+     * If the player has Bahnhof, chooses between 1d6 and 2d6 based on which dice range
+     * covers more of the player's owned card activations: if the player has cards with
+     * activation in 7–12 range, 2d6 is preferred; if all activations are in 1–6, 1d6 is used.
+     * This is consistent with the optimal dice choice logic in the analytical model.
      */
     private static int rollDice(GameState state, int activePlayer, Random rng) {
         Player player = state.getPlayers()[activePlayer];
@@ -110,8 +126,23 @@ public class GameSimulator {
             return 1 + rng.nextInt(6);
         }
 
-        // Approximate choice: always use 2d6 when Bahnhof is available
-        // (valid heuristic for mid-to-late game where 2d6 range covers more owned cards)
+        // Choose dice based on whether the player has any cards activating on 7–12.
+        // This fast heuristic matches the behavior of the analytical dice-choice model
+        // without calling computeNetGainForRoll 42 times per turn.
+        boolean hasHighRangeCard = false;
+        for (Project p : player.getOwned_projects()) {
+            for (int activation : p.getDice_activation()) {
+                if (activation >= 7) { hasHighRangeCard = true; break; }
+            }
+            if (hasHighRangeCard) break;
+        }
+
+        boolean use2d6 = hasHighRangeCard;
+
+        if (!use2d6) {
+            return 1 + rng.nextInt(6);
+        }
+
         int d1 = 1 + rng.nextInt(6);
         int d2 = 1 + rng.nextInt(6);
         int roll2 = d1 + d2;

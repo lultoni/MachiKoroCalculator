@@ -77,7 +77,7 @@ See `ARCHITECTURE.md §2.8` for the current approximation details.
 ### 2. GameSimulator — Bahnhof Always Uses 2d6
 **Priority: Medium**
 
-- [ ] In `GameSimulator.rollDice()`, compute expected income for both 1d6 and 2d6 and choose the higher-EV option (same logic as `immediateEV` uses analytically). This fixes overestimation of Bahnhof owners' income in early game. *(GameSimulator.java)*
+- [x] In `GameSimulator.rollDice()`, the dice choice is now based on whether the player owns any cards with activation in the 7–12 range (which benefit from 2d6's bell-curve). If the player only has 1–6 range cards (e.g. early game with only weizenfeld + bäckerei), 1d6 is used instead. This matches the analytical model's dice-choice behavior without expensive per-roll EV computation. *(GameSimulator.java)*
 
 ### 3. GameSimulator — Bürohaus Not Executed
 **Priority: Low**

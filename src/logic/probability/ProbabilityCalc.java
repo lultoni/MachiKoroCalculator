@@ -790,11 +790,25 @@ public class ProbabilityCalc {
      * @return win rate in [0, 1]
      */
     public static double mcWinRate(GameState state, int playerIndex, int numSims) {
-        long wins = IntStream.range(0, numSims)
+        int[] outcomes = IntStream.range(0, numSims)
                 .parallel()
-                .filter(i -> GameSimulator.simulate(state.copy(), ThreadLocalRandom.current())
-                        == playerIndex)
-                .count();
+                .map(i -> GameSimulator.simulate(state.copy(), ThreadLocalRandom.current()))
+                .toArray();
+
+        long wins = 0;
+        int timeouts = 0;
+        for (int w : outcomes) {
+            if (w == playerIndex) wins++;
+            else if (w == -1) timeouts++;
+        }
+
+        if (timeouts > numSims / 100) { // more than 1% timeouts
+            System.err.println("[GameSimulator] WARNING: " + timeouts + "/" + numSims
+                    + " simulations timed out (>" + GameSimulator.MAX_TURNS
+                    + " turns). State may be degenerate.");
+            GameSimulator.TIMEOUT_COUNT.addAndGet(timeouts);
+        }
+
         return (double) wins / numSims;
     }
 

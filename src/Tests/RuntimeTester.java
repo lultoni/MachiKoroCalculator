@@ -76,6 +76,7 @@ public class RuntimeTester {
         System.out.println("\n=== Session Persistence Tests ===\n");
         test_save_and_load_roundtrip();
         test_load_restores_player_names_and_history_size();
+        test_save_and_load_snapshot_rooted_session();
         test_load_invalid_file_throws();
 
         System.out.println("\n--- Results: " + passed + " passed, " + failed + " failed ---");
@@ -841,6 +842,36 @@ public class RuntimeTester {
                     "Spieler3".equals(loaded.getPlayerNames()[2]));
             assertTrue("history size 2 after load",
                     loaded.getHistory().size() == 2);
+        } finally {
+            Files.deleteIfExists(tmp);
+        }
+    }
+
+    private static void test_save_and_load_snapshot_rooted_session() throws Exception {
+        // Simulate a mid-game snapshot: player 0 already has bergwerk (cost 6, not a starter card)
+        GameStateBuilder b = new GameStateBuilder(2);
+        b.setPlayerName(0, "Alice").setCoins(0, 8)
+                .addProject(0, "weizenfeld").addProject(0, "bäckerei").addProject(0, "bergwerk");
+        b.setPlayerName(1, "Bob").setCoins(1, 5)
+                .addProject(1, "weizenfeld").addProject(1, "bäckerei");
+        GameSession snapshotSession = GameSession.fromSnapshot(b, new String[]{"Alice", "Bob"});
+        // Apply one turn from this snapshot state
+        snapshotSession.applyTurn(new TurnRecord(0, 9, null)); // roll 9 triggers bergwerk
+
+        Path tmp = Files.createTempFile("mkoro_snapshot_", ".mkoro");
+        try {
+            snapshotSession.save(tmp);
+            GameSession loaded = GameSession.load(tmp);
+            assertTrue("snapshot session: Alice owns bergwerk after load",
+                    loaded.getState().getPlayers()[0].hasProject("bergwerk"));
+            assertTrue("snapshot session: initial state has bergwerk (not fresh initial)",
+                    loaded.getState().getPlayers()[0].hasProject("bergwerk"));
+            assertTrue("snapshot session: history size 1 after load",
+                    loaded.getHistory().size() == 1);
+            // Alice's coins: started at 8, rolled 9 with bergwerk (earns 5) = 13
+            assertTrue("snapshot session: Alice coins match after bergwerk roll",
+                    loaded.getState().getPlayers()[0].getCoins()
+                            == snapshotSession.getState().getPlayers()[0].getCoins());
         } finally {
             Files.deleteIfExists(tmp);
         }

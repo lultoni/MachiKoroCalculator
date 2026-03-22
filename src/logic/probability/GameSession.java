@@ -32,6 +32,7 @@ import java.util.List;
 public class GameSession {
 
     private GameState state;
+    private final GameState initialState;  // immutable copy of the starting state
     private final ArrayList<TurnRecord> history = new ArrayList<>();
     private final String[] playerNames;
     private boolean finished = false;
@@ -46,6 +47,7 @@ public class GameSession {
     public GameSession(GameState initialState, String[] playerNames) {
         if (playerNames.length != initialState.getPlayers().length)
             throw new IllegalArgumentException("playerNames length must match player count");
+        this.initialState = initialState.copy();
         this.state = initialState.copy();
         this.playerNames = playerNames.clone();
     }
@@ -218,16 +220,21 @@ public class GameSession {
     /**
      * Saves this session to a JSON file at {@code path}.
      *
-     * <p>The file stores the player names and the full turn history. The live game state is
-     * not stored directly — it is reconstructed on load by replaying the turns from the
-     * initial state. This keeps the file compact and self-consistent.
+     * <p>The file stores the initial game state snapshot plus the full turn history.
+     * On load, the initial state is reconstructed from the snapshot and turns are replayed
+     * to restore the live game state. This correctly handles sessions started from a
+     * mid-game snapshot (via {@link #fromSnapshot}) as well as fresh games.
      *
      * <p>File format:
      * <pre>
      * {
      *   "playerNames": ["Alice", "Bob"],
+     *   "initialSnapshot": [
+     *     {"name": "Alice", "coins": 3, "ownedIds": ["weizenfeld", "bäckerei"]},
+     *     {"name": "Bob",   "coins": 3, "ownedIds": ["weizenfeld", "bäckerei"]}
+     *   ],
      *   "turns": [
-     *     {"playerIndex": 0, "roll": 7, "boughtId": "bäckerei"},
+     *     {"playerIndex": 0, "roll": 7, "boughtId": "bauernhof"},
      *     {"playerIndex": 1, "roll": 3, "boughtId": null}
      *   ]
      * }
@@ -243,6 +250,20 @@ public class GameSession {
         JsonArray names = new JsonArray();
         for (String n : playerNames) names.add(n);
         root.add("playerNames", names);
+
+        // Serialize the initial state so load() can reconstruct it exactly,
+        // even for sessions that started from a mid-game snapshot.
+        JsonArray snapshot = new JsonArray();
+        for (Player p : initialState.getPlayers()) {
+            JsonObject ps = new JsonObject();
+            ps.addProperty("name", p.getName());
+            ps.addProperty("coins", p.getCoins());
+            JsonArray ownedIds = new JsonArray();
+            for (Project proj : p.getOwned_projects()) ownedIds.add(proj.getId());
+            ps.add("ownedIds", ownedIds);
+            snapshot.add(ps);
+        }
+        root.add("initialSnapshot", snapshot);
 
         JsonArray turns = new JsonArray();
         for (TurnRecord t : history) {
@@ -266,8 +287,9 @@ public class GameSession {
     /**
      * Loads a previously saved session from a JSON file.
      *
-     * <p>Reconstructs the live game state by replaying all stored turns from the initial
-     * game state. The returned session's history will match the turns in the file.
+     * <p>Reconstructs the initial game state from the stored snapshot, then replays
+     * all turns to restore the live game state. Correctly handles both fresh games
+     * and sessions started from a mid-game snapshot.
      *
      * @param path source file path
      * @return restored session
@@ -284,12 +306,16 @@ public class GameSession {
                 names[i] = namesArr.get(i).getAsString();
             }
 
+            // Reconstruct the initial state from the stored snapshot.
+            JsonArray snapshotArr = root.getAsJsonArray("initialSnapshot");
             GameStateBuilder builder = new GameStateBuilder(names.length);
             for (int i = 0; i < names.length; i++) {
-                builder.setPlayerName(i, names[i]);
-                builder.setCoins(i, 3);
-                builder.addProject(i, "weizenfeld");
-                builder.addProject(i, "bäckerei");
+                JsonObject ps = snapshotArr.get(i).getAsJsonObject();
+                builder.setPlayerName(i, ps.get("name").getAsString());
+                builder.setCoins(i, ps.get("coins").getAsInt());
+                for (JsonElement idEl : ps.getAsJsonArray("ownedIds")) {
+                    builder.addProject(i, idEl.getAsString());
+                }
             }
             GameSession session = new GameSession(builder.build(), names);
 

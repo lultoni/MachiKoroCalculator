@@ -213,4 +213,4 @@ See `ARCHITECTURE.md §2.8` for the current approximation details.
 - [ ] All simulated players use the same greedy policy. Simulating different archetypes (aggressive landmark buyer vs. income maximizer) would produce more realistic win rates.
 
 ### Session Persistence
-- [x] `GameSession.save(Path)` serializes player names + turn history to a compact JSON file (`.mkoro`). `GameSession.load(Path)` restores the session by replaying the history from the initial state — no stored game state, just the event log. `MainWindow` has Save/Load buttons backed by `JFileChooser`. *(GameSession.java, MainWindow.java)*
+- [x] `GameSession.save(Path)` serializes the initial state snapshot + turn history to a compact JSON file (`.mkoro`). `GameSession.load(Path)` reconstructs the initial state from the snapshot (not always `GameState.initial()`) and replays turns — correctly handles sessions rooted at mid-game snapshots from `SnapshotDialog`. `MainWindow` has Save/Load buttons backed by `JFileChooser`. *(GameSession.java, MainWindow.java)*

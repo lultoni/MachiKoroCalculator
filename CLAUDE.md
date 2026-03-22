@@ -140,9 +140,23 @@ The codebase is now a single active layer with no legacy code.
 - `immediateEV` — own-turn EV including Bahnhof/Freizeitpark/Funkturm.
 - `evPerRound` — full-round EV (own turn + N−1 opponent turns, blue and red cards).
 - `roiOverHorizon` — geometric-series discounted ROI + variance + probNoIncome, returns `RankEntry`.
-- `estimateWinProbDelta` — analytical softmax win-probability delta.
-- `rankPurchasableProjects` — sorted list of all affordable cards by ROI.
-- Package-visible bridges: `computeNetGainForRollPublic`, `computeOpponentTurnGainForRollPublic` — used by `GameSession.applyTurn`.
+- `estimateWinProbDelta` — analytical softmax win-probability delta; also accepts MC path when `mcSimulations > 0`.
+- `rankPurchasableProjects` — sorted list of all affordable cards by ROI; computes MC baseline once and reuses it across all candidates.
+- `public static mcWinRate(GameState, int, int)` — runs N parallel Monte Carlo simulations via `IntStream.parallel()` + `ThreadLocalRandom`; returns win rate in [0, 1].
+- Package-visible bridges: `computeNetGainForRollPublic`, `computeOpponentTurnGainForRollPublic` — used by `GameSession.applyTurn` and `GameSimulator`.
+
+### GameSimulator (Phase 5)
+
+`probability.GameSimulator` — stateless Monte Carlo game simulator. All methods are static; callers supply a per-thread `Random`.
+
+- `simulate(GameState, Random) → int` — runs one full game from the given state using a greedy rollout policy. Returns winner index (0-based) or -1 on timeout (MAX_TURNS = 200).
+- **Greedy policy:** (1) buy cheapest unbuilt landmark if affordable; (2) else buy highest `STATIC_EV_PER_COST` establishment; (3) else save.
+- `STATIC_EV_PER_COST` — precomputed `evPerRound/cost` table built once at class load from a 4-player reference state; avoids calling ProbabilityCalc in the simulation hot loop.
+- Supply: 6 copies per non-landmark card; tracked as `Map<String,Integer>`. Players cannot buy exhausted cards.
+- Freizeitpark doubles → second roll applied immediately. Bahnhof → always uses 2d6 (heuristic).
+- `public static boolean hasWon(Player)` — returns true if player owns ≥ 4 Großprojekte.
+
+**Thread safety:** pass `ThreadLocalRandom.current()` and `state.copy()` per simulation. `rankPurchasableProjects` uses `IntStream.range(0, numSims).parallel()` for embarrassingly parallel execution.
 
 ### Project data
 

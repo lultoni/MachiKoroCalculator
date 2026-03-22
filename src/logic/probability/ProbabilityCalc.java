@@ -2,6 +2,8 @@ package logic.probability;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.stream.IntStream;
 
 /**
  * Pure-static math engine for Machi Koro base-game buy-decision analysis.
@@ -745,12 +747,13 @@ public class ProbabilityCalc {
     }
 
     // -------------------------------------------------------------------------
-    // estimateWinProbDelta — analytical softmax approximation
+    // estimateWinProbDelta — analytical softmax or Monte Carlo
     // -------------------------------------------------------------------------
 
     /**
      * Estimates the change in win probability for playerIndex from buying {@code candidate}.
-     * <p>
+     *
+     * <h3>Analytical mode ({@code mcSimulations == 0})</h3>
      * Uses a softmax score approximation:
      * <pre>
      *   score(p) = Σ evPerRound(card) × REMAINING_TURNS + Σ LANDMARK_WEIGHT (per built landmark)
@@ -758,16 +761,32 @@ public class ProbabilityCalc {
      *   delta    = P_win(after buy) − P_win(before)
      * </pre>
      *
-     * @param gs            game state before purchase
-     * @param playerIndex   the buying player
-     * @param candidate     project being evaluated
-     * @param searchDepth   reserved for future Expectimax (ignored in analytical mode)
-     * @param mcSimulations reserved for future Monte Carlo (ignored when 0)
+     * <h3>Monte Carlo mode ({@code mcSimulations > 0})</h3>
+     * Runs {@code mcSimulations} parallel full-game simulations for both the
+     * baseline state and the post-buy state using {@link GameSimulator}.
+     * Each simulation uses its own {@link GameState#copy()} and
+     * {@link ThreadLocalRandom#current()}.  Returns
+     * {@code P_win(after buy) − P_win(baseline)}.
+     *
+     * @param gs             game state before purchase
+     * @param playerIndex    the buying player
+     * @param candidate      project being evaluated
+     * @param searchDepth    reserved for future Expectimax (ignored)
+     * @param mcSimulations  number of MC simulations per state; 0 = analytical only
      * @return estimated win probability delta (positive = better for playerIndex)
      */
     public static double estimateWinProbDelta(GameState gs, int playerIndex,
                                                Project candidate,
                                                int searchDepth, int mcSimulations) {
+        if (mcSimulations > 0) {
+            double baseline = mcWinRate(gs, playerIndex, mcSimulations);
+            GameState stateAfter = gs.copy();
+            stateAfter.getPlayers()[playerIndex].getOwned_projects().add(candidate);
+            double afterBuy = mcWinRate(stateAfter, playerIndex, mcSimulations);
+            return afterBuy - baseline;
+        }
+
+        // Analytical path
         double[] scoresBefore = computeScores(gs);
         double pWinBefore = softmaxEntry(scoresBefore, playerIndex);
 
@@ -777,6 +796,29 @@ public class ProbabilityCalc {
         double pWinAfter = softmaxEntry(scoresAfter, playerIndex);
 
         return pWinAfter - pWinBefore;
+    }
+
+    /**
+     * Runs {@code numSims} Monte Carlo simulations in parallel and returns the
+     * fraction in which {@code playerIndex} wins.
+     *
+     * <p>Uses {@code parallelStream} over simulation indices so the JVM's common
+     * {@link java.util.concurrent.ForkJoinPool} handles thread management.
+     * Each simulation gets its own {@link GameState#copy()} and uses
+     * {@link ThreadLocalRandom#current()} (contention-free, per-thread RNG).
+     *
+     * @param state       starting state (read-only; a copy is taken per simulation)
+     * @param playerIndex player whose win rate is measured
+     * @param numSims     number of simulations to run
+     * @return win rate in [0, 1]
+     */
+    public static double mcWinRate(GameState state, int playerIndex, int numSims) {
+        long wins = IntStream.range(0, numSims)
+                .parallel()
+                .filter(i -> GameSimulator.simulate(state.copy(), ThreadLocalRandom.current())
+                        == playerIndex)
+                .count();
+        return (double) wins / numSims;
     }
 
     /**
@@ -847,6 +889,11 @@ public class ProbabilityCalc {
      * <p>
      * Each {@link RankEntry} is fully populated with immediateEV, evPerRound, roiOverHorizon,
      * variance, probNoIncomeOwnTurn, probNoIncomeRound, and optionally winProbDelta.
+     * <p>
+     * When {@link RankingOptions#includeWinProbDelta} is true, win-probability delta is computed
+     * analytically (fast) by default. When {@link RankingOptions#mcSimulations} &gt; 0, Monte Carlo
+     * simulations are used instead — the baseline win rate is computed once and reused across all
+     * candidates to avoid redundant simulation work.
      *
      * @param gs          current game state
      * @param playerIndex the buying player
@@ -860,6 +907,12 @@ public class ProbabilityCalc {
 
         ArrayList<RankEntry> results = new ArrayList<>();
 
+        // Compute MC baseline win rate once (expensive) — reused for all candidates.
+        double mcBaseline = 0.0;
+        if (opts.includeWinProbDelta && opts.mcSimulations > 0) {
+            mcBaseline = mcWinRate(gs, playerIndex, opts.mcSimulations);
+        }
+
         for (Project candidate : gs.getUnbuilt_projects()) {
             if (candidate.getCost() > coins) continue;
             if (candidate.isIs_grossprojekt() && player.hasProject(candidate.getId())) continue;
@@ -868,7 +921,17 @@ public class ProbabilityCalc {
                     opts.horizonTurns, opts.discountFactor);
 
             if (opts.includeWinProbDelta) {
-                entry.winProbDelta = estimateWinProbDelta(gs, playerIndex, candidate, 0, opts.mcSimulations);
+                if (opts.mcSimulations > 0) {
+                    // MC path: compare post-buy win rate against pre-computed baseline
+                    GameState stateAfter = gs.copy();
+                    stateAfter.getPlayers()[playerIndex].getOwned_projects().add(candidate);
+                    double afterBuy = mcWinRate(stateAfter, playerIndex, opts.mcSimulations);
+                    entry.winProbDelta = afterBuy - mcBaseline;
+                } else {
+                    // Analytical path (default)
+                    entry.winProbDelta = estimateWinProbDelta(
+                            gs, playerIndex, candidate, 0, 0);
+                }
             }
 
             results.add(entry);

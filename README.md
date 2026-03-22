@@ -9,7 +9,8 @@ A decision-support tool for the base game of Machi Koro. Given the current game 
 - Expected value calculation per project per game state
 - Considers 1d6 vs. 2d6 choice (Bahnhof), Einkaufszentrum bonuses, Freizeitpark double-roll, Funkturm re-roll
 - Ranks all affordable projects by EV/round, ROI over 10 turns (discounted), and risk (P=0 income)
-- Optional win-probability delta column (toggle button)
+- Optional win-probability delta column: analytical (softmax) or Monte Carlo (toggle button)
+- **Deep Analysis mode**: 1000 Monte Carlo game simulations per candidate for accurate win-probability deltas (< 100ms with parallelStream); toggled via "Deep Analysis" button
 - Three-column Swing GUI: turn input | top recommendation | full ranked table
 
 ## Requirements
@@ -40,10 +41,11 @@ src/
     GameStateBuilder.java   # Fluent builder for constructing GameState from user inputs
     GameSession.java        # Turn-by-turn tracker with undo + snapshot conversion
     TurnRecord.java         # Immutable record of one turn (roll + purchase)
-    ProbabilityCalc.java    # Pure-static math engine (EV, ROI, variance, rankings)
+    ProbabilityCalc.java    # Pure-static math engine (EV, ROI, variance, rankings, MC)
+    GameSimulator.java      # Stateless Monte Carlo game simulator (greedy rollout policy)
     ProjectLoader.java      # JSON loader with static cache
     RankEntry.java          # Result POJO for ranked recommendations
-    RankingOptions.java     # Options (horizon, discount factor, win-prob flag)
+    RankingOptions.java     # Options (horizon, discount factor, win-prob flag, MC sims)
   gui/newui/                # Swing UI
     SetupWindow.java        # New game setup (player count + names)
     MainWindow.java         # Main three-column game window

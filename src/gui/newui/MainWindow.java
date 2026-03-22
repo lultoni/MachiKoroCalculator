@@ -63,6 +63,8 @@ public class MainWindow extends JFrame {
     private DefaultTableModel tableModel;
     private JTable rankTable;
     private JButton toggleWinProbBtn;
+    private JToggleButton deepAnalysisBtn;
+    private JLabel statusLabel;
 
     // ---- snapshot / live state for the current-player recommendation ----
     private ArrayList<RankEntry> lastRanking = new ArrayList<>();
@@ -264,6 +266,16 @@ public class MainWindow extends JFrame {
         toggleWinProbBtn = new JButton("Show Win Prob Δ");
         toggleWinProbBtn.addActionListener(this::onToggleWinProb);
         btnBar.add(toggleWinProbBtn);
+
+        deepAnalysisBtn = new JToggleButton("Deep Analysis (MC)");
+        deepAnalysisBtn.setToolTipText("Run 1000 Monte Carlo simulations per card for accurate win-probability delta. ~1–2 seconds.");
+        deepAnalysisBtn.addActionListener(this::onToggleDeepAnalysis);
+        btnBar.add(deepAnalysisBtn);
+
+        statusLabel = new JLabel("");
+        statusLabel.setFont(new Font("Arial", Font.ITALIC, 11));
+        btnBar.add(statusLabel);
+
         panel.add(btnBar, BorderLayout.SOUTH);
 
         return panel;
@@ -304,6 +316,20 @@ public class MainWindow extends JFrame {
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, ex.getMessage(), "Undo failed", JOptionPane.ERROR_MESSAGE);
             return;
+        }
+        refreshAll();
+    }
+
+    private void onToggleDeepAnalysis(ActionEvent e) {
+        boolean enabled = deepAnalysisBtn.isSelected();
+        rankOpts.mcSimulations = enabled ? 1000 : 0;
+        deepAnalysisBtn.setText(enabled ? "Deep Analysis ON (MC)" : "Deep Analysis (MC)");
+        // Only show win-prob column when deep analysis is active
+        if (enabled && !showWinProb) {
+            showWinProb = true;
+            rankOpts.includeWinProbDelta = true;
+            toggleWinProbBtn.setText("Hide Win Prob Δ");
+            topCardWinProb.setVisible(true);
         }
         refreshAll();
     }
@@ -352,25 +378,54 @@ public class MainWindow extends JFrame {
         // Rebuild buy combo: "— nothing —" + affordable unbuilt cards
         rebuildBuyCombo(pi, activePlayer);
 
-        // Recompute ranking for the current player
-        lastRanking = ProbabilityCalc.rankPurchasableProjects(session.getState(), pi, rankOpts);
-
-        // Populate table
-        rebuildTable();
-
-        // Populate center with top recommendation
-        if (!lastRanking.isEmpty()) {
-            populateCenter(lastRanking.get(0));
-            if (rankTable.getRowCount() > 0) rankTable.setRowSelectionInterval(0, 0);
-        } else {
-            clearCenter("No affordable cards — save up!");
-        }
-
-        // History
+        // History and undo must always update immediately
         refreshHistory();
-
-        // Undo availability
         undoBtn.setEnabled(!session.getHistory().isEmpty());
+
+        if (rankOpts.mcSimulations > 0) {
+            // MC path: run ranking on background thread to keep UI responsive
+            statusLabel.setText("Running MC simulations…");
+            confirmBtn.setEnabled(false);
+            final GameState snapState = session.getState().copy();
+            final int snapPi = pi;
+
+            SwingWorker<ArrayList<RankEntry>, Void> worker = new SwingWorker<>() {
+                @Override
+                protected ArrayList<RankEntry> doInBackground() {
+                    return ProbabilityCalc.rankPurchasableProjects(snapState, snapPi, rankOpts);
+                }
+
+                @Override
+                protected void done() {
+                    try {
+                        lastRanking = get();
+                    } catch (Exception ex) {
+                        lastRanking = new ArrayList<>();
+                    }
+                    statusLabel.setText("MC done (" + rankOpts.mcSimulations + " sims)");
+                    confirmBtn.setEnabled(true);
+                    rebuildTable();
+                    if (!lastRanking.isEmpty()) {
+                        populateCenter(lastRanking.get(0));
+                        if (rankTable.getRowCount() > 0) rankTable.setRowSelectionInterval(0, 0);
+                    } else {
+                        clearCenter("No affordable cards — save up!");
+                    }
+                }
+            };
+            worker.execute();
+        } else {
+            // Analytical path: fast, run on EDT directly
+            statusLabel.setText("");
+            lastRanking = ProbabilityCalc.rankPurchasableProjects(session.getState(), pi, rankOpts);
+            rebuildTable();
+            if (!lastRanking.isEmpty()) {
+                populateCenter(lastRanking.get(0));
+                if (rankTable.getRowCount() > 0) rankTable.setRowSelectionInterval(0, 0);
+            } else {
+                clearCenter("No affordable cards — save up!");
+            }
+        }
     }
 
     private void rebuildBuyCombo(int pi, Player activePlayer) {

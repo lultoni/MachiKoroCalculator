@@ -44,6 +44,12 @@ public class RuntimeTester {
         test_rank_excludes_unaffordable();
         test_win_prob_delta_buying_improves_score();
 
+        System.out.println("\n=== Phase 5 Monte Carlo Tests ===\n");
+        test_simulator_returns_valid_winner();
+        test_simulator_deterministic_with_seed();
+        test_mc_win_rates_sum_to_one();
+        test_mc_win_prob_delta_in_range();
+
         System.out.println("\n--- Results: " + passed + " passed, " + failed + " failed ---");
 
         System.out.println("\n=== Runtime Benchmarks ===\n");
@@ -68,6 +74,16 @@ public class RuntimeTester {
                 + String.format("%.2f", (double) elapsed / BENCH_RUNS) + " ms/call");
         assertTrue("rankPurchasableProjects avg < 5 ms",
                 (double) elapsed / BENCH_RUNS < 5.0);
+
+        System.out.println("\nBenchmark: MC simulation (1000 sims, 4-player starting state)");
+        GameState gs4mc = GameState.initial(4);
+        // Warm-up
+        ProbabilityCalc.mcWinRate(gs4mc, 0, 10);
+        long mcStart = System.currentTimeMillis();
+        ProbabilityCalc.mcWinRate(gs4mc, 0, 1000);
+        long mcElapsed = System.currentTimeMillis() - mcStart;
+        System.out.println(" - 1000 sims: " + mcElapsed + " ms");
+        assertTrue("1000 MC sims < 2000 ms (was " + mcElapsed + " ms)", mcElapsed < 2000);
     }
 
     // =========================================================================
@@ -402,6 +418,62 @@ public class RuntimeTester {
         // At least one card should have a non-negative winProbDelta
         boolean anyPositive = ranking.stream().anyMatch(e -> e.winProbDelta >= -0.01);
         assertTrue("at least one card has non-negative winProbDelta", anyPositive);
+    }
+
+    // =========================================================================
+    // Phase 5 tests
+    // =========================================================================
+
+    private static void test_simulator_returns_valid_winner() {
+        GameState gs = GameState.initial(4);
+        java.util.Random rng = new java.util.Random(42);
+        int winner = GameSimulator.simulate(gs.copy(), rng);
+        assertTrue("simulate() returns -1 or valid player index [0,3]",
+                winner == -1 || (winner >= 0 && winner < 4));
+        // Run 10 games — every result must be valid
+        boolean allValid = true;
+        for (int i = 0; i < 10; i++) {
+            int w = GameSimulator.simulate(GameState.initial(4).copy(), rng);
+            if (w < -1 || w >= 4) { allValid = false; break; }
+        }
+        assertTrue("all of 10 simulate() calls return valid winner index", allValid);
+    }
+
+    private static void test_simulator_deterministic_with_seed() {
+        GameState gs1 = GameState.initial(3);
+        GameState gs2 = GameState.initial(3);
+        java.util.Random rng1 = new java.util.Random(12345);
+        java.util.Random rng2 = new java.util.Random(12345);
+        int w1 = GameSimulator.simulate(gs1, rng1);
+        int w2 = GameSimulator.simulate(gs2, rng2);
+        assertEq("same seed → same winner", w1, w2);
+    }
+
+    private static void test_mc_win_rates_sum_to_one() {
+        // Sum of win rates across all players should be ≈ 1.0 (ignoring rare timeouts)
+        GameState gs = GameState.initial(3);
+        int sims = 300;
+        double total = 0.0;
+        for (int p = 0; p < 3; p++) {
+            total += ProbabilityCalc.mcWinRate(gs, p, sims);
+        }
+        // Allow generous tolerance because timeouts (returned -1) are excluded from all players
+        assertTrue("sum of mcWinRate over all players ≈ 1.0 (was " + total + ")",
+                total >= 0.90 && total <= 1.10);
+    }
+
+    private static void test_mc_win_prob_delta_in_range() {
+        GameState gs = GameState.initial(4);
+        gs.getPlayers()[0].setCoins(10);
+        RankingOptions opts = new RankingOptions();
+        opts.includeWinProbDelta = true;
+        opts.mcSimulations = 200;
+        ArrayList<RankEntry> ranking = ProbabilityCalc.rankPurchasableProjects(gs, 0, opts);
+        assertTrue("MC ranking is non-empty", !ranking.isEmpty());
+        for (RankEntry e : ranking) {
+            assertTrue("winProbDelta in [-1, 1] for " + e.project.getId(),
+                    e.winProbDelta >= -1.0 && e.winProbDelta <= 1.0);
+        }
     }
 
     // =========================================================================

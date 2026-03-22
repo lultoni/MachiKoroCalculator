@@ -89,7 +89,22 @@ These are documented deviations from optimal accuracy that have been reviewed an
 
 ## Missing UI Features
 
-### 1. Roll Outcome Display in Turn Tracker
+### 1. Roll Spinner Allows Out-of-Range Values Without Bahnhof
+**Priority: High — correctness issue**
+
+The roll spinner is initialised with a fixed range of `1–12` regardless of whether the active player owns Bahnhof. Without Bahnhof the player rolls 1d6 (valid values 1–6); entering 7–12 produces an EV calculation and turn record that can never occur in the real game.
+
+**Root cause — `MainWindow.buildLeftPanel()` (MainWindow.java ~line 135):**
+```java
+rollSpinner = new JSpinner(new SpinnerNumberModel(7, 1, 12, 1));
+```
+Range is never updated when the turn changes to a player without Bahnhof.
+
+**What needs fixing:**
+- [ ] On every turn change (after `Confirm Turn`, after `Undo`, after `replaceSession`), update the spinner model: `max = activePlayer.hasProject("bahnhof") ? 12 : 6`, `min = activePlayer.hasProject("bahnhof") ? 2 : 1`. Clamp the current spinner value into the new range if it is out of bounds. *(MainWindow.java)*
+- [ ] Default the spinner to a sensible value on turn change: e.g. `7` when Bahnhof is owned (mode of 2d6), `3` or `4` when not (middle of 1d6). *(MainWindow.java)*
+
+### 2. Roll Outcome Display in Turn Tracker
 **Priority: Medium**
 
 After a roll is entered in the turn input, the center panel should show which coins each player will gain or lose from that roll — so the user can verify the calculation matches what happened on the physical table. Currently the panel only updates after `Confirm Turn` is pressed.

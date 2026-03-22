@@ -148,6 +148,12 @@ The codebase is now a single active layer with no legacy code.
 
 ### ProbabilityCalc — all methods implemented (Phase 2 complete)
 
+Implementation is split across three files in `src/logic/probability/`:
+- **`CardIncome.java`** (package-private) — `P1`/`P2`, `get_I`, `PlayerStats`, `buildOpponentCoins`, `sumColorIncome`, `weightedRollEV`, `bestDiceEV`, `singleCardEvPerRound`. Pure math primitives, no external state.
+- **`WinProbabilityCalc.java`** (package-private) — `computeScores`, `softmaxEntry`, `computeBaselineWinProb`, `estimateWinProbDelta`, `mcWinRate`.
+- **`ProbabilityCalc.java`** (public facade) — all public API methods plus `computeNetGainForRoll`, `computeOpponentTurnGainForRoll`, `immediateEV`, `evPerRound`, `roiOverHorizon`, `rankPurchasableProjects`, `computeAllDeltasForRoll`, bürohaus helpers, legacy matrix method, deprecated bridges.
+
+Public methods on `ProbabilityCalc`:
 - `get_P1(r)` / `get_P2(r)` — 1d6 / 2d6 probabilities (pre-computed arrays).
 - `get_I(r, p_id, oop, eb, f_c, a_c, p_c, c, co)` — coin income/cost for a single project on a given roll. All 19 base-game cards implemented. `bürohaus` returns 0 here; its swap EV is handled separately in `immediateEV` via `bürohausSwapEV()`.
 - `computeNetGainForRoll` / `computeOpponentTurnGainForRoll` — per-roll coin delta for active player and passive player respectively.

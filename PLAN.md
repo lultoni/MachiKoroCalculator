@@ -186,13 +186,11 @@ See `ARCHITECTURE.md §2.8` for the current approximation details.
 ### 1. `ProbabilityCalc` Split
 **Priority: Low**
 
-- [ ] `ProbabilityCalc.java` is ~1000 lines. Candidate split:
-  - `CardIncome` — `get_I`, `P1`, `P2`, `PlayerStats`
-  - `EVCalculator` — `immediateEV`, `evPerRound`, `bestSecondRollEV`
-  - `RankingEngine` — `rankPurchasableProjects`, `roiOverHorizon`
-  - `WinProbability` — `estimateWinProbDelta`, `mcWinRate`, `computeScores`
-
-  This is a refactor with no behaviour change. Do the deduplication items above first — the split will be cleaner afterwards.
+- [x] `ProbabilityCalc.java` (was 1283 lines) split into three files:
+  - `CardIncome.java` (313 lines) — `P1`/`P2`, `get_I`, `PlayerStats`, `buildOpponentCoins`, `sumColorIncome`, `weightedRollEV`, `bestDiceEV`, `singleCardEvPerRound`. All package-private, pure primitives.
+  - `WinProbabilityCalc.java` (145 lines) — `computeScores`, `softmaxEntry`, `computeBaselineWinProb`, `estimateWinProbDelta`, `mcWinRate`. All package-private.
+  - `ProbabilityCalc.java` (855 lines) — public API facade + `computeNetGainForRoll`, `computeOpponentTurnGainForRoll`, `immediateEV`, `evPerRound`, `roiOverHorizon`, `rankPurchasableProjects`, `computeAllDeltasForRoll`, bürohaus helpers, legacy matrix method, deprecated bridges.
+  Public API and behaviour unchanged. 152/152 tests pass.
 
 ### 2. `MainWindow` Controller/View Separation
 **Priority: Low**

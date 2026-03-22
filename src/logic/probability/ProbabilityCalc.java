@@ -2,9 +2,9 @@ package logic.probability;
 
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.IntToDoubleFunction;
 import java.util.stream.IntStream;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Pure-static math engine for Machi Koro base-game buy-decision analysis.
@@ -21,35 +21,27 @@ import java.util.stream.IntStream;
  *       The return value is negative (coin loss for the roller).</li>
  *   <li>For blue (blau) cards, the return is always positive regardless of {@code oop}.</li>
  * </ul>
+ * <p>
+ * Implementation is split across package-private helper classes:
+ * <ul>
+ *   <li>{@link CardIncome} — probability tables, {@code get_I}, {@code PlayerStats},
+ *       {@code buildOpponentCoins}, {@code sumColorIncome}, {@code weightedRollEV},
+ *       {@code bestDiceEV}, {@code singleCardEvPerRound}.</li>
+ *   <li>{@link WinProbabilityCalc} — {@code computeScores}, {@code softmaxEntry},
+ *       {@code mcWinRate}, {@code estimateWinProbDelta}, {@code computeBaselineWinProb}.</li>
+ * </ul>
  */
 public class ProbabilityCalc {
 
-    // -------------------------------------------------------------------------
-    // Pre-computed probability tables (O(1) lookup, no switch overhead)
-    // -------------------------------------------------------------------------
-
+    // Expose probability tables for tests and external callers
     /** P1[r] = probability of rolling r with 1d6. Valid indices: 1–6. */
-    static final double[] P1 = new double[13];
+    static final double[] P1 = CardIncome.P1;
 
     /** P2[r] = probability of rolling r with 2d6. Valid indices: 2–12. */
-    static final double[] P2 = new double[13];
-
-    static {
-        for (int r = 1; r <= 6; r++)  P1[r] = 1.0 / 6.0;
-        for (int r = 2; r <= 12; r++) P2[r] = (6.0 - Math.abs(r - 7)) / 36.0;
-    }
-
-    /** Landmark weights used in the win-probability score function (arbitrary but consistent). */
-    private static final double LANDMARK_WEIGHT = 2.0;
-
-    /**
-     * Remaining-turns estimate used in win-probability scoring.
-     * Represents the expected turns left in a typical game from mid-game onwards.
-     */
-    private static final double REMAINING_TURNS_ESTIMATE = 12.0;
+    static final double[] P2 = CardIncome.P2;
 
     // -------------------------------------------------------------------------
-    // Public probability accessors (kept for external use and tests)
+    // Public probability accessors
     // -------------------------------------------------------------------------
 
     /**
@@ -69,7 +61,7 @@ public class ProbabilityCalc {
     }
 
     // -------------------------------------------------------------------------
-    // get_I — per-card income/cost for a single roll
+    // get_I — per-card income/cost for a single roll (delegates to CardIncome)
     // -------------------------------------------------------------------------
 
     /**
@@ -89,135 +81,7 @@ public class ProbabilityCalc {
      */
     public static int get_I(int r, String p_id, boolean oop, boolean eb,
                              int f_c, int a_c, int p_c, int c, int[] co) {
-        switch (p_id) {
-
-            // --- Blue (blau): trigger every player's turn, pay from bank ---
-
-            case "weizenfeld" -> {
-                if (r != 1) return 0;
-                return 1;
-            }
-            case "apfelplantage" -> {
-                if (r != 10) return 0;
-                return 3;
-            }
-            case "bauernhof" -> {
-                if (r != 2) return 0;
-                return 1;
-            }
-            case "wald" -> {
-                if (r != 5) return 0;
-                return 1;
-            }
-            case "bergwerk" -> {
-                if (r != 9) return 0;
-                return 5;
-            }
-
-            // --- Green (grün): own turn only, pay from bank ---
-
-            case "bäckerei" -> {
-                if (r != 2 && r != 3) return 0;
-                if (!oop) return 0;
-                return eb ? 2 : 1;
-            }
-            case "mini-markt" -> {
-                if (r != 4) return 0;
-                if (!oop) return 0;
-                return eb ? 4 : 3;
-            }
-            case "markthalle" -> {
-                if (r != 11 && r != 12) return 0;
-                if (!oop) return 0;
-                return f_c * 2;
-            }
-            case "molkerei" -> {
-                if (r != 7) return 0;
-                if (!oop) return 0;
-                return a_c * 3;
-            }
-            case "möbelfabrik" -> {
-                if (r != 8) return 0;
-                if (!oop) return 0;
-                return p_c * 3;
-            }
-
-            // --- Red (rot): active player (roller) pays the card owner.
-            //     Perspective: queried player is the roller (oop=false → pays).
-            //     Return is negative (roller loses coins), clamped to available coins. ---
-
-            case "café" -> {
-                if (r != 3) return 0;
-                if (oop) return 0;          // owner does not pay themselves
-                int cost = eb ? -2 : -1;
-                if (Math.abs(cost) > c) return -c;
-                return cost;
-            }
-            case "familienrestaurant" -> {
-                if (r != 9 && r != 10) return 0;
-                if (oop) return 0;
-                int cost = eb ? -3 : -2;
-                if (Math.abs(cost) > c) return -c;
-                return cost;
-            }
-
-            // --- Purple (lila): own turn only, effects vary ---
-
-            case "stadion" -> {
-                // Takes 2 coins from EACH opponent (capped per opponent at their coins). No total cap.
-                if (r != 6) return 0;
-                if (!oop) return 0;
-                int total = 0;
-                for (int opponentCoins : co) total += Math.min(2, opponentCoins);
-                return total;
-            }
-            case "fernsehsender" -> {
-                // Takes 5 coins from the RICHEST opponent (optimal play assumption for EV).
-                if (r != 6) return 0;
-                if (!oop) return 0;
-                int richest = 0;
-                for (int opponentCoins : co) richest = Math.max(richest, opponentCoins);
-                return Math.min(5, richest);
-            }
-            case "bürohaus" -> {
-                // Card-swap effect modelled separately in immediateEV via bürohausSwapEV().
-                // Returns 0 here because get_I only handles coin deltas per roll.
-                return 0;
-            }
-        }
-        return 0;
-    }
-
-    // -------------------------------------------------------------------------
-    // PlayerStats helper — cached per-player counts used by get_I
-    // -------------------------------------------------------------------------
-
-    private static class PlayerStats {
-        boolean hasEinkaufszentrum = false;
-        boolean hasBahnhof        = false;
-        boolean hasFreizeitpark   = false;
-        boolean hasFunkturm       = false;
-        int foodCount       = 0;
-        int animalCount     = 0;
-        int productionCount = 0;
-
-        static PlayerStats of(Player player) {
-            PlayerStats s = new PlayerStats();
-            for (Project p : player.getOwned_projects()) {
-                switch (p.getId()) {
-                    case "einkaufszentrum" -> s.hasEinkaufszentrum = true;
-                    case "bahnhof"         -> s.hasBahnhof         = true;
-                    case "freizeitpark"    -> s.hasFreizeitpark    = true;
-                    case "funkturm"        -> s.hasFunkturm        = true;
-                }
-                switch (p.getCategory()) {
-                    case "food"       -> s.foodCount++;
-                    case "animal"     -> s.animalCount++;
-                    case "production" -> s.productionCount++;
-                }
-            }
-            return s;
-        }
+        return CardIncome.get_I(r, p_id, oop, eb, f_c, a_c, p_c, c, co);
     }
 
     // -------------------------------------------------------------------------
@@ -237,14 +101,6 @@ public class ProbabilityCalc {
      * Earlier claimants in that order are paid in full; later claimants receive whatever
      * remains if the active player runs out of coins.
      *
-     * <p>Activation rules on own turn:
-     * <ul>
-     *   <li>Red cards: opponents' red cards fire first — roller pays from current coins.</li>
-     *   <li>Blue cards: fire for all players; active player receives income from bank.</li>
-     *   <li>Green cards: own-turn only; active player receives income from bank.</li>
-     *   <li>Purple cards: own-turn only; fire last (may steal from opponents).</li>
-     * </ul>
-     *
      * @param state       current game state (with candidate already added to player's projects)
      * @param playerIndex the active player (roller)
      * @param roll        the dice result (1–12)
@@ -254,7 +110,7 @@ public class ProbabilityCalc {
     private static int computeNetGainForRoll(GameState state, int playerIndex,
                                               int roll, boolean isDoubles) {
         Player activePlayer = state.getPlayers()[playerIndex];
-        PlayerStats activeStats = PlayerStats.of(activePlayer);
+        CardIncome.PlayerStats activeStats = CardIncome.PlayerStats.of(activePlayer);
         int activeCoins = activePlayer.getCoins();
 
         Player[] players = state.getPlayers();
@@ -269,14 +125,13 @@ public class ProbabilityCalc {
         for (int step = 1; step < n; step++) {
             int opponentIdx = (playerIndex - step + n) % n; // counter-clockwise
             Player opponent = players[opponentIdx];
-            PlayerStats oppStats = PlayerStats.of(opponent);
+            CardIncome.PlayerStats oppStats = CardIncome.PlayerStats.of(opponent);
             for (Project p : opponent.getOwned_projects()) {
                 if ("rot".equals(p.getColor())) {
-                    int loss = get_I(roll, p.getId(), false,
+                    int loss = CardIncome.get_I(roll, p.getId(), false,
                             oppStats.hasEinkaufszentrum,
                             0, 0, 0,
                             remainingCoins, new int[0]);
-                    // loss is 0 or negative; clamp to remaining coins
                     if (loss < 0 && -loss > remainingCoins) loss = -remainingCoins;
                     net += loss;
                     remainingCoins += loss;
@@ -286,19 +141,17 @@ public class ProbabilityCalc {
         }
 
         // --- Blue cards: own blue cards pay from the bank regardless of red losses.
-        int[] opponentCoins = buildOpponentCoins(players, playerIndex);
-        net += sumColorIncome(activePlayer, "blau", roll, activeStats, activeCoins, opponentCoins);
+        int[] opponentCoins = CardIncome.buildOpponentCoins(players, playerIndex);
+        net += CardIncome.sumColorIncome(activePlayer, "blau", roll, activeStats, activeCoins, opponentCoins);
 
         // --- Green cards: own-turn only, pay from bank.
-        net += sumColorIncome(activePlayer, "grün", roll, activeStats, activeCoins, opponentCoins);
+        net += CardIncome.sumColorIncome(activePlayer, "grün", roll, activeStats, activeCoins, opponentCoins);
 
         // --- Purple cards: own-turn only, fire last.
-        //     Stadion/Fernsehsender steal from opponents; re-read opponent coins each time
-        //     since the amounts may change as multiple purple effects resolve sequentially.
         for (Project p : activePlayer.getOwned_projects()) {
             if ("lila".equals(p.getColor())) {
-                int[] freshOpponentCoins = buildOpponentCoins(players, playerIndex);
-                net += get_I(roll, p.getId(), true,
+                int[] freshOpponentCoins = CardIncome.buildOpponentCoins(players, playerIndex);
+                net += CardIncome.get_I(roll, p.getId(), true,
                         activeStats.hasEinkaufszentrum,
                         activeStats.foodCount, activeStats.animalCount,
                         activeStats.productionCount,
@@ -309,95 +162,6 @@ public class ProbabilityCalc {
         return net;
     }
 
-    /** Builds an array of coins for all players except playerIndex. */
-    private static int[] buildOpponentCoins(Player[] players, int excludeIndex) {
-        int[] coins = new int[players.length - 1];
-        int idx = 0;
-        for (int i = 0; i < players.length; i++) {
-            if (i != excludeIndex) coins[idx++] = players[i].getCoins();
-        }
-        return coins;
-    }
-
-    /** Builds a sub-array excluding the element at excludeIndex (overload for raw coin arrays). */
-    private static int[] buildOpponentCoins(int[] coins, int excludeIndex) {
-        int[] result = new int[coins.length - 1];
-        int idx = 0;
-        for (int i = 0; i < coins.length; i++) {
-            if (i != excludeIndex) result[idx++] = coins[i];
-        }
-        return result;
-    }
-
-    /**
-     * Sums {@link #get_I} income for all cards owned by {@code player} that match {@code color}
-     * on the given roll. Used to avoid repeating the filter-and-sum loop for each color.
-     *
-     * @param player   the player whose owned cards to inspect
-     * @param color    card color string to match ("blau", "grün", "lila", etc.)
-     * @param roll     the dice result
-     * @param stats    pre-computed stats for the player
-     * @param coins    current coin count used by {@code get_I} for clamping / synergy
-     * @param oppCoins coins of other players (passed through to {@code get_I})
-     * @return sum of income values for matching cards
-     */
-    private static int sumColorIncome(Player player, String color, int roll,
-                                       PlayerStats stats, int coins, int[] oppCoins) {
-        int net = 0;
-        for (Project p : player.getOwned_projects()) {
-            if (color.equals(p.getColor())) {
-                net += get_I(roll, p.getId(), true,
-                        stats.hasEinkaufszentrum,
-                        stats.foodCount, stats.animalCount, stats.productionCount,
-                        coins, oppCoins);
-            }
-        }
-        return net;
-    }
-
-    // -------------------------------------------------------------------------
-    // Dice-roll EV helpers — eliminate repeated 1d6/2d6 loop boilerplate
-    // -------------------------------------------------------------------------
-
-    /**
-     * Returns the weighted sum {@code Σ P(r) × payoutFn(r)} over all possible rolls.
-     *
-     * @param use2d6    if true, uses 2d6 probabilities (P2, rolls 2–12);
-     *                  if false, uses 1d6 probabilities (P1, rolls 1–6)
-     * @param payoutFn  maps a roll result to a payout value (may return 0)
-     * @return expected payout over the roll distribution
-     */
-    private static double weightedRollEV(boolean use2d6, IntToDoubleFunction payoutFn) {
-        double ev = 0.0;
-        if (use2d6) {
-            for (int d1 = 1; d1 <= 6; d1++) {
-                for (int d2 = 1; d2 <= 6; d2++) {
-                    ev += (1.0 / 36.0) * payoutFn.applyAsDouble(d1 + d2);
-                }
-            }
-        } else {
-            for (int d = 1; d <= 6; d++) {
-                ev += P1[d] * payoutFn.applyAsDouble(d);
-            }
-        }
-        return ev;
-    }
-
-    /**
-     * Returns the expected payout for the player's best dice choice on their own turn.
-     * If the player has Bahnhof, computes both 1d6 and 2d6 EVs and returns the max.
-     * Otherwise returns the 1d6 EV.
-     *
-     * @param hasBahnhof true if the player owns Bahnhof
-     * @param payoutFn   maps a roll result to a payout value
-     * @return EV under the optimal dice choice
-     */
-    private static double bestDiceEV(boolean hasBahnhof, IntToDoubleFunction payoutFn) {
-        double ev1 = weightedRollEV(false, payoutFn);
-        if (!hasBahnhof) return ev1;
-        return Math.max(ev1, weightedRollEV(true, payoutFn));
-    }
-
     // -------------------------------------------------------------------------
     // computeOpponentTurnGainForRoll
     // -------------------------------------------------------------------------
@@ -406,45 +170,35 @@ public class ProbabilityCalc {
      * Computes the net coin change for the tracked player (playerIndex) when it is
      * an OPPONENT's turn and they roll {@code roll}.
      * <p>
-     * On an opponent's turn the tracked player:
-     * <ul>
-     *   <li>Gains coins from their own blue cards (blue triggers for all players every turn).</li>
-     *   <li>Gains coins from their own red cards (red triggers on the opponent/roller's turn).</li>
-     *   <li>Does NOT gain from green or purple cards (those only trigger on the owner's own turn).</li>
-     * </ul>
+     * On an opponent's turn the tracked player gains from their blue cards and red cards only.
      *
-     * @param state          current game state
-     * @param playerIndex    the tracked player (not the active roller)
+     * @param state             current game state
+     * @param playerIndex       the tracked player (not the active roller)
      * @param activeRollerIndex the player currently rolling
-     * @param roll           dice result
+     * @param roll              dice result
      * @return net coin change for playerIndex during this opponent turn
      */
     private static int computeOpponentTurnGainForRoll(GameState state, int playerIndex,
                                                        int activeRollerIndex, int roll) {
         Player trackedPlayer = state.getPlayers()[playerIndex];
         Player activeRoller  = state.getPlayers()[activeRollerIndex];
-        PlayerStats trackedStats = PlayerStats.of(trackedPlayer);
+        CardIncome.PlayerStats trackedStats = CardIncome.PlayerStats.of(trackedPlayer);
         int trackedCoins = trackedPlayer.getCoins();
         int rollerCoins  = activeRoller.getCoins();
 
         int net = 0;
 
         // Blue cards: tracked player earns from their own blue cards
-        net += sumColorIncome(trackedPlayer, "blau", roll, trackedStats,
+        net += CardIncome.sumColorIncome(trackedPlayer, "blau", roll, trackedStats,
                 trackedCoins, new int[]{rollerCoins});
 
         // Red cards: tracked player earns from their own red cards (roller pays them)
         for (Project p : trackedPlayer.getOwned_projects()) {
             if ("rot".equals(p.getColor())) {
-                // From the tracked player's (owner's) perspective, oop=true but get_I
-                // for red cards only pays when oop=false (roller's perspective). We
-                // therefore compute the absolute income by querying the roller's perspective
-                // and negating.
-                int rollerLoss = get_I(roll, p.getId(), false,
+                int rollerLoss = CardIncome.get_I(roll, p.getId(), false,
                         trackedStats.hasEinkaufszentrum,
                         0, 0, 0,
                         Math.max(0, rollerCoins), new int[0]);
-                // rollerLoss is 0 or negative; the tracked player gains its absolute value
                 net += Math.abs(rollerLoss);
             }
         }
@@ -469,17 +223,15 @@ public class ProbabilityCalc {
      */
     private static double bestSecondRollEV(GameState state, int playerIndex, int forcedDiceCount) {
         boolean hasBahnhof = state.getPlayers()[playerIndex].hasProject("bahnhof");
-        // Second roll never chains (isDoubles=false)
         IntToDoubleFunction payout = r -> computeNetGainForRoll(state, playerIndex, r, false);
 
-        if (forcedDiceCount == 1) return weightedRollEV(false, payout);
-        if (forcedDiceCount == 2) return weightedRollEV(true, payout);
-        // forcedDiceCount == -1: player chooses freely (needs Bahnhof)
-        return hasBahnhof ? bestDiceEV(true, payout) : weightedRollEV(false, payout);
+        if (forcedDiceCount == 1) return CardIncome.weightedRollEV(false, payout);
+        if (forcedDiceCount == 2) return CardIncome.weightedRollEV(true, payout);
+        return hasBahnhof ? CardIncome.bestDiceEV(true, payout) : CardIncome.weightedRollEV(false, payout);
     }
 
     // -------------------------------------------------------------------------
-    // immediateEV — EV of the buyer's current turn after purchasing candidate
+    // immediateEV — EV of the buyer's current turn
     // -------------------------------------------------------------------------
 
     /**
@@ -508,9 +260,9 @@ public class ProbabilityCalc {
         double evTotal;
 
         if (!hasBahnhof) {
-            evTotal = weightedRollEV(false, r -> computeNetGainForRoll(state, playerIndex, r, false));
+            evTotal = CardIncome.weightedRollEV(false, r -> computeNetGainForRoll(state, playerIndex, r, false));
         } else {
-            double ev1 = weightedRollEV(false, r -> computeNetGainForRoll(state, playerIndex, r, false));
+            double ev1 = CardIncome.weightedRollEV(false, r -> computeNetGainForRoll(state, playerIndex, r, false));
 
             double ev2 = 0.0;
             for (int d1 = 1; d1 <= 6; d1++) {
@@ -530,8 +282,6 @@ public class ProbabilityCalc {
         }
 
         // Bürohaus card-swap EV: fires on own turn when roll = 6 (lila, own-turn only).
-        // bürohausSwapEV() approximates the net EV gain from trading the player's lowest-EV
-        // non-landmark for the opponent's highest-EV non-landmark.
         if (player.hasProject("bürohaus")) {
             double swapEV = bürohausSwapEV(state, playerIndex);
             double p6 = hasBahnhof ? P2[6] : P1[6];
@@ -568,9 +318,9 @@ public class ProbabilityCalc {
         // Own turn: blue + green + purple + red costs paid
         boolean hasBahnhof = state.getPlayers()[playerIndex].hasProject("bahnhof");
         if (!hasBahnhof) {
-            total += weightedRollEV(false, r -> computeNetGainForRoll(state, playerIndex, r, false));
+            total += CardIncome.weightedRollEV(false, r -> computeNetGainForRoll(state, playerIndex, r, false));
         } else {
-            double ev1 = weightedRollEV(false, r -> computeNetGainForRoll(state, playerIndex, r, false));
+            double ev1 = CardIncome.weightedRollEV(false, r -> computeNetGainForRoll(state, playerIndex, r, false));
             boolean hasFreizeitpark = state.getPlayers()[playerIndex].hasProject("freizeitpark");
             boolean hasFunkturm    = state.getPlayers()[playerIndex].hasProject("funkturm");
             double ev2 = 0.0;
@@ -590,11 +340,9 @@ public class ProbabilityCalc {
         // Opponent turns: tracked player gains from blue + red cards each opponent turn
         for (int opponentIdx = 0; opponentIdx < n; opponentIdx++) {
             if (opponentIdx == playerIndex) continue;
-
-            // Assume opponents roll 1d6 unless they have Bahnhof (best case: they use 2d6 optimally).
             boolean opponentHasBahnhof = state.getPlayers()[opponentIdx].hasProject("bahnhof");
             final int oppIdx = opponentIdx;
-            total += bestDiceEV(opponentHasBahnhof,
+            total += CardIncome.bestDiceEV(opponentHasBahnhof,
                     r -> computeOpponentTurnGainForRoll(state, playerIndex, oppIdx, r));
         }
 
@@ -624,7 +372,6 @@ public class ProbabilityCalc {
         RankEntry entry = new RankEntry();
         entry.project = candidate;
 
-        // Simulate the purchase in a state copy
         GameState state = gs.copy();
         state.getPlayers()[playerIndex].getOwned_projects().add(candidate);
 
@@ -644,31 +391,19 @@ public class ProbabilityCalc {
         }
         entry.roiOverHorizon = entry.evPerRound * geometricSum - candidate.getCost();
 
-        // Variance of own-turn net gain distribution
-        entry.variance = computeVarianceOwnTurn(state, playerIndex);
-
-        // Risk: P(earn 0 coins on own turn)
+        entry.variance             = computeVarianceOwnTurn(state, playerIndex);
         entry.probNoIncomeOwnTurn  = computeProbNoIncomeOwnTurn(state, playerIndex);
         entry.probNoIncomeRound    = computeProbNoIncomeRound(state, playerIndex);
 
         return entry;
     }
 
-    /**
-     * Variance of the per-own-turn net gain distribution (Var = E[X²] − E[X]²).
-     * Uses 1d6 if no Bahnhof, 2d6 otherwise (best-EV dice choice).
-     */
     private static double computeVarianceOwnTurn(GameState state, int playerIndex) {
         boolean hasBahnhof = state.getPlayers()[playerIndex].hasProject("bahnhof");
-
-        if (!hasBahnhof) {
-            return computeVariance1d6(state, playerIndex);
-        } else {
-            // Return variance of the dice choice that yields higher EV
-            IntToDoubleFunction payout = r -> computeNetGainForRoll(state, playerIndex, r, false);
-            boolean use2d6 = weightedRollEV(true, payout) > weightedRollEV(false, payout);
-            return use2d6 ? computeVariance2d6(state, playerIndex) : computeVariance1d6(state, playerIndex);
-        }
+        if (!hasBahnhof) return computeVariance1d6(state, playerIndex);
+        IntToDoubleFunction payout = r -> computeNetGainForRoll(state, playerIndex, r, false);
+        boolean use2d6 = CardIncome.weightedRollEV(true, payout) > CardIncome.weightedRollEV(false, payout);
+        return use2d6 ? computeVariance2d6(state, playerIndex) : computeVariance1d6(state, playerIndex);
     }
 
     private static double computeVariance1d6(GameState state, int playerIndex) {
@@ -694,29 +429,21 @@ public class ProbabilityCalc {
         return e2 - ev * ev;
     }
 
-    /** P(earn 0 coins on own turn). */
     private static double computeProbNoIncomeOwnTurn(GameState state, int playerIndex) {
         boolean hasBahnhof = state.getPlayers()[playerIndex].hasProject("bahnhof");
         IntToDoubleFunction payout = r -> computeNetGainForRoll(state, playerIndex, r, false);
-
-        boolean use2d6 = hasBahnhof && weightedRollEV(true, payout) > weightedRollEV(false, payout);
-        return weightedRollEV(use2d6, r -> payout.applyAsDouble(r) == 0 ? 1.0 : 0.0);
+        boolean use2d6 = hasBahnhof && CardIncome.weightedRollEV(true, payout) > CardIncome.weightedRollEV(false, payout);
+        return CardIncome.weightedRollEV(use2d6, r -> payout.applyAsDouble(r) == 0 ? 1.0 : 0.0);
     }
 
-    /**
-     * P(earn 0 coins over the entire round — own turn AND all opponent turns).
-     * Approximated as the product of P(zero on own turn) × P(zero on each opponent turn),
-     * treating turns as independent.
-     */
     private static double computeProbNoIncomeRound(GameState state, int playerIndex) {
         double prob = computeProbNoIncomeOwnTurn(state, playerIndex);
-
         int n = state.getPlayers().length;
         for (int oppIdx = 0; oppIdx < n; oppIdx++) {
             if (oppIdx == playerIndex) continue;
             boolean oppHasBahnhof = state.getPlayers()[oppIdx].hasProject("bahnhof");
             final int oi = oppIdx;
-            double probZeroOppTurn = weightedRollEV(oppHasBahnhof,
+            double probZeroOppTurn = CardIncome.weightedRollEV(oppHasBahnhof,
                     r -> computeOpponentTurnGainForRoll(state, playerIndex, oi, r) == 0 ? 1.0 : 0.0);
             prob *= probZeroOppTurn;
         }
@@ -724,41 +451,29 @@ public class ProbabilityCalc {
     }
 
     // -------------------------------------------------------------------------
-    // estimateWinProbDelta — analytical softmax or Monte Carlo
+    // Win probability (delegates to WinProbabilityCalc)
     // -------------------------------------------------------------------------
 
     /**
      * Returns the baseline win probability for {@code playerIndex} in the current state,
      * using the analytical softmax score approximation (no Monte Carlo).
      *
-     * <p>This is the same scoring function used internally by {@link #estimateWinProbDelta}:
-     * {@code score(p) = Σ singleCardEvPerRound × REMAINING_TURNS + Σ LANDMARK_WEIGHT}.
-     *
      * @param gs          current game state
      * @param playerIndex the player whose win probability to estimate
      * @return estimated win probability in [0, 1]
      */
     public static double computeBaselineWinProb(GameState gs, int playerIndex) {
-        return softmaxEntry(computeScores(gs), playerIndex);
+        return WinProbabilityCalc.computeBaselineWinProb(gs, playerIndex);
     }
 
     /**
      * Estimates the change in win probability for playerIndex from buying {@code candidate}.
      *
      * <h3>Analytical mode ({@code mcSimulations == 0})</h3>
-     * Uses a softmax score approximation:
-     * <pre>
-     *   score(p) = Σ evPerRound(card) × REMAINING_TURNS + Σ LANDMARK_WEIGHT (per built landmark)
-     *   P_win(p) = exp(score_p) / Σ exp(score_j)   [numerically stable, max-subtracted]
-     *   delta    = P_win(after buy) − P_win(before)
-     * </pre>
+     * Uses a softmax score approximation.
      *
      * <h3>Monte Carlo mode ({@code mcSimulations > 0})</h3>
-     * Runs {@code mcSimulations} parallel full-game simulations for both the
-     * baseline state and the post-buy state using {@link GameSimulator}.
-     * Each simulation uses its own {@link GameState#copy()} and
-     * {@link ThreadLocalRandom#current()}.  Returns
-     * {@code P_win(after buy) − P_win(baseline)}.
+     * Runs parallel full-game simulations for baseline and post-buy state.
      *
      * @param gs             game state before purchase
      * @param playerIndex    the buying player
@@ -770,34 +485,12 @@ public class ProbabilityCalc {
     public static double estimateWinProbDelta(GameState gs, int playerIndex,
                                                Project candidate,
                                                int searchDepth, int mcSimulations) {
-        if (mcSimulations > 0) {
-            double baseline = mcWinRate(gs, playerIndex, mcSimulations);
-            GameState stateAfter = gs.copy();
-            stateAfter.getPlayers()[playerIndex].getOwned_projects().add(candidate);
-            double afterBuy = mcWinRate(stateAfter, playerIndex, mcSimulations);
-            return afterBuy - baseline;
-        }
-
-        // Analytical path
-        double[] scoresBefore = computeScores(gs);
-        double pWinBefore = softmaxEntry(scoresBefore, playerIndex);
-
-        GameState stateAfter = gs.copy();
-        stateAfter.getPlayers()[playerIndex].getOwned_projects().add(candidate);
-        double[] scoresAfter = computeScores(stateAfter);
-        double pWinAfter = softmaxEntry(scoresAfter, playerIndex);
-
-        return pWinAfter - pWinBefore;
+        return WinProbabilityCalc.estimateWinProbDelta(gs, playerIndex, candidate, mcSimulations);
     }
 
     /**
      * Runs {@code numSims} Monte Carlo simulations in parallel and returns the
      * fraction in which {@code playerIndex} wins.
-     *
-     * <p>Uses {@code parallelStream} over simulation indices so the JVM's common
-     * {@link java.util.concurrent.ForkJoinPool} handles thread management.
-     * Each simulation gets its own {@link GameState#copy()} and uses
-     * {@link ThreadLocalRandom#current()} (contention-free, per-thread RNG).
      *
      * @param state       starting state (read-only; a copy is taken per simulation)
      * @param playerIndex player whose win rate is measured
@@ -805,120 +498,48 @@ public class ProbabilityCalc {
      * @return win rate in [0, 1]
      */
     public static double mcWinRate(GameState state, int playerIndex, int numSims) {
-        int[] outcomes = IntStream.range(0, numSims)
-                .parallel()
-                .map(i -> GameSimulator.simulate(state.copy(), ThreadLocalRandom.current()))
-                .toArray();
-
-        long wins = 0;
-        int timeouts = 0;
-        for (int w : outcomes) {
-            if (w == playerIndex) wins++;
-            else if (w == -1) timeouts++;
-        }
-
-        if (timeouts > numSims / 100) { // more than 1% timeouts
-            System.err.println("[GameSimulator] WARNING: " + timeouts + "/" + numSims
-                    + " simulations timed out (>" + GameSimulator.MAX_TURNS
-                    + " turns). State may be degenerate.");
-            GameSimulator.TIMEOUT_COUNT.addAndGet(timeouts);
-        }
-
-        return (double) wins / numSims;
+        return WinProbabilityCalc.mcWinRate(state, playerIndex, numSims);
     }
 
-    /**
-     * Computes a heuristic score for each player in the given state.
-     * score(p) = Σ_card evPerRound_of_card_alone × REMAINING_TURNS + Σ_landmark LANDMARK_WEIGHT
-     */
-    private static double[] computeScores(GameState gs) {
-        Player[] players = gs.getPlayers();
-        double[] scores = new double[players.length];
-
-        for (int i = 0; i < players.length; i++) {
-            double score = 0.0;
-            for (Project p : players[i].getOwned_projects()) {
-                // Single-card EV contribution: use the evPerRound of this card in isolation
-                // relative to a minimal state to avoid expensive full-state computation.
-                score += singleCardEvPerRound(p, players.length) * REMAINING_TURNS_ESTIMATE;
-                if (p.isIs_grossprojekt()) score += LANDMARK_WEIGHT;
-            }
-            scores[i] = score;
-        }
-        return scores;
-    }
-
-    /**
-     * Approximates the per-round EV of a single card in isolation (no synergy),
-     * scaled by the number of players for blue cards.
-     */
-    private static double singleCardEvPerRound(Project card, int numPlayers) {
-        double ev = 0.0;
-        // Use 2d6 probabilities as the general case (most mid/late game play is 2d6)
-        for (int r = 2; r <= 12; r++) {
-            int income = get_I(r, card.getId(), true, false, 1, 1, 1, 99, new int[]{5, 5, 5});
-            if (income > 0) ev += P2[r] * income;
-        }
-        // Also cover 1-only rolls (weizenfeld, etc.) using 1d6
-        for (int r = 1; r <= 6; r++) {
-            int income = get_I(r, card.getId(), true, false, 1, 1, 1, 99, new int[]{5, 5, 5});
-            if (income > 0) ev = Math.max(ev, P1[r] * income * ("blau".equals(card.getColor()) ? numPlayers : 1));
-        }
-        // Correct blue card scaling: multiply by numPlayers
-        if ("blau".equals(card.getColor())) {
-            ev *= numPlayers;
-        }
-        return ev;
-    }
+    // -------------------------------------------------------------------------
+    // Bürohaus helpers
+    // -------------------------------------------------------------------------
 
     /**
      * Approximates the coin-equivalent EV of a bürohaus card-swap for the active player.
-     * <p>
-     * The heuristic assumes the player makes the optimal swap: they trade their
-     * lowest-EV owned non-landmark establishment for the highest-EV non-landmark
-     * establishment owned by any opponent. The bürohaus itself is excluded from the
-     * "trade away" candidates since it is the trigger card.
-     * <p>
-     * Returns 0 if the swap would be neutral or unfavourable (e.g. the player already owns
-     * better cards than any opponent, or opponents own no non-landmark cards).
+     * Returns {@code max(0, bestOppCardEV − worstOwnCardEV)}.
      *
-     * @param state       game state with the candidate card (bürohaus) already in the player's list
+     * @param state       game state with bürohaus already in the player's list
      * @param playerIndex the active player
-     * @return per-activation EV gain (≥ 0; clamped below by 0)
+     * @return per-activation EV gain (≥ 0)
      */
     private static double bürohausSwapEV(GameState state, int playerIndex) {
         Player active = state.getPlayers()[playerIndex];
         int n = state.getPlayers().length;
 
-        // Worst owned non-landmark the player might give away (exclude bürohaus itself)
         double worstOwnEV = Double.MAX_VALUE;
         for (Project p : active.getOwned_projects()) {
             if (!p.isIs_grossprojekt() && !p.getId().equals("bürohaus")) {
-                worstOwnEV = Math.min(worstOwnEV, singleCardEvPerRound(p, n));
+                worstOwnEV = Math.min(worstOwnEV, CardIncome.singleCardEvPerRound(p, n));
             }
         }
-        if (worstOwnEV == Double.MAX_VALUE) worstOwnEV = 0.0; // nothing to trade away
+        if (worstOwnEV == Double.MAX_VALUE) worstOwnEV = 0.0;
 
-        // Best non-landmark card any opponent owns (the card to take)
         double bestOppEV = 0.0;
         for (int i = 0; i < n; i++) {
             if (i == playerIndex) continue;
             for (Project p : state.getPlayers()[i].getOwned_projects()) {
                 if (!p.isIs_grossprojekt()) {
-                    bestOppEV = Math.max(bestOppEV, singleCardEvPerRound(p, n));
+                    bestOppEV = Math.max(bestOppEV, CardIncome.singleCardEvPerRound(p, n));
                 }
             }
         }
-
         return Math.max(0.0, bestOppEV - worstOwnEV);
     }
 
     /**
      * Returns a human-readable description of the best bürohaus swap, or {@code null} if
-     * no beneficial swap exists (no opponent cards, or the player's worst card is already
-     * better than any opponent card).
-     *
-     * <p>Example: {@code "Swap your Weizenfeld for P2's Bergwerk"}.
+     * no beneficial swap exists.
      *
      * @param state       game state with bürohaus already in the active player's owned list
      * @param playerIndex the active player
@@ -928,17 +549,15 @@ public class ProbabilityCalc {
         Player active = state.getPlayers()[playerIndex];
         int n = state.getPlayers().length;
 
-        // Find the player's worst non-landmark card (excluding bürohaus)
         Project worstOwn = null;
         double worstEV = Double.MAX_VALUE;
         for (Project p : active.getOwned_projects()) {
             if (!p.isIs_grossprojekt() && !p.getId().equals("bürohaus")) {
-                double ev = singleCardEvPerRound(p, n);
+                double ev = CardIncome.singleCardEvPerRound(p, n);
                 if (ev < worstEV) { worstEV = ev; worstOwn = p; }
             }
         }
 
-        // Find the best non-landmark card owned by any opponent
         Project bestOpp = null;
         double bestOppEV = 0.0;
         int bestOppPlayer = -1;
@@ -946,14 +565,13 @@ public class ProbabilityCalc {
             if (i == playerIndex) continue;
             for (Project p : state.getPlayers()[i].getOwned_projects()) {
                 if (!p.isIs_grossprojekt()) {
-                    double ev = singleCardEvPerRound(p, n);
+                    double ev = CardIncome.singleCardEvPerRound(p, n);
                     if (ev > bestOppEV) { bestOppEV = ev; bestOpp = p; bestOppPlayer = i; }
                 }
             }
         }
 
-        if (bestOpp == null || worstOwn == null) return null;
-        if (bestOppEV <= worstEV) return null; // no beneficial swap
+        if (bestOpp == null || worstOwn == null || bestOppEV <= worstEV) return null;
 
         String oppName = state.getPlayers()[bestOppPlayer].getName();
         return "Swap your " + capitalize(worstOwn.getId())
@@ -968,11 +586,9 @@ public class ProbabilityCalc {
 
     /**
      * Executes the optimal bürohaus card swap in-place on {@code state}.
-     * Removes the active player's lowest-EV non-landmark establishment and gives it to
-     * the opponent who owns the highest-EV non-landmark establishment; that card moves
-     * to the active player. If no beneficial swap exists the state is unchanged.
-     *
-     * <p>Called by {@link GameSimulator} when the active player owns bürohaus and rolls 6.
+     * Removes the active player's lowest-EV non-landmark and gives it to the opponent
+     * who owns the highest-EV non-landmark; that card moves to the active player.
+     * No-ops if no beneficial swap exists.
      *
      * @param state       game state to mutate
      * @param playerIndex the active player
@@ -981,17 +597,15 @@ public class ProbabilityCalc {
         Player active = state.getPlayers()[playerIndex];
         int n = state.getPlayers().length;
 
-        // Find the active player's worst non-landmark (excluding bürohaus itself)
         Project worstOwn = null;
         double worstEV = Double.MAX_VALUE;
         for (Project p : active.getOwned_projects()) {
             if (!p.isIs_grossprojekt() && !p.getId().equals("bürohaus")) {
-                double ev = singleCardEvPerRound(p, n);
+                double ev = CardIncome.singleCardEvPerRound(p, n);
                 if (ev < worstEV) { worstEV = ev; worstOwn = p; }
             }
         }
 
-        // Find the best non-landmark card any opponent owns
         Project bestOpp = null;
         double bestOppEV = 0.0;
         int bestOppPlayer = -1;
@@ -999,7 +613,7 @@ public class ProbabilityCalc {
             if (i == playerIndex) continue;
             for (Project p : state.getPlayers()[i].getOwned_projects()) {
                 if (!p.isIs_grossprojekt()) {
-                    double ev = singleCardEvPerRound(p, n);
+                    double ev = CardIncome.singleCardEvPerRound(p, n);
                     if (ev > bestOppEV) { bestOppEV = ev; bestOpp = p; bestOppPlayer = i; }
                 }
             }
@@ -1007,26 +621,11 @@ public class ProbabilityCalc {
 
         if (bestOpp == null || worstOwn == null || bestOppEV <= worstEV) return;
 
-        // Execute the swap
         Player opponent = state.getPlayers()[bestOppPlayer];
         active.getOwned_projects().remove(worstOwn);
         opponent.getOwned_projects().remove(bestOpp);
         active.getOwned_projects().add(bestOpp);
         opponent.getOwned_projects().add(worstOwn);
-    }
-
-    /**
-     * Numerically stable softmax: returns the probability for index {@code i}.
-     * Uses max-subtraction to prevent overflow.
-     */
-    private static double softmaxEntry(double[] scores, int index) {
-        double max = Double.NEGATIVE_INFINITY;
-        for (double s : scores) if (s > max) max = s;
-
-        double sumExp = 0.0;
-        for (double s : scores) sumExp += Math.exp(s - max);
-
-        return Math.exp(scores[index] - max) / sumExp;
     }
 
     // -------------------------------------------------------------------------
@@ -1039,11 +638,6 @@ public class ProbabilityCalc {
      * <p>
      * Each {@link RankEntry} is fully populated with immediateEV, evPerRound, roiOverHorizon,
      * variance, probNoIncomeOwnTurn, probNoIncomeRound, and optionally winProbDelta.
-     * <p>
-     * When {@link RankingOptions#includeWinProbDelta} is true, win-probability delta is computed
-     * analytically (fast) by default. When {@link RankingOptions#mcSimulations} &gt; 0, Monte Carlo
-     * simulations are used instead — the baseline win rate is computed once and reused across all
-     * candidates to avoid redundant simulation work.
      *
      * @param gs          current game state
      * @param playerIndex the buying player
@@ -1057,15 +651,13 @@ public class ProbabilityCalc {
 
         ArrayList<RankEntry> results = new ArrayList<>();
 
-        // Compute MC baseline win rate once (expensive) — reused for all candidates.
         double mcBaseline = 0.0;
         if (opts.includeWinProbDelta && opts.mcSimulations > 0) {
-            mcBaseline = mcWinRate(gs, playerIndex, opts.mcSimulations);
+            mcBaseline = WinProbabilityCalc.mcWinRate(gs, playerIndex, opts.mcSimulations);
         }
 
         for (Project candidate : gs.getUnbuilt_projects()) {
             if (candidate.getCost() > coins) continue;
-            // Großprojekte (gelb) and purple (lila) cards are unique — skip if already owned
             if (candidate.isIs_grossprojekt() && player.hasProject(candidate.getId())) continue;
             if (candidate.getColor().equals("lila") && player.hasProject(candidate.getId())) continue;
 
@@ -1081,15 +673,13 @@ public class ProbabilityCalc {
 
             if (opts.includeWinProbDelta) {
                 if (opts.mcSimulations > 0) {
-                    // MC path: compare post-buy win rate against pre-computed baseline
                     GameState stateAfter = gs.copy();
                     stateAfter.getPlayers()[playerIndex].getOwned_projects().add(candidate);
-                    double afterBuy = mcWinRate(stateAfter, playerIndex, opts.mcSimulations);
+                    double afterBuy = WinProbabilityCalc.mcWinRate(stateAfter, playerIndex, opts.mcSimulations);
                     entry.winProbDelta = afterBuy - mcBaseline;
                 } else {
-                    // Analytical path (default)
-                    entry.winProbDelta = estimateWinProbDelta(
-                            gs, playerIndex, candidate, 0, 0);
+                    entry.winProbDelta = WinProbabilityCalc.estimateWinProbDelta(
+                            gs, playerIndex, candidate, 0);
                 }
             }
 
@@ -1126,9 +716,8 @@ public class ProbabilityCalc {
         for (int playerIndex = 0; playerIndex < playerProjects.size(); playerIndex++) {
             Project[] projects = playerProjects.get(playerIndex);
             int ownCoins = playerCoins[playerIndex];
-            int[] otherCoins = buildOpponentCoins(playerCoins, playerIndex);
+            int[] otherCoins = CardIncome.buildOpponentCoins(playerCoins, playerIndex);
 
-            // Count synergy categories for this player
             boolean hasEB = false;
             int fCount = 0, aCount = 0, pCount = 0;
             for (Project p : projects) {
@@ -1147,7 +736,7 @@ public class ProbabilityCalc {
                 if (vmRow >= valueMatrix.length) continue;
 
                 for (int roll = 1; roll <= ROLL_COUNT; roll++) {
-                    valueMatrix[vmRow][roll - 1] += get_I(
+                    valueMatrix[vmRow][roll - 1] += CardIncome.get_I(
                             roll, project.getId(), true, hasEB,
                             fCount, aCount, pCount, ownCoins, otherCoins);
                 }
@@ -1157,7 +746,7 @@ public class ProbabilityCalc {
     }
 
     // -------------------------------------------------------------------------
-    // Package-visible bridges for GameSession (turn simulation)
+    // Package-visible bridges for GameSession and GameSimulator
     // -------------------------------------------------------------------------
 
     /**
@@ -1166,20 +755,6 @@ public class ProbabilityCalc {
      * red-card payment priority.
      *
      * <p>This is the single authoritative method for applying a roll to all players.
-     * It must be used instead of calling {@link #computeNetGainForRollPublic} and
-     * {@link #computeOpponentTurnGainForRollPublic} separately, because red card
-     * payments compete for the active player's coins — computing them simultaneously
-     * would let multiple red card owners each claim the same coins.
-     *
-     * <p>Algorithm:
-     * <ol>
-     *   <li>Walk opponents counter-clockwise from the active player.</li>
-     *   <li>For each opponent, compute their red card gain against the roller's
-     *       remaining coins (sequential, not simultaneous).</li>
-     *   <li>For each player, compute their blue card gain independently (bank pays —
-     *       no contention).</li>
-     *   <li>For the active player, add green and purple income on top.</li>
-     * </ol>
      *
      * @param state         current game state (coins reflect pre-roll values)
      * @param activePlayer  index of the rolling player
@@ -1191,48 +766,45 @@ public class ProbabilityCalc {
         int n = players.length;
         int[] deltas = new int[n];
 
-        // --- Step 1: Red card payments (counter-clockwise, sequential).
-        //     Active player's coins are consumed in order; opponents receive what is collected.
+        // Step 1: Red card payments (counter-clockwise, sequential).
         int rollerCoins = players[activePlayer].getCoins();
         for (int step = 1; step < n; step++) {
-            int oppIdx = (activePlayer - step + n) % n; // counter-clockwise
+            int oppIdx = (activePlayer - step + n) % n;
             Player opponent = players[oppIdx];
-            PlayerStats oppStats = PlayerStats.of(opponent);
+            CardIncome.PlayerStats oppStats = CardIncome.PlayerStats.of(opponent);
             for (Project p : opponent.getOwned_projects()) {
                 if ("rot".equals(p.getColor())) {
-                    int loss = get_I(roll, p.getId(), false,
-                            oppStats.hasEinkaufszentrum,
-                            0, 0, 0,
+                    int loss = CardIncome.get_I(roll, p.getId(), false,
+                            oppStats.hasEinkaufszentrum, 0, 0, 0,
                             rollerCoins, new int[0]);
                     if (loss < 0 && -loss > rollerCoins) loss = -rollerCoins;
-                    int gain = -loss; // what the opponent collects
-                    deltas[activePlayer] += loss;   // roller loses
-                    deltas[oppIdx]       += gain;   // opponent gains
+                    int gain = -loss;
+                    deltas[activePlayer] += loss;
+                    deltas[oppIdx]       += gain;
                     rollerCoins += loss;
                     if (rollerCoins < 0) rollerCoins = 0;
                 }
             }
         }
 
-        // --- Step 2: Blue card income for every player (bank pays — no contention).
+        // Step 2: Blue card income for every player.
         for (int i = 0; i < n; i++) {
             Player player = players[i];
-            PlayerStats stats = PlayerStats.of(player);
-            int[] otherCoins = buildOpponentCoins(players, i);
-            deltas[i] += sumColorIncome(player, "blau", roll, stats, player.getCoins(), otherCoins);
+            CardIncome.PlayerStats stats = CardIncome.PlayerStats.of(player);
+            int[] otherCoins = CardIncome.buildOpponentCoins(players, i);
+            deltas[i] += CardIncome.sumColorIncome(player, "blau", roll, stats, player.getCoins(), otherCoins);
         }
 
-        // --- Step 3: Green and purple income for the active player (own-turn only).
+        // Step 3: Green and purple income for the active player.
         Player active = players[activePlayer];
-        PlayerStats activeStats = PlayerStats.of(active);
-        int[] opponentCoins = buildOpponentCoins(players, activePlayer);
-        deltas[activePlayer] += sumColorIncome(active, "grün", roll, activeStats,
+        CardIncome.PlayerStats activeStats = CardIncome.PlayerStats.of(active);
+        int[] opponentCoins = CardIncome.buildOpponentCoins(players, activePlayer);
+        deltas[activePlayer] += CardIncome.sumColorIncome(active, "grün", roll, activeStats,
                 active.getCoins(), opponentCoins);
-        // Purple: re-read opponent coins for each purple card (sequential stealing)
         for (Project p : active.getOwned_projects()) {
             if ("lila".equals(p.getColor())) {
-                int[] freshOpponentCoins = buildOpponentCoins(players, activePlayer);
-                deltas[activePlayer] += get_I(roll, p.getId(), true,
+                int[] freshOpponentCoins = CardIncome.buildOpponentCoins(players, activePlayer);
+                deltas[activePlayer] += CardIncome.get_I(roll, p.getId(), true,
                         activeStats.hasEinkaufszentrum,
                         activeStats.foodCount, activeStats.animalCount, activeStats.productionCount,
                         active.getCoins() + deltas[activePlayer], freshOpponentCoins);

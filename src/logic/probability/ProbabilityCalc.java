@@ -302,6 +302,12 @@ public class ProbabilityCalc {
      * <p>
      * Blue cards contribute on every turn. Green and purple contribute only on own turn.
      * Red cards contribute (as income) on every opponent's turn.
+     * <p>
+     * Coin counts are adjusted to a projected value before evaluation:
+     * {@code projectedCoins = currentCoins + estimateUncappedOwnTurnEV}. This avoids the
+     * static-snapshot bias where a player with 0 coins appears permanently unable to pay red
+     * cards, when in reality they will accumulate income before the triggering roll fires.
+     * {@code immediateEV} is <em>not</em> affected — it models the current turn with current coins.
      *
      * @param gs          game state before the purchase
      * @param playerIndex the player to evaluate
@@ -311,6 +317,15 @@ public class ProbabilityCalc {
     public static double evPerRound(GameState gs, int playerIndex, Project candidate) {
         GameState state = gs.copy();
         state.getPlayers()[playerIndex].getOwned_projects().add(candidate);
+
+        // Project each player's coins forward by their expected per-turn blue+green income.
+        // This corrects the static-snapshot bias in red card clamping for the EV horizon.
+        for (Player p : state.getPlayers()) {
+            boolean pHasBahnhof = p.hasProject("bahnhof");
+            int projected = (int) Math.round(p.getCoins()
+                    + CardIncome.estimateUncappedOwnTurnEV(p, pHasBahnhof));
+            p.setCoins(projected);
+        }
 
         int n = state.getPlayers().length;
         double total = 0.0;

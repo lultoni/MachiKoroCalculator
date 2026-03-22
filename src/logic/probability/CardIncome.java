@@ -285,6 +285,33 @@ class CardIncome {
     }
 
     // -------------------------------------------------------------------------
+    // estimateUncappedOwnTurnEV — projected income for EV horizon calculations
+    // -------------------------------------------------------------------------
+
+    /**
+     * Estimates the expected blue+green coin income for {@code player} on their own turn,
+     * without any coin-clamp (uses {@code c=99}). This represents the income the player
+     * can expect to accumulate regardless of their current wallet, suitable as a
+     * conservative floor when projecting future coin counts for EV calculations.
+     *
+     * <p>Red cards are excluded because their payment depends on the coin count being
+     * estimated — including them would create a circular dependency.
+     *
+     * @param player     the player whose owned cards to evaluate
+     * @param hasBahnhof true if the player owns Bahnhof (may use 2d6 on own turn)
+     * @return expected blue+green income per own turn, unclamped (≥ 0)
+     */
+    static double estimateUncappedOwnTurnEV(Player player, boolean hasBahnhof) {
+        PlayerStats stats = PlayerStats.of(player);
+        IntToDoubleFunction payout = r -> {
+            int blue  = sumColorIncome(player, "blau", r, stats, 99, new int[0]);
+            int green = sumColorIncome(player, "grün", r, stats, 99, new int[0]);
+            return blue + green;
+        };
+        return bestDiceEV(hasBahnhof, payout);
+    }
+
+    // -------------------------------------------------------------------------
     // singleCardEvPerRound — isolated card EV for scoring
     // -------------------------------------------------------------------------
 

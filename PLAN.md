@@ -87,7 +87,7 @@ See `ARCHITECTURE.md §2.8` for the current approximation details.
 ### 4. `evPerRound` — Static Coin Count
 **Priority: Medium**
 
-- [ ] `evPerRound` uses the player's *current* coin count for all turns. Does not model coin accumulation between turns or red card losses changing the effective coin count mid-turn. Slightly optimistic for low-coin players.
+- [x] `evPerRound` now projects each player's coins forward by their expected blue+green per-turn income before evaluating red card clamping. `immediateEV` is unaffected (models current turn with actual coins). See `ARCHITECTURE.md §2.4b`. *(ProbabilityCalc.java, CardIncome.java)*
 
 ### 5. `singleCardEvPerRound` — No Synergy in Softmax Scores
 **Priority: Low**

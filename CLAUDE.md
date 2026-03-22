@@ -149,7 +149,7 @@ The codebase is now a single active layer with no legacy code.
 ### ProbabilityCalc — all methods implemented (Phase 2 complete)
 
 Implementation is split across three files in `src/logic/probability/`:
-- **`CardIncome.java`** (package-private) — `P1`/`P2`, `get_I`, `PlayerStats`, `buildOpponentCoins`, `sumColorIncome`, `weightedRollEV`, `bestDiceEV`, `singleCardEvPerRound`. Pure math primitives, no external state.
+- **`CardIncome.java`** (package-private) — `P1`/`P2`, `get_I`, `PlayerStats`, `buildOpponentCoins`, `sumColorIncome`, `weightedRollEV`, `bestDiceEV`, `estimateUncappedOwnTurnEV`, `singleCardEvPerRound`. Pure math primitives, no external state.
 - **`WinProbabilityCalc.java`** (package-private) — `computeScores`, `softmaxEntry`, `computeBaselineWinProb`, `estimateWinProbDelta`, `mcWinRate`.
 - **`ProbabilityCalc.java`** (public facade) — all public API methods plus `computeNetGainForRoll`, `computeOpponentTurnGainForRoll`, `immediateEV`, `evPerRound`, `roiOverHorizon`, `rankPurchasableProjects`, `computeAllDeltasForRoll`, bürohaus helpers, legacy matrix method, deprecated bridges.
 
@@ -162,7 +162,7 @@ Public methods on `ProbabilityCalc`:
 - `executeBürohausSwap(GameState, int)` — public helper that mutates `state` by performing the optimal swap: removes the active player's lowest-EV non-landmark and replaces it with the highest-EV non-landmark from any opponent. Called by `GameSimulator.applyRoll()` on roll=6 when the active player owns bürohaus.
 - `bestSecondRollEV` — EV of best re-roll after Freizeitpark doubles.
 - `immediateEV` — own-turn EV including Bahnhof/Freizeitpark/Funkturm.
-- `evPerRound` — full-round EV (own turn + N−1 opponent turns, blue and red cards).
+- `evPerRound` — full-round EV (own turn + N−1 opponent turns, blue/green/red/purple). Projects each player's coins forward by `CardIncome.estimateUncappedOwnTurnEV` before evaluation, correcting the static-snapshot bias in red card clamping. `immediateEV` uses actual current coins.
 - `roiOverHorizon` — geometric-series discounted ROI + variance + probNoIncome, returns `RankEntry`.
 - `estimateWinProbDelta` — analytical softmax win-probability delta; also accepts MC path when `mcSimulations > 0`.
 - `rankPurchasableProjects` — sorted list of all affordable cards by ROI; computes MC baseline once and reuses it across all candidates.

@@ -127,6 +127,19 @@ This is enforced consistently in:
 
 The two older bridge methods (`computeNetGainForRollPublic`, `computeOpponentTurnGainForRollPublic`) are retained as `@Deprecated` for backward compatibility but are no longer used in the live game path.
 
+### 2.4b `evPerRound` — Projected Coin Correction
+
+`computeNetGainForRoll` uses the players' current coin counts for red card clamping. This creates a **static-snapshot bias**: a player with 0 coins appears unable to pay red cards in the EV model, even though they will accumulate blue/green income before the roll that triggers the red card.
+
+`evPerRound` corrects for this by projecting each player's coins forward before evaluation:
+```
+projectedCoins(player) = currentCoins + round(estimateUncappedOwnTurnEV(player))
+```
+
+`estimateUncappedOwnTurnEV` sums the player's own-turn blue+green income using `c=99` (no clamp), giving the income they can expect regardless of current wallet. The rounding converts the fractional EV to the nearest integer coin count.
+
+`immediateEV` is **not** affected — it correctly uses actual current coins for the turn happening right now (the player may genuinely have 0 coins on their current turn).
+
 ### 2.5 Red Card Payment (Café, Familienrestaurant)
 
 `get_I` is called from the *roller's* perspective for red cards:

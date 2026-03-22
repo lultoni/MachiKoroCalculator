@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Implementation Plan
+
+See `PLAN.md` for the full phase-by-phase implementation roadmap, from clean-up through final UI. Always check which phase is current before starting new work.
+
 ## Project Goal
 
 A Machi Koro buy-decision calculator: given any game state (player coins, owned projects, number of players), determine the mathematically optimal purchase using expected value and probability calculations.

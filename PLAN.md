@@ -147,17 +147,17 @@ See `ARCHITECTURE.md §2.8` for the current approximation details.
 ### 5. Bahnhof Dice-Choice Pattern
 **Priority: Medium** · *ProbabilityCalc.java*
 
-- [ ] The pattern `double p = hasBahnhof ? P2[r] : P1[r]` (or `ev1 vs ev2` EV comparison for 1d6 vs 2d6) appears in at least 3 places. Extract `diceProb(int roll, boolean hasBahnhof)` and `chooseOptimalDice(GameState, int playerIndex)` helpers.
+- [x] The pattern `double p = hasBahnhof ? P2[r] : P1[r]` (or `ev1 vs ev2` EV comparison for 1d6 vs 2d6) appears in at least 3 places. Replaced by `weightedRollEV(boolean use2d6, IntToDoubleFunction)` and `bestDiceEV(boolean hasBahnhof, IntToDoubleFunction)` helpers (see dedup item #1 above). *(ProbabilityCalc.java)*
 
 ### 6. `PlayerStats` Computation Duplicated
 **Priority: Medium** · *ProbabilityCalc.java*
 
-- [ ] `PlayerStats.of(player)` is called in the hot loop inside `rankPurchasableProjects` but also constructed ad hoc in at least one other location. Verify it is always created via `PlayerStats.of()` and remove any inline duplicates.
+- [x] `PlayerStats.of(player)` is called in the hot loop inside `rankPurchasableProjects` but also constructed ad hoc in at least one other location. Verified: all usages are via `PlayerStats.of()` — no inline duplicates. *(ProbabilityCalc.java)*
 
 ### 7. `colorForCard()` — Two Versions
 **Priority: Medium** · *MainWindow.java*
 
-- [ ] `MainWindow` contains two private methods that map card color strings to Java `Color` values — one for the table cell renderer and one for the center panel. They use different palettes. Consolidate into a single `colorForCard(String color, boolean dark)` method or a shared `CardColors` utility class.
+- [x] `MainWindow` contained two private methods that map card color strings to `Color` values — one for the table cell renderer (pastel, for backgrounds) and one for the center panel (saturated, for color bars). Consolidated into `colorForCard(String colorId, boolean saturated)` with a one-line wrapper `colorForCard(Project p)`. *(MainWindow.java)*
 
 ### 8. `capitalize()` — Identical 4-Line Method
 **Priority: Low** · *MainWindow.java, SnapshotDialog.java*

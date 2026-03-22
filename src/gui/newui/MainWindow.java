@@ -578,14 +578,35 @@ public class MainWindow extends JFrame {
     }
 
     private static Color colorForCard(Project p) {
-        return switch (p.getColor()) {
-            case "blau"  -> CARD_COLORS[0];
-            case "rot"   -> CARD_COLORS[1];
-            case "grün"  -> CARD_COLORS[2];
-            case "lila"  -> CARD_COLORS[3];
-            case "gelb"  -> CARD_COLORS[4];
-            default      -> Color.LIGHT_GRAY;
-        };
+        return colorForCard(p.getColor(), true);
+    }
+
+    /**
+     * Returns the display color for a card.
+     *
+     * @param colorId card color string (e.g. "blau", "rot")
+     * @param saturated true = vivid/saturated color (for color bars); false = pastel (for table cell backgrounds)
+     */
+    private static Color colorForCard(String colorId, boolean saturated) {
+        if (saturated) {
+            return switch (colorId) {
+                case "blau"  -> CARD_COLORS[0];
+                case "rot"   -> CARD_COLORS[1];
+                case "grün"  -> CARD_COLORS[2];
+                case "lila"  -> CARD_COLORS[3];
+                case "gelb"  -> CARD_COLORS[4];
+                default      -> Color.LIGHT_GRAY;
+            };
+        } else {
+            return switch (colorId) {
+                case "blau"  -> new Color(0xD0E8FF);
+                case "rot"   -> new Color(0xFFD5C2);
+                case "grün"  -> new Color(0xD5F0C1);
+                case "lila"  -> new Color(0xE8D5FF);
+                case "gelb"  -> new Color(0xFFF5B0);
+                default      -> Color.WHITE;
+            };
+        }
     }
 
     /**
@@ -637,7 +658,7 @@ public class MainWindow extends JFrame {
                 String id = (String) value;
                 Project p = ProjectLoader.getProject(id).orElse(null);
                 if (p != null) {
-                    setBackground(colorForCard(p).brighter());
+                    setBackground(colorForCard(p.getColor(), false));
                 } else {
                     setBackground(Color.WHITE);
                 }
@@ -645,17 +666,6 @@ public class MainWindow extends JFrame {
                 setBackground(table.getSelectionBackground());
             }
             return this;
-        }
-
-        private static Color colorForCard(Project p) {
-            return switch (p.getColor()) {
-                case "blau"  -> new Color(0xD0E8FF);
-                case "rot"   -> new Color(0xFFD5C2);
-                case "grün"  -> new Color(0xD5F0C1);
-                case "lila"  -> new Color(0xE8D5FF);
-                case "gelb"  -> new Color(0xFFF5B0);
-                default      -> Color.WHITE;
-            };
         }
     }
 }

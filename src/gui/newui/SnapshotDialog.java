@@ -110,6 +110,22 @@ public class SnapshotDialog extends JDialog {
                 JCheckBox cb = new JCheckBox(capitalize(p.getId()) + " (" + p.getCost() + ")");
                 cb.setFont(new Font("Arial", Font.PLAIN, 11));
                 projectChecks[playerIndex][j] = cb;
+                // Purple cards are unique — only one player may own each copy.
+                // When this checkbox is selected, uncheck the same card for all other players.
+                if (color.equals("lila")) {
+                    final int cardIndex = j;
+                    cb.addItemListener(ev -> {
+                        if (cb.isSelected()) {
+                            for (int otherPlayer = 0; otherPlayer < numPlayers; otherPlayer++) {
+                                if (otherPlayer == playerIndex) continue;
+                                if (projectChecks[otherPlayer] != null
+                                        && projectChecks[otherPlayer][cardIndex] != null) {
+                                    projectChecks[otherPlayer][cardIndex].setSelected(false);
+                                }
+                            }
+                        }
+                    });
+                }
                 colorSection.add(cb);
             }
             panel.add(colorSection);
@@ -138,14 +154,21 @@ public class SnapshotDialog extends JDialog {
     private void onApply(ActionEvent e) {
         String[] names = session.getPlayerNames();
         GameStateBuilder builder = new GameStateBuilder(numPlayers);
-        for (int i = 0; i < numPlayers; i++) {
-            builder.setPlayerName(i, names[i]);
-            builder.setCoins(i, (int) coinSpinners[i].getValue());
-            for (int j = 0; j < allProjects.size(); j++) {
-                if (projectChecks[i][j] != null && projectChecks[i][j].isSelected()) {
-                    builder.addProject(i, allProjects.get(j).getId());
+        try {
+            for (int i = 0; i < numPlayers; i++) {
+                builder.setPlayerName(i, names[i]);
+                builder.setCoins(i, (int) coinSpinners[i].getValue());
+                for (int j = 0; j < allProjects.size(); j++) {
+                    if (projectChecks[i][j] != null && projectChecks[i][j].isSelected()) {
+                        builder.addProject(i, allProjects.get(j).getId());
+                    }
                 }
             }
+        } catch (IllegalArgumentException ex) {
+            JOptionPane.showMessageDialog(this,
+                    "Invalid game state: " + ex.getMessage(),
+                    "Snapshot Error", JOptionPane.ERROR_MESSAGE);
+            return;
         }
 
         // Replace session state

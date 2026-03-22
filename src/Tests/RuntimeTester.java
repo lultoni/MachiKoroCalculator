@@ -54,6 +54,12 @@ public class RuntimeTester {
         test_mc_win_rates_sum_to_one();
         test_mc_win_prob_delta_in_range();
 
+        System.out.println("\n=== Supply & Ownership Rules Tests ===\n");
+        test_builder_throws_on_duplicate_purple_same_player();
+        test_builder_allows_same_purple_for_different_players();
+        test_rank_excludes_owned_purple_cards();
+        test_rank_excludes_owned_landmarks();
+
         System.out.println("\n--- Results: " + passed + " passed, " + failed + " failed ---");
 
         System.out.println("\n=== Runtime Benchmarks ===\n");
@@ -536,6 +542,67 @@ public class RuntimeTester {
             assertTrue("winProbDelta in [-1, 1] for " + e.project.getId(),
                     e.winProbDelta >= -1.0 && e.winProbDelta <= 1.0);
         }
+    }
+
+    // =========================================================================
+    // Supply & Ownership Rules Tests
+    // =========================================================================
+
+    private static void test_builder_throws_on_duplicate_purple_same_player() {
+        // Adding the same purple card twice to the same player must throw
+        boolean threw = false;
+        try {
+            new GameStateBuilder(2)
+                    .addProject(0, "stadion")
+                    .addProject(0, "stadion"); // duplicate — should throw
+        } catch (IllegalArgumentException ex) {
+            threw = true;
+        }
+        assertTrue("GameStateBuilder throws when same purple card added twice to one player", threw);
+    }
+
+    private static void test_builder_allows_same_purple_for_different_players() {
+        // Two different players may each own one copy of the same purple card
+        // (Each copy is separate; the uniqueness rule is per-player, not global for builder validation)
+        boolean threw = false;
+        try {
+            new GameStateBuilder(2)
+                    .addProject(0, "stadion")
+                    .addProject(1, "stadion"); // different players — allowed
+        } catch (IllegalArgumentException ex) {
+            threw = true;
+        }
+        assertTrue("GameStateBuilder allows same purple card for different players", !threw);
+    }
+
+    private static void test_rank_excludes_owned_purple_cards() {
+        // If a player already owns stadion, rankPurchasableProjects must not offer it again
+        GameStateBuilder b = new GameStateBuilder(2);
+        b.setPlayerName(0, "P0").setCoins(0, 20)
+                .addProject(0, "weizenfeld").addProject(0, "stadion");
+        b.setPlayerName(1, "P1").setCoins(1, 3).addProject(1, "weizenfeld");
+        GameState gs = b.build();
+        RankingOptions opts = new RankingOptions();
+        ArrayList<RankEntry> ranks = ProbabilityCalc.rankPurchasableProjects(gs, 0, opts);
+        boolean stadionOffered = ranks.stream()
+                .anyMatch(e -> e.project.getId().equals("stadion"));
+        assertTrue("rankPurchasableProjects does not offer stadion to player who already owns it",
+                !stadionOffered);
+    }
+
+    private static void test_rank_excludes_owned_landmarks() {
+        // Sanity check: a player who owns bahnhof should not be offered it again
+        GameStateBuilder b = new GameStateBuilder(2);
+        b.setPlayerName(0, "P0").setCoins(0, 20)
+                .addProject(0, "weizenfeld").addProject(0, "bahnhof");
+        b.setPlayerName(1, "P1").setCoins(1, 3).addProject(1, "weizenfeld");
+        GameState gs = b.build();
+        RankingOptions opts = new RankingOptions();
+        ArrayList<RankEntry> ranks = ProbabilityCalc.rankPurchasableProjects(gs, 0, opts);
+        boolean bahnhofOffered = ranks.stream()
+                .anyMatch(e -> e.project.getId().equals("bahnhof"));
+        assertTrue("rankPurchasableProjects does not offer bahnhof to player who already owns it",
+                !bahnhofOffered);
     }
 
     // =========================================================================

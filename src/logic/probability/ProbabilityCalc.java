@@ -966,7 +966,9 @@ public class ProbabilityCalc {
 
         for (Project candidate : gs.getUnbuilt_projects()) {
             if (candidate.getCost() > coins) continue;
+            // Großprojekte (gelb) and purple (lila) cards are unique — skip if already owned
             if (candidate.isIs_grossprojekt() && player.hasProject(candidate.getId())) continue;
+            if (candidate.getColor().equals("lila") && player.hasProject(candidate.getId())) continue;
 
             RankEntry entry = roiOverHorizon(gs, playerIndex, candidate,
                     opts.horizonTurns, opts.discountFactor);

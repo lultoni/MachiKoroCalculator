@@ -4,6 +4,21 @@ All phases of the original implementation plan are complete. This file records w
 
 ---
 
+## Supply / Ownership Rules Fix
+
+**Goal:** Enforce correct per-player ownership limits for purple (lila) cards.
+
+**What was done:**
+- `GameStateBuilder.addProject()` now throws `IllegalArgumentException` if the card is purple and the target player already owns one (purple cards are unique — max 1 per player)
+- `ProbabilityCalc.rankPurchasableProjects()` now skips purple cards that the active player already owns, in addition to the existing Großprojekt singleton check
+- `SnapshotDialog` purple checkboxes now have an `ItemListener`: when a purple card is checked for one player, the same card is automatically unchecked for all other players
+- `SnapshotDialog.onApply()` now wraps the `GameStateBuilder` calls in a try/catch; any `IllegalArgumentException` (e.g. duplicate purple) surfaces as a `JOptionPane` error dialog instead of a stack trace
+- 4 new tests added to `RuntimeTester` covering all the above; total test count: 134/134
+
+**Tests:** 134/134 pass
+
+---
+
 ## Phase 6 — Polish & Final Integration
 
 **Goal:** Resolve all remaining FIXMEs, complete documentation, add final benchmarks.

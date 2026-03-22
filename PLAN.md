@@ -27,10 +27,10 @@ The current model does not correctly enforce Machi Koro's per-player ownership l
 
 **What needs fixing:**
 
-- [ ] `rankPurchasableProjects` should exclude purple cards the active player already owns (unique cards). *(ProbabilityCalc.java)*
-- [ ] The snapshot dialog should prevent checking a purple card for a player who already owns one. *(SnapshotDialog.java)*
+- [x] `rankPurchasableProjects` should exclude purple cards the active player already owns (unique cards). *(ProbabilityCalc.java)*
+- [x] The snapshot dialog should prevent checking a purple card for a player who already owns one. *(SnapshotDialog.java)*
 - [ ] `GameState.unbuilt_projects` semantics should be clarified (or changed) to reflect supply counts, not just presence. *(GameState.java)*
-- [ ] `GameStateBuilder` should throw if a purple card is added twice to the same player. *(GameStateBuilder.java)*
+- [x] `GameStateBuilder` should throw if a purple card is added twice to the same player. *(GameStateBuilder.java)*
 
 ---
 
@@ -80,7 +80,7 @@ See `ARCHITECTURE.md §2.5` for the current approximation details.
 ### 3. Snapshot Dialog Validation Feedback
 **Priority: Medium**
 
-- [ ] Invalid states (e.g. same purple card owned by two players) currently produce a Java exception. Fix: validate uniqueness constraints in `GameStateBuilder.build()` or `SnapshotDialog.onApply()` and show a `JOptionPane` error instead. *(GameStateBuilder.java, SnapshotDialog.java)*
+- [x] Invalid states (e.g. same purple card owned by two players) currently produce a Java exception. Fix: validate uniqueness constraints in `GameStateBuilder.build()` or `SnapshotDialog.onApply()` and show a `JOptionPane` error instead. *(GameStateBuilder.java, SnapshotDialog.java)*
 
 ### 4. "Current Win Probability" Summary
 **Priority: Low**

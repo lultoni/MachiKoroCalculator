@@ -64,12 +64,20 @@ public class GameStateBuilder {
      *
      * @param playerIndex player index
      * @param projectId   project ID as in projects.json (e.g. "weizenfeld")
-     * @throws IllegalArgumentException if projectId is not found in ProjectLoader
+     * @throws IllegalArgumentException if projectId is not found in ProjectLoader, or if the
+     *                                  card is lila (purple) and that player already owns one
+     *                                  (purple cards are unique — max 1 copy per player)
      */
     public GameStateBuilder addProject(int playerIndex, String projectId) {
         checkIndex(playerIndex);
         Project p = ProjectLoader.getProject(projectId)
                 .orElseThrow(() -> new IllegalArgumentException("Unknown project id: " + projectId));
+        if (p.getColor().equals("lila") && owned.get(playerIndex).stream()
+                .anyMatch(existing -> existing.getId().equals(projectId))) {
+            throw new IllegalArgumentException(
+                    "Purple card '" + projectId + "' is unique — player " + playerIndex
+                    + " already owns one copy");
+        }
         owned.get(playerIndex).add(p);
         return this;
     }

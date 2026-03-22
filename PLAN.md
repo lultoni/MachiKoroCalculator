@@ -4,6 +4,20 @@
 
 ---
 
+## Progress Tracker
+
+| Phase | Status | Commit | Notes |
+|-------|--------|--------|-------|
+| 0 — Deep Clean & Audit | ✅ Done | `48a965e` | Compiles clean, all TODOs → FIXME, legacy tagged |
+| 1 — Solid Data Model | ✅ Done | `c0d15dd` | 31/31 tests pass, ProjectLoader cached, GameState.initial() |
+| 2 — Core Math Engine | ⬜ Pending | — | — |
+| 3 — Game State Config UI | ⬜ Pending | — | Requires design question answered first (3.1) |
+| 4 — Remove Legacy Code | ⬜ Pending | — | Blocked on Phase 3 |
+| 5 — Monte Carlo Deep Mode | ⬜ Pending | — | Blocked on Phase 2 |
+| 6 — Polish & Final Integration | ⬜ Pending | — | Blocked on Phase 5 |
+
+---
+
 ## How to Use This Plan
 
 Work through phases top-to-bottom. Each phase has:
@@ -16,7 +30,7 @@ If any step introduces a design question not answered here, **stop and ask the u
 
 ---
 
-## Phase 0 — Deep Clean & Audit
+## ✅ Phase 0 — Deep Clean & Audit (COMPLETE — commit `48a965e`)
 
 **Goal:** Eliminate dead code, compile errors, and architectural confusion so the codebase is a clean, stable foundation.
 
@@ -56,7 +70,7 @@ This turns the audit into a tracked, phase-linked work list.
 
 ---
 
-## Phase 1 — Solid Data Model (probability layer only)
+## ✅ Phase 1 — Solid Data Model (COMPLETE — commit `c0d15dd`)
 
 **Goal:** The `logic.probability` package has a complete, correct, immutable data model that can represent any valid base-game state. No legacy dependency.
 
@@ -407,9 +421,9 @@ Add a "Deep Analysis" toggle in the UI. When enabled: `opts.mcSimulations = 1000
 - `bürohaus`: Ask user how card swapping should be modeled (its effect is non-monetary). Implement based on answer.
 - Audit for any other cards added to `projects.json` but missing in `get_I`.
 
-### 6.2 Complete `projects.json` descriptions
+### 6.2 ~~Complete `projects.json` descriptions~~ (done in Phase 1)
 
-Replace all `"description": "Placeholder"` with the actual card description text from the rulebook.
+All 19 card descriptions were filled in during Phase 1. `bürohaus` has a FIXME note about its non-monetary effect pending Phase 2 design decision.
 
 ### 6.3 Final documentation pass
 

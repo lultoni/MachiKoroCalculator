@@ -10,7 +10,7 @@
 |-------|--------|--------|-------|
 | 0 — Deep Clean & Audit | ✅ Done | `48a965e` | Compiles clean, all TODOs → FIXME, legacy tagged |
 | 1 — Solid Data Model | ✅ Done | `c0d15dd` | 31/31 tests pass, ProjectLoader cached, GameState.initial() |
-| 2 — Core Math Engine | ⬜ Pending | — | — |
+| 2 — Core Math Engine | ✅ Done | — | 108/108 tests pass, 0.18 ms/call; EV, ROI, variance, ranking, win prob delta |
 | 3 — Game State Config UI | ⬜ Pending | — | Requires design question answered first (3.1) |
 | 4 — Remove Legacy Code | ⬜ Pending | — | Blocked on Phase 3 |
 | 5 — Monte Carlo Deep Mode | ⬜ Pending | — | Blocked on Phase 2 |

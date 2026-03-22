@@ -4,6 +4,26 @@ All phases of the original implementation plan are complete. This file records w
 
 ---
 
+## Rules Correctness: Income Order and Counter-Clockwise Payment
+
+**Goal:** Make the EV model and live game tracking fully conform to the official rules.
+
+**What was done:**
+
+**Income processing order (Rot → Blau & Grün → Violett):**
+- `computeNetGainForRoll` reordered: red card payments now fire against `activeCoins` (pre-roll coins) before any blue/green income is credited. Previously red fired last, causing the roller to appear richer when clamping was evaluated — making red cards look cheaper to the roller than they are.
+
+**Counter-clockwise red card payment priority:**
+- `computeNetGainForRoll` now iterates opponents counter-clockwise: `(playerIndex - step + n) % n`. Previously ascending index order was used.
+- Added `computeAllDeltasForRoll(state, activePlayer, roll)` — a new single-pass method that computes all players' coin deltas for a roll in the correct order, with red card gains for opponents derived directly from sequential counter-clockwise deductions against the roller's actual coins. This replaces the old simultaneous-delta approach in `GameSession.applyTurn` and `GameSimulator.applyRoll`, which allowed multiple red card owners to each claim the same coins when the roller was short.
+- `GameSession.applyTurn` and `GameSimulator.applyRoll` both updated to use `computeAllDeltasForRoll`. The two older bridge methods are marked `@Deprecated`.
+
+**Tests:** 138/138 pass. Two new targeted tests added:
+- `test_red_fires_before_green_income`: roller with 0 coins and bäckerei; opponent has café. On roll 3, correct result is +1 (red fires first against 0 coins → pays 0; then bäckerei gives +1). Old code would give 0.
+- `test_red_payment_counter_clockwise_order`: 4-player game, active = P2 with 1 coin, three opponents each with café. Counter-clockwise neighbour P1 collects the coin; P0 gets nothing. Old code would have given it to P0 (ascending index).
+
+---
+
 ## Supply / Ownership Rules Fix
 
 **Goal:** Enforce correct per-player ownership limits for purple (lila) cards.

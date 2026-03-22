@@ -56,19 +56,13 @@ public class GameSession {
         Player[] players = state.getPlayers();
 
         // --- Apply coin effects from the roll ---
-        // Compute each player's delta for this roll and apply simultaneously
-        // (so inability-to-pay checks are based on coins before this roll)
-        int[] deltas = new int[players.length];
-
+        // computeAllDeltasForRoll resolves all players' deltas in the correct order:
+        // red card payments counter-clockwise first, then blue/green/purple income.
+        // This ensures the roller's coins are consumed in the right order when
+        // multiple red card owners trigger on the same roll.
+        int[] deltas = ProbabilityCalc.computeAllDeltasForRoll(state, pi, roll);
         for (int i = 0; i < players.length; i++) {
-            // Net gain for player i when player pi is the active roller
-            deltas[i] = (i == pi)
-                    ? ProbabilityCalc.computeNetGainForRollPublic(state, pi, roll)
-                    : ProbabilityCalc.computeOpponentTurnGainForRollPublic(state, i, pi, roll);
-        }
-        for (int i = 0; i < players.length; i++) {
-            int newCoins = Math.max(0, players[i].getCoins() + deltas[i]);
-            players[i].setCoins(newCoins);
+            players[i].setCoins(Math.max(0, players[i].getCoins() + deltas[i]));
         }
 
         // --- Apply purchase ---

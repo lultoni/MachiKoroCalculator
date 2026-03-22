@@ -95,31 +95,62 @@ queried player**. The `oop` (own-turn perspective) flag disambiguates card colou
 | lila   | receives income        | 0 (purple only fires on own turn) |
 | rot    | 0 (owner doesn't pay self) | **negative** (queried player is the roller, pays the owner) |
 
-### 2.2 Red Card Payment (Café, Familienrestaurant)
+### 2.2 Income Processing Order
+
+The official rules specify: **Rot → Blau & Grün → Violett**.
+
+`computeNetGainForRoll` implements this order:
+1. **Red** — opponents' red card payments are deducted from the roller's coins *before any income is received*. Roller's coins at the start of red resolution = `activeCoins` (pre-roll).
+2. **Blue** — active player receives bank income from their own blue cards.
+3. **Green** — active player receives bank income from their own green cards.
+4. **Purple** — active player's purple effects fire last (Stadion, Fernsehsender steal; Bürohaus handled separately in `immediateEV`).
+
+This ordering matters for the **inability-to-pay** rule: a roller with 0 coins pays nothing to red card owners, even if they would receive blue or green income on the same roll.
+
+### 2.3 Counter-Clockwise Red Card Payment Order
+
+When multiple red card owners trigger on the same roll, they are paid in **counter-clockwise order** from the active player. Earlier claimants are paid in full; later claimants receive whatever remains.
+
+`computeNetGainForRoll` iterates opponents as:
+```
+for step in 1..(n-1):
+    opponentIdx = (playerIndex - step + n) % n
+```
+
+This is enforced consistently in:
+- `computeNetGainForRoll` (EV model)
+- `computeAllDeltasForRoll` (live game / simulation)
+
+### 2.4 `computeAllDeltasForRoll` — Single Source of Truth for Roll Resolution
+
+`computeAllDeltasForRoll(state, activePlayer, roll)` returns an `int[]` of per-player coin deltas for a single roll, applying the correct order and counter-clockwise priority. Both `GameSession.applyTurn` and `GameSimulator.applyRoll` use this method.
+
+The two older bridge methods (`computeNetGainForRollPublic`, `computeOpponentTurnGainForRollPublic`) are retained as `@Deprecated` for backward compatibility but are no longer used in the live game path.
+
+### 2.5 Red Card Payment (Café, Familienrestaurant)
 
 `get_I` is called from the *roller's* perspective for red cards:
 - Returns a **negative** integer (the amount the roller loses)
 - Clamped to `−min(base_cost, current_coins)` to enforce inability-to-pay
 - Einkaufszentrum (`eb = true`) adds +1 to the amount the owner collects (roller pays +1)
 
-The owner's gain is computed separately by negating the roller's loss in
-`computeOpponentTurnGainForRoll`.
+The owner's gain equals the absolute value of the roller's loss. In `computeAllDeltasForRoll`, the owner's delta is set to `-loss` directly, ensuring the gain exactly matches what the roller pays (no double-counting).
 
-### 2.3 Stadion (Lila, Roll 6)
+### 2.6 Stadion (Lila, Roll 6)
 
 Takes **2 coins from each opponent** (not just the richest). Total is uncapped.
 ```
 gain = Σ_opponents min(2, opponent_coins)
 ```
 
-### 2.4 Fernsehsender (Lila, Roll 6)
+### 2.7 Fernsehsender (Lila, Roll 6)
 
 Takes **up to 5 coins from the single richest opponent** (one target only).
 ```
 gain = min(5, max(opponent_coins))
 ```
 
-### 2.5 Bürohaus (Lila, Roll 6) — Special Handling
+### 2.8 Bürohaus (Lila, Roll 6) — Special Handling
 
 `get_I` returns `0` for bürohaus because card-swapping is non-monetary.
 
@@ -135,7 +166,7 @@ Contribution to immediateEV = P(roll = 6 | dice_mode) × bürohausSwapEV
 **Limitation:** This assumes the player always makes the optimal swap. In reality the swap is
 optional and only favourable when `bestOppEV > worstOwnEV`.
 
-### 2.6 Category Multipliers
+### 2.9 Category Multipliers
 
 | Card | Category multiplier |
 |------|-------------------|

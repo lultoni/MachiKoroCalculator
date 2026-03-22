@@ -143,21 +143,14 @@ public class GameSimulator {
 
     /**
      * Applies the coin effects of {@code roll} to all players.
-     * Uses the package-visible bridges in {@link ProbabilityCalc}.
+     * Uses {@link ProbabilityCalc#computeAllDeltasForRoll} to resolve all deltas
+     * in the correct order: red card payments counter-clockwise first, then
+     * blue/green/purple income.
      */
     private static void applyRoll(GameState state, int activePlayer, int roll) {
         Player[] players = state.getPlayers();
-        int n = players.length;
-
-        // Compute deltas first (based on coins before this roll),
-        // then apply simultaneously to avoid order-dependency.
-        int[] deltas = new int[n];
-        for (int i = 0; i < n; i++) {
-            deltas[i] = (i == activePlayer)
-                    ? ProbabilityCalc.computeNetGainForRollPublic(state, i, roll)
-                    : ProbabilityCalc.computeOpponentTurnGainForRollPublic(state, i, activePlayer, roll);
-        }
-        for (int i = 0; i < n; i++) {
+        int[] deltas = ProbabilityCalc.computeAllDeltasForRoll(state, activePlayer, roll);
+        for (int i = 0; i < players.length; i++) {
             players[i].setCoins(Math.max(0, players[i].getCoins() + deltas[i]));
         }
     }

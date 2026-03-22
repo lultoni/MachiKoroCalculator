@@ -46,10 +46,10 @@ RULES.md: *"Rot → Blau & Grün → Violett"* — red card payments must be res
 **Current state:** `computeNetGainForRoll` processes Blue → Green → Purple → Red. Because blue and green income is credited before red costs are deducted, the active player appears richer when red card clamping is evaluated. This means the model underestimates how often the active player cannot fully pay red card demands — making red cards look slightly weaker (to their owners) and slightly cheaper (to the roller) than they really are.
 
 **What needs fixing:**
-- [ ] Reorder `computeNetGainForRoll` to process: Red first (against `activeCoins` before any income), then Blue, then Green, then Purple. *(ProbabilityCalc.java)*
-- [ ] `computeNetGainForRoll` currently tracks `remainingCoins` for sequential red deductions. After the reorder, `remainingCoins` for red should start at `activeCoins` (not `activeCoins + net`). *(ProbabilityCalc.java)*
-- [ ] `GameSession.applyTurn` computes all deltas simultaneously using `computeNetGainForRollPublic`. After the fix, verify that `applyTurn` produces the same result as the corrected EV model so the live game tracking stays consistent. *(GameSession.java)*
-- [ ] Update `ARCHITECTURE.md` to document the correct processing order. *(ARCHITECTURE.md)*
+- [x] Reorder `computeNetGainForRoll` to process: Red first (against `activeCoins` before any income), then Blue, then Green, then Purple. *(ProbabilityCalc.java)*
+- [x] `computeNetGainForRoll` currently tracks `remainingCoins` for sequential red deductions. After the reorder, `remainingCoins` for red should start at `activeCoins` (not `activeCoins + net`). *(ProbabilityCalc.java)*
+- [x] `GameSession.applyTurn` computes all deltas simultaneously using `computeNetGainForRollPublic`. After the fix, verify that `applyTurn` produces the same result as the corrected EV model so the live game tracking stays consistent. *(GameSession.java)*
+- [x] Update `ARCHITECTURE.md` to document the correct processing order. *(ARCHITECTURE.md)*
 
 ### 2. Counter-Clockwise Red Card Payment Order
 **Priority: Medium — correctness issue**
@@ -59,20 +59,20 @@ RULES.md: *"Sollten sich aufgrund eines Würfelwurfs mehrere Ansprüche ergeben,
 **Current state:** `computeNetGainForRoll` iterates opponents in ascending index order (0, 1, 2, 3). When the active player is, say, player 2 in a 4-player game, the correct counter-clockwise order is 1, 0, 3 — not 0, 1, 3.
 
 **What needs fixing:**
-- [ ] In `computeNetGainForRoll`, build the opponent iteration order as counter-clockwise from the active player: starting at `(playerIndex - 1 + n) % n`, stepping down by 1 mod n, until all opponents are covered. *(ProbabilityCalc.java)*
-- [ ] In `GameSession.applyTurn`, when computing red card deltas, apply the same counter-clockwise iteration order so the live tracking matches the corrected EV model. *(GameSession.java)*
-- [ ] In `GameSimulator.applyRoll`, `ProbabilityCalc.computeNetGainForRollPublic` is called — the fix in `computeNetGainForRoll` will automatically propagate here. Verify simulated outcomes are unchanged for states where the roller can pay everyone. *(GameSimulator.java)*
+- [x] In `computeNetGainForRoll`, build the opponent iteration order as counter-clockwise from the active player: starting at `(playerIndex - 1 + n) % n`, stepping down by 1 mod n, until all opponents are covered. *(ProbabilityCalc.java)*
+- [x] In `GameSession.applyTurn`, when computing red card deltas, apply the same counter-clockwise iteration order so the live tracking matches the corrected EV model. Implemented via new `computeAllDeltasForRoll` which replaced the old simultaneous-delta approach. *(GameSession.java)*
+- [x] In `GameSimulator.applyRoll`, updated to use `computeAllDeltasForRoll`. *(GameSimulator.java)*
 
 ---
 
-
+## Known Approximations to Improve
 
 ### 1. Bürohaus — Heuristic Model
 **Priority: Low**
 
 - [ ] `bürohausSwapEV` assumes optimal swap on every activation. A more accurate model would require a state-lookahead pass (design-level change). Acceptable approximation for now.
 
-See `ARCHITECTURE.md §2.5` for the current approximation details.
+See `ARCHITECTURE.md §2.8` for the current approximation details.
 
 ### 2. GameSimulator — Bahnhof Always Uses 2d6
 **Priority: Medium**

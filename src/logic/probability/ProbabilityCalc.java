@@ -226,18 +226,23 @@ public class ProbabilityCalc {
     /**
      * Computes the net coin change for the active player (playerIndex) when the given
      * roll occurs on their own turn.
-     * <p>
-     * Activation rules on own turn:
+     *
+     * <p>Processing order matches the official rules: <b>Red → Blue → Green → Purple</b>.
+     * Red card payments are deducted first (against coins held before any income is received),
+     * then blue and green income is credited, then purple effects fire last.
+     *
+     * <p>When multiple red card owners trigger on the same roll, payments are collected in
+     * <b>counter-clockwise</b> order from the active player, as specified by the rules.
+     * Earlier claimants in that order are paid in full; later claimants receive whatever
+     * remains if the active player runs out of coins.
+     *
+     * <p>Activation rules on own turn:
      * <ul>
-     *   <li>Blue cards: activate for ALL players (each owner gets paid from bank).</li>
-     *   <li>Green cards: activate only for the active player (oop=true).</li>
-     *   <li>Purple cards: activate only for the active player (oop=true).</li>
-     *   <li>Red cards: do NOT activate on the roller's own turn (they activate on opponents' turns).</li>
+     *   <li>Red cards: opponents' red cards fire first — roller pays from current coins.</li>
+     *   <li>Blue cards: fire for all players; active player receives income from bank.</li>
+     *   <li>Green cards: own-turn only; active player receives income from bank.</li>
+     *   <li>Purple cards: own-turn only; fire last (may steal from opponents).</li>
      * </ul>
-     * On the active player's own turn they may also be paying opponents' red cards — but red cards
-     * only activate when the active player rolls, and the activation cost is already included
-     * in get_I by returning a negative value when oop=false.  However, for own-turn computation
-     * we only apply red losses FROM opponents' cards that trigger on this roll number.
      *
      * @param state       current game state (with candidate already added to player's projects)
      * @param playerIndex the active player (roller)
@@ -251,16 +256,36 @@ public class ProbabilityCalc {
         PlayerStats activeStats = PlayerStats.of(activePlayer);
         int activeCoins = activePlayer.getCoins();
 
-        // Build opponent coin array
         Player[] players = state.getPlayers();
         int n = players.length;
-        int[] opponentCoins = buildOpponentCoins(players, playerIndex);
 
         int net = 0;
 
-        // --- Blue cards: every player's owned blue cards pay their owner from the bank.
-        //     The active player receives income from their own blue cards.
-        //     Other players' blue cards pay those players — no effect on active player's coins.
+        // --- Red cards (FIRST, per rules: Rot → Blau & Grün → Violett).
+        //     Opponents' red cards are paid counter-clockwise from the active player.
+        //     Payment is deducted from coins held BEFORE any income this turn.
+        int remainingCoins = activeCoins;
+        for (int step = 1; step < n; step++) {
+            int opponentIdx = (playerIndex - step + n) % n; // counter-clockwise
+            Player opponent = players[opponentIdx];
+            PlayerStats oppStats = PlayerStats.of(opponent);
+            for (Project p : opponent.getOwned_projects()) {
+                if ("rot".equals(p.getColor())) {
+                    int loss = get_I(roll, p.getId(), false,
+                            oppStats.hasEinkaufszentrum,
+                            0, 0, 0,
+                            remainingCoins, new int[0]);
+                    // loss is 0 or negative; clamp to remaining coins
+                    if (loss < 0 && -loss > remainingCoins) loss = -remainingCoins;
+                    net += loss;
+                    remainingCoins += loss;
+                    if (remainingCoins < 0) remainingCoins = 0;
+                }
+            }
+        }
+
+        // --- Blue cards: own blue cards pay from the bank regardless of red losses.
+        int[] opponentCoins = buildOpponentCoins(players, playerIndex);
         for (Project p : activePlayer.getOwned_projects()) {
             if ("blau".equals(p.getColor())) {
                 net += get_I(roll, p.getId(), true,
@@ -271,7 +296,7 @@ public class ProbabilityCalc {
             }
         }
 
-        // --- Green cards: own turn only, owner = active player ---
+        // --- Green cards: own-turn only, pay from bank.
         for (Project p : activePlayer.getOwned_projects()) {
             if ("grün".equals(p.getColor())) {
                 net += get_I(roll, p.getId(), true,
@@ -282,44 +307,17 @@ public class ProbabilityCalc {
             }
         }
 
-        // --- Purple cards: own turn only, owner = active player ---
+        // --- Purple cards: own-turn only, fire last.
+        //     Stadion/Fernsehsender steal from opponents; re-read opponent coins each time
+        //     since the amounts may change as multiple purple effects resolve sequentially.
         for (Project p : activePlayer.getOwned_projects()) {
             if ("lila".equals(p.getColor())) {
-                // For purple cards that steal from opponents we need the real-time coin counts.
-                // We re-read opponentCoins each time since purple effects are sequential.
                 int[] freshOpponentCoins = buildOpponentCoins(players, playerIndex);
                 net += get_I(roll, p.getId(), true,
                         activeStats.hasEinkaufszentrum,
                         activeStats.foodCount, activeStats.animalCount,
                         activeStats.productionCount,
                         activeCoins + net, freshOpponentCoins);
-            }
-        }
-
-        // --- Red cards: opponents' red cards activate on the active player's turn.
-        //     The active player LOSES coins to each opponent who owns a red card.
-        //     We sum the costs from every opponent's red cards.
-        int remainingCoins = activeCoins + net; // coins after blue/green/purple income
-        for (int i = 0; i < n; i++) {
-            if (i == playerIndex) continue;
-            Player opponent = players[i];
-            PlayerStats oppStats = PlayerStats.of(opponent);
-            for (Project p : opponent.getOwned_projects()) {
-                if ("rot".equals(p.getColor())) {
-                    // get_I from active player's perspective: oop=false (active player is NOT the owner)
-                    // eb here is the OWNER's (opponent's) Einkaufszentrum
-                    int loss = get_I(roll, p.getId(), false,
-                            oppStats.hasEinkaufszentrum,
-                            0, 0, 0,
-                            Math.max(0, remainingCoins), new int[0]);
-                    // loss is 0 or negative; clamp to remaining coins
-                    if (loss < 0 && Math.abs(loss) > remainingCoins) {
-                        loss = -remainingCoins;
-                    }
-                    net += loss;
-                    remainingCoins += loss;
-                    if (remainingCoins < 0) remainingCoins = 0;
-                }
             }
         }
 
@@ -1064,9 +1062,108 @@ public class ProbabilityCalc {
     // -------------------------------------------------------------------------
 
     /**
+     * Computes the coin delta for every player on a single roll, respecting the
+     * official processing order (Red → Blue/Green → Purple) and counter-clockwise
+     * red-card payment priority.
+     *
+     * <p>This is the single authoritative method for applying a roll to all players.
+     * It must be used instead of calling {@link #computeNetGainForRollPublic} and
+     * {@link #computeOpponentTurnGainForRollPublic} separately, because red card
+     * payments compete for the active player's coins — computing them simultaneously
+     * would let multiple red card owners each claim the same coins.
+     *
+     * <p>Algorithm:
+     * <ol>
+     *   <li>Walk opponents counter-clockwise from the active player.</li>
+     *   <li>For each opponent, compute their red card gain against the roller's
+     *       remaining coins (sequential, not simultaneous).</li>
+     *   <li>For each player, compute their blue card gain independently (bank pays —
+     *       no contention).</li>
+     *   <li>For the active player, add green and purple income on top.</li>
+     * </ol>
+     *
+     * @param state         current game state (coins reflect pre-roll values)
+     * @param activePlayer  index of the rolling player
+     * @param roll          dice total (1–12)
+     * @return delta array indexed by player; positive = gained, negative = lost
+     */
+    static int[] computeAllDeltasForRoll(GameState state, int activePlayer, int roll) {
+        Player[] players = state.getPlayers();
+        int n = players.length;
+        int[] deltas = new int[n];
+
+        // --- Step 1: Red card payments (counter-clockwise, sequential).
+        //     Active player's coins are consumed in order; opponents receive what is collected.
+        int rollerCoins = players[activePlayer].getCoins();
+        for (int step = 1; step < n; step++) {
+            int oppIdx = (activePlayer - step + n) % n; // counter-clockwise
+            Player opponent = players[oppIdx];
+            PlayerStats oppStats = PlayerStats.of(opponent);
+            for (Project p : opponent.getOwned_projects()) {
+                if ("rot".equals(p.getColor())) {
+                    int loss = get_I(roll, p.getId(), false,
+                            oppStats.hasEinkaufszentrum,
+                            0, 0, 0,
+                            rollerCoins, new int[0]);
+                    if (loss < 0 && -loss > rollerCoins) loss = -rollerCoins;
+                    int gain = -loss; // what the opponent collects
+                    deltas[activePlayer] += loss;   // roller loses
+                    deltas[oppIdx]       += gain;   // opponent gains
+                    rollerCoins += loss;
+                    if (rollerCoins < 0) rollerCoins = 0;
+                }
+            }
+        }
+
+        // --- Step 2: Blue card income for every player (bank pays — no contention).
+        for (int i = 0; i < n; i++) {
+            Player player = players[i];
+            PlayerStats stats = PlayerStats.of(player);
+            int[] otherCoins = buildOpponentCoins(players, i);
+            for (Project p : player.getOwned_projects()) {
+                if ("blau".equals(p.getColor())) {
+                    deltas[i] += get_I(roll, p.getId(), true,
+                            stats.hasEinkaufszentrum,
+                            stats.foodCount, stats.animalCount, stats.productionCount,
+                            player.getCoins(), otherCoins);
+                }
+            }
+        }
+
+        // --- Step 3: Green and purple income for the active player (own-turn only).
+        Player active = players[activePlayer];
+        PlayerStats activeStats = PlayerStats.of(active);
+        int[] opponentCoins = buildOpponentCoins(players, activePlayer);
+        for (Project p : active.getOwned_projects()) {
+            if ("grün".equals(p.getColor())) {
+                deltas[activePlayer] += get_I(roll, p.getId(), true,
+                        activeStats.hasEinkaufszentrum,
+                        activeStats.foodCount, activeStats.animalCount, activeStats.productionCount,
+                        active.getCoins(), opponentCoins);
+            }
+        }
+        // Purple: re-read opponent coins for each purple card (sequential stealing)
+        for (Project p : active.getOwned_projects()) {
+            if ("lila".equals(p.getColor())) {
+                int[] freshOpponentCoins = buildOpponentCoins(players, activePlayer);
+                deltas[activePlayer] += get_I(roll, p.getId(), true,
+                        activeStats.hasEinkaufszentrum,
+                        activeStats.foodCount, activeStats.animalCount, activeStats.productionCount,
+                        active.getCoins() + deltas[activePlayer], freshOpponentCoins);
+            }
+        }
+
+        return deltas;
+    }
+
+    /**
      * Package-visible wrapper so {@link GameSession} can compute the coin delta
      * for the active player on their own turn without going through immediateEV.
+     *
+     * @deprecated Prefer {@link #computeAllDeltasForRoll} which correctly handles
+     *             counter-clockwise red card payment ordering across all players.
      */
+    @Deprecated
     static int computeNetGainForRollPublic(GameState state, int playerIndex, int roll) {
         return computeNetGainForRoll(state, playerIndex, roll, false);
     }
@@ -1074,7 +1171,11 @@ public class ProbabilityCalc {
     /**
      * Package-visible wrapper so {@link GameSession} can compute the coin delta
      * for a tracked player on an opponent's turn.
+     *
+     * @deprecated Prefer {@link #computeAllDeltasForRoll} which correctly handles
+     *             counter-clockwise red card payment ordering across all players.
      */
+    @Deprecated
     static int computeOpponentTurnGainForRollPublic(GameState state, int playerIndex,
                                                      int activeRollerIndex, int roll) {
         return computeOpponentTurnGainForRoll(state, playerIndex, activeRollerIndex, roll);

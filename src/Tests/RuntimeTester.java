@@ -60,6 +60,10 @@ public class RuntimeTester {
         test_rank_excludes_owned_purple_cards();
         test_rank_excludes_owned_landmarks();
 
+        System.out.println("\n=== Rules Correctness Tests ===\n");
+        test_red_fires_before_green_income();
+        test_red_payment_counter_clockwise_order();
+
         System.out.println("\n--- Results: " + passed + " passed, " + failed + " failed ---");
 
         System.out.println("\n=== Runtime Benchmarks ===\n");
@@ -606,8 +610,76 @@ public class RuntimeTester {
     }
 
     // =========================================================================
-    // Assertion helpers
+    // Rules Correctness Tests
     // =========================================================================
+
+    private static void test_red_fires_before_green_income() {
+        // Rule: Red → Blue/Green → Purple.
+        // Setup: 2-player game. Active player (P0) owns bäckerei (green, activates on roll 2-3).
+        //        Opponent (P1) owns café (red, activates on roll 3, costs roller 1 coin).
+        //        P0 has 0 coins.
+        //
+        // Roll = 3:
+        //   Correct (Red first):  red fires against 0 coins → P0 pays 0; then bäckerei fires → +1. Net = +1.
+        //   Wrong   (Green first): bäckerei fires → P0 has +1 (1 coin); then red fires → pays 1. Net = 0.
+        //
+        // The test verifies the correct outcome: net gain = +1.
+        GameStateBuilder b = new GameStateBuilder(2);
+        b.setPlayerName(0, "P0").setCoins(0, 0).addProject(0, "bäckerei");
+        b.setPlayerName(1, "P1").setCoins(1, 5).addProject(1, "café");
+        GameState gs = b.build();
+
+        // Use computeNetGainForRollPublic (package-private bridge) via evPerRound isolation:
+        // We compute the net gain for roll=3 on P0's turn by using a neutral candidate.
+        // Simpler: use GameSession.applyTurn and observe P0's coins after the turn.
+        logic.probability.GameSession session = new logic.probability.GameSession(gs, new String[]{"P0", "P1"});
+        logic.probability.TurnRecord turn = new logic.probability.TurnRecord(0, 3, null);
+        session.applyTurn(turn);
+
+        int p0Coins = session.getState().getPlayers()[0].getCoins();
+        // Correct: red fires first (0 coins → pays 0), then bäckerei gives +1. P0 ends with 1.
+        // Wrong:   bäckerei fires first (+1), then café takes 1. P0 ends with 0.
+        assertTrue("Red fires before green: P0 (0 coins, bäckerei) nets +1 on roll 3 when opp has café (was "
+                + p0Coins + ")", p0Coins == 1);
+    }
+
+    private static void test_red_payment_counter_clockwise_order() {
+        // Rule: multiple red card owners are paid counter-clockwise from the active player.
+        // Setup: 4-player game. Active player = P2 (index 2). P2 has 1 coin.
+        //        P1 (counter-clockwise neighbour 1) owns café (roll 3, costs 1).
+        //        P0 (counter-clockwise neighbour 2) owns café (roll 3, costs 1).
+        //        P3 (counter-clockwise neighbour 3) owns café (roll 3, costs 1).
+        //
+        // Counter-clockwise from P2: P1 → P0 → P3.
+        // P2 has 1 coin → P1 collects 1 coin, P0 and P3 collect 0.
+        //
+        // Old (ascending index) order: P0 → P1 → P3. P0 would collect 1, P1 and P3 get 0.
+        // This test verifies P1 (not P0) gets paid — proving counter-clockwise is correct.
+        GameStateBuilder b = new GameStateBuilder(4);
+        b.setPlayerName(0, "P0").setCoins(0, 5).addProject(0, "café");
+        b.setPlayerName(1, "P1").setCoins(1, 5).addProject(1, "café");
+        b.setPlayerName(2, "P2").setCoins(2, 1);  // active player, only 1 coin
+        b.setPlayerName(3, "P3").setCoins(3, 5).addProject(3, "café");
+        GameState gs = b.build();
+
+        logic.probability.GameSession session = new logic.probability.GameSession(gs, new String[]{"P0","P1","P2","P3"});
+        logic.probability.TurnRecord turn = new logic.probability.TurnRecord(2, 3, null);
+        session.applyTurn(turn);
+
+        int p0After = session.getState().getPlayers()[0].getCoins();
+        int p1After = session.getState().getPlayers()[1].getCoins();
+        int p2After = session.getState().getPlayers()[2].getCoins();
+
+        // Counter-clockwise from P2: P1 is first → P1 collects the 1 coin. P0 gets nothing.
+        assertTrue("Counter-clockwise: P1 (first CCW neighbour of P2) collects the 1 coin (was " + p1After + ")",
+                p1After == 6);
+        assertTrue("Counter-clockwise: P0 (second CCW neighbour) gets 0 when P2 is broke (was " + p0After + ")",
+                p0After == 5);
+        assertTrue("Counter-clockwise: P2 ends with 0 coins after paying P1 (was " + p2After + ")",
+                p2After == 0);
+    }
+
+
 
     private static void assertTrue(String label, boolean condition) {
         if (condition) {

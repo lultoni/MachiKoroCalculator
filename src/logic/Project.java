@@ -1,5 +1,6 @@
 package logic;
 
+// LEGACY — to be removed in Phase 4 once the probability layer and new UI are complete.
 public class Project {
 
     int id;
@@ -75,7 +76,7 @@ public class Project {
             }
             case 13 -> {
                 for (int i = 0; i < player.projectList[id].ownCount; i++) {
-                    for (Player p: game.getPlayers()) { // TODO unable to pay (look at case 17)
+                    for (Player p: game.getPlayers()) { // FIXME [Phase 4 / remove]: inability-to-pay not enforced; handled correctly in probability layer.
                         if (p.id != player.id) {
                             p.addDiceValueOwn(diceActivation, -2);
                         } else {
@@ -86,7 +87,7 @@ public class Project {
             }
             case 14 -> {
                 for (int i = 0; i < player.projectList[id].ownCount; i++) {
-                    for (Player p: game.getPlayers()) { // TODO unable to pay (look at case 17)
+                    for (Player p: game.getPlayers()) { // FIXME [Phase 4 / remove]: inability-to-pay not enforced; handled correctly in probability layer.
                         if (p.id != player.id) {
                             p.addDiceValueOwn(diceActivation, -1);
                         } else {

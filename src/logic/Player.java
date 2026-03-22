@@ -1,5 +1,6 @@
 package logic;
 
+// LEGACY — to be removed in Phase 4 once the probability layer and new UI are complete.
 public class Player {
 
     int id;
@@ -117,7 +118,7 @@ public class Player {
                 if (contains(possibleID, project.id)) project.doEffect(player, projectList[1].ownCount == 1);
             }
         }
-        if (isDiceThrower) { // TODO fix this to immediately give other person coins
+        if (isDiceThrower) { // FIXME [Phase 4 / remove]: incorrect red-card coin transfer; entire legacy layer deleted in Phase 4.
             redValue = -diceValuesOthers[diceNumber - 1];
         } else {
             redValue = diceValuesOwn[diceNumber - 1];

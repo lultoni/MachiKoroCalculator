@@ -259,7 +259,7 @@ public class ProbabilityCalc {
         return -1;
     }
 
-    // TODO where does the risk P(netIncome <= 0) get into play?
+    // FIXME [Phase 2]: Incorporate risk metric P(netIncome <= 0) into RankEntry.
 
     // Erwarteter Wert (Münzen) *sofort* für den Käufer, wenn er das Project kauft und danach seinen aktuellen Zug beendet.
     // - berücksichtigt: 1d6/2d6-Option (wenn Bahnhof vorhanden wählbar), Einkaufszentrum-Effekt (über get_I),
@@ -316,31 +316,47 @@ public class ProbabilityCalc {
         return evTotal;
     }
 
-    // TODO write function docs
-    // Erwarteter Netto-Ertrag des Käufers, bis alle anderen einmal dran waren (also bis zum eigenen nächsten Zug).
-    // - zählt, dass blaue Karten von anderen Spielern pro Runde mehrfach triggen (Anzahl Spieler relevant).
-    // - berücksichtigt GP-Effekte (Einkaufszentrum, Bahnhof etc.) und dass Gegner in der Simulation sinnvoll handeln.
-    // TODO write function body
-    public static double evPerRound(GameState gs, int playerId, Project candidate);
+    // FIXME [Phase 2]: Implement computeNetGainForRoll — net coin change for active player on a given roll,
+    // summing blue income (all players), green/purple income (own turn only), red costs (opponents' red cards).
+    // Enforce inability-to-pay: clamp costs to player.getCoins().
+    private static int computeNetGainForRoll(GameState state, int playerIndex, int roll, boolean isDoubles) {
+        throw new UnsupportedOperationException("not yet implemented");
+    }
 
-    // TODO write function docs
-    // Return on Investment für Kauf von `candidate` über horizonTurns (z. B. N = 5) mit Discount factor.
-    // Gibt z.B. EV_total - cost und evPerTurn etc. zurück (als POJO/RankEntry).
-    // TODO write function body
-    public static RankEntry roiOverHorizon(GameState gs, int playerId, Project candidate, int horizonTurns, double discountFactor);
+    // FIXME [Phase 2]: Implement bestSecondRollEV — EV of optimal re-roll when Freizeitpark triggers.
+    // forcedDiceCount: -1 = player chooses freely (Bahnhof present), 1 = must use 1 die, 2 = must use 2 dice (Funkturm).
+    // No doubles chaining on second roll.
+    private static double bestSecondRollEV(GameState state, int playerIndex, int forcedDiceCount) {
+        throw new UnsupportedOperationException("not yet implemented");
+    }
 
-    // TODO write function docs
-    // Schätzt Gewinnwahrscheinlichkeit bzw. relative Nutzendifferenz (z. B. Siegchance innerhalb M Zügen) wenn candidate gekauft wird.
-    // - kann Expectimax (optimal opponents) bis searchDepth nutzen oder Monte-Carlo (nSim simulations).
-    // - (freizeitpark) hier muss auf pasch geguckt werden auch (weil nicht jede zb 2d6 = 6 auch ein pasch ist) (es kann aber nur ein pasch passieren, nicht mehr)
-    // - (funkturm) falls erneut gewürfelt werden soll, muss gute logik dafür drin sein und auch muss mit der gleich würfelanzahl dann nochmal gewürfelt werden
-    // TODO write function body
-    public static double estimateWinProbDelta(GameState gs, int playerId, Project candidate, int searchDepth, int mcSimulations);
+    // FIXME [Phase 2]: Implement evPerRound — net EV for playerIndex over a full round (own turn + N-1 opponent turns).
+    // Blue cards trigger on all turns. Red cards trigger on opponents' turns (cost to player).
+    // Candidate is treated as already purchased.
+    public static double evPerRound(GameState gs, int playerId, Project candidate) {
+        throw new UnsupportedOperationException("not yet implemented");
+    }
 
-    // TODO write function docs
-    // Gibt sortiertes Ranking aller legalen Kaufoptionen zurück.
-    // RankEntry enthält: Project, immediateEV, evPerRound, roiOverHorizon (N), winProbDelta, variance, notes
-    // TODO write function body
-    public static ArrayList<RankEntry> rankPurchasableProjects(GameState gs, int playerId, RankingOptions opts);
+    // FIXME [Phase 2]: Implement roiOverHorizon — discounted ROI over horizonTurns turns.
+    // Formula: evPerRound * gamma * (1 - gamma^T) / (1 - gamma) - cost.
+    // Populate and return a RankEntry with immediateEV, evPerRound, roiOverHorizon, variance fields.
+    public static RankEntry roiOverHorizon(GameState gs, int playerId, Project candidate, int horizonTurns, double discountFactor) {
+        throw new UnsupportedOperationException("not yet implemented");
+    }
+
+    // FIXME [Phase 2]: Implement estimateWinProbDelta — win probability delta for buying candidate.
+    // Use softmax score approximation: score(player) = sum EV_round(card) * T_remaining + landmark weights.
+    // P_win(i) = exp(score_i) / sum_j exp(score_j). Delta = P_win after buy - P_win before.
+    // If opts.mcSimulations > 0: simulate full games and use observed win rate instead.
+    // Note: freizeitpark doubles trigger needs pairs detection; funkturm forces same dice count on re-roll.
+    public static double estimateWinProbDelta(GameState gs, int playerId, Project candidate, int searchDepth, int mcSimulations) {
+        throw new UnsupportedOperationException("not yet implemented");
+    }
+
+    // FIXME [Phase 2]: Implement rankPurchasableProjects — enumerate all affordable cards in gs.unbuilt_projects,
+    // call roiOverHorizon on each, populate winProbDelta if opts.includeWinProbDelta, sort by ROI descending.
+    public static ArrayList<RankEntry> rankPurchasableProjects(GameState gs, int playerId, RankingOptions opts) {
+        throw new UnsupportedOperationException("not yet implemented");
+    }
 
 }

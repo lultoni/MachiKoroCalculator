@@ -12,7 +12,7 @@
 | 1 — Solid Data Model | ✅ Done | `c0d15dd` | 31/31 tests pass, ProjectLoader cached, GameState.initial() |
 | 2 — Core Math Engine | ✅ Done | — | 108/108 tests pass, 0.18 ms/call; EV, ROI, variance, ranking, win prob delta |
 | 3 — Game State Config UI | ✅ Done | — | Turn-by-turn + snapshot mode; SetupWindow, MainWindow, SnapshotDialog, GameStateBuilder, GameSession |
-| 4 — Remove Legacy Code | ⬜ Pending | — | Blocked on Phase 3 |
+| 4 — Remove Legacy Code | ✅ Done | — | 14 legacy files deleted; Main.java clean; zero warnings |
 | 5 — Monte Carlo Deep Mode | ⬜ Pending | — | Blocked on Phase 2 |
 | 6 — Polish & Final Integration | ⬜ Pending | — | Blocked on Phase 5 |
 

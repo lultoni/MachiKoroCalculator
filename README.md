@@ -34,8 +34,8 @@ java -cp "out:src:gson-2.11.0.jar" Tests.RuntimeTester
 
 ```
 src/
-  logic/                    # Legacy game model (tagged for removal in Phase 4)
-  logic/probability/        # Active probability layer — math engine + data model
+  logic/                    # Entry point only (Main.java)
+  logic/probability/        # Probability layer — math engine + data model
     GameState.java          # Mutable game state (Player[] + unbuilt pool)
     GameStateBuilder.java   # Fluent builder for constructing GameState from user inputs
     GameSession.java        # Turn-by-turn tracker with undo + snapshot conversion
@@ -44,11 +44,10 @@ src/
     ProjectLoader.java      # JSON loader with static cache
     RankEntry.java          # Result POJO for ranked recommendations
     RankingOptions.java     # Options (horizon, discount factor, win-prob flag)
-  gui/newui/                # New Swing UI (launched by Main)
+  gui/newui/                # Swing UI
     SetupWindow.java        # New game setup (player count + names)
     MainWindow.java         # Main three-column game window
     SnapshotDialog.java     # Mid-game snapshot editor
-  gui/boot/, gui/game/      # Legacy Swing UI (not launched; removed in Phase 4)
   resources/jsons/          # projects.json — all 19 base-game cards
   Tests/                    # RuntimeTester — 108 unit tests + benchmarks
 ```

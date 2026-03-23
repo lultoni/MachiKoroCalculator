@@ -4,6 +4,22 @@ All phases of the original implementation plan are complete. This file records w
 
 ---
 
+## Buy dropdown and ranking now use post-roll coins
+
+**Goal:** Correct the turn-order model in the UI. In Machi Koro the sequence is roll → collect income / pay red cards → buy. The buy dropdown and ranking table previously used the player's pre-roll coins, so a player with 2 coins who rolled a 3 (and collected 1 from Bäckerei) would not see cards costing 3 in their buy list even though they could now afford them.
+
+**What was done:**
+
+- `MainWindow.postRollState()` — new helper that copies the current `GameState` and applies `computeAllDeltasForRoll` to all players with the current spinner value. Returns the state as it will be after income/payments resolve, before any purchase.
+- `refreshAll()` calls `postRollState()` once and passes the result to `rebuildBuyCombo`, `rankPurchasableProjects`, and `computeBaselineWinProb`. The ranking EV and ROI are now evaluated from the correct starting position.
+- `rebuildBuyCombo` takes the post-roll `Player` and `GameState` instead of the pre-roll player — affordability check uses post-roll coins.
+- Coin label now shows "N → M (after roll)" when the roll changes the active player's coin count, so the user can see both the current wallet and what they will have after collecting.
+- `refreshAfterRollChange()` — new method triggered by the roll spinner's `ChangeListener`. Re-runs preview, buy combo, win-prob label, and ranking whenever the spinner changes, so the buy list updates live as the user types a roll value. MC ranking is skipped on spinner change (analytical only) to keep the EDT responsive.
+
+**Tests:** 165 passed, 0 failed.
+
+---
+
 ## File split: BürohausLogic and GameSessionPersistence extracted
 
 **Goal:** Reduce the two largest mixed-concern files by extracting cohesive sub-responsibilities into dedicated package-private helpers.

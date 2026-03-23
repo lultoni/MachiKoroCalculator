@@ -99,8 +99,10 @@ public class MainWindow extends JFrame {
         JPanel center = buildCenterPanel();
         JPanel right  = buildRightPanel();
 
-        // Wire roll spinner change listener now that rollPreviewArea is initialized
-        rollSpinner.addChangeListener(e -> refreshRollPreview());
+        // Wire roll spinner change listener now that rollPreviewArea is initialized.
+        // When the roll value changes, the post-roll coins change too, so refresh
+        // the preview, the buy dropdown, and the full ranking — all roll-dependent.
+        rollSpinner.addChangeListener(e -> refreshAfterRollChange());
 
         JSplitPane rightSplit = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, center, right);
         rightSplit.setDividerLocation(300);
@@ -471,20 +473,45 @@ public class MainWindow extends JFrame {
     // Data refresh
     // =========================================================================
 
+    /**
+     * Returns a copy of the current game state with coin deltas from the current roll
+     * already applied. This is the state the active player actually buys from: in Machi Koro
+     * you roll first, collect income / pay red cards, and only then make a purchase.
+     */
+    private GameState postRollState() {
+        int pi   = session.nextPlayerIndex();
+        int roll = (int) rollSpinner.getValue();
+        GameState state  = session.getState().copy();
+        int[] deltas = ProbabilityCalc.computeAllDeltasForRoll(state, pi, roll);
+        Player[] players = state.getPlayers();
+        for (int i = 0; i < players.length; i++) {
+            players[i].setCoins(Math.max(0, players[i].getCoins() + deltas[i]));
+        }
+        return state;
+    }
+
     private void refreshAll() {
         int pi = session.nextPlayerIndex();
         Player[] players = session.getState().getPlayers();
         Player activePlayer = players[pi];
 
-        // Update active-player label and coins
+        // Update active-player label and coins (pre-roll coins shown as context)
         activePlayerLabel.setText(activePlayer.getName() + "'s turn");
         coinsLabel.setText("Coins: " + activePlayer.getCoins());
 
         // Update roll spinner range based on whether the active player owns Bahnhof
         updateRollSpinner(activePlayer);
 
-        // Rebuild buy combo: "— nothing —" + affordable unbuilt cards
-        rebuildBuyCombo(pi, activePlayer);
+        // Compute post-roll state: this is what the player can afford to buy
+        GameState postRoll = postRollState();
+        Player postRollPlayer = postRoll.getPlayers()[pi];
+        int postRollCoins = postRollPlayer.getCoins();
+        if (postRollCoins != activePlayer.getCoins()) {
+            coinsLabel.setText("Coins: " + activePlayer.getCoins() + " → " + postRollCoins + " (after roll)");
+        }
+
+        // Rebuild buy combo using post-roll coins (roll first, then buy)
+        rebuildBuyCombo(pi, postRollPlayer, postRoll);
 
         // History and undo must always update immediately
         refreshHistory();
@@ -493,15 +520,15 @@ public class MainWindow extends JFrame {
         // Show roll outcome preview for the current spinner value
         refreshRollPreview();
 
-        // Baseline win probability (analytical, always fast — shown regardless of MC mode)
-        double baselineWinProb = ProbabilityCalc.computeBaselineWinProb(session.getState(), pi);
+        // Baseline win probability uses post-roll state (more accurate for current position)
+        double baselineWinProb = ProbabilityCalc.computeBaselineWinProb(postRoll, pi);
         baselineWinProbLabel.setText(String.format("Current win prob: %.1f%%", baselineWinProb * 100));
 
         if (rankOpts.mcSimulations > 0) {
             // MC path: run ranking on background thread to keep UI responsive
             statusLabel.setText("Running MC simulations…");
             confirmBtn.setEnabled(false);
-            final GameState snapState = session.getState().copy();
+            final GameState snapState = postRoll;
             final int snapPi = pi;
 
             SwingWorker<ArrayList<RankEntry>, Void> worker = new SwingWorker<>() {
@@ -532,7 +559,7 @@ public class MainWindow extends JFrame {
         } else {
             // Analytical path: fast, run on EDT directly
             statusLabel.setText("");
-            lastRanking = ProbabilityCalc.rankPurchasableProjects(session.getState(), pi, rankOpts);
+            lastRanking = ProbabilityCalc.rankPurchasableProjects(postRoll, pi, rankOpts);
             rebuildTable();
             if (!lastRanking.isEmpty()) {
                 populateCenter(lastRanking.get(0));
@@ -587,19 +614,58 @@ public class MainWindow extends JFrame {
         rollPreviewArea.setText(sb.toString());
     }
 
-    private void rebuildBuyCombo(int pi, Player activePlayer) {
+    /**
+     * Refreshes all roll-dependent UI elements when the roll spinner value changes.
+     * Re-computes the post-roll state and updates the buy dropdown, ranking table,
+     * and roll preview — without touching turn-independent elements (history, spinner range).
+     * Skips MC re-ranking to avoid blocking the EDT on every spinner tick.
+     */
+    private void refreshAfterRollChange() {
+        refreshRollPreview();
+
+        int pi = session.nextPlayerIndex();
+        GameState postRoll = postRollState();
+        Player preRollPlayer  = session.getState().getPlayers()[pi];
+        Player postRollPlayer = postRoll.getPlayers()[pi];
+        int preCoins  = preRollPlayer.getCoins();
+        int postCoins = postRollPlayer.getCoins();
+        if (postCoins != preCoins) {
+            coinsLabel.setText("Coins: " + preCoins + " → " + postCoins + " (after roll)");
+        } else {
+            coinsLabel.setText("Coins: " + preCoins);
+        }
+
+        rebuildBuyCombo(pi, postRollPlayer, postRoll);
+
+        double baselineWinProb = ProbabilityCalc.computeBaselineWinProb(postRoll, pi);
+        baselineWinProbLabel.setText(String.format("Current win prob: %.1f%%", baselineWinProb * 100));
+
+        // Analytical ranking only on spinner change (MC is too slow for live updates)
+        if (rankOpts.mcSimulations == 0) {
+            lastRanking = ProbabilityCalc.rankPurchasableProjects(postRoll, pi, rankOpts);
+            rebuildTable();
+            if (!lastRanking.isEmpty()) {
+                populateCenter(lastRanking.get(0));
+                if (rankTable.getRowCount() > 0) rankTable.setRowSelectionInterval(0, 0);
+            } else {
+                clearCenter("No affordable cards — save up!");
+            }
+        }
+    }
+
+    private void rebuildBuyCombo(int pi, Player postRollPlayer, GameState postRoll) {
         buyCombo.removeAllItems();
         buyCombo.addItem("— nothing —");
-        int coins = activePlayer.getCoins();
+        int coins = postRollPlayer.getCoins();
 
-        // Unbuilt pool (normal cards)
-        for (Project p : session.getState().getUnbuilt_projects()) {
+        // Unbuilt pool (normal cards) — affordable with post-roll coins
+        for (Project p : postRoll.getUnbuilt_projects()) {
             if (p.getCost() <= coins) buyCombo.addItem(labelForProject(p));
         }
 
         // Großprojekte: always available if not yet owned by this player
         for (Project p : ProjectLoader.getAllProjects()) {
-            if (p.isIs_grossprojekt() && !activePlayer.hasProject(p.getId()) && p.getCost() <= coins) {
+            if (p.isIs_grossprojekt() && !postRollPlayer.hasProject(p.getId()) && p.getCost() <= coins) {
                 buyCombo.addItem(labelForProject(p) + " [GP]");
             }
         }

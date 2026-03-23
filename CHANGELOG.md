@@ -4,6 +4,51 @@ All phases of the original implementation plan are complete. This file records w
 
 ---
 
+## Supply model fix, SnapshotDialog multi-copy spinners, roll spinner range, roll preview
+
+**Goal:** Fix four high-priority correctness and usability issues from the PLAN.md backlog.
+
+### 1. Supply model — card no longer disappears after first purchase
+
+Cards with 6 physical copies (blau/grün/rot/lila) now correctly stay purchasable until all 6 copies are owned across all players.
+
+- `GameSession.applyTurn`: only removes a card type from `unbuilt_projects` when the total owned copies across all players reaches 6 (`GameSimulator.SUPPLY_PER_CARD`).
+- `GameStateBuilder.build()`: builds a per-type owned-count map and excludes a type only when count ≥ 6. Previously used `contains(p)` with id-based equals, which excluded a type if any single player owned any copy.
+- `GameState.initial()`: corrected to include weizenfeld and bäckerei in the unbuilt pool. Starter copies given to each player are separate from the 6 shared market copies — all non-landmark types belong in the pool.
+- `GameSession.undoLastTurn()`: simplified to replay from `initialState.copy()` instead of manually reconstructing a hardcoded 3-coin/2-card state (which was also incorrect for snapshot-rooted sessions).
+- `GameSimulator.SUPPLY_PER_CARD`: widened from `private` to package-private so `GameSession` can reference it.
+
+### 2. SnapshotDialog — JSpinner for multi-copy cards
+
+blau, grün, and rot cards now use `JSpinner(0–6)` instead of `JCheckBox` in the snapshot editor, allowing players who own multiple copies to record that accurately.
+
+- lila (unique purple) and gelb (landmarks) remain `JCheckBox` — at most one copy per player.
+- `loadCurrentState`: uses `Collections.frequency(ownedIds, id)` to populate spinner values.
+- `onApply`: calls `builder.addProject(i, id)` N times for spinner value N.
+- Field `projectChecks JCheckBox[][]` replaced by `cardControls Component[][]`; type-checked with `instanceof JSpinner` / `instanceof JCheckBox` at read time.
+
+### 3. Roll spinner range updated on every turn change
+
+The roll spinner now correctly reflects the active player's dice mode.
+
+- Without Bahnhof: range 1–6, default 3. With Bahnhof: range 1–12, default 7.
+- `updateRollSpinner(Player)` helper called from `refreshAll()` on every turn change (after Confirm, Undo, replaceSession).
+- The label above the spinner ("Dice roll (1–N):") updates to match.
+- Current spinner value is clamped to the new max if out of range; default is reset when dice mode changes.
+
+### 4. Roll preview in center panel
+
+Typing a roll value now immediately shows per-player coin deltas so the user can verify the math before confirming.
+
+- `refreshRollPreview()` calls `ProbabilityCalc.computeAllDeltasForRoll` and displays "Roll N: Player X +3, Player Y −1" in a new `rollPreviewArea` (4-line `JTextArea`) in the center panel.
+- `rollSpinner.addChangeListener(e -> refreshRollPreview())` wired in `buildUI()`.
+- `computeAllDeltasForRoll` widened from package-private to `public` to allow access from `gui.newui`.
+- Preview also refreshes on `refreshAll()` so it reflects the new active player after each confirmed turn.
+
+**Tests:** 165 passed, 0 failed (pool-size assertion updated from 17 → 15 to match corrected `GameState.initial()` pool).
+
+---
+
 ## Baseline win probability display in center panel
 
 **Goal:** Show each player's current estimated win probability in the center panel so the player can gauge their overall position without having to buy a specific card first.

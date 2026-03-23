@@ -105,12 +105,12 @@ public class GameState {
             players[i] = new Player("Player " + (i + 1), 3, owned);
         }
 
-        // Unbuilt pool: everything except the two starter cards
+        // Unbuilt pool: all non-landmark card types are available from the start.
+        // Weizenfeld and Bäckerei are also purchasable from the pool — each player's
+        // starter copy is separate from the 6 shared market copies.
         ArrayList<Project> unbuilt = new ArrayList<>();
         for (Project p : allProjects) {
-            if (!p.getId().equals("weizenfeld") && !p.getId().equals("bäckerei")) {
-                unbuilt.add(p);
-            }
+            if (!p.isIs_grossprojekt()) unbuilt.add(p);
         }
 
         return new GameState(players, unbuilt);

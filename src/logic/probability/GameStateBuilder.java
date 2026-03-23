@@ -101,14 +101,21 @@ public class GameStateBuilder {
             players[i] = new Player(names[i], coins[i], new ArrayList<>(owned.get(i)));
         }
 
-        // Unbuilt = all projects that are not owned by any player
+        // Unbuilt = card types where total copies owned across all players < 6
         ArrayList<Project> allProjects = ProjectLoader.getAllProjects();
-        ArrayList<Project> allOwned = new ArrayList<>();
-        for (int i = 0; i < numPlayers; i++) allOwned.addAll(owned.get(i));
+        // Count how many copies of each card type are owned (across all players)
+        java.util.Map<String, Integer> ownedCount = new java.util.HashMap<>();
+        for (int i = 0; i < numPlayers; i++) {
+            for (Project p : owned.get(i)) {
+                ownedCount.merge(p.getId(), 1, Integer::sum);
+            }
+        }
 
         ArrayList<Project> unbuilt = new ArrayList<>();
         for (Project p : allProjects) {
-            if (!allOwned.contains(p)) unbuilt.add(p);
+            if (p.isIs_grossprojekt()) continue;  // landmarks never go in the unbuilt pool
+            int count = ownedCount.getOrDefault(p.getId(), 0);
+            if (count < GameSimulator.SUPPLY_PER_CARD) unbuilt.add(p);
         }
 
         return new GameState(players, unbuilt);

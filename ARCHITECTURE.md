@@ -262,6 +262,13 @@ Non-landmark establishments have 6 copies in the base game. The simulator tracks
 `Map<String, Integer>` supply and prevents purchases when supply reaches 0. Landmarks have
 unlimited supply (one per player, not shared).
 
+**`GameState.unbuilt_projects` semantics (live game path):** Stores one entry per non-landmark
+card *type* that still has at least one copy available. A type is removed from the list only
+when total copies owned across all players reaches 6. `GameState.initial()` includes all 15
+non-landmark types (including weizenfeld and bäckerei — starter copies given to players are
+counted against the shared pool of 6). `GameSession.applyTurn` removes a type after the 6th
+copy is purchased; `GameStateBuilder.build()` excludes a type when its owned count ≥ 6.
+
 ### 4.4 Known Approximations in the Simulator
 
 | Approximation | Impact | Location |

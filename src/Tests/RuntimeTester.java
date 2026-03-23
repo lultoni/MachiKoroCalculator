@@ -186,7 +186,7 @@ public class RuntimeTester {
             assertTrue(p.getName() + " owns weizenfeld", p.hasProject("weizenfeld"));
             assertTrue(p.getName() + " owns bäckerei", p.hasProject("bäckerei"));
         }
-        assertEq("unbuilt pool has 17 projects", 17, gs.getUnbuilt_projects().size());
+        assertEq("unbuilt pool has 15 projects", 15, gs.getUnbuilt_projects().size());
     }
 
     private static void test_game_state_copy_is_independent() {

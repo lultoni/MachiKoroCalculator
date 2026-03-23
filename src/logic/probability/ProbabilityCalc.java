@@ -776,7 +776,7 @@ public class ProbabilityCalc {
      * @param roll          dice total (1–12)
      * @return delta array indexed by player; positive = gained, negative = lost
      */
-    static int[] computeAllDeltasForRoll(GameState state, int activePlayer, int roll) {
+    public static int[] computeAllDeltasForRoll(GameState state, int activePlayer, int roll) {
         Player[] players = state.getPlayers();
         int n = players.length;
         int[] deltas = new int[n];

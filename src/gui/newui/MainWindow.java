@@ -44,6 +44,7 @@ public class MainWindow extends JFrame {
 
     // ---- left panel components ----
     private JLabel activePlayerLabel;
+    private JLabel rollRangeLabel;
     private JSpinner rollSpinner;
     private JComboBox<String> buyCombo;
     private JButton confirmBtn;
@@ -61,6 +62,7 @@ public class MainWindow extends JFrame {
     private JLabel topCardNote;
     private JPanel topCardColorBar;
     private JLabel baselineWinProbLabel;
+    private JTextArea rollPreviewArea;
 
     // ---- right panel components ----
     private DefaultTableModel tableModel;
@@ -97,6 +99,9 @@ public class MainWindow extends JFrame {
         JPanel center = buildCenterPanel();
         JPanel right  = buildRightPanel();
 
+        // Wire roll spinner change listener now that rollPreviewArea is initialized
+        rollSpinner.addChangeListener(e -> refreshRollPreview());
+
         JSplitPane rightSplit = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, center, right);
         rightSplit.setDividerLocation(300);
         rightSplit.setResizeWeight(0.35);
@@ -131,8 +136,10 @@ public class MainWindow extends JFrame {
         panel.add(Box.createVerticalStrut(10));
 
         // Roll input
-        panel.add(wrap(bold("Dice roll (1–12):")));
-        rollSpinner = new JSpinner(new SpinnerNumberModel(7, 1, 12, 1));
+        rollRangeLabel = bold("Dice roll (1–6):");
+        rollRangeLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        panel.add(wrap(rollRangeLabel));
+        rollSpinner = new JSpinner(new SpinnerNumberModel(3, 1, 6, 1));
         rollSpinner.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
         rollSpinner.setAlignmentX(Component.LEFT_ALIGNMENT);
         panel.add(rollSpinner);
@@ -257,6 +264,19 @@ public class MainWindow extends JFrame {
         topCardNote.setFont(new Font("Arial", Font.ITALIC, 12));
         topCardNote.setAlignmentX(Component.LEFT_ALIGNMENT);
         panel.add(wrap(topCardNote));
+
+        panel.add(Box.createVerticalStrut(10));
+
+        panel.add(wrap(bold("Roll outcome:")));
+        rollPreviewArea = new JTextArea(4, 22);
+        rollPreviewArea.setFont(new Font("Monospaced", Font.PLAIN, 11));
+        rollPreviewArea.setEditable(false);
+        rollPreviewArea.setLineWrap(true);
+        rollPreviewArea.setBackground(panel.getBackground());
+        JScrollPane previewScroll = new JScrollPane(rollPreviewArea);
+        previewScroll.setAlignmentX(Component.LEFT_ALIGNMENT);
+        previewScroll.setMaximumSize(new Dimension(Integer.MAX_VALUE, 90));
+        panel.add(previewScroll);
 
         return panel;
     }
@@ -460,12 +480,18 @@ public class MainWindow extends JFrame {
         activePlayerLabel.setText(activePlayer.getName() + "'s turn");
         coinsLabel.setText("Coins: " + activePlayer.getCoins());
 
+        // Update roll spinner range based on whether the active player owns Bahnhof
+        updateRollSpinner(activePlayer);
+
         // Rebuild buy combo: "— nothing —" + affordable unbuilt cards
         rebuildBuyCombo(pi, activePlayer);
 
         // History and undo must always update immediately
         refreshHistory();
         undoBtn.setEnabled(!session.getHistory().isEmpty());
+
+        // Show roll outcome preview for the current spinner value
+        refreshRollPreview();
 
         // Baseline win probability (analytical, always fast — shown regardless of MC mode)
         double baselineWinProb = ProbabilityCalc.computeBaselineWinProb(session.getState(), pi);
@@ -515,6 +541,50 @@ public class MainWindow extends JFrame {
                 clearCenter("No affordable cards — save up!");
             }
         }
+    }
+
+    /**
+     * Updates the roll spinner's range and default value for the given active player.
+     * Without Bahnhof the valid roll range is 1–6 (1d6); with Bahnhof it is 1–12 (2d6 option).
+     * The default is 3 (mid-1d6) or 7 (mode of 2d6). The current value is clamped to the new range.
+     */
+    private void updateRollSpinner(Player activePlayer) {
+        boolean hasBahnhof = activePlayer.hasProject("bahnhof");
+        int newMax = hasBahnhof ? 12 : 6;
+        int newDefault = hasBahnhof ? 7 : 3;
+        int current = (int) rollSpinner.getValue();
+        int clamped = Math.min(current, newMax);
+        SpinnerNumberModel model = (SpinnerNumberModel) rollSpinner.getModel();
+        // Update max before clamping value to avoid model validation errors
+        model.setMaximum(newMax);
+        model.setMinimum(1);
+        if (current != clamped) rollSpinner.setValue(clamped);
+        // Reset to sensible default when switching dice mode
+        if ((hasBahnhof && current <= 6) || (!hasBahnhof && current > 6)) {
+            rollSpinner.setValue(newDefault);
+        }
+        rollRangeLabel.setText("Dice roll (1–" + newMax + "):");
+    }
+
+    /**
+     * Computes and displays per-player coin deltas for the current roll spinner value.
+     * Called whenever the roll spinner changes so the user can verify outcomes before confirming.
+     */
+    private void refreshRollPreview() {
+        if (rollPreviewArea == null) return;
+        int roll = (int) rollSpinner.getValue();
+        int pi = session.nextPlayerIndex();
+        GameState state = session.getState();
+        int[] deltas = ProbabilityCalc.computeAllDeltasForRoll(state, pi, roll);
+        String[] names = session.getPlayerNames();
+        StringBuilder sb = new StringBuilder("Roll ").append(roll).append(": ");
+        for (int i = 0; i < deltas.length; i++) {
+            if (i > 0) sb.append(", ");
+            sb.append(names[i]).append(" ");
+            if (deltas[i] >= 0) sb.append("+");
+            sb.append(deltas[i]);
+        }
+        rollPreviewArea.setText(sb.toString());
     }
 
     private void rebuildBuyCombo(int pi, Player activePlayer) {

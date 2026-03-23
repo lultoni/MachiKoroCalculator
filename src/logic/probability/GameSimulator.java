@@ -46,7 +46,7 @@ public class GameSimulator {
     public static final int MAX_TURNS = 200;
 
     /** Market supply copies per non-landmark card in the base game. */
-    private static final int SUPPLY_PER_CARD = 6;
+    static final int SUPPLY_PER_CARD = 6;
 
     /** Counts timeouts across all mcWinRate calls for diagnostic logging. */
     static final AtomicInteger TIMEOUT_COUNT = new AtomicInteger(0);

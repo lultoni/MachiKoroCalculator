@@ -91,11 +91,22 @@ public class GameSession {
                         "Player " + pi + " cannot afford " + card.getId()
                         + " (has " + buyer.getCoins() + ", needs " + card.getCost() + ")");
 
-            boolean inPool = state.getUnbuilt_projects().remove(card);
-            // Großprojekte are not in the pool — they are always available for purchase
-            if (!inPool && !card.isIs_grossprojekt())
-                throw new IllegalArgumentException(
-                        "Card " + card.getId() + " is not in the unbuilt pool");
+            // Großprojekte are never in the pool — they are always available for purchase
+            if (!card.isIs_grossprojekt()) {
+                if (!state.getUnbuilt_projects().contains(card))
+                    throw new IllegalArgumentException(
+                            "Card " + card.getId() + " is not in the unbuilt pool");
+                // Remove from pool only when all 6 physical copies are now owned
+                int totalOwned = 0;
+                for (Player p : players) {
+                    for (Project owned : p.getOwned_projects()) {
+                        if (owned.getId().equals(card.getId())) totalOwned++;
+                    }
+                }
+                if (totalOwned >= GameSimulator.SUPPLY_PER_CARD) {
+                    state.getUnbuilt_projects().remove(card);
+                }
+            }
 
             buyer.getOwned_projects().add(card);
             buyer.setCoins(buyer.getCoins() - card.getCost());
@@ -117,25 +128,8 @@ public class GameSession {
      */
     public void undoLastTurn() {
         if (history.isEmpty()) throw new IllegalStateException("No turns to undo");
-        // Rebuild state from scratch by replaying all turns except the last
-        GameState fresh = GameState.initial(state.getPlayers().length);
-        // Re-apply player names and starting coins from the original (we re-initialize to initial)
-        // Since initial() always sets names to "Player N" and coins to 3, we replay from there.
-        // Names are injected separately; rebuild players array with correct names.
-        Player[] freshPlayers = fresh.getPlayers();
-        for (int i = 0; i < freshPlayers.length; i++) {
-            // Copy name from our tracked names; initial() coins/projects are already correct
-            // We can't set name on existing Player, so rebuild via GameStateBuilder
-        }
-        // Use GameStateBuilder to rebuild initial state with correct names
-        GameStateBuilder builder = new GameStateBuilder(playerNames.length);
-        for (int i = 0; i < playerNames.length; i++) {
-            builder.setPlayerName(i, playerNames[i]);
-            builder.setCoins(i, 3);
-            builder.addProject(i, "weizenfeld");
-            builder.addProject(i, "bäckerei");
-        }
-        this.state = builder.build();
+        // Rebuild state from the stored initial snapshot, then replay all turns except the last.
+        this.state = initialState.copy();
 
         // Reset win state — will be re-set if the replayed turns include a win
         finished = false;

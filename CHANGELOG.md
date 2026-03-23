@@ -4,6 +4,22 @@ All phases of the original implementation plan are complete. This file records w
 
 ---
 
+## File split: BürohausLogic and GameSessionPersistence extracted
+
+**Goal:** Reduce the two largest mixed-concern files by extracting cohesive sub-responsibilities into dedicated package-private helpers.
+
+### BürohausLogic (extracted from ProbabilityCalc)
+
+`bürohausSwapEV`, `bürohausSwapNote`, and `executeBürohausSwap` shared identical logic to scan for the active player's worst-EV card and each opponent's best-EV card. All three were inlined, duplicating the nested loops. The new `BürohausLogic` class centralises this into one `findCandidates()` helper that returns a `SwapCandidates` record. The three public/package methods on `ProbabilityCalc` become thin wrappers (`BürohausLogic.swapEV`, `swapNote`, `executeSwap`). Public API and test behaviour are unchanged.
+
+### GameSessionPersistence (extracted from GameSession)
+
+`GameSession.save` and `GameSession.load` (140 lines, 11 Gson imports) have been moved to a new `GameSessionPersistence` class. The serialization helpers are private to that class (`serializeSnapshot`, `serializeTurns`, `parseNames`, `parseSnapshot`, `replayTurns`). `GameSession.save` / `GameSession.load` are now thin one-line wrappers that delegate. All Gson/JSON imports are isolated in `GameSessionPersistence`; `GameSession` now has only 3 standard library imports. Public API and file format are unchanged.
+
+**Tests:** 165 passed, 0 failed.
+
+---
+
 ## Supply model fix, SnapshotDialog multi-copy spinners, roll spinner range, roll preview
 
 **Goal:** Fix four high-priority correctness and usability issues from the PLAN.md backlog.

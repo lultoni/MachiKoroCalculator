@@ -32,24 +32,35 @@ These are documented deviations from optimal accuracy that have been reviewed an
 
 ## Code Quality
 
-### 1. File Split Analysis
-**Priority: High**
+### 1. File Split — Priority 1 (complete)
 
-Several source files have grown large enough that they likely warrant splitting. Before doing any split, conduct a deep analysis pass across the whole `src/` tree to identify candidates — looking at line count, number of distinct responsibilities per file, and test coverage boundaries.
+Audit conducted 2026-03-23. All files assessed by line count and responsibility. Files ≥ 200 lines
+with mixed concerns and a clear split boundary:
 
-Known candidates from prior work:
-- `src/Tests/RuntimeTester.java` — a single ~1800-line class containing all tests, benchmarks, and helpers. Should be split by domain (data-model tests, EV/probability tests, simulation tests, UI/session tests, benchmarks) into separate test classes, ideally under a proper test source root.
-- `src/gui/newui/MainWindow.java` — mixes UI layout, event handling, SwingWorker lifecycle, and game-state read calls. A controller/presenter separation would make event logic independently testable.
+| File | Lines | Concern to extract | Status |
+|------|-------|--------------------|--------|
+| `ProbabilityCalc.java` | 870 | Bürohaus helpers (3 methods, ~130 lines) → `BürohausLogic` | `[x]` |
+| `GameSession.java` | 336 | JSON persistence (save + load, ~140 lines) → `GameSessionPersistence` | `[x]` |
 
-**What needs doing:**
-- [ ] Audit every file in `src/` for line count and responsibility count. Produce a prioritised list of split candidates with proposed target structure. *(analysis only — no code changes)*
-- [ ] Split `RuntimeTester.java` into per-domain test classes. *(Tests/)*
-- [ ] Extract a thin `GameController` from `MainWindow` handling turn application, undo, snapshot, and session save/load. *(gui/newui/)*
+### 2. File Split — Priority 2 (deferred — needs UI test layer first)
 
-### 2. `MainWindow` Controller/View Separation
+- [ ] Extract `UIDataModel` from `MainWindow` (~50 lines): holds `session`, `rankOpts`, `lastRanking`, `showWinProb`.
+- [ ] Extract `RankingUIRenderer` from `MainWindow` (~100 lines): `rebuildTable`, `populateCenter`, `clearCenter`, `buildNote`.
+- [ ] Extract thin `GameController` from `MainWindow`: turn application, undo, snapshot, save/load event dispatch.
+
+### 3. File Split — No action needed
+
+`RuntimeTester.java` (928 lines) is a single self-contained test runner with 47 test methods and 7
+benchmark sections. Despite its size it has no mixed concerns — splitting into per-domain classes
+would add a multi-class test runner harness without meaningful benefit given the current single-file
+compile-and-run workflow.
+
+`CardIncome.java`, `WinProbabilityCalc.java`, `GameSimulator.java` — well-factored, no split warranted.
+
+### 4. `MainWindow` Controller/View Separation
 **Priority: Low**
 
-Covered under File Split Analysis above — tracked separately so the controller extraction can be done independently of the broader audit.
+Covered under File Split Priority 2 above — deferred until a Swing UI testing layer (JUnit + WindowTester or similar) is in place.
 
 ---
 

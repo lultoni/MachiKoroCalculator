@@ -29,6 +29,8 @@ import java.util.concurrent.ThreadLocalRandom;
  *       {@code bestDiceEV}, {@code singleCardEvPerRound}.</li>
  *   <li>{@link WinProbabilityCalc} — {@code computeScores}, {@code softmaxEntry},
  *       {@code mcWinRate}, {@code estimateWinProbDelta}, {@code computeBaselineWinProb}.</li>
+ *   <li>{@link BürohausLogic} — bürohaus card-swap EV, swap note generation,
+ *       and swap execution.</li>
  * </ul>
  */
 public class ProbabilityCalc {
@@ -517,130 +519,44 @@ public class ProbabilityCalc {
     }
 
     // -------------------------------------------------------------------------
-    // Bürohaus helpers
+    // Bürohaus helpers (delegates to BürohausLogic)
     // -------------------------------------------------------------------------
 
     /**
-     * Approximates the coin-equivalent EV of a bürohaus card-swap for the active player.
+     * Approximates the per-activation coin-equivalent EV of a bürohaus card-swap.
      * Returns {@code max(0, bestOppCardEV − worstOwnCardEV)}.
      *
-     * @param state       game state with bürohaus already in the player's list
+     * @param state       game state with bürohaus already in the player's owned list
      * @param playerIndex the active player
      * @return per-activation EV gain (≥ 0)
      */
     private static double bürohausSwapEV(GameState state, int playerIndex) {
-        Player active = state.getPlayers()[playerIndex];
-        int n = state.getPlayers().length;
-
-        double worstOwnEV = Double.MAX_VALUE;
-        for (Project p : active.getOwned_projects()) {
-            if (!p.isIs_grossprojekt() && !p.getId().equals("bürohaus")) {
-                worstOwnEV = Math.min(worstOwnEV, CardIncome.singleCardEvPerRound(p, n));
-            }
-        }
-        if (worstOwnEV == Double.MAX_VALUE) worstOwnEV = 0.0;
-
-        double bestOppEV = 0.0;
-        for (int i = 0; i < n; i++) {
-            if (i == playerIndex) continue;
-            for (Project p : state.getPlayers()[i].getOwned_projects()) {
-                if (!p.isIs_grossprojekt()) {
-                    bestOppEV = Math.max(bestOppEV, CardIncome.singleCardEvPerRound(p, n));
-                }
-            }
-        }
-        return Math.max(0.0, bestOppEV - worstOwnEV);
+        return BürohausLogic.swapEV(state, playerIndex);
     }
 
     /**
      * Returns a human-readable description of the best bürohaus swap, or {@code null} if
-     * no beneficial swap exists.
+     * no beneficial swap exists (e.g. "Swap your Weizenfeld for P1's Bergwerk").
      *
      * @param state       game state with bürohaus already in the active player's owned list
      * @param playerIndex the active player
      * @return swap description, or {@code null} if no swap is beneficial
      */
     static String bürohausSwapNote(GameState state, int playerIndex) {
-        Player active = state.getPlayers()[playerIndex];
-        int n = state.getPlayers().length;
-
-        Project worstOwn = null;
-        double worstEV = Double.MAX_VALUE;
-        for (Project p : active.getOwned_projects()) {
-            if (!p.isIs_grossprojekt() && !p.getId().equals("bürohaus")) {
-                double ev = CardIncome.singleCardEvPerRound(p, n);
-                if (ev < worstEV) { worstEV = ev; worstOwn = p; }
-            }
-        }
-
-        Project bestOpp = null;
-        double bestOppEV = 0.0;
-        int bestOppPlayer = -1;
-        for (int i = 0; i < n; i++) {
-            if (i == playerIndex) continue;
-            for (Project p : state.getPlayers()[i].getOwned_projects()) {
-                if (!p.isIs_grossprojekt()) {
-                    double ev = CardIncome.singleCardEvPerRound(p, n);
-                    if (ev > bestOppEV) { bestOppEV = ev; bestOpp = p; bestOppPlayer = i; }
-                }
-            }
-        }
-
-        if (bestOpp == null || worstOwn == null || bestOppEV <= worstEV) return null;
-
-        String oppName = state.getPlayers()[bestOppPlayer].getName();
-        return "Swap your " + capitalize(worstOwn.getId())
-                + " for " + oppName + "'s " + capitalize(bestOpp.getId());
-    }
-
-    /** Capitalizes the first character of a string. */
-    private static String capitalize(String s) {
-        if (s == null || s.isEmpty()) return s;
-        return Character.toUpperCase(s.charAt(0)) + s.substring(1);
+        return BürohausLogic.swapNote(state, playerIndex);
     }
 
     /**
      * Executes the optimal bürohaus card swap in-place on {@code state}.
      * Removes the active player's lowest-EV non-landmark and gives it to the opponent
-     * who owns the highest-EV non-landmark; that card moves to the active player.
+     * who holds the highest-EV non-landmark; that card moves to the active player.
      * No-ops if no beneficial swap exists.
      *
      * @param state       game state to mutate
      * @param playerIndex the active player
      */
     public static void executeBürohausSwap(GameState state, int playerIndex) {
-        Player active = state.getPlayers()[playerIndex];
-        int n = state.getPlayers().length;
-
-        Project worstOwn = null;
-        double worstEV = Double.MAX_VALUE;
-        for (Project p : active.getOwned_projects()) {
-            if (!p.isIs_grossprojekt() && !p.getId().equals("bürohaus")) {
-                double ev = CardIncome.singleCardEvPerRound(p, n);
-                if (ev < worstEV) { worstEV = ev; worstOwn = p; }
-            }
-        }
-
-        Project bestOpp = null;
-        double bestOppEV = 0.0;
-        int bestOppPlayer = -1;
-        for (int i = 0; i < n; i++) {
-            if (i == playerIndex) continue;
-            for (Project p : state.getPlayers()[i].getOwned_projects()) {
-                if (!p.isIs_grossprojekt()) {
-                    double ev = CardIncome.singleCardEvPerRound(p, n);
-                    if (ev > bestOppEV) { bestOppEV = ev; bestOpp = p; bestOppPlayer = i; }
-                }
-            }
-        }
-
-        if (bestOpp == null || worstOwn == null || bestOppEV <= worstEV) return;
-
-        Player opponent = state.getPlayers()[bestOppPlayer];
-        active.getOwned_projects().remove(worstOwn);
-        opponent.getOwned_projects().remove(bestOpp);
-        active.getOwned_projects().add(bestOpp);
-        opponent.getOwned_projects().add(worstOwn);
+        BürohausLogic.executeSwap(state, playerIndex);
     }
 
     // -------------------------------------------------------------------------

@@ -134,7 +134,8 @@ The codebase is now a single active layer with no legacy code.
 - `probability.ProjectLoader` — static cache (`Map<String, Project>`) built once at class load from classpath. `getProject(id)` returns `Optional<Project>`. `getAllProjects()` returns a new `ArrayList` of all 19 projects. **`src/` must be on the runtime classpath** for resource loading to work.
 - `probability.GameStateBuilder` — fluent builder for constructing a `GameState` from user inputs (setPlayerName, setCoins, addProject, removeProject, build). Used by the UI and snapshot dialog.
 - `probability.TurnRecord` — immutable record of one turn (playerIndex, roll, bought project or null).
-- `probability.GameSession` — wraps a mutable `GameState` with a full `ArrayList<TurnRecord>` history. Methods: `applyTurn`, `undoLastTurn`, `toSnapshot` (→ builder), `fromSnapshot` (builder → new session), `nextPlayerIndex`. Bidirectional turn-by-turn ↔ snapshot conversion.
+- `probability.GameSession` — wraps a mutable `GameState` with a full `ArrayList<TurnRecord>` history. Methods: `applyTurn`, `undoLastTurn`, `toSnapshot` (→ builder), `fromSnapshot` (builder → new session), `nextPlayerIndex`. Bidirectional turn-by-turn ↔ snapshot conversion. `save`/`load` are thin wrappers that delegate to `GameSessionPersistence`.
+- `probability.GameSessionPersistence` — package-private static helper for JSON save/load. Reads/writes the `.mkoro` file format (initial snapshot + turn list). Keeps all Gson imports isolated from `GameSession`.
 - `probability.ProbabilityCalc` — pure-static math engine (see below).
 - `probability.RankEntry` — result POJO for rankings.
 - `probability.RankingOptions` — options for `rankPurchasableProjects` (horizonTurns, discountFactor, mcSimulations, includeWinProbDelta).
@@ -151,7 +152,8 @@ The codebase is now a single active layer with no legacy code.
 Implementation is split across three files in `src/logic/probability/`:
 - **`CardIncome.java`** (package-private) — `P1`/`P2`, `get_I`, `PlayerStats`, `buildOpponentCoins`, `sumColorIncome`, `weightedRollEV`, `bestDiceEV`, `estimateUncappedOwnTurnEV`, `playerEvPerRound`, `singleCardEvPerRound`. Pure math primitives, no external state.
 - **`WinProbabilityCalc.java`** (package-private) — `computeScores`, `softmaxEntry`, `computeBaselineWinProb`, `estimateWinProbDelta`, `mcWinRate`.
-- **`ProbabilityCalc.java`** (public facade) — all public API methods plus `computeNetGainForRoll`, `computeOpponentTurnGainForRoll`, `immediateEV`, `evPerRound`, `roiOverHorizon`, `rankPurchasableProjects`, `computeAllDeltasForRoll`, bürohaus helpers, legacy matrix method, deprecated bridges.
+- **`ProbabilityCalc.java`** (public facade) — all public API methods plus `computeNetGainForRoll`, `computeOpponentTurnGainForRoll`, `immediateEV`, `evPerRound`, `roiOverHorizon`, `rankPurchasableProjects`, `computeAllDeltasForRoll`, bürohaus thin-wrappers (delegate to `BürohausLogic`), legacy matrix method, deprecated bridges.
+- **`BürohausLogic.java`** (package-private) — `swapEV`, `swapNote`, `executeSwap`. Single shared candidate scan eliminates code duplication from the three former inline bürohaus methods.
 
 Public methods on `ProbabilityCalc`:
 - `get_P1(r)` / `get_P2(r)` — 1d6 / 2d6 probabilities (pre-computed arrays).

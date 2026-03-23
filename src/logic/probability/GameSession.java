@@ -1,17 +1,6 @@
 package logic.probability;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
-
 import java.io.IOException;
-import java.io.Reader;
-import java.io.Writer;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -28,6 +17,10 @@ import java.util.List;
  *       whatever the snapshot describes, with an empty history from that point forward. The caller
  *       can then call {@link #applyTurn} to continue turn-by-turn tracking from that snapshot.</li>
  * </ul>
+ *
+ * <h2>Persistence</h2>
+ * JSON serialization and deserialization are handled by {@link GameSessionPersistence}.
+ * {@link #save} and {@link #load} are thin public wrappers that delegate there.
  */
 public class GameSession {
 
@@ -208,7 +201,7 @@ public class GameSession {
     }
 
     // -------------------------------------------------------------------------
-    // Persistence — save / load
+    // Persistence — save / load (JSON delegated to GameSessionPersistence)
     // -------------------------------------------------------------------------
 
     /**
@@ -219,63 +212,13 @@ public class GameSession {
      * to restore the live game state. This correctly handles sessions started from a
      * mid-game snapshot (via {@link #fromSnapshot}) as well as fresh games.
      *
-     * <p>File format:
-     * <pre>
-     * {
-     *   "playerNames": ["Alice", "Bob"],
-     *   "initialSnapshot": [
-     *     {"name": "Alice", "coins": 3, "ownedIds": ["weizenfeld", "bäckerei"]},
-     *     {"name": "Bob",   "coins": 3, "ownedIds": ["weizenfeld", "bäckerei"]}
-     *   ],
-     *   "turns": [
-     *     {"playerIndex": 0, "roll": 7, "boughtId": "bauernhof"},
-     *     {"playerIndex": 1, "roll": 3, "boughtId": null}
-     *   ]
-     * }
-     * </pre>
+     * <p>For the file format see {@link GameSessionPersistence}.
      *
      * @param path destination file path (created or overwritten)
      * @throws IOException if the file cannot be written
      */
     public void save(Path path) throws IOException {
-        Gson gson = new GsonBuilder().setPrettyPrinting().create();
-        JsonObject root = new JsonObject();
-
-        JsonArray names = new JsonArray();
-        for (String n : playerNames) names.add(n);
-        root.add("playerNames", names);
-
-        // Serialize the initial state so load() can reconstruct it exactly,
-        // even for sessions that started from a mid-game snapshot.
-        JsonArray snapshot = new JsonArray();
-        for (Player p : initialState.getPlayers()) {
-            JsonObject ps = new JsonObject();
-            ps.addProperty("name", p.getName());
-            ps.addProperty("coins", p.getCoins());
-            JsonArray ownedIds = new JsonArray();
-            for (Project proj : p.getOwned_projects()) ownedIds.add(proj.getId());
-            ps.add("ownedIds", ownedIds);
-            snapshot.add(ps);
-        }
-        root.add("initialSnapshot", snapshot);
-
-        JsonArray turns = new JsonArray();
-        for (TurnRecord t : history) {
-            JsonObject turn = new JsonObject();
-            turn.addProperty("playerIndex", t.playerIndex);
-            turn.addProperty("roll", t.roll);
-            if (t.bought != null) {
-                turn.addProperty("boughtId", t.bought.getId());
-            } else {
-                turn.add("boughtId", com.google.gson.JsonNull.INSTANCE);
-            }
-            turns.add(turn);
-        }
-        root.add("turns", turns);
-
-        try (Writer w = Files.newBufferedWriter(path, StandardCharsets.UTF_8)) {
-            gson.toJson(root, w);
-        }
+        GameSessionPersistence.save(initialState, history, playerNames, path);
     }
 
     /**
@@ -291,45 +234,7 @@ public class GameSession {
      * @throws IllegalArgumentException if the file is malformed or contains invalid turns
      */
     public static GameSession load(Path path) throws IOException {
-        try (Reader r = Files.newBufferedReader(path, StandardCharsets.UTF_8)) {
-            JsonObject root = JsonParser.parseReader(r).getAsJsonObject();
-
-            JsonArray namesArr = root.getAsJsonArray("playerNames");
-            String[] names = new String[namesArr.size()];
-            for (int i = 0; i < names.length; i++) {
-                names[i] = namesArr.get(i).getAsString();
-            }
-
-            // Reconstruct the initial state from the stored snapshot.
-            JsonArray snapshotArr = root.getAsJsonArray("initialSnapshot");
-            GameStateBuilder builder = new GameStateBuilder(names.length);
-            for (int i = 0; i < names.length; i++) {
-                JsonObject ps = snapshotArr.get(i).getAsJsonObject();
-                builder.setPlayerName(i, ps.get("name").getAsString());
-                builder.setCoins(i, ps.get("coins").getAsInt());
-                for (JsonElement idEl : ps.getAsJsonArray("ownedIds")) {
-                    builder.addProject(i, idEl.getAsString());
-                }
-            }
-            GameSession session = new GameSession(builder.build(), names);
-
-            JsonArray turnsArr = root.getAsJsonArray("turns");
-            for (JsonElement el : turnsArr) {
-                JsonObject t = el.getAsJsonObject();
-                int pi = t.get("playerIndex").getAsInt();
-                int roll = t.get("roll").getAsInt();
-                JsonElement boughtEl = t.get("boughtId");
-                Project bought = null;
-                if (boughtEl != null && !boughtEl.isJsonNull()) {
-                    String id = boughtEl.getAsString();
-                    bought = ProjectLoader.getProject(id)
-                            .orElseThrow(() -> new IllegalArgumentException(
-                                    "Unknown project id in save file: " + id));
-                }
-                session.applyTurn(new TurnRecord(pi, roll, bought));
-            }
-            return session;
-        }
+        return GameSessionPersistence.load(path);
     }
 }
 

@@ -504,10 +504,24 @@ public class MainWindow extends JFrame {
 
         panel.add(btnBar, BorderLayout.SOUTH);
 
-        // Column tooltips explaining headers
-        rankTable.getTableHeader().setToolTipText(
-                "<html>EV/rnd = expected coins/round · ROI = return on investment (10 turns) · " +
-                "P(0) = probability of zero income · Var = variance</html>");
+        // Per-column header tooltips via a custom JTableHeader
+        rankTable.setTableHeader(new javax.swing.table.JTableHeader(rankTable.getColumnModel()) {
+            private static final String[] TIPS = {
+                "Card name",
+                "Purchase cost (coins)",
+                "EV/round: expected coins earned per full game round (own turn + opponent turns)",
+                "ROI: discounted return on investment over 10 rounds minus purchase cost. Positive = profitable.",
+                "P(0): probability of earning zero coins on your own turn. Lower = more reliable income.",
+                "Var: statistical variance of per-turn income. Higher = boom-or-bust.",
+                "Win \u0394: estimated change in win probability from buying this card (analytical or MC).",
+            };
+            @Override
+            public String getToolTipText(java.awt.event.MouseEvent e) {
+                int col = columnAtPoint(e.getPoint());
+                if (col >= 0 && col < TIPS.length) return TIPS[col];
+                return null;
+            }
+        });
 
         return panel;
     }

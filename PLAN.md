@@ -125,11 +125,11 @@ Done. `rankPurchasableProjects` now includes unowned GPs.
 #### [x] Configurable MC sim count + independent reload button
 Done. `BoundedSpinner` 100–10 000 + "⟳" button; independent of win-prob toggle.
 
-#### [ ] Win Prob Δ explanation in table header / column
-Column header "Win Δ" is not self-explanatory. Add tooltip to the column header. A JTable header tooltip requires a custom `JTableHeader.getToolTipText(MouseEvent)` override. Low priority; current table-header tooltip covers all columns collectively.
+#### [x] Win Prob Δ explanation in table header / column
+Done. Custom `JTableHeader.getToolTipText(MouseEvent)` override provides per-column tooltips for all 7 columns (including "Win Δ"). The previous single blanket tooltip is replaced.
 
-#### [ ] Table sort indicator in column header
-`TableRowSorter` already renders a sort arrow in the column header — this is the default Swing behavior. No additional work needed unless a custom look is desired.
+#### [x] Table sort indicator in column header
+`TableRowSorter` renders a sort arrow by default — no additional work needed.
 
 ---
 

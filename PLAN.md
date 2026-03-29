@@ -17,19 +17,7 @@ Open items only. For history see `CHANGELOG.md`, for math see `ARCHITECTURE.md`.
 
 ## UI-Verbesserungen
 
-### U1 · Rechtes Panel: umbenennen + Tabs (Medium)
-
-**Aktuell:** "Alle erschwinglichen Karten" → veraltet.
-**Neu:** "Verfügbare Karten" (DE) / "Available Cards" (EN)
-
-**Tab-Struktur:**
-| Tab | Inhalt |
-|-----|--------|
-| Erschwinglich / Affordable | Wie bisher — nur kaufbare Karten, sortiert nach ROI |
-| Nicht erschwinglich / Not Affordable | Karten die der aktive Spieler noch nicht kaufen kann (Planung / Sparvorschau) |
-| Alle / All | Beide Gruppen kombiniert; nicht erschwingliche Karten ausgegraut/kursiv |
-
-Buttons (Win Prob, Deep Analysis, MC Spinner etc.) bleiben unten und gelten für alle Tabs.
+### U1 · ~~Rechtes Panel: umbenennen + Tabs~~ ✓ (behoben)
 
 ---
 
@@ -97,6 +85,24 @@ Deterministischer, regelbasierter Spielassistent. **Keine generative KI.** Werte
 | A1 | Bürohaus — Optimal-Swap-Annahme | `bürohausSwapEV` nimmt an, der Spieler tauscht immer optimal. Swap ist eigentlich optional. Akzeptable Heuristik. Siehe `ARCHITECTURE.md §2.8`. |
 | A2 | GameSimulator — Statische EV/Cost-Tabelle | `STATIC_EV_PER_COST` ignoriert Synergien (z.B. viele Food-Karten + Markthalle). Akzeptabel für Gewinnraten-Schätzung. Siehe `ARCHITECTURE.md §4.2`. |
 | A3 | `evPerRound` — Einschritt-Münzprojektion | Projektion via `estimateUncappedOwnTurnEV` ist kein vollständiges Mehrrundenmodell. Akzeptierte Näherung. Siehe `ARCHITECTURE.md §2.4b`. |
+
+---
+
+## Math-Audit (High — Priorität nach N1)
+
+### M1 · Tiefenanalyse der Berechnungsarchitektur — Näherungen entfernen
+
+Ziel: Die drei akzeptierten Näherungen (A1–A3) mathematisch präzise lösen. Dazu ist eine gründliche Analyse der bestehenden Formeln notwendig, ggf. mit Webrecherche zu exakten analytischen Methoden.
+
+**Scope:**
+
+| # | Näherung | Ziel |
+|---|----------|------|
+| A1 | Bürohaus-Swap als fixer "optimal swap immer" | Swap ist optional → EV-Berechnung muss den Erwartungswert beider Optionen (tauschen vs. nicht tauschen) gewichten |
+| A2 | `STATIC_EV_PER_COST` in GameSimulator ignoriert Synergien | Entweder dynamische Berechnung pro Simulationszustand oder verbesserte statische Tabelle mit Synergieboni |
+| A3 | `evPerRound` als Einschritt-Projektion (keine echte Mehrrundenmodellierung) | Mehrrundenmodell: EV-Wachstum durch Münzakkumulation korrekt in der Projektion abbilden |
+
+**Vorgehen:** Webrecherche zu Machi-Koro-Mathematik und verwandten stochastischen Spielmodellen → Formeln ableiten → in `ProbabilityCalc`/`CardIncome` implementieren → A1–A3 aus "Akzeptierte Näherungen" entfernen.
 
 ---
 

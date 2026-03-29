@@ -630,8 +630,69 @@ public class ProbabilityCalc {
         return results;
     }
 
-    // -------------------------------------------------------------------------
-    // Legacy matrix method (kept for backward compatibility)
+    /**
+     * Returns a ranked list of ALL candidate projects (affordable and not), sorted by ROI descending.
+     * Each entry's {@link RankEntry#affordable} flag indicates whether the player can currently buy it.
+     * Win-probability delta is never computed for unaffordable cards (would be hypothetical only).
+     *
+     * @param gs          current game state
+     * @param playerIndex the buying player
+     * @param opts        ranking options (horizon, discount factor; mcSimulations ignored for unaffordable cards)
+     * @return sorted list, best ROI first; affordable cards appear before unaffordable at equal ROI
+     */
+    public static ArrayList<RankEntry> rankAllProjects(GameState gs, int playerIndex,
+                                                        RankingOptions opts) {
+        Player player = gs.getPlayers()[playerIndex];
+        int coins = player.getCoins();
+
+        // Build MC baseline once for affordable cards (if win-prob requested)
+        double mcBaseline = 0.0;
+        if (opts.includeWinProbDelta && opts.mcSimulations > 0) {
+            mcBaseline = WinProbabilityCalc.mcWinRate(gs, playerIndex, opts.mcSimulations);
+        }
+
+        ArrayList<Project> candidates = new ArrayList<>(gs.getUnbuilt_projects());
+        for (Project p : ProjectLoader.getAllProjects()) {
+            if (p.isIs_grossprojekt() && !player.hasProject(p.getId())) {
+                candidates.add(p);
+            }
+        }
+
+        ArrayList<RankEntry> results = new ArrayList<>();
+
+        for (Project candidate : candidates) {
+            if (candidate.isIs_grossprojekt() && player.hasProject(candidate.getId())) continue;
+            if (candidate.getColor().equals("lila") && player.hasProject(candidate.getId())) continue;
+
+            boolean canAfford = candidate.getCost() <= coins;
+            RankEntry entry = roiOverHorizon(gs, playerIndex, candidate,
+                    opts.horizonTurns, opts.discountFactor);
+            entry.affordable = canAfford;
+
+            if ("bürohaus".equals(candidate.getId()) && canAfford) {
+                GameState stateWithBuerohaus = gs.copy();
+                stateWithBuerohaus.getPlayers()[playerIndex].getOwned_projects().add(candidate);
+                entry.notes = bürohausSwapNote(stateWithBuerohaus, playerIndex);
+            }
+
+            if (canAfford && opts.includeWinProbDelta) {
+                if (opts.mcSimulations > 0) {
+                    GameState stateAfter = gs.copy();
+                    stateAfter.getPlayers()[playerIndex].getOwned_projects().add(candidate);
+                    double afterBuy = WinProbabilityCalc.mcWinRate(stateAfter, playerIndex, opts.mcSimulations);
+                    entry.winProbDelta = afterBuy - mcBaseline;
+                } else {
+                    entry.winProbDelta = WinProbabilityCalc.estimateWinProbDelta(
+                            gs, playerIndex, candidate, 0);
+                }
+            }
+
+            results.add(entry);
+        }
+
+        results.sort(Comparator.comparingDouble((RankEntry e) -> e.roiOverHorizon).reversed());
+        return results;
+    }
     // -------------------------------------------------------------------------
 
     /**

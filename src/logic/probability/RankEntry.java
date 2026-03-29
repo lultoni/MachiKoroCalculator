@@ -74,4 +74,11 @@ public class RankEntry {
      */
     public String notes;
 
+    /**
+     * True if the player can currently afford this card (coins ≥ cost).
+     * Set by {@link ProbabilityCalc#rankAllProjects}; always true for entries from
+     * {@link ProbabilityCalc#rankPurchasableProjects}.
+     */
+    public boolean affordable = true;
+
 }

@@ -77,7 +77,12 @@ public class MainWindow extends JFrame {
 
     // ---- right panel components ----
     private DefaultTableModel tableModel;
+    private DefaultTableModel tableModelUnaffordable;
+    private DefaultTableModel tableModelAll;
     private JTable rankTable;
+    private JTable rankTableUnaffordable;
+    private JTable rankTableAll;
+    private JTabbedPane rankTabs;
     private JButton toggleWinProbBtn;
     private JToggleButton deepAnalysisBtn;
     private JLabel statusLabel;
@@ -460,35 +465,28 @@ public class MainWindow extends JFrame {
         JPanel panel = new JPanel(new BorderLayout(4, 4));
         panel.setBorder(titledBorder(Strings.rightPanelTitle()));
 
-        String[] cols = {Strings.colCard(), Strings.colCost(), Strings.colEV(), Strings.colROI(), Strings.colP0(), Strings.colVar()};
-        tableModel = new DefaultTableModel(cols, 0) {
-            @Override public boolean isCellEditable(int r, int c) { return false; }
-            @Override public Class<?> getColumnClass(int c) {
-                return c == 0 ? String.class : Double.class;
-            }
-        };
-        rankTable = new JTable(tableModel);
-        rankTable.setFont(MONO_FONT);
-        rankTable.setRowHeight(22);
-        rankTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        // Three tabs: Affordable / Not Affordable / All
+        rankTabs = new JTabbedPane();
+        rankTable             = buildRankTable();
+        rankTableUnaffordable = buildRankTable();
+        rankTableAll          = buildRankTable();
+
+        // Selection listeners: clicking any row in any tab updates Card Details
         rankTable.getSelectionModel().addListSelectionListener(e -> {
-            if (!e.getValueIsAdjusting()) onTableSelect();
+            if (!e.getValueIsAdjusting()) onTableSelect(rankTable, tableModel);
+        });
+        rankTableUnaffordable.getSelectionModel().addListSelectionListener(e -> {
+            if (!e.getValueIsAdjusting()) onTableSelect(rankTableUnaffordable, tableModelUnaffordable);
+        });
+        rankTableAll.getSelectionModel().addListSelectionListener(e -> {
+            if (!e.getValueIsAdjusting()) onTableSelect(rankTableAll, tableModelAll);
         });
 
-        // Sortable columns
-        TableRowSorter<DefaultTableModel> sorter = new TableRowSorter<>(tableModel);
-        rankTable.setRowSorter(sorter);
-        // Card column (String): alphabetic sort; numeric columns: numeric sort
-        sorter.setComparator(0, java.util.Comparator.naturalOrder());
-        for (int c = 1; c <= 5; c++) {
-            sorter.setComparator(c, java.util.Comparator.comparingDouble(o -> (Double) o));
-        }
-        // Default: sort by ROI (column 3) descending
-        java.util.List<RowSorter.SortKey> sortKeys = new java.util.ArrayList<>();
-        sortKeys.add(new RowSorter.SortKey(3, SortOrder.DESCENDING));
-        sorter.setSortKeys(sortKeys);
+        rankTabs.addTab(Strings.tabAffordable(),    new JScrollPane(rankTable));
+        rankTabs.addTab(Strings.tabNotAffordable(), new JScrollPane(rankTableUnaffordable));
+        rankTabs.addTab(Strings.tabAll(),           new JScrollPane(rankTableAll));
 
-        panel.add(new JScrollPane(rankTable), BorderLayout.CENTER);
+        panel.add(rankTabs, BorderLayout.CENTER);
 
         // Button bar at bottom
         JPanel btnBar = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 4));
@@ -531,18 +529,49 @@ public class MainWindow extends JFrame {
 
         panel.add(btnBar, BorderLayout.SOUTH);
 
-        // Per-column header tooltips via a custom JTableHeader
-        rankTable.setTableHeader(new javax.swing.table.JTableHeader(rankTable.getColumnModel()) {
+        // Ensure the button bar is never clipped when the window is resized narrow.
+        panel.setMinimumSize(new Dimension(430, 0));
+        return panel;
+    }
+
+    /** Creates a new JTable with the standard rank table settings but no model yet. */
+    private JTable buildRankTable() {
+        String[] cols = {Strings.colCard(), Strings.colCost(), Strings.colEV(), Strings.colROI(), Strings.colP0(), Strings.colVar()};
+        DefaultTableModel model = new DefaultTableModel(cols, 0) {
+            @Override public boolean isCellEditable(int r, int c) { return false; }
+            @Override public Class<?> getColumnClass(int c) {
+                return c == 0 ? String.class : Double.class;
+            }
+        };
+        // Assign model to the correct field based on which call this is
+        // (models assigned by caller via setModel; use a local reference here)
+        if (tableModel == null)             tableModel = model;
+        else if (tableModelUnaffordable == null) tableModelUnaffordable = model;
+        else                                tableModelAll = model;
+
+        JTable table = new JTable(model);
+        table.setFont(MONO_FONT);
+        table.setRowHeight(22);
+        table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+
+        TableRowSorter<DefaultTableModel> sorter = new TableRowSorter<>(model);
+        table.setRowSorter(sorter);
+        sorter.setComparator(0, java.util.Comparator.naturalOrder());
+        for (int c = 1; c <= 5; c++) {
+            sorter.setComparator(c, java.util.Comparator.comparingDouble(o -> (Double) o));
+        }
+        java.util.List<RowSorter.SortKey> sortKeys = new java.util.ArrayList<>();
+        sortKeys.add(new RowSorter.SortKey(3, SortOrder.DESCENDING));
+        sorter.setSortKeys(sortKeys);
+
+        // Per-column header tooltips
+        table.setTableHeader(new javax.swing.table.JTableHeader(table.getColumnModel()) {
             @Override
             public String getToolTipText(java.awt.event.MouseEvent e) {
                 int col = columnAtPoint(e.getPoint());
                 String[] tips = {
-                    Strings.colTipCard(),
-                    Strings.colTipCost(),
-                    Strings.colTipEV(),
-                    Strings.colTipROI(),
-                    Strings.colTipP0(),
-                    Strings.colTipVar(),
+                    Strings.colTipCard(), Strings.colTipCost(), Strings.colTipEV(),
+                    Strings.colTipROI(), Strings.colTipP0(), Strings.colTipVar(),
                     Strings.colTipWinDelta(),
                 };
                 if (col >= 0 && col < tips.length) return tips[col];
@@ -550,15 +579,26 @@ public class MainWindow extends JFrame {
             }
         });
 
-        // Ensure the button bar is never clipped when the window is resized narrow.
-        // The bar needs ~430 px (win-prob btn + deep analysis btn + N: + spinner + reload + status + gaps).
-        panel.setMinimumSize(new Dimension(430, 0));
-        return panel;
+        return table;
     }
 
     // =========================================================================
     // Event handlers
     // =========================================================================
+
+    /** Selects the first affordable entry in the affordable tab, or clears Card Details if none. */
+    private void selectFirstAffordable() {
+        RankEntry first = null;
+        for (RankEntry e : lastRanking) {
+            if (e.affordable) { first = e; break; }
+        }
+        if (first != null) {
+            populateCenter(first);
+            if (rankTable.getRowCount() > 0) rankTable.setRowSelectionInterval(0, 0);
+        } else {
+            clearCenter(Strings.noAffordableCardsTab());
+        }
+    }
 
     private void onConfirmTurn(ActionEvent e) {
         int pi = session.nextPlayerIndex();
@@ -662,13 +702,21 @@ public class MainWindow extends JFrame {
         }
     }
 
-    private void onTableSelect() {
-        int viewRow = rankTable.getSelectedRow();
+    private void onTableSelect(JTable table, DefaultTableModel model) {
+        int viewRow = table.getSelectedRow();
         if (viewRow < 0) return;
-        int modelRow = rankTable.convertRowIndexToModel(viewRow);
-        if (modelRow < 0 || modelRow >= lastRanking.size()) return;
-        RankEntry entry = lastRanking.get(modelRow);
-        populateCenter(entry);
+        int modelRow = table.convertRowIndexToModel(viewRow);
+        // Find the matching RankEntry by card name stored in column 0
+        String label = (String) model.getValueAt(modelRow, 0);
+        for (RankEntry entry : lastRanking) {
+            String entryLabel = entry.project.isIs_grossprojekt()
+                    ? entry.project.getLocalizedName() + " " + Strings.gpTag()
+                    : entry.project.getLocalizedName();
+            if (entryLabel.equals(label)) {
+                populateCenter(entry);
+                return;
+            }
+        }
     }
 
     private void onOpenSnapshot(ActionEvent e) {
@@ -729,6 +777,8 @@ public class MainWindow extends JFrame {
         topCardNote.setText(Strings.gameOverNote());
 
         tableModel.setRowCount(0);
+        tableModelUnaffordable.setRowCount(0);
+        tableModelAll.setRowCount(0);
         statusLabel.setText(Strings.gameOverStatus());
     }
 
@@ -804,7 +854,7 @@ public class MainWindow extends JFrame {
             SwingWorker<ArrayList<RankEntry>, Void> worker = new SwingWorker<>() {
                 @Override
                 protected ArrayList<RankEntry> doInBackground() {
-                    return ProbabilityCalc.rankPurchasableProjects(snapState, snapPi, rankOpts);
+                    return ProbabilityCalc.rankAllProjects(snapState, snapPi, rankOpts);
                 }
 
                 @Override
@@ -818,25 +868,15 @@ public class MainWindow extends JFrame {
                     confirmBtn.setEnabled(true);
                     mcReloadBtn.setEnabled(deepAnalysisBtn.isSelected() && showWinProb);
                     rebuildTable();
-                    if (!lastRanking.isEmpty()) {
-                        populateCenter(lastRanking.get(0));
-                        if (rankTable.getRowCount() > 0) rankTable.setRowSelectionInterval(0, 0);
-                    } else {
-                        clearCenter(Strings.noAffordableCards());
-                    }
+                    selectFirstAffordable();
                 }
             };
             worker.execute();
         } else {
             statusLabel.setText("");
-            lastRanking = ProbabilityCalc.rankPurchasableProjects(postRoll, pi, rankOpts);
+            lastRanking = ProbabilityCalc.rankAllProjects(postRoll, pi, rankOpts);
             rebuildTable();
-            if (!lastRanking.isEmpty()) {
-                populateCenter(lastRanking.get(0));
-                if (rankTable.getRowCount() > 0) rankTable.setRowSelectionInterval(0, 0);
-            } else {
-                clearCenter(Strings.noAffordableCards());
-            }
+            selectFirstAffordable();
         }
     }
 
@@ -909,14 +949,9 @@ public class MainWindow extends JFrame {
         baselineWinProbLabel.setText(Strings.baselineWinProbFmt(baselineWinProb * 100));
 
         if (rankOpts.mcSimulations == 0) {
-            lastRanking = ProbabilityCalc.rankPurchasableProjects(postRoll, pi, rankOpts);
+            lastRanking = ProbabilityCalc.rankAllProjects(postRoll, pi, rankOpts);
             rebuildTable();
-            if (!lastRanking.isEmpty()) {
-                populateCenter(lastRanking.get(0));
-                if (rankTable.getRowCount() > 0) rankTable.setRowSelectionInterval(0, 0);
-            } else {
-                clearCenter(Strings.noAffordableCards());
-            }
+            selectFirstAffordable();
         }
     }
 
@@ -937,19 +972,42 @@ public class MainWindow extends JFrame {
     }
 
     private void rebuildTable() {
-        // Preserve the user's current sort order across rebuilds
-        RowSorter<?> existingSorter = rankTable.getRowSorter();
-        java.util.List<? extends RowSorter.SortKey> savedSortKeys =
-                (existingSorter != null) ? existingSorter.getSortKeys() : null;
-
         String[] cols = showWinProb
                 ? new String[]{Strings.colCard(), Strings.colCost(), Strings.colEV(), Strings.colROI(), Strings.colP0(), Strings.colVar(), Strings.colWinDelta()}
                 : new String[]{Strings.colCard(), Strings.colCost(), Strings.colEV(), Strings.colROI(), Strings.colP0(), Strings.colVar()};
 
-        tableModel.setColumnIdentifiers(cols);
-        tableModel.setRowCount(0);
+        // Update tab labels (language may have changed)
+        rankTabs.setTitleAt(0, Strings.tabAffordable());
+        rankTabs.setTitleAt(1, Strings.tabNotAffordable());
+        rankTabs.setTitleAt(2, Strings.tabAll());
 
-        for (RankEntry e : lastRanking) {
+        fillRankTableModel(tableModel,             rankTable,             cols, lastRanking, true,  false);
+        fillRankTableModel(tableModelUnaffordable, rankTableUnaffordable, cols, lastRanking, false, false);
+        fillRankTableModel(tableModelAll,          rankTableAll,          cols, lastRanking, null,  true);
+    }
+
+    /**
+     * Fills a rank table model and re-applies column renderers and sorter comparators.
+     *
+     * @param model        the DefaultTableModel to populate
+     * @param table        the JTable whose renderers and sorter to update
+     * @param cols         column header names (length 6 or 7)
+     * @param ranking      the full ranking (affordable + unaffordable)
+     * @param affordableFilter  true = only affordable, false = only unaffordable, null = all
+     * @param dimUnaffordable   true = use dimmed renderer for unaffordable rows (used in "All" tab)
+     */
+    private void fillRankTableModel(DefaultTableModel model, JTable table, String[] cols,
+                                     ArrayList<RankEntry> ranking,
+                                     Boolean affordableFilter, boolean dimUnaffordable) {
+        RowSorter<?> existingSorter = table.getRowSorter();
+        java.util.List<? extends RowSorter.SortKey> savedSortKeys =
+                existingSorter != null ? existingSorter.getSortKeys() : null;
+
+        model.setColumnIdentifiers(cols);
+        model.setRowCount(0);
+
+        for (RankEntry e : ranking) {
+            if (affordableFilter != null && e.affordable != affordableFilter) continue;
             String cardLabel = e.project.isIs_grossprojekt()
                     ? e.project.getLocalizedName() + " " + Strings.gpTag()
                     : e.project.getLocalizedName();
@@ -961,37 +1019,39 @@ public class MainWindow extends JFrame {
                     : new Object[]{cardLabel, (double) e.project.getCost(),
                                    e.evPerRound, e.roiOverHorizon,
                                    e.probNoIncomeOwnTurn, e.variance};
-            tableModel.addRow(row);
+            model.addRow(row);
         }
 
-        // Re-apply renderers and widths — col 1 (cost) neutral, cols 2..N metric-aware
-        rankTable.getColumnModel().getColumn(0).setCellRenderer(new CardNameRenderer());
-        rankTable.getColumnModel().getColumn(0).setPreferredWidth(120);
-        rankTable.getColumnModel().getColumn(1).setCellRenderer(new NumericCellRenderer(MetricColorScheme.COST));
-        rankTable.getColumnModel().getColumn(1).setPreferredWidth(52);
+        // Re-apply renderers
+        boolean useUnaffordableRenderer = dimUnaffordable;
+        table.getColumnModel().getColumn(0).setCellRenderer(
+                useUnaffordableRenderer ? new CardNameRendererWithDim(ranking) : new CardNameRenderer());
+        table.getColumnModel().getColumn(0).setPreferredWidth(120);
+        table.getColumnModel().getColumn(1).setCellRenderer(new NumericCellRenderer(MetricColorScheme.COST));
+        table.getColumnModel().getColumn(1).setPreferredWidth(52);
         for (int c = 2; c < cols.length; c++) {
             MetricColorScheme scheme = MetricColorScheme.TABLE_ORDER[c - 2];
-            rankTable.getColumnModel().getColumn(c).setCellRenderer(new NumericCellRenderer(scheme));
-            rankTable.getColumnModel().getColumn(c).setPreferredWidth(52);
+            NumericCellRenderer r = useUnaffordableRenderer
+                    ? new NumericCellRendererWithDim(scheme, ranking)
+                    : new NumericCellRenderer(scheme);
+            table.getColumnModel().getColumn(c).setCellRenderer(r);
+            table.getColumnModel().getColumn(c).setPreferredWidth(52);
         }
 
-        // Re-attach sorter comparators after column rebuild
-        TableRowSorter<?> sorter = (TableRowSorter<?>) rankTable.getRowSorter();
+        // Re-attach sorter
+        @SuppressWarnings("unchecked")
+        TableRowSorter<DefaultTableModel> sorter = (TableRowSorter<DefaultTableModel>) table.getRowSorter();
         if (sorter != null) {
-            @SuppressWarnings("unchecked")
-            TableRowSorter<DefaultTableModel> trs = (TableRowSorter<DefaultTableModel>) sorter;
-            trs.setComparator(0, java.util.Comparator.naturalOrder());
+            sorter.setComparator(0, java.util.Comparator.naturalOrder());
             for (int c = 1; c < cols.length; c++) {
-                trs.setComparator(c, java.util.Comparator.comparingDouble(o -> (Double) o));
+                sorter.setComparator(c, java.util.Comparator.comparingDouble(o -> (Double) o));
             }
-            // Restore the previously saved sort order (or keep default ROI-descending)
             if (savedSortKeys != null && !savedSortKeys.isEmpty()) {
-                // Clamp sort key columns to valid range after possible column count change
                 java.util.List<RowSorter.SortKey> restored = new java.util.ArrayList<>();
                 for (RowSorter.SortKey sk : savedSortKeys) {
                     if (sk.getColumn() < cols.length) restored.add(sk);
                 }
-                if (!restored.isEmpty()) trs.setSortKeys(restored);
+                if (!restored.isEmpty()) sorter.setSortKeys(restored);
             }
         }
     }
@@ -1249,7 +1309,6 @@ public class MainWindow extends JFrame {
                                                         int row, int column) {
             super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
             if (!isSelected && value instanceof String label) {
-                // Strip [GP] suffix and reverse-lookup by localized name to find color
                 String clean = label.replace(" " + Strings.gpTag(), "");
                 int paren = clean.indexOf(" (");
                 String localizedName = paren >= 0 ? clean.substring(0, paren) : clean;
@@ -1269,15 +1328,40 @@ public class MainWindow extends JFrame {
         }
     }
 
+    /**
+     * Variant of {@link CardNameRenderer} used in the "All" tab.
+     * Unaffordable rows are rendered in italic with a dimmed/grey background.
+     */
+    private static class CardNameRendererWithDim extends CardNameRenderer {
+        private final ArrayList<RankEntry> ranking;
+
+        CardNameRendererWithDim(ArrayList<RankEntry> ranking) {
+            this.ranking = ranking;
+        }
+
+        @Override
+        public Component getTableCellRendererComponent(JTable table, Object value,
+                                                        boolean isSelected, boolean hasFocus,
+                                                        int row, int column) {
+            super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+            if (!isSelected && value instanceof String label) {
+                RankEntry entry = entryForLabel(label, ranking);
+                if (entry != null && !entry.affordable) {
+                    setBackground(new Color(0xEEEEEE));
+                    setFont(getFont().deriveFont(Font.ITALIC));
+                    setForeground(new Color(0x888888));
+                }
+            }
+            return this;
+        }
+    }
+
     // =========================================================================
     // Color-coded numeric cell renderer
     // =========================================================================
 
     /**
      * Renders numeric table cells with 2-decimal formatting and metric-aware colour coding.
-     * Each instance is bound to a {@link MetricColorScheme} so P(0) and Variance are
-     * coloured with inverted logic (lower = better), while EV, ROI and Win Δ use normal
-     * (higher = better) logic.
      */
     private static class NumericCellRenderer extends DefaultTableCellRenderer {
         private final MetricColorScheme scheme;
@@ -1312,5 +1396,49 @@ public class MainWindow extends JFrame {
             }
             return this;
         }
+    }
+
+    /**
+     * Variant used in the "All" tab — dims unaffordable rows with grey italic rendering.
+     */
+    private static class NumericCellRendererWithDim extends NumericCellRenderer {
+        private final ArrayList<RankEntry> ranking;
+
+        NumericCellRendererWithDim(MetricColorScheme scheme, ArrayList<RankEntry> ranking) {
+            super(scheme);
+            this.ranking = ranking;
+        }
+
+        @Override
+        public Component getTableCellRendererComponent(JTable table, Object value,
+                                                        boolean isSelected, boolean hasFocus,
+                                                        int row, int column) {
+            super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+            if (!isSelected) {
+                // Look up the card name from the same row (column 0) to find the entry
+                Object nameCell = table.getModel().getValueAt(
+                        table.convertRowIndexToModel(row), 0);
+                if (nameCell instanceof String label) {
+                    RankEntry entry = entryForLabel(label, ranking);
+                    if (entry != null && !entry.affordable) {
+                        setBackground(new Color(0xEEEEEE));
+                        setForeground(new Color(0x888888));
+                        setFont(getFont().deriveFont(Font.ITALIC));
+                    }
+                }
+            }
+            return this;
+        }
+    }
+
+    /** Looks up a RankEntry by the localized card label used in the table (strips [GP] suffix). */
+    private static RankEntry entryForLabel(String label, ArrayList<RankEntry> ranking) {
+        String clean = label.replace(" " + Strings.gpTag(), "");
+        int paren = clean.indexOf(" (");
+        String localizedName = paren >= 0 ? clean.substring(0, paren) : clean;
+        for (RankEntry e : ranking) {
+            if (e.project.getLocalizedName().equals(localizedName)) return e;
+        }
+        return null;
     }
 }

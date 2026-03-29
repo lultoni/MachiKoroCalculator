@@ -181,6 +181,11 @@ public final class Strings {
 
     public static String showWinProbBtn()     { return s("Gewinnw.-Δ anzeigen", "Show Win Prob Δ"); }
     public static String hideWinProbBtn()     { return s("Gewinnw.-Δ verbergen", "Hide Win Prob Δ"); }
+    public static String tabAffordable()      { return s("Erschwinglich", "Affordable"); }
+    public static String tabNotAffordable()   { return s("Nicht erschwinglich", "Not Affordable"); }
+    public static String tabAll()             { return s("Alle", "All"); }
+    public static String noAffordableCardsTab() { return s("Keine erschwinglichen Karten — sparen!", "No affordable cards — save up!"); }
+    public static String noUnaffordableCards()  { return s("Alle Karten sind erschwinglich!", "All cards are affordable!"); }
     public static String deepAnalysisBtn()    { return s("Tiefenanalyse (MC)", "Deep Analysis (MC)"); }
     public static String deepAnalysisBtnOn()  { return s("Tiefenanalyse AN (MC)", "Deep Analysis ON (MC)"); }
     public static String deepAnalysisTooltip(){ return s("Monte-Carlo-Simulationen pro Karte für genaues Gewinnwahrscheinlichkeits-Delta.",

@@ -85,58 +85,15 @@ Konzept für datengetriebene Gewichtskalibrierung. Besteht aus drei Teilsystemen
 
 ---
 
-#### N4a · `SnapshotCard` — neues Spieler-Snapshot-Widget
-
-Ersatz/Erweiterung für das aktuelle Tab-basierte `SnapshotDialog`-Interface mit schneller visueller Übersicht:
-
-**`SnapshotCard` (neue Klasse, `gui.newui`):**
-- Ein kompaktes Panel pro Spieler (2–4 Cards nebeneinander im Full-UI)
-- Zeigt: Spielername, Münzen, GP-Fortschrittsleiste (0–4, farblich), Kartenübersicht nach Farbe (blaue/grüne/rote/lila Karten als farbige Chips), EV/Runde
-- Farbkodierung: GP-Balken grün (führend), gelb (mittel), rot (hinten)
-- Editierbar: Doppelklick auf Feld öffnet Inline-Spinner — gleiche Eingabelogik wie `SnapshotDialog`, aber inline im Card
-- **Sauberes API:**
-  ```
-  SnapshotCard(Player player, GameState gs, int playerIndex)
-  SnapshotCard.setPlayer(Player p)          // live update from session
-  SnapshotCard.getEditedPlayer() → Player   // returns current edited state
-  SnapshotCard.setEditable(boolean)         // toggle edit mode
-  SnapshotCard.addChangeListener(...)       // für save/load integration
-  ```
-- Integration: `SnapshotDialog` kann intern auf `SnapshotCard`-Widgets wechseln (Tab-Layout bleibt als Option); `MainWindow` kann `SnapshotCard`s direkt als Live-View rendern
-
-**`.mkoro`-Kompatibilität:** `SnapshotCard.getEditedPlayer()` liefert denselben `Player`-Typ wie `GameStateBuilder` erwartet → direkt zu `GameSession.fromSnapshot()` kompatibel. Keine neuen Serialisierungsformate nötig.
+#### N4a · ~~`SnapshotCard` — neues Spieler-Snapshot-Widget~~ ✓ (behoben)
 
 ---
 
-#### N4b · Snapshot-Generator
-
-- `SnapshotGenerator.generate(numPlayers, targetTurnRange)` — spielt via `GameSimulator.simulate()` bis zu einem zufälligen Zug (z.B. Züge 3–20) und gibt den `GameState` zurück
-- Liefert realistische Portfolios ohne manuelle Eingabe
-- Optional: `generateFromFile(Path mkoro)` — lädt eine `.mkoro`-Datei und gibt einen zufälligen Turn-Snapshot daraus zurück → **kombiniert Labeling mit echten Spielverläufen**
+#### N4b · ~~Snapshot-Generator~~ ✓ (behoben)
 
 ---
 
-#### N4c · Labeling-UI
-
-**Neues Fenster `LabelingWindow`:**
-- Zeigt 2–4 `SnapshotCard`s nebeneinander (ein Snapshot = eine Spielsituation)
-- Darunter: drei beschriftungslose Slider (keine Zahlen, nur Endpunkte):
-  - "Frühphase ←————————→ Nicht Frühphase"
-  - "Mittelspiel ←————————→ Nicht Mittelspiel"
-  - "Endspiel ←————————→ Nicht Endspiel"
-  - *Hinweis: alle drei unabhängig, da Übergangssituationen möglich*
-- "Weiter"-Button: nächster generierter Snapshot
-- "Aus Datei laden"-Button: `.mkoro`-Datei wählen, zufälligen Snapshot laden
-- "Labels exportieren"-Button: speichert alle bisherigen Labels als JSON (`phase_labels.json`)
-- Alle Labels persistent zwischen Sessions speicherbar
-
-**Label-Format (JSON):**
-```json
-{
-  "snapshot": { /* GameState als JSON, gleiche Struktur wie .mkoro */ },
-  "labels": { "early": 0.8, "mid": 0.3, "late": 0.1 }
-}
-```
+#### N4c · ~~Labeling-UI~~ ✓ (behoben)
 
 ---
 

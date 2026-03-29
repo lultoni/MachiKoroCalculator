@@ -154,6 +154,13 @@ public class MainWindow extends JFrame {
         langMenu.add(deItem);
         langMenu.add(enItem);
         bar.add(langMenu);
+
+        JMenu toolsMenu = new JMenu(Strings.menuTools());
+        JMenuItem labelingItem = new JMenuItem(Strings.menuLabelingWindow());
+        labelingItem.addActionListener(e -> new LabelingWindow());
+        toolsMenu.add(labelingItem);
+        bar.add(toolsMenu);
+
         return bar;
     }
 

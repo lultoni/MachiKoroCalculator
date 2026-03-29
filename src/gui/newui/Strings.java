@@ -449,6 +449,14 @@ public final class Strings {
     public static String snapshotError(String e){ return s("Ungültiger Spielzustand: " + e, "Invalid game state: " + e); }
     public static String snapshotErrorTitle() { return s("Schnappschuss-Fehler", "Snapshot Error"); }
 
+    // Short color names for SnapshotCard chips
+    public static String snapshotColorBlauShort()  { return s("Blau",  "Blue"); }
+    public static String snapshotColorGrünShort()  { return s("Grün",  "Green"); }
+    public static String snapshotColorRotShort()   { return s("Rot",   "Red"); }
+    public static String snapshotColorLilaShort()  { return s("Lila",  "Purple"); }
+    public static String snapshotColorGelbShort()  { return s("Gelb",  "Yellow"); }
+    public static String snapshotCardNone()        { return s("(keine Karten)", "(no cards)"); }
+
     // =========================================================================
     // Card color labels (used in center panel color tag)
     // =========================================================================
@@ -471,6 +479,8 @@ public final class Strings {
     public static String menuLanguage()       { return s("Sprache", "Language"); }
     public static String menuLangDE()         { return "Deutsch"; }
     public static String menuLangEN()         { return "English"; }
+    public static String menuTools()          { return s("Werkzeuge", "Tools"); }
+    public static String menuLabelingWindow() { return s("Spielphase Labeling…", "Game Phase Labeling…"); }
 
     // =========================================================================
     // Build-note strings
@@ -479,5 +489,34 @@ public final class Strings {
     public static String costNotRecouped(int turns) {
         return s("(Kosten werden in " + turns + " Zügen nicht zurückgespielt)",
                  "(cost may not be recouped in " + turns + " turns)");
+    }
+
+    // =========================================================================
+    // LabelingWindow (N4c)
+    // =========================================================================
+
+    public static String labelingWindowTitle()   { return s("Spielphase Labeling", "Game Phase Labeling"); }
+    public static String labelingNextBtn()       { return s("Nächster Snapshot →", "Next Snapshot →"); }
+    public static String labelingFromFileBtn()   { return s("Aus Datei laden…", "Load from File…"); }
+    public static String labelingExportBtn()     { return s("Labels exportieren…", "Export Labels…"); }
+    public static String labelingLabelCount(int n) { return s(n + " Label(s) gespeichert", n + " label(s) saved"); }
+    public static String labelingSliderEarlyLeft()  { return s("Frühphase", "Early Game"); }
+    public static String labelingSliderEarlyRight() { return s("Nicht Frühphase", "Not Early Game"); }
+    public static String labelingSliderMidLeft()    { return s("Mittelspiel", "Mid Game"); }
+    public static String labelingSliderMidRight()   { return s("Nicht Mittelspiel", "Not Mid Game"); }
+    public static String labelingSliderLateLeft()   { return s("Endspiel", "Late Game"); }
+    public static String labelingSliderLateRight()  { return s("Nicht Endspiel", "Not Late Game"); }
+    public static String labelingNoSnapshot()       { return s("Kein Snapshot geladen.", "No snapshot loaded."); }
+    public static String labelingNumPlayers()       { return s("Spieleranzahl:", "Number of players:"); }
+    public static String labelingTurnRange()        { return s("Züge (min–max):", "Turns (min–max):"); }
+    public static String labelingGenerate()         { return s("Generieren", "Generate"); }
+    public static String labelingExportSuccess(String path) {
+        return s("Labels gespeichert: " + path, "Labels saved: " + path);
+    }
+    public static String labelingExportError(String msg) {
+        return s("Export fehlgeschlagen: " + msg, "Export failed: " + msg);
+    }
+    public static String labelingLoadError(String msg) {
+        return s("Fehler beim Laden: " + msg, "Error loading file: " + msg);
     }
 }

@@ -178,7 +178,7 @@ public class GameSimulator {
      * in the correct order: red card payments counter-clockwise first, then
      * blue/green/purple income.
      */
-    private static void applyRoll(GameState state, int activePlayer, int roll) {
+    static void applyRoll(GameState state, int activePlayer, int roll) {
         Player[] players = state.getPlayers();
         int[] deltas = ProbabilityCalc.computeAllDeltasForRoll(state, activePlayer, roll);
         for (int i = 0; i < players.length; i++) {
@@ -224,7 +224,7 @@ public class GameSimulator {
      * @return the winner's player index if this purchase completes the game,
      *         or {@code -1} if the game continues
      */
-    private static int greedyBuy(GameState state, int activePlayer,
+    static int greedyBuy(GameState state, int activePlayer,
                                    Map<String, Integer> supply) {
         Player player = state.getPlayers()[activePlayer];
 
@@ -296,7 +296,7 @@ public class GameSimulator {
      * Each non-landmark card starts with {@link #SUPPLY_PER_CARD} copies minus
      * however many are already owned by players.
      */
-    private static Map<String, Integer> buildSupply(GameState state) {
+    static Map<String, Integer> buildSupply(GameState state) {
         Map<String, Integer> supply = new HashMap<>();
         for (Project p : ProjectLoader.getAllProjects()) {
             if (!p.isIs_grossprojekt()) {

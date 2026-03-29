@@ -4,6 +4,18 @@ Implementierungsgeschichte: was gebaut wurde, warum, und welche Designentscheidu
 
 ---
 
+## N4a–N4c: SnapshotCard + SnapshotGenerator + LabelingWindow
+
+**N4a — `SnapshotCard.java`:** Neues kompaktes Player-Panel in `gui.newui`. Zeigt: Spielername, Münzen (Clickable / Spinner in edit mode), GP-Fortschrittsleiste (0–4, farbkodiert: grün=führend, gelb=mittel, rot=hinten), farbige Karten-Chips (Blau/Grün/Rot/Lila/Gelb als aggregierte Chips mit ×N-Zähler), EV/Runde via `portfolioEvPerRound`. In Edit-Mode (Doppelklick oder `setEditable(true)`): `BoundedSpinner` für Münzen, pro-Farbe-Spinner/Checkbox für alle Karten — gleiche Validierungslogik wie `SnapshotDialog`. API: `setPlayer(Player)`, `getEditedPlayer() → Player`, `setEditable(boolean)`, `addChangeListener(...)`. `.mkoro`-kompatibel: `getEditedPlayer()` liefert direkt einen `Player` für `GameStateBuilder`.
+
+**N4b — `SnapshotGenerator.java`:** Neue public Klasse in `logic.probability`. `generate(numPlayers, minTurn, maxTurn)`: Simuliert ein frisches Spiel (greedy via `GameSimulator.applyRoll` + `greedyBuy`) bis zu einem Zufallszug im Bereich und gibt den `GameState`-Deep-Copy zurück. `generateFromFile(Path)`: Lädt `.mkoro` via `GameSession.load()` und gibt den Endzustand zurück. `applyRoll`, `greedyBuy`, `buildSupply` in `GameSimulator` auf package-private geändert.
+
+**N4c — `LabelingWindow.java`:** Neues JFrame in `gui.newui`. Layout: Oben — Spieleranzahl, Züge-Bereich, "Generieren"-Button, "Aus Datei laden"-Button. Mitte — Side-by-Side `SnapshotCard`s + drei unabhängige Slider (keine Tick-Nummern, nur Endpoint-Labels: "Frühphase ←→ Nicht Frühphase" etc.) für Early/Mid/Late. Unten — "Nächster Snapshot" (speichert aktuelles Label, generiert nächsten), "Labels exportieren" (schreibt `phase_labels.json` via Gson). Label-Format: `[{players:[{name,coins,gps,cards}], labels:{early,mid,late}}]`. Erreichbar via neues "Werkzeuge"-Menü in `MainWindow`.
+
+**Tests:** 224 bestanden, 0 fehlgeschlagen.
+
+---
+
 ## N2+N3: Bahnhof-Würfelwahl im Assistenten + wirtschaftsbasierte Phasenerkennung
 
 **N2 — `optimalDiceCount(gs, pi)`:** Neuer public wrapper in `ProbabilityCalc`. Vergleicht `weightedRollEV(1d6)` vs `weightedRollEV(2d6)` mit aktuellem Portfolio (kein Kandidat). Gibt 1 oder 2 zurück. Im Assistenten: wenn Bahnhof besessen → neuer Hint "🎲 1W6 optimal — Portfolio aktiviert hauptsächlich auf 1–6" (oder 2W6). Strings: `assistantDiceHint1d6()` / `assistantDiceHint2d6()`.

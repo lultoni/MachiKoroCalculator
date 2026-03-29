@@ -43,9 +43,9 @@ public final class Strings {
     // =========================================================================
 
     public static String mainWindowTitle()    { return s("Machi Koro Rechner", "Machi Koro Calculator"); }
-    public static String leftPanelTitle()     { return s("Aktueller Zug", "Current Turn Tracker"); }
+    public static String leftPanelTitle()     { return s("Aktueller Zug-Tracker", "Current Turn Tracker"); }
     public static String centerPanelTitle()   { return s("Kartendetails", "Card Details"); }
-    public static String rightPanelTitle()    { return s("Alle erschwinglichen Karten", "All Affordable Cards"); }
+    public static String rightPanelTitle()    { return s("Verfügbare Karten", "Available Cards"); }
 
     // =========================================================================
     // MainWindow — left panel labels & buttons
@@ -159,7 +159,7 @@ public final class Strings {
     public static String colTipCard()         { return s("Kartenname", "Card name"); }
     public static String colTipCost()         { return s("Kaufpreis (Münzen)", "Purchase cost (coins)"); }
     public static String colTipEV()           {
-        return s("EV/Runde: erwartete Münzen pro vollständiger Runde",
+        return s("EV/Runde: erwartete Münzen pro vollständiger Runde (eigener Zug + Gegner-Züge)",
                  "EV/round: expected coins earned per full game round (own turn + opponent turns)");
     }
     public static String colTipROI()          {
@@ -213,7 +213,8 @@ public final class Strings {
     }
     public static String noAffordableCards()  { return s("Keine erschwinglichen Karten — sparen!", "No affordable cards — save up!"); }
     public static String gameOver(String winner){ return winner + s(" gewinnt!", " wins!"); }
-    public static String gameOverDesc()       { return s("<html><i>Alle 4 Großprojekte gebaut!</i></html>", "<html><i>All 4 Großprojekte built!</i></html>"); }
+    public static String gameOverDesc()       { return s("<html><i>Alle 4 Großprojekte gebaut!</i></html>",
+                                                          "<html><i>All 4 " + grossProjekt() + "s built!</i></html>"); }
     public static String gameOverNote()       { return s("<html><i>Spiel vorbei. Rückgängig drücken oder Fenster schließen.</i></html>",
                                                           "<html><i>Game over. Use Undo to continue or close the window.</i></html>"); }
     public static String gameOverStatus()     { return s("Spiel vorbei!", "Game over!"); }

@@ -18,42 +18,11 @@ Progress key: `[ ]` open · `[~]` in progress · `[x]` done
 
 ## Code-Qualität
 
-### C1 · Metrik-Färbung: gemeinsame Basisklasse (Medium)
+### C1 · ~~Metrik-Färbung: gemeinsame Basisklasse~~ ✓ (behoben)
 
-`NumericCellRenderer` (Tabelle) und die Metrik-Labels in Kartendetails (`topCardEV`, `topCardROI`, etc.) färben Werte unabhängig voneinander — mit inkonsistenten, hartkodiert gestreuten Schwellen (aktuell: > 0.5 grün, < −0.5 rot für alle Spalten, ungeachtet Wertebereich oder Semantik).
+### C2 · ~~Language Deep Clean — UX-Lesbarkeit des gesamten UI~~ ✓ (behoben)
 
-**Gewünschtes Verhalten:**
-- Spaltenspezifische Schwellen, kalibriert auf den realen Wertebereich jeder Metrik
-- P(0) und Varianz: Farblogik umkehren (kleiner = besser)
-- Eine einzige `MetricColorScheme`-Klasse (oder enum) hält alle Schwellen; sowohl `NumericCellRenderer` als auch die Label-Färbung in `populateCenter` nutzen dieselbe Quelle — keine Dopplungen
-
-Typische Wertebereiche (via Simulation zu kalibrieren):
-
-| Metrik | Kleiner Wert | Großer Wert | Richtung |
-|--------|-------------|-------------|---------|
-| EV/round | ~0.1 (Weizenfeld solo) | ~1.5 (Bergwerk mit vielen Spielern) | höher = besser |
-| ROI | negativ | ~5.0+ | höher = besser |
-| P(0) | 0.0 | 1.0 | **niedriger = besser** |
-| Varianz | 0.0 | ~5.0 | **niedriger = besser** |
-| Win Prob Δ | −0.1 | +0.3 | höher = besser |
-
----
-
-### C2 · Language Deep Clean — UX-Lesbarkeit des gesamten UI (Medium)
-
-Alle UI-Strings in `Strings.java` auf Verständlichkeit und Konsistenz prüfen:
-- Sind Labels klar und knapp? (kein "Alle erschwinglichen Karten", kein überlanger Tooltip-Text)
-- Ist die Sprache in DE und EN konsistent im Ton?
-- Redundante oder unnatürlich klingende Formulierungen identifizieren und korrigieren
-
----
-
-### C3 · Codeduplizierungen und Dead Code entfernen (Low)
-
-Gezielt auf redundante Muster prüfen:
-- Doppelte Logik zwischen `NumericCellRenderer` und `populateCenter` (→ C1)
-- `DICE.png` ist als statisches Feld in `MainWindow` deklariert, aber seit der Würfel-UI-Überarbeitung nie geladen — prüfen ob noch referenziert, sonst entfernen
-- Sonstige ungenutzte Methoden oder Felder im gesamten Projekt durchsuchen und entfernen (oder mit mir absprechen, wenn eine Methode ein potenziell nützliches Feature hat)
+### C3 · ~~Codeduplizierungen und Dead Code entfernen~~ ✓ (behoben)
 
 ---
 

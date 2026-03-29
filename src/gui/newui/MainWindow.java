@@ -964,13 +964,14 @@ public class MainWindow extends JFrame {
             tableModel.addRow(row);
         }
 
-        // Re-apply renderers and widths
+        // Re-apply renderers and widths — col 1 (cost) neutral, cols 2..N metric-aware
         rankTable.getColumnModel().getColumn(0).setCellRenderer(new CardNameRenderer());
         rankTable.getColumnModel().getColumn(0).setPreferredWidth(120);
-
-        NumericCellRenderer numRenderer = new NumericCellRenderer();
-        for (int c = 1; c < cols.length; c++) {
-            rankTable.getColumnModel().getColumn(c).setCellRenderer(numRenderer);
+        rankTable.getColumnModel().getColumn(1).setCellRenderer(new NumericCellRenderer(MetricColorScheme.COST));
+        rankTable.getColumnModel().getColumn(1).setPreferredWidth(52);
+        for (int c = 2; c < cols.length; c++) {
+            MetricColorScheme scheme = MetricColorScheme.TABLE_ORDER[c - 2];
+            rankTable.getColumnModel().getColumn(c).setCellRenderer(new NumericCellRenderer(scheme));
             rankTable.getColumnModel().getColumn(c).setPreferredWidth(52);
         }
 
@@ -1012,15 +1013,25 @@ public class MainWindow extends JFrame {
         String desc = p.getLocalizedDescription();
         topCardDesc.setText("<html><i>" + (desc != null && !desc.isEmpty() ? desc : "—") + "</i></html>");
 
-        topCardEV.setText(fmt2(entry.evPerRound));
-        topCardROI.setText(fmt2(entry.roiOverHorizon));
-        topCardRisk.setText(fmt2(entry.probNoIncomeOwnTurn));
-        topCardVar.setText(fmt2(entry.variance));
-        topCardWinProb.setText(fmt2(entry.winProbDelta));
+        applyMetricColor(topCardEV,    MetricColorScheme.EV,            entry.evPerRound);
+        applyMetricColor(topCardROI,   MetricColorScheme.ROI,           entry.roiOverHorizon);
+        applyMetricColor(topCardRisk,  MetricColorScheme.P0,            entry.probNoIncomeOwnTurn);
+        applyMetricColor(topCardVar,   MetricColorScheme.VARIANCE,      entry.variance);
+        applyMetricColor(topCardWinProb, MetricColorScheme.WIN_PROB_DELTA, entry.winProbDelta);
         topCardNote.setText("<html><i>" + buildNote(entry) + "</i></html>");
         topCardColorBar.setBackground(colorForCard(p));
         // Always re-apply visibility to keep it in sync with the global toggle
         setWinProbRowVisible(showWinProb);
+    }
+
+    /** Sets the text and background/foreground tint of a metric label using the given scheme. */
+    private static void applyMetricColor(JLabel label, MetricColorScheme scheme, double value) {
+        label.setText(fmt2(value));
+        Color bg = scheme.backgroundFor(value);
+        Color fg = scheme.foregroundFor(value);
+        label.setOpaque(bg != null);
+        label.setBackground(bg != null ? bg : label.getParent() != null ? label.getParent().getBackground() : Color.WHITE);
+        label.setForeground(fg != null ? fg : Color.BLACK);
     }
 
     private void clearCenter(String message) {
@@ -1263,11 +1274,16 @@ public class MainWindow extends JFrame {
     // =========================================================================
 
     /**
-     * Renders numeric table cells with 2-decimal formatting and color-coding:
-     * positive values use a green tint, negative values use a red tint.
+     * Renders numeric table cells with 2-decimal formatting and metric-aware colour coding.
+     * Each instance is bound to a {@link MetricColorScheme} so P(0) and Variance are
+     * coloured with inverted logic (lower = better), while EV, ROI and Win Δ use normal
+     * (higher = better) logic.
      */
     private static class NumericCellRenderer extends DefaultTableCellRenderer {
-        NumericCellRenderer() {
+        private final MetricColorScheme scheme;
+
+        NumericCellRenderer(MetricColorScheme scheme) {
+            this.scheme = scheme;
             setHorizontalAlignment(SwingConstants.RIGHT);
         }
 
@@ -1282,18 +1298,17 @@ public class MainWindow extends JFrame {
             if (!isSelected && value instanceof String s) {
                 try {
                     double d = Double.parseDouble(s);
-                    if (d > 0.5) {
-                        setBackground(new Color(0xDDFFDD));
-                    } else if (d < -0.5) {
-                        setBackground(new Color(0xFFDDDD));
-                    } else {
-                        setBackground(table.getBackground());
-                    }
+                    Color bg = scheme.backgroundFor(d);
+                    Color fg = scheme.foregroundFor(d);
+                    setBackground(bg != null ? bg : table.getBackground());
+                    setForeground(fg != null ? fg : table.getForeground());
                 } catch (NumberFormatException ignored) {
                     setBackground(table.getBackground());
+                    setForeground(table.getForeground());
                 }
             } else if (isSelected) {
                 setBackground(table.getSelectionBackground());
+                setForeground(table.getSelectionForeground());
             }
             return this;
         }

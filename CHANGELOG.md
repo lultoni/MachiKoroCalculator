@@ -4,6 +4,35 @@ All phases of the original implementation plan are complete. This file records w
 
 ---
 
+## DE/EN localisation
+
+Full German/English localisation of the Machi Koro calculator.
+
+### Strings.java
+
+New `gui.newui.Strings` class: central string registry with a `Locale` enum (`DE`/`EN`), a `static setLocale()` method, and static accessor methods for every user-visible string. Private `s(de, en)` helper dispatches on the current locale.
+
+### projects.json + Project
+
+All 19 cards in `projects.json` gained `name_en` and `description_en` fields with official English Machi Koro names (Wheat Field, Bakery, Ranch, Forest, Mine, Apple Orchard, Café, Family Restaurant, Convenience Store, Farmers Market, Cheese Factory, Furniture Factory, Business Center, Stadium, TV Station, Train Station, Shopping Mall, Amusement Park, Radio Tower). `Project` constructor extended to 9 args; `getLocalizedName()` and `getLocalizedDescription()` return locale-appropriate values. `ProjectLoader` switched from Gson auto-mapping to manual field extraction.
+
+### All GUI files wired to Strings
+
+Every user-visible string in `SetupWindow`, `MainWindow`, `SnapshotDialog`, and `TurnEntryPanel` now routes through `Strings.*`. `Project.getLocalizedName()` / `.getLocalizedDescription()` used wherever a card name or description is displayed.
+
+### Language switchers
+
+- **SetupWindow** — DE/EN radio buttons at the top of the form; switching rebuilds the form in-place via `rebuildUI()`, preserving spinner value and name-field text.
+- **MainWindow** — `JMenuBar` with a "Language" / "Sprache" menu containing `JRadioButtonMenuItem`s for Deutsch/English; switching calls `Strings.setLocale()` and rebuilds the entire window content in-place via `buildUI()` + `refreshAll()`.
+
+### projectIdFromLabel fix
+
+Previously `projectIdFromLabel` lowercased the localized card name to recover the project ID — correct in DE but wrong in EN ("Wheat Field".toLowerCase() ≠ "weizenfeld"). Replaced by `projectFromLabel`, a reverse lookup that iterates all projects comparing `getLocalizedName()`. `CardNameRenderer` in the ranking table uses the same approach. The fallback (toLowerCase) is kept only for unexpected edge-case labels.
+
+**Tests:** 228 passed, 0 failed.
+
+---
+
 ## Dice UI overhaul: programmatic dice faces, selector strips, redesigned history
 
 **Goal:** Replace all uses of the broken `DICE.png` icon with programmatically-drawn dice faces, introduce a clickable die-strip roll input, redesign the turn history to embed rendered dice, and improve metric discoverability in the Card Details panel.

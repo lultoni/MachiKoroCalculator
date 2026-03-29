@@ -5,14 +5,11 @@ import logic.probability.*;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
-import java.awt.event.WindowAdapter;
-import java.awt.event.WindowEvent;
-import java.util.ArrayList;
 
 /**
  * New-game setup window.
  *
- * <p>Lets the user choose player count (2–4) and enter player names,
+ * <p>Lets the user choose the language (DE/EN), player count (2–4) and player names,
  * then launches {@link MainWindow}.
  */
 public class SetupWindow extends JFrame {
@@ -26,7 +23,6 @@ public class SetupWindow extends JFrame {
 
     /** Constructs and displays the setup window on the EDT. */
     public SetupWindow() {
-        setTitle("Machi Koro Calculator — New Game");
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setResizable(false);
         buildUI();
@@ -36,23 +32,44 @@ public class SetupWindow extends JFrame {
     }
 
     private void buildUI() {
+        setTitle(Strings.setupWindowTitle());
+
         JPanel root = new JPanel(new BorderLayout(10, 10));
         root.setBorder(BorderFactory.createEmptyBorder(20, 30, 20, 30));
 
         // Title
-        JLabel title = new JLabel("Machi Koro Calculator");
+        JLabel title = new JLabel(Strings.setupHeading());
         title.setFont(TITLE_FONT);
         title.setHorizontalAlignment(SwingConstants.CENTER);
         root.add(title, BorderLayout.NORTH);
 
-        // Center: player count + name fields
+        // Center: language toggle + player count + name fields
         JPanel center = new JPanel();
         center.setLayout(new BoxLayout(center, BoxLayout.Y_AXIS));
 
+        // Language toggle row
+        JPanel langRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 4));
+        ButtonGroup langGroup = new ButtonGroup();
+        JRadioButton deBtn = new JRadioButton("Deutsch");
+        JRadioButton enBtn = new JRadioButton("English");
+        deBtn.setFont(LABEL_FONT);
+        enBtn.setFont(LABEL_FONT);
+        langGroup.add(deBtn);
+        langGroup.add(enBtn);
+        deBtn.setSelected(Strings.isDE());
+        enBtn.setSelected(!Strings.isDE());
+        deBtn.addActionListener(e -> { Strings.setLocale(Strings.Locale.DE); rebuildUI(); });
+        enBtn.addActionListener(e -> { Strings.setLocale(Strings.Locale.EN); rebuildUI(); });
+        langRow.add(deBtn);
+        langRow.add(enBtn);
+        center.add(langRow);
+        center.add(Box.createVerticalStrut(6));
+
         // Player count row
         JPanel countRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 5));
-        countRow.add(labelOf("Number of players:"));
-        SpinnerNumberModel snm = new SpinnerNumberModel(2, 2, 4, 1);
+        countRow.add(labelOf(Strings.setupNumPlayers()));
+        SpinnerNumberModel snm = new SpinnerNumberModel(
+                playerCountSpinner != null ? (int) playerCountSpinner.getValue() : 2, 2, 4, 1);
         playerCountSpinner = new JSpinner(snm);
         playerCountSpinner.setPreferredSize(new Dimension(55, 28));
         playerCountSpinner.addChangeListener(e -> refreshNameFields());
@@ -65,9 +82,11 @@ public class SetupWindow extends JFrame {
         nameFieldPanel.setLayout(new BoxLayout(nameFieldPanel, BoxLayout.Y_AXIS));
         for (int i = 0; i < 4; i++) {
             JPanel row = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 4));
-            row.add(labelOf("Player " + (i + 1) + " name:"));
-            nameFields[i] = new JTextField(18);
-            nameFields[i].setText("Player " + (i + 1));
+            row.add(labelOf(Strings.setupPlayerName(i + 1)));
+            if (nameFields[i] == null) {
+                nameFields[i] = new JTextField(18);
+                nameFields[i].setText(Strings.setupDefaultName(i + 1));
+            }
             row.add(nameFields[i]);
             nameFieldPanel.add(row);
         }
@@ -76,7 +95,7 @@ public class SetupWindow extends JFrame {
         root.add(center, BorderLayout.CENTER);
 
         // Start button
-        JButton startBtn = new JButton("Start Game");
+        JButton startBtn = new JButton(Strings.setupStartBtn());
         startBtn.setFont(new Font("Arial", Font.BOLD, 14));
         startBtn.addActionListener(this::onStart);
         JPanel btnRow = new JPanel(new FlowLayout(FlowLayout.CENTER));
@@ -85,6 +104,13 @@ public class SetupWindow extends JFrame {
 
         setContentPane(root);
         refreshNameFields();
+    }
+
+    /** Rebuilds the UI after a locale change (keeps spinner value and name field contents). */
+    private void rebuildUI() {
+        buildUI();
+        revalidate();
+        pack();
     }
 
     private void refreshNameFields() {
@@ -100,9 +126,8 @@ public class SetupWindow extends JFrame {
         String[] names = new String[count];
         for (int i = 0; i < count; i++) {
             String name = nameFields[i].getText().trim();
-            names[i] = name.isEmpty() ? "Player " + (i + 1) : name;
+            names[i] = name.isEmpty() ? Strings.setupDefaultName(i + 1) : name;
         }
-        // Build initial GameSession
         GameStateBuilder builder = new GameStateBuilder(count);
         for (int i = 0; i < count; i++) {
             builder.setPlayerName(i, names[i])
@@ -111,7 +136,6 @@ public class SetupWindow extends JFrame {
                    .addProject(i, "bäckerei");
         }
         GameSession session = new GameSession(builder.build(), names);
-
         dispose();
         new MainWindow(session).setVisible(true);
     }

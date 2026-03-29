@@ -142,4 +142,4 @@ Done. Custom `JTableHeader.getToolTipText(MouseEvent)` override provides per-col
 - [ ] Simulated players use the same greedy policy. Simulating different archetypes would produce more realistic win rates.
 
 ### Localisation
-- [ ] Add a language switcher (DE/EN) in the setup screen. All displayed strings should be centralised in a `Strings` class with a static locale selection. Low priority.
+- [x] Add a language switcher (DE/EN) in the setup screen. All displayed strings should be centralised in a `Strings` class with a static locale selection. Low priority.

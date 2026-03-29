@@ -5,7 +5,9 @@
     "cost": 4,
     "dice_activation": [],
     "color": "gelb",
-    "description": "Du kannst bei deinem Zug entscheiden, ob du 1 oder 2 Würfel wirfst."
+    "description": "Du kannst bei deinem Zug entscheiden, ob du 1 oder 2 Würfel wirfst.",
+    "name_en": "Train Station",
+    "description_en": "On your turn, you may choose to roll 1 or 2 dice."
   },
   "einkaufszentrum": {
     "category": "office",
@@ -13,7 +15,9 @@
     "cost": 10,
     "dice_activation": [],
     "color": "gelb",
-    "description": "Deine Café- und Geschäftsgebäude erhalten je +1 Münze Bonus."
+    "description": "Deine Café- und Geschäftsgebäude erhalten je +1 Münze Bonus.",
+    "name_en": "Shopping Mall",
+    "description_en": "Your Café and Store establishments each earn +1 extra coin."
   },
   "freizeitpark": {
     "category": "office",
@@ -21,7 +25,9 @@
     "cost": 16,
     "dice_activation": [],
     "color": "gelb",
-    "description": "Wenn du einen Pasch würfelst, darfst du nochmal würfeln. Kein weiterer Bonus bei erneutem Pasch."
+    "description": "Wenn du einen Pasch würfelst, darfst du nochmal würfeln. Kein weiterer Bonus bei erneutem Pasch.",
+    "name_en": "Amusement Park",
+    "description_en": "If you roll doubles, take another turn. No extra turn if you roll doubles again."
   },
   "funkturm": {
     "category": "office",
@@ -29,7 +35,9 @@
     "cost": 22,
     "dice_activation": [],
     "color": "gelb",
-    "description": "Einmal pro Zug darfst du deinen Wurf wiederholen. Du musst die gleiche Würfelanzahl verwenden."
+    "description": "Einmal pro Zug darfst du deinen Wurf wiederholen. Du musst die gleiche Würfelanzahl verwenden.",
+    "name_en": "Radio Tower",
+    "description_en": "Once per turn, you may reroll the dice. You must use the same number of dice."
   },
   "weizenfeld": {
     "category": "food",
@@ -37,7 +45,9 @@
     "cost": 1,
     "dice_activation": [1],
     "color": "blau",
-    "description": "Erhalte 1 Münze von der Bank. (Jeder Spieler, bei jedem Zug)"
+    "description": "Erhalte 1 Münze von der Bank. (Jeder Spieler, bei jedem Zug)",
+    "name_en": "Wheat Field",
+    "description_en": "Get 1 coin from the bank. (Everyone, on anyone's turn)"
   },
   "bäckerei": {
     "category": "store",
@@ -45,7 +55,9 @@
     "cost": 1,
     "dice_activation": [2, 3],
     "color": "grün",
-    "description": "Erhalte 1 Münze von der Bank. Mit Einkaufszentrum: 2 Münzen. (Nur in deinem Zug)"
+    "description": "Erhalte 1 Münze von der Bank. Mit Einkaufszentrum: 2 Münzen. (Nur in deinem Zug)",
+    "name_en": "Bakery",
+    "description_en": "Get 1 coin from the bank. Shopping Mall: 2 coins. (Your turn only)"
   },
   "apfelplantage": {
     "category": "food",
@@ -53,7 +65,9 @@
     "cost": 3,
     "dice_activation": [10],
     "color": "blau",
-    "description": "Erhalte 3 Münzen von der Bank. (Jeder Spieler, bei jedem Zug)"
+    "description": "Erhalte 3 Münzen von der Bank. (Jeder Spieler, bei jedem Zug)",
+    "name_en": "Apple Orchard",
+    "description_en": "Get 3 coins from the bank. (Everyone, on anyone's turn)"
   },
   "bauernhof": {
     "category": "animal",
@@ -61,7 +75,9 @@
     "cost": 1,
     "dice_activation": [2],
     "color": "blau",
-    "description": "Erhalte 1 Münze von der Bank. (Jeder Spieler, bei jedem Zug)"
+    "description": "Erhalte 1 Münze von der Bank. (Jeder Spieler, bei jedem Zug)",
+    "name_en": "Ranch",
+    "description_en": "Get 1 coin from the bank. (Everyone, on anyone's turn)"
   },
   "wald": {
     "category": "production",
@@ -69,7 +85,9 @@
     "cost": 3,
     "dice_activation": [5],
     "color": "blau",
-    "description": "Erhalte 1 Münze von der Bank. (Jeder Spieler, bei jedem Zug)"
+    "description": "Erhalte 1 Münze von der Bank. (Jeder Spieler, bei jedem Zug)",
+    "name_en": "Forest",
+    "description_en": "Get 1 coin from the bank. (Everyone, on anyone's turn)"
   },
   "bergwerk": {
     "category": "production",
@@ -77,7 +95,9 @@
     "cost": 6,
     "dice_activation": [9],
     "color": "blau",
-    "description": "Erhalte 5 Münzen von der Bank. (Jeder Spieler, bei jedem Zug)"
+    "description": "Erhalte 5 Münzen von der Bank. (Jeder Spieler, bei jedem Zug)",
+    "name_en": "Mine",
+    "description_en": "Get 5 coins from the bank. (Everyone, on anyone's turn)"
   },
   "markthalle": {
     "category": "market",
@@ -85,7 +105,9 @@
     "cost": 2,
     "dice_activation": [11, 12],
     "color": "grün",
-    "description": "Erhalte 2 Münzen von der Bank für jedes Lebensmittelgebäude, das du besitzt. (Nur in deinem Zug)"
+    "description": "Erhalte 2 Münzen von der Bank für jedes Lebensmittelgebäude, das du besitzt. (Nur in deinem Zug)",
+    "name_en": "Farmers Market",
+    "description_en": "Get 2 coins from the bank for each food establishment you own. (Your turn only)"
   },
   "molkerei": {
     "category": "factory",
@@ -93,7 +115,9 @@
     "cost": 5,
     "dice_activation": [7],
     "color": "grün",
-    "description": "Erhalte 3 Münzen von der Bank für jedes Tier-Gebäude, das du besitzt. (Nur in deinem Zug)"
+    "description": "Erhalte 3 Münzen von der Bank für jedes Tier-Gebäude, das du besitzt. (Nur in deinem Zug)",
+    "name_en": "Cheese Factory",
+    "description_en": "Get 3 coins from the bank for each animal establishment you own. (Your turn only)"
   },
   "möbelfabrik": {
     "category": "factory",
@@ -101,7 +125,9 @@
     "cost": 3,
     "dice_activation": [8],
     "color": "grün",
-    "description": "Erhalte 3 Münzen von der Bank für jedes Rohstoff-Gebäude, das du besitzt. (Nur in deinem Zug)"
+    "description": "Erhalte 3 Münzen von der Bank für jedes Rohstoff-Gebäude, das du besitzt. (Nur in deinem Zug)",
+    "name_en": "Furniture Factory",
+    "description_en": "Get 3 coins from the bank for each production establishment you own. (Your turn only)"
   },
   "mini-markt": {
     "category": "store",
@@ -109,7 +135,9 @@
     "cost": 2,
     "dice_activation": [4],
     "color": "grün",
-    "description": "Erhalte 3 Münzen von der Bank. Mit Einkaufszentrum: 4 Münzen. (Nur in deinem Zug)"
+    "description": "Erhalte 3 Münzen von der Bank. Mit Einkaufszentrum: 4 Münzen. (Nur in deinem Zug)",
+    "name_en": "Convenience Store",
+    "description_en": "Get 3 coins from the bank. Shopping Mall: 4 coins. (Your turn only)"
   },
   "familienrestaurant": {
     "category": "cafe",
@@ -117,7 +145,9 @@
     "cost": 3,
     "dice_activation": [9, 10],
     "color": "rot",
-    "description": "Erhalte 2 Münzen vom aktiven Spieler. Mit Einkaufszentrum (des Besitzers): 3 Münzen. (Nur in fremden Zügen)"
+    "description": "Erhalte 2 Münzen vom aktiven Spieler. Mit Einkaufszentrum (des Besitzers): 3 Münzen. (Nur in fremden Zügen)",
+    "name_en": "Family Restaurant",
+    "description_en": "Take 2 coins from the active player. Owner's Shopping Mall: 3 coins. (Opponent's turns only)"
   },
   "café": {
     "category": "cafe",
@@ -125,7 +155,9 @@
     "cost": 2,
     "dice_activation": [3],
     "color": "rot",
-    "description": "Erhalte 1 Münze vom aktiven Spieler. Mit Einkaufszentrum (des Besitzers): 2 Münzen. (Nur in fremden Zügen)"
+    "description": "Erhalte 1 Münze vom aktiven Spieler. Mit Einkaufszentrum (des Besitzers): 2 Münzen. (Nur in fremden Zügen)",
+    "name_en": "Café",
+    "description_en": "Take 1 coin from the active player. Owner's Shopping Mall: 2 coins. (Opponent's turns only)"
   },
   "bürohaus": {
     "category": "office",
@@ -133,7 +165,9 @@
     "cost": 8,
     "dice_activation": [6],
     "color": "lila",
-    "description": "Tausche ein beliebiges Nicht-Großprojekt-Gebäude mit einem Mitspieler. (Nur in deinem Zug)"
+    "description": "Tausche ein beliebiges Nicht-Großprojekt-Gebäude mit einem Mitspieler. (Nur in deinem Zug)",
+    "name_en": "Business Center",
+    "description_en": "Trade any non-landmark establishment with another player. (Your turn only)"
   },
   "stadion": {
     "category": "office",
@@ -141,7 +175,9 @@
     "cost": 6,
     "dice_activation": [6],
     "color": "lila",
-    "description": "Erhalte 2 Münzen von jedem Mitspieler (falls vorhanden). (Nur in deinem Zug)"
+    "description": "Erhalte 2 Münzen von jedem Mitspieler (falls vorhanden). (Nur in deinem Zug)",
+    "name_en": "Stadium",
+    "description_en": "Take 2 coins from each player (if available). (Your turn only)"
   },
   "fernsehsender": {
     "category": "office",
@@ -149,6 +185,8 @@
     "cost": 7,
     "dice_activation": [6],
     "color": "lila",
-    "description": "Erhalte 5 Münzen von einem Mitspieler deiner Wahl. (Nur in deinem Zug)"
+    "description": "Erhalte 5 Münzen von einem Mitspieler deiner Wahl. (Nur in deinem Zug)",
+    "name_en": "TV Station",
+    "description_en": "Take 5 coins from a player of your choice. (Your turn only)"
   }
 }

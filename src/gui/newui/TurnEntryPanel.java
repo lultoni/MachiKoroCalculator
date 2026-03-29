@@ -1,7 +1,6 @@
 package gui.newui;
 
 import logic.probability.TurnRecord;
-import gui.newui.UIUtils;
 
 import javax.swing.*;
 import java.awt.*;
@@ -37,7 +36,7 @@ public class TurnEntryPanel extends JPanel {
         nameLabel.setForeground(pColor);
         row1.add(nameLabel);
 
-        JLabel rolledLabel = new JLabel("rolled");
+        JLabel rolledLabel = new JLabel(Strings.historyRolled());
         rolledLabel.setFont(new Font("Arial", Font.PLAIN, 11));
         row1.add(rolledLabel);
 
@@ -45,7 +44,7 @@ public class TurnEntryPanel extends JPanel {
         addDiceFaces(row1, t.roll);
 
         if (t.isDoubles) {
-            JLabel doublesLabel = new JLabel(" DOUBLES!");
+            JLabel doublesLabel = new JLabel(Strings.historyDoubles());
             doublesLabel.setFont(new Font("Arial", Font.BOLD, 11));
             doublesLabel.setForeground(new Color(0x7030A0));
             row1.add(doublesLabel);
@@ -73,12 +72,10 @@ public class TurnEntryPanel extends JPanel {
 
         // ── Row 3: purchase (if any) ──────────────────────────────────────────────
         if (t.bought != null) {
-            String gpMark = t.bought.isIs_grossprojekt() ? " [GP]" : "";
             JPanel row3 = new JPanel(new FlowLayout(FlowLayout.LEFT, 3, 0));
             row3.setOpaque(false);
-            JLabel buyLabel = new JLabel("→ bought "
-                    + UIUtils.capitalize(t.bought.getId()) + gpMark
-                    + " (−" + t.bought.getCost() + "¢)");
+            JLabel buyLabel = new JLabel(Strings.historyBought(
+                    t.bought.getLocalizedName(), t.bought.isIs_grossprojekt(), t.bought.getCost()));
             buyLabel.setFont(new Font("Arial", Font.PLAIN, 10));
             buyLabel.setForeground(new Color(0x444444));
             row3.add(buyLabel);

@@ -48,7 +48,7 @@ public class SnapshotDialog extends JDialog {
      * @param session the current game session whose state is pre-loaded into the form
      */
     public SnapshotDialog(MainWindow parent, GameSession session) {
-        super(parent, "Edit Snapshot", true);
+        super(parent, Strings.snapshotDialogTitle(), true);
         this.parent = parent;
         this.session = session;
         this.numPlayers = session.getState().getPlayers().length;
@@ -78,15 +78,15 @@ public class SnapshotDialog extends JDialog {
 
         // Buttons
         JPanel btnRow = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
-        JButton applyBtn = new JButton("Apply Snapshot");
+        JButton applyBtn = new JButton(Strings.snapshotApplyBtn());
         applyBtn.addActionListener(this::onApply);
-        JButton cancelBtn = new JButton("Cancel");
+        JButton cancelBtn = new JButton(Strings.snapshotCancelBtn());
         cancelBtn.addActionListener(e -> dispose());
         btnRow.add(cancelBtn);
         btnRow.add(applyBtn);
         add(btnRow, BorderLayout.SOUTH);
 
-        JLabel hint = new JLabel("<html><small>Changes take effect from this point. Turn history resets to empty.</small></html>");
+        JLabel hint = new JLabel(Strings.snapshotHint());
         hint.setBorder(BorderFactory.createEmptyBorder(4, 0, 4, 0));
         add(hint, BorderLayout.NORTH);
     }
@@ -98,7 +98,7 @@ public class SnapshotDialog extends JDialog {
 
         // Coin spinner
         JPanel coinRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 4));
-        coinRow.add(label("Coins:"));
+        coinRow.add(label(Strings.snapshotCoins()));
         JSpinner spinner = new JSpinner(new SpinnerNumberModel(3, 0, 200, 1));
         spinner.setPreferredSize(new Dimension(70, 28));
         coinSpinners[playerIndex] = spinner;
@@ -106,7 +106,7 @@ public class SnapshotDialog extends JDialog {
         panel.add(coinRow);
 
         panel.add(Box.createVerticalStrut(6));
-        panel.add(label("Owned cards:"));
+        panel.add(label(Strings.snapshotOwnedCards()));
         panel.add(Box.createVerticalStrut(4));
 
         cardControls[playerIndex] = new Component[allProjects.size()];
@@ -123,7 +123,7 @@ public class SnapshotDialog extends JDialog {
                 Project p = allProjects.get(j);
                 if (!p.getColor().equals(color)) continue;
 
-                String cardLabel = UIUtils.capitalize(p.getId()) + " (" + p.getCost() + ")";
+                String cardLabel = p.getLocalizedName() + " (" + p.getCost() + ")";
                 if (isMultiCopy) {
                     // Starter cards (weizenfeld, bäckerei) may be owned up to 7 times:
                     // 1 starting copy + 6 from the shared market supply. All other
@@ -215,8 +215,8 @@ public class SnapshotDialog extends JDialog {
             }
         } catch (IllegalArgumentException ex) {
             JOptionPane.showMessageDialog(this,
-                    "Invalid game state: " + ex.getMessage(),
-                    "Snapshot Error", JOptionPane.ERROR_MESSAGE);
+                    Strings.snapshotError(ex.getMessage()),
+                    Strings.snapshotErrorTitle(), JOptionPane.ERROR_MESSAGE);
             return;
         }
 
@@ -235,11 +235,11 @@ public class SnapshotDialog extends JDialog {
 
     private static String colorLabel(String color) {
         return switch (color) {
-            case "blau" -> "Blau — all turns (spinner = copies owned)";
-            case "rot"  -> "Rot — opponent turns (spinner = copies owned)";
-            case "grün" -> "Grün — own turn (spinner = copies owned)";
-            case "lila" -> "Lila — own turn, unique (tick = owned)";
-            case "gelb" -> "Gelb — Großprojekte (tick = built)";
+            case "blau" -> Strings.snapshotColorBlau();
+            case "rot"  -> Strings.snapshotColorRot();
+            case "grün" -> Strings.snapshotColorGrün();
+            case "lila" -> Strings.snapshotColorLila();
+            case "gelb" -> Strings.snapshotColorGelb();
             default     -> color;
         };
     }

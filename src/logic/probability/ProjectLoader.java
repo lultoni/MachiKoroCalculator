@@ -1,6 +1,7 @@
 package logic.probability;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
@@ -51,9 +52,21 @@ public class ProjectLoader {
                 String id = entry.getKey();
                 JsonObject obj = entry.getValue().getAsJsonObject();
 
-                // Inject the id field (it is the JSON key, not a field inside the object).
-                obj.addProperty("id", id);
-                Project project = gson.fromJson(obj, Project.class);
+                String category       = obj.get("category").getAsString();
+                boolean isGP          = obj.get("is_grossprojekt").getAsBoolean();
+                int cost              = obj.get("cost").getAsInt();
+                String color          = obj.get("color").getAsString();
+                String description    = obj.get("description").getAsString();
+                String nameEn         = obj.has("name_en")        ? obj.get("name_en").getAsString()        : null;
+                String descriptionEn  = obj.has("description_en") ? obj.get("description_en").getAsString() : null;
+
+                int[] diceActivation;
+                com.google.gson.JsonArray da = obj.getAsJsonArray("dice_activation");
+                diceActivation = new int[da.size()];
+                for (int i = 0; i < da.size(); i++) diceActivation[i] = da.get(i).getAsInt();
+
+                Project project = new Project(id, category, isGP, cost, diceActivation,
+                                              color, description, nameEn, descriptionEn);
                 map.put(id, project);
             }
         } catch (IOException e) {

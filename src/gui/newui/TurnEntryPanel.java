@@ -29,8 +29,6 @@ public class TurnEntryPanel extends JPanel {
         setBackground(even ? Color.WHITE : new Color(0xF5F5F5));
         setOpaque(true);
         setBorder(BorderFactory.createEmptyBorder(3, 4, 3, 4));
-
-        // ── Row 1: player name + dice face(s) [+ DOUBLES badge] ──────────────────
         JPanel row1 = new JPanel(new FlowLayout(FlowLayout.LEFT, 3, 0));
         row1.setOpaque(false);
 
@@ -88,6 +86,15 @@ public class TurnEntryPanel extends JPanel {
             add(row3);
         }
         // No "→ saved" text when nothing was bought — silence is fine.
+    }
+
+    /**
+     * Caps the maximum height to the preferred height so BoxLayout does not stretch this
+     * panel vertically when the history scroll pane has more space than entries fill.
+     */
+    @Override
+    public Dimension getMaximumSize() {
+        return new Dimension(Integer.MAX_VALUE, getPreferredSize().height);
     }
 
     /**

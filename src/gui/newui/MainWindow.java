@@ -151,10 +151,10 @@ public class MainWindow extends JFrame {
         coinsLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
         controls.add(wrap(coinsLabel));
 
-        coinsAfterLabel = new JLabel();
+        coinsAfterLabel = new JLabel("→ 3 coins (±0)");
         coinsAfterLabel.setFont(new Font("Arial", Font.PLAIN, 11));
+        coinsAfterLabel.setForeground(new Color(0x888888));
         coinsAfterLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
-        coinsAfterLabel.setVisible(false);
         controls.add(wrap(coinsAfterLabel));
 
         controls.add(Box.createVerticalStrut(8));
@@ -400,7 +400,8 @@ public class MainWindow extends JFrame {
             JLabel abbr = new JLabel(entry[0] + ":");
             abbr.setFont(new Font("Arial", Font.BOLD, 10));
             abbr.setPreferredSize(new Dimension(62, 14));
-            JLabel desc = new JLabel(entry[1]);
+            // HTML wrapping ensures long descriptions don't get clipped in the narrow center panel
+            JLabel desc = new JLabel("<html><body style='width:170px'>" + entry[1] + "</body></html>");
             desc.setFont(new Font("Arial", Font.PLAIN, 10));
             desc.setForeground(new Color(0x444444));
             row.add(abbr);
@@ -1132,8 +1133,8 @@ public class MainWindow extends JFrame {
 
     /**
      * Updates the post-roll coins label below the main coin display.
-     * Shows "→ N coins (±delta)" in green/red when the roll changes the player's coin count;
-     * hides the label when the roll has no effect.
+     * Always visible to avoid layout shift; shows a neutral "±0" placeholder when the roll
+     * has no effect, and green/red delta when coins change.
      */
     private void updateCoinsAfterLabel(int preCoins, int postCoins) {
         int delta = postCoins - preCoins;
@@ -1141,10 +1142,11 @@ public class MainWindow extends JFrame {
             String sign = delta > 0 ? "+" : "";
             coinsAfterLabel.setText("→ " + postCoins + " coins (" + sign + delta + ")");
             coinsAfterLabel.setForeground(delta > 0 ? new Color(0x007700) : new Color(0xAA0000));
-            coinsAfterLabel.setVisible(true);
         } else {
-            coinsAfterLabel.setVisible(false);
+            coinsAfterLabel.setText("→ " + postCoins + " coins (±0)");
+            coinsAfterLabel.setForeground(new Color(0x888888));
         }
+        coinsAfterLabel.setVisible(true);
     }
 
     /**

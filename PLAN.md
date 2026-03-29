@@ -79,6 +79,12 @@ Done. `TurnRecord` stores `int[] coinDeltas` (computed by `applyTurn`). History 
 #### [x] Left panel resize — history should get free space, not labels
 Done. `buildLeftPanel` now uses `BorderLayout`; the controls sub-panel is in `NORTH` (fixed) and the history `JScrollPane` is in `CENTER` (fills all remaining vertical space).
 
+#### [x] History entries overly tall when few turns played
+Done. `TurnEntryPanel.getMaximumSize()` returns `(MAX_WIDTH, preferredHeight)` so `BoxLayout` cannot stretch entries vertically.
+
+#### [x] Coins-after label causes layout shift in the dice strip area
+Done. `coinsAfterLabel` is now always visible. When the roll has no effect it shows "→ N coins (±0)" in grey; when coins change it shows the delta in green/red as before. `updateCoinsAfterLabel` no longer calls `setVisible(false)`.
+
 ### Center panel — Card Details
 
 #### [x] Rename "Best Purchase" → "Card Details"

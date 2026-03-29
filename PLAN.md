@@ -35,18 +35,7 @@ d. `IconTextRenderer`: Custom-Renderer der Kategorienamen durch Icons ersetzt �
 
 ---
 
-### U3 · Trigger-Modus-Anzeige in Kartendetails (Low)
-
-Auf echten Machi-Koro-Karten steht, ob die Karte für alle oder nur den aktiven Spieler gilt:
-
-| Farbe | Symbol | Bedeutung |
-|-------|--------|-----------|
-| Blau | 3 Personen | Triggert immer — alle Spieler |
-| Grün | 1 Person | Nur eigener Zug |
-| Rot | 1 Person + Hinweis | Nur fremde Züge |
-| Lila | 1 Person | Nur eigener Zug, einmalig |
-
-Programmatisch als kleine Kreise/Ovale zeichnen; für Rot zusätzlich Hinweis "Wird in fremden Zügen ausgelöst."
+### U3 · ~~Trigger-Modus-Anzeige in Kartendetails~~ ✓ (behoben)
 
 ---
 

@@ -4,6 +4,21 @@ Implementierungsgeschichte: was gebaut wurde, warum, und welche Designentscheidu
 
 ---
 
+## U3: Trigger-Modus-Anzeige in Kartendetails
+
+`TriggerModePanel` — neues inneres `JPanel` in `MainWindow`, in die `nameRow` nach dem Farb-Tag eingefügt. Zeichnet programmatisch mit `Graphics2D`:
+- **Blau** — 3 blaue Kreise: Karte triggert bei jedem Spieler-Zug
+- **Grün** — 1 grüner Kreis: nur eigener Zug
+- **Rot** — 1 roter Kreis mit Diagonalstrich: nur Gegner-Züge
+- **Lila** — 1 lila Kreis + Diamant: eigener Zug, einmalig pro Runde
+- **Gelb** — kein Indikator (Großprojekte werden gebaut, nicht getriggert)
+
+`populateCenter` setzt `topCardTrigger.setCardColor(p.getColor())`; `clearCenter` setzt `null`.
+
+**Tests:** 224 bestanden, 0 fehlgeschlagen.
+
+---
+
 ## M5: "Warten/Sparen" als synthetischer RankEntry im "Alle"-Tab
 
 **Problem:** Das Ranking zeigte nie die Option, Münzen für eine bessere Karte zu sparen.

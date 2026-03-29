@@ -65,6 +65,7 @@ public class MainWindow extends JFrame {
     private JLabel topCardName;
     private JPanel topCardCostRow;  // cost + activation dice faces
     private JLabel topCardColorTag;
+    private TriggerModePanel topCardTrigger;
     private JLabel topCardDesc;
     private JLabel topCardEV;
     private JLabel topCardROI;
@@ -331,6 +332,8 @@ public class MainWindow extends JFrame {
         topCardColorTag.setOpaque(true);
         topCardColorTag.setBorder(BorderFactory.createEmptyBorder(1, 4, 1, 4));
         nameRow.add(topCardColorTag);
+        topCardTrigger = new TriggerModePanel();
+        nameRow.add(topCardTrigger);
         nameRow.setAlignmentX(Component.LEFT_ALIGNMENT);
         panel.add(nameRow);
 
@@ -1578,6 +1581,7 @@ public class MainWindow extends JFrame {
         topCardColorTag.setText(colorStr);
         topCardColorTag.setBackground(colorForCard(p.getColor(), false));
         topCardColorTag.setForeground(colorForCard(p.getColor(), true).darker());
+        topCardTrigger.setCardColor(p.getColor());
 
         topCardCostRow.removeAll();
         JLabel costLabel = new JLabel(Strings.costPrefix(p.getCost()));
@@ -1673,6 +1677,7 @@ public class MainWindow extends JFrame {
         topCardName.setText("—");
         topCardColorTag.setText("");
         topCardColorTag.setBackground(null);
+        topCardTrigger.setCardColor(null);
         topCardCostRow.removeAll();
         topCardDesc.setText("");
         topCardEV.setText("—");
@@ -2016,8 +2021,93 @@ public class MainWindow extends JFrame {
         int paren = clean.indexOf(" (");
         String localizedName = paren >= 0 ? clean.substring(0, paren) : clean;
         for (RankEntry e : ranking) {
+            if (e.isWaitEntry()) continue;
             if (e.project.getLocalizedName().equals(localizedName)) return e;
         }
         return null;
+    }
+
+    // -------------------------------------------------------------------------
+    // TriggerModePanel — draws small circles indicating when a card fires
+    // -------------------------------------------------------------------------
+
+    /**
+     * A small panel that draws filled circles representing the trigger mode of a card:
+     * <ul>
+     *   <li>Blau  — 3 circles: fires on every player's turn</li>
+     *   <li>Grün  — 1 circle:  fires on own turn only</li>
+     *   <li>Rot   — 1 circle:  fires on opponents' turns (drawn with a diagonal line inside)</li>
+     *   <li>Lila  — 1 circle + diamond: own turn, once per round</li>
+     *   <li>Gelb  — no indicator (landmarks are bought, not triggered)</li>
+     * </ul>
+     */
+    private static class TriggerModePanel extends javax.swing.JPanel {
+        private String color = "";
+
+        TriggerModePanel() {
+            setOpaque(false);
+            setPreferredSize(new java.awt.Dimension(56, 16));
+        }
+
+        void setCardColor(String cardColor) {
+            this.color = cardColor == null ? "" : cardColor;
+            repaint();
+        }
+
+        @Override
+        protected void paintComponent(java.awt.Graphics g) {
+            super.paintComponent(g);
+            java.awt.Graphics2D g2 = (java.awt.Graphics2D) g.create();
+            g2.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING,
+                    java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
+
+            int r = 5;      // circle radius
+            int d = r * 2;  // circle diameter
+            int gap = 3;    // gap between circles
+            int cy = getHeight() / 2;
+
+            java.awt.Color fill;
+            int count;
+            boolean withLine   = false; // red: diagonal line through circle
+            boolean withDiamond = false; // lila: small diamond after circle
+
+            switch (color) {
+                case "blau"  -> { fill = new java.awt.Color(0x5B9BD5); count = 3; }
+                case "grün"  -> { fill = new java.awt.Color(0x70A050); count = 1; }
+                case "rot"   -> { fill = new java.awt.Color(0xC84040); count = 1; withLine = true; }
+                case "lila"  -> { fill = new java.awt.Color(0x9060B0); count = 1; withDiamond = true; }
+                default      -> { g2.dispose(); return; }  // gelb / unknown: nothing
+            }
+
+            int x = 0;
+            for (int i = 0; i < count; i++) {
+                g2.setColor(fill);
+                g2.fillOval(x, cy - r, d, d);
+                g2.setColor(fill.darker());
+                g2.setStroke(new java.awt.BasicStroke(0.8f));
+                g2.drawOval(x, cy - r, d, d);
+
+                if (withLine) {
+                    g2.setColor(java.awt.Color.WHITE);
+                    g2.setStroke(new java.awt.BasicStroke(1.2f));
+                    g2.drawLine(x + 2, cy + r - 2, x + d - 2, cy - r + 2);
+                }
+                x += d + gap;
+            }
+
+            if (withDiamond) {
+                int dx = x + 1;
+                int ds = 4; // half-size
+                int[] xs = {dx + ds, dx + ds * 2, dx + ds, dx};
+                int[] ys = {cy - ds, cy, cy + ds, cy};
+                g2.setColor(fill);
+                g2.fillPolygon(xs, ys, 4);
+                g2.setColor(fill.darker());
+                g2.setStroke(new java.awt.BasicStroke(0.8f));
+                g2.drawPolygon(xs, ys, 4);
+            }
+
+            g2.dispose();
+        }
     }
 }

@@ -44,7 +44,6 @@ public class MainWindow extends JFrame {
     // ---- state ----
     private GameSession session;
     private final RankingOptions rankOpts = new RankingOptions();
-    private boolean showWinProb = true;
     private int mcSimCount = 1000;
 
     // ---- left panel components ----
@@ -77,6 +76,7 @@ public class MainWindow extends JFrame {
     /** Per-metric rank labels in the 3-column metrics grid: [EV, ROI, P0, VAR, WIN]. */
     private JLabel[] topCardMetricRank = new JLabel[5];
     private JLabel topCardNote;
+    private JLabel topCardRank;  // "#X / Y affordable · #Z / N total"
     private JPanel topCardColorBar;
     private JLabel baselineWinProbLabel;
 
@@ -436,6 +436,12 @@ public class MainWindow extends JFrame {
         topCardNote.setFont(new Font("Arial", Font.ITALIC, 12));
         topCardNote.setAlignmentX(Component.LEFT_ALIGNMENT);
         panel.add(wrap(topCardNote));
+
+        topCardRank = new JLabel("—");
+        topCardRank.setFont(new Font("Arial", Font.ITALIC, 10));
+        topCardRank.setForeground(new Color(0x555555));
+        topCardRank.setAlignmentX(Component.LEFT_ALIGNMENT);
+        panel.add(wrap(topCardRank));
 
         return panel;
     }
@@ -920,7 +926,7 @@ public class MainWindow extends JFrame {
                     }
                     statusLabel.setText(Strings.mcDone(rankOpts.mcSimulations));
                     confirmBtn.setEnabled(true);
-                    mcReloadBtn.setEnabled(deepAnalysisBtn.isSelected() && showWinProb);
+                    mcReloadBtn.setEnabled(deepAnalysisBtn.isSelected());
                     rebuildTable();
                     selectFirstAffordable();
                 }
@@ -1143,9 +1149,7 @@ public class MainWindow extends JFrame {
     }
 
     private void rebuildTable() {
-        String[] cols = showWinProb
-                ? new String[]{Strings.colCard(), Strings.colCost(), Strings.colEV(), Strings.colROI(), Strings.colP0(), Strings.colVar(), Strings.colWinDelta()}
-                : new String[]{Strings.colCard(), Strings.colCost(), Strings.colEV(), Strings.colROI(), Strings.colP0(), Strings.colVar()};
+        String[] cols = new String[]{Strings.colCard(), Strings.colCost(), Strings.colEV(), Strings.colROI(), Strings.colP0(), Strings.colVar(), Strings.colWinDelta()};
 
         // Update tab labels (language may have changed)
         rankTabs.setTitleAt(0, Strings.tabAffordable());
@@ -1986,14 +1990,10 @@ public class MainWindow extends JFrame {
                             ? e.project.getLocalizedName() + " " + Strings.gpTag()
                             : e.project.getLocalizedName());
             double cost = e.isWaitEntry() ? Double.NaN : (double) e.project.getCost();
-            Object[] row = showWinProb
-                    ? new Object[]{cardLabel, cost,
-                                   e.evPerRound, e.roiOverHorizon,
-                                   e.probNoIncomeRound, e.variance,
-                                   e.winProbDelta}
-                    : new Object[]{cardLabel, cost,
-                                   e.evPerRound, e.roiOverHorizon,
-                                   e.probNoIncomeRound, e.variance};
+            Object[] row = new Object[]{cardLabel, cost,
+                                       e.evPerRound, e.roiOverHorizon,
+                                       e.probNoIncomeRound, e.variance,
+                                       e.winProbDelta};
             model.addRow(row);
         }
 
@@ -2066,6 +2066,19 @@ public class MainWindow extends JFrame {
 
         topCardNote.setText("<html><i>" + buildNote(entry) + "</i></html>");
         topCardColorBar.setBackground(colorForCard(p));
+
+        // Rank context: "#X / Y affordable · #Z / N total"
+        int rankAffordable = 0, totalAffordable = 0, rankAll = 0, totalAll = 0;
+        for (RankEntry e : lastRanking) {
+            if (e.isWaitEntry()) continue;
+            totalAll++;
+            if (e.affordable) totalAffordable++;
+            if (e.project.getId().equals(p.getId())) {
+                rankAll = totalAll;
+                if (e.affordable) rankAffordable = totalAffordable;
+            }
+        }
+        topCardRank.setText(Strings.rankLabel(rankAffordable, totalAffordable, rankAll, totalAll));
 
         // Always re-apply visibility (win prob always shown)
         setWinProbRowVisible(true);
@@ -2175,6 +2188,7 @@ public class MainWindow extends JFrame {
         topCardWinProb.setText("—");
         for (JLabel r : topCardMetricRank) if (r != null) r.setText("—");
         topCardNote.setText("<html><i>" + message + "</i></html>");
+        topCardRank.setText("—");
         topCardColorBar.setBackground(Color.LIGHT_GRAY);
     }
 

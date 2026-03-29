@@ -1081,36 +1081,76 @@ public class MainWindow extends JFrame {
     // Game Assistant — phase context + helpers
     // =========================================================================
 
-    /** Snapshot of strategic context used for the Spiellage-Analyse profile. */
+    /**
+     * Rich strategic snapshot of the current game state from the active player's perspective.
+     * All continuous signals are in [0,1] unless noted. Used by {@link #addContextProfile}
+     * to interpolate weight arrays and generate contextual advice.
+     *
+     * <p><b>Phase signals</b> (sum to 1.0):
+     * {@code earlyStrength}, {@code midStrength}, {@code lateStrength}.
+     *
+     * <p><b>Position signals</b>:
+     * {@code catchUpStrength} (0=leading, 1=far behind) and
+     * {@code pullAheadStrength} (0=equal, 1=far ahead) reflect relative standing
+     * vs the strongest opponent. These modulate Aggro/GPRush vs ROI/Safe weights.
+     *
+     * <p><b>Economy signals</b>:
+     * {@code coinAdvantage} (positive = more coins than avg opp, negative = less) relative
+     * to avgOppEv, clamped to [-1,1]; {@code portfolioDiversity} (0=concentrated on one
+     * number, 1=perfectly spread); {@code evGapVsLeader} (own EV minus best-opp EV,
+     * negative = lagging economy).
+     *
+     * <p><b>Urgency</b>: {@code turnsToOwnWin} and {@code minTurnsToOppWin} — both in turns.
+     *
+     * <p><b>Synergy gaps</b>: flags for individual GP and card-synergy suggestions.
+     */
     private record GamePhaseContext(
+            // ── Phase (sum to 1.0) ──
             String phaseLabel,
-            /** Continuous phase strengths [0,1]; sum to 1.0. Used for weight interpolation. */
             double earlyStrength,
             double midStrength,
             double lateStrength,
+            // ── Landmarks ──
             int ownLandmarks,
             int maxOppLandmarks,
+            // ── Position (0=neutral, 1=extreme) ──
+            /** 1 = far behind in GPs+EV, 0 = leading or equal. Boosts GPRush+Aggro. */
+            double catchUpStrength,
+            /** 1 = far ahead in GPs+EV, 0 = equal or behind. Boosts ROI+Safe (consolidate). */
+            double pullAheadStrength,
+            /** Own EV minus best-opponent EV. Negative = economy lagging. */
+            double evGapVsLeader,
+            /** Coin advantage relative to opp EV scale: (ownCoins-avgOppCoins)/10, clamped [-1,1]. */
+            double coinAdvantage,
+            /** How spread the portfolio is over dice outcomes: 0=concentrated, 1=fully spread. */
+            double portfolioDiversity,
+            // ── Urgency ──
+            /** Turns until the active player can plausibly buy the 4th GP. */
+            double turnsToOwnWin,
+            /** Turns until the leading opponent can plausibly buy their 4th GP. */
+            double minTurnsToOppWin,
+            // ── GP synergy suggestions ──
             boolean bahnhofSuggested, double bahnhofEvGain,
             boolean ekzSuggested,     double ekzEvGain,
             boolean fpSuggested,
-            boolean ftSuggested
+            boolean ftSuggested,
+            // ── Card synergy gap ──
+            /** True if a booster card exists that would amplify ≥2 cards already owned. */
+            boolean synergyGapExists,
+            String  synergyGapCard,   // localized name of the booster
+            double  synergyGapGain    // EV gain from buying the booster
     ) {}
 
     /**
-     * Computes the current game phase and GP synergy hints for the active player {@code pi}.
-     * Phase detection is economics-based (coin flows), not just GP-count-based:
-     * <ul>
-     *   <li>Early: avg portfolio EV is low AND Einkaufszentrum not reachable within 2 rounds</li>
-     *   <li>Late: max(own GPs, any opponent GPs) ≥ 3</li>
-     *   <li>Mid: everything else</li>
-     * </ul>
+     * Computes the full strategic context for the active player {@code pi}.
+     * All signals are derived analytically from the current game state.
      */
     private GamePhaseContext computePhaseContext(int pi) {
         Player[] players = session.getState().getPlayers();
         Player active = players[pi];
         int n = players.length;
 
-        // Count own and opponent landmarks
+        // ── Landmark counts ───────────────────────────────────────────────────
         int ownLm = 0;
         for (Project p : active.getOwned_projects()) if (p.isIs_grossprojekt()) ownLm++;
         int maxOppLm = 0;
@@ -1121,57 +1161,112 @@ public class MainWindow extends JFrame {
             maxOppLm = Math.max(maxOppLm, lm);
         }
 
-        // Economic phase detection
-        double ownEv  = ProbabilityCalc.portfolioEvPerRound(session.getState(), pi);
-        double avgEv  = 0.0;
-        for (int i = 0; i < n; i++) avgEv += ProbabilityCalc.portfolioEvPerRound(session.getState(), i);
+        // ── EV per player ─────────────────────────────────────────────────────
+        double[] evs = new double[n];
+        double ownEv = 0, avgEv = 0, bestOppEv = 0;
+        for (int i = 0; i < n; i++) {
+            evs[i] = ProbabilityCalc.portfolioEvPerRound(session.getState(), i);
+            avgEv += evs[i];
+            if (i != pi) bestOppEv = Math.max(bestOppEv, evs[i]);
+        }
+        ownEv = evs[pi];
         avgEv /= n;
 
-        // Compute soft phase strengths in [0,1] that sum to 1.0.
-        // Late strength: based on max-GP ratio clamped [0,1] with threshold at LATE_GP_THRESHOLD-1
-        // Early strength: based on economy weakness (low EV, EKZ unreachable)
-        // Mid strength: remainder
+        // ── Phase strengths ───────────────────────────────────────────────────
         int maxGps = Math.max(ownLm, maxOppLm);
-        double lateRaw;
-        if (maxGps >= AssistantConfig.LATE_GP_THRESHOLD) {
-            lateRaw = 1.0;
-        } else {
-            // Soft ramp: 0 at 0 GPs → 1 at LATE_GP_THRESHOLD
-            lateRaw = (double) maxGps / AssistantConfig.LATE_GP_THRESHOLD;
-        }
+        double lateRaw = maxGps >= AssistantConfig.LATE_GP_THRESHOLD
+                ? 1.0 : (double) maxGps / AssistantConfig.LATE_GP_THRESHOLD;
 
-        double earlyRaw;
-        {
-            double ownCoins = active.getCoins();
-            boolean ekzReachable = (ownCoins + AssistantConfig.EARLY_SAVE_ROUNDS * ownEv)
-                                    >= AssistantConfig.EKZ_COST;
-            // EV weakness: 1.0 when avgEv==0, 0.0 when avgEv>=threshold
-            double evWeak = Math.max(0.0, 1.0 - avgEv / AssistantConfig.EARLY_AVG_EV_THRESHOLD);
-            double ekzFar  = ekzReachable ? 0.0 : 1.0;
-            earlyRaw = (evWeak + ekzFar) / 2.0;  // average of the two signals, in [0,1]
-        }
+        double ownCoins = active.getCoins();
+        boolean ekzReachable = (ownCoins + AssistantConfig.EARLY_SAVE_ROUNDS * ownEv)
+                                >= AssistantConfig.EKZ_COST;
+        double evWeak  = Math.max(0.0, 1.0 - avgEv / AssistantConfig.EARLY_AVG_EV_THRESHOLD);
+        double ekzFar  = ekzReachable ? 0.0 : 1.0;
+        double earlyRaw = (evWeak + ekzFar) / 2.0;
 
-        // Normalize so all three sum to 1.0; late takes priority, then early uses remainder
         double lateStr  = lateRaw;
         double earlyStr = earlyRaw * (1.0 - lateStr);
         double midStr   = 1.0 - lateStr - earlyStr;
 
-        // Snap phaseLabel to whichever strength is highest (for display + string-keyed lookups)
         String phase;
-        if (lateStr >= midStr && lateStr >= earlyStr) {
-            phase = Strings.assistantPhaseLate();
-        } else if (earlyStr > midStr) {
-            phase = Strings.assistantPhaseEarly();
-        } else {
-            phase = Strings.assistantPhaseMid();
+        if (lateStr >= midStr && lateStr >= earlyStr)  phase = Strings.assistantPhaseLate();
+        else if (earlyStr > midStr)                    phase = Strings.assistantPhaseEarly();
+        else                                           phase = Strings.assistantPhaseMid();
+
+        // ── Position: catch-up vs pull-ahead ─────────────────────────────────
+        // GP gap: positive = we lead, negative = we lag
+        int gpGap = ownLm - maxOppLm;         // e.g. -2 = opponent 2 GPs ahead
+        // EV gap
+        double evGapVsLeader = ownEv - bestOppEv;  // negative = economy lagging
+
+        // Composite position score: weighted sum of GP gap and EV gap
+        // GP gap scaled by 0.5 (max 4 GPs), EV gap scaled by ~1.5¢ range
+        double positionScore = (gpGap / 4.0) * 0.6 + (evGapVsLeader / 1.5) * 0.4;
+        positionScore = Math.max(-1.0, Math.min(1.0, positionScore));
+
+        // catchUp = how far behind (0=leading/equal, 1=far behind)
+        double catchUpStrength  = positionScore < 0 ? Math.min(1.0, -positionScore * 1.5) : 0.0;
+        // pullAhead = how far ahead (0=equal/behind, 1=clearly leading)
+        double pullAheadStrength = positionScore > 0 ? Math.min(1.0, positionScore * 1.5) : 0.0;
+
+        // ── Coin advantage ────────────────────────────────────────────────────
+        double avgOppCoins = 0;
+        int oppCount = 0;
+        for (int i = 0; i < n; i++) {
+            if (i == pi) continue;
+            avgOppCoins += players[i].getCoins();
+            oppCount++;
+        }
+        if (oppCount > 0) avgOppCoins /= oppCount;
+        // Scale: ±10 coins = ±1.0 (roughly 2-3 turns of income)
+        double coinAdvantage = Math.max(-1.0, Math.min(1.0, (ownCoins - avgOppCoins) / 10.0));
+
+        // ── Portfolio diversity ───────────────────────────────────────────────
+        // Measure: how many distinct dice outcomes (1–12) trigger at least one card.
+        // More outcomes covered = more diversity.
+        boolean[] covered = new boolean[13]; // index 1..12
+        for (Project p : active.getOwned_projects()) {
+            if (!p.isIs_grossprojekt()) {
+                for (int act : p.getDice_activation()) {
+                    if (act >= 1 && act <= 12) covered[act] = true;
+                }
+            }
+        }
+        int coveredCount = 0;
+        for (int r = 1; r <= 12; r++) if (covered[r]) coveredCount++;
+        double portfolioDiversity = coveredCount / 12.0;
+
+        // ── Urgency: turns-to-win ─────────────────────────────────────────────
+        // Own: how many turns to save up for the cheapest missing GP
+        double turnsToOwnWin = Double.MAX_VALUE;
+        {
+            int nextGpCost = nextMissingGpCost(active);
+            if (nextGpCost == 0) {
+                turnsToOwnWin = 0; // already has all 4
+            } else if (ownEv > 0) {
+                turnsToOwnWin = Math.max(0, (nextGpCost - ownCoins)) / ownEv;
+            }
+        }
+        // Opponent: how many turns for the leading opp to win (same as pressure calc)
+        double minTurnsToOppWin = Double.MAX_VALUE;
+        for (int i = 0; i < n; i++) {
+            if (i == pi) continue;
+            double oppEv = evs[i];
+            if (oppEv <= 0) continue;
+            int oppLm = 0;
+            for (Project p : players[i].getOwned_projects()) if (p.isIs_grossprojekt()) oppLm++;
+            if (oppLm >= 4) { minTurnsToOppWin = 0; break; }
+            int nextOppGpCost = nextMissingGpCost(players[i]);
+            double t = Math.max(0, (nextOppGpCost - players[i].getCoins())) / oppEv;
+            minTurnsToOppWin = Math.min(minTurnsToOppWin, t);
         }
 
+        // ── GP synergy suggestions ─────────────────────────────────────────────
         boolean hasBahnhof = active.hasProject("bahnhof");
         boolean hasEkz     = active.hasProject("einkaufszentrum");
         boolean hasFp      = active.hasProject("freizeitpark");
         boolean hasFt      = active.hasProject("funkturm");
 
-        // Bahnhof: worth buying if player has a high-range card + EV gain > 0.2
         boolean bahnhofSuggested = false;
         double bahnhofEvGain = 0.0;
         if (!hasBahnhof) {
@@ -1181,25 +1276,21 @@ public class MainWindow extends JFrame {
                 if (hasHighRange) break;
             }
             if (hasHighRange) {
-                double evWithout = ownEv; // already computed above
                 GameState withBahnhof = session.getState().copy();
                 logic.probability.ProjectLoader.getProject("bahnhof").ifPresent(bp ->
                         withBahnhof.getPlayers()[pi].getOwned_projects().add(bp));
-                double evWith = ProbabilityCalc.portfolioEvPerRound(withBahnhof, pi);
-                bahnhofEvGain = evWith - evWithout;
+                bahnhofEvGain = ProbabilityCalc.portfolioEvPerRound(withBahnhof, pi) - ownEv;
                 bahnhofSuggested = bahnhofEvGain > 0.2;
             }
         }
 
-        // Einkaufszentrum: worth buying if player has ≥ 2 green or store cards; compute EV gain
         boolean ekzSuggested = false;
         double ekzEvGain = 0.0;
         if (!hasEkz) {
             int greenOrStore = 0;
             for (Project p : active.getOwned_projects()) {
-                if ((p.getColor().equals("grün") || p.getCategory().equals("store")) && !p.isIs_grossprojekt()) {
+                if ((p.getColor().equals("grün") || p.getCategory().equals("store")) && !p.isIs_grossprojekt())
                     greenOrStore++;
-                }
             }
             if (greenOrStore >= 2) {
                 GameState withEkz = session.getState().copy();
@@ -1210,7 +1301,6 @@ public class MainWindow extends JFrame {
             }
         }
 
-        // Freizeitpark: worth buying if player has Bahnhof + cards activating on 6–8
         boolean fpSuggested = false;
         if (!hasFp && hasBahnhof) {
             for (Project p : active.getOwned_projects()) {
@@ -1220,12 +1310,69 @@ public class MainWindow extends JFrame {
                 if (fpSuggested) break;
             }
         }
-
-        // Funkturm: worth buying if player has Freizeitpark (doubles already possible)
         boolean ftSuggested = !hasFt && hasFp;
 
-        return new GamePhaseContext(phase, earlyStr, midStr, lateStr, ownLm, maxOppLm,
-                bahnhofSuggested, bahnhofEvGain, ekzSuggested, ekzEvGain, fpSuggested, ftSuggested);
+        // ── Card synergy gap ──────────────────────────────────────────────────
+        // Check if any booster card (Molkerei/Möbelfabrik/Markthalle etc.) would amplify
+        // ≥2 cards already in the portfolio, and the EV gain exceeds a threshold.
+        boolean synergyGapExists = false;
+        String synergyGapCard = null;
+        double synergyGapGain = 0.0;
+        {
+            String[] boosters = {"molkerei", "möbelfabrik", "markthalle", "käsefabrik", "obstmarkt"};
+            for (String boosterId : boosters) {
+                if (active.hasProject(boosterId)) continue;
+                java.util.Optional<Project> bpOpt = logic.probability.ProjectLoader.getProject(boosterId);
+                if (bpOpt.isEmpty()) continue;
+                Project bp = bpOpt.get();
+                int synergyCount = 0;
+                for (Project owned : active.getOwned_projects()) {
+                    if (cardSynergizesWith(owned, bp)) synergyCount++;
+                }
+                if (synergyCount < 2) continue;
+                GameState withBooster = session.getState().copy();
+                withBooster.getPlayers()[pi].getOwned_projects().add(bp);
+                double gain = ProbabilityCalc.portfolioEvPerRound(withBooster, pi) - ownEv;
+                if (gain > synergyGapGain) {
+                    synergyGapGain = gain;
+                    synergyGapCard = bp.getLocalizedName();
+                }
+            }
+            synergyGapExists = synergyGapCard != null && synergyGapGain > 0.1;
+        }
+
+        return new GamePhaseContext(
+                phase, earlyStr, midStr, lateStr,
+                ownLm, maxOppLm,
+                catchUpStrength, pullAheadStrength, evGapVsLeader, coinAdvantage, portfolioDiversity,
+                turnsToOwnWin, minTurnsToOppWin,
+                bahnhofSuggested, bahnhofEvGain,
+                ekzSuggested, ekzEvGain,
+                fpSuggested, ftSuggested,
+                synergyGapExists, synergyGapCard, synergyGapGain);
+    }
+
+    /** Returns true if {@code owned} card would benefit from {@code booster}'s multiplier. */
+    private static boolean cardSynergizesWith(Project owned, Project booster) {
+        String cat = owned.getCategory();
+        return switch (booster.getId()) {
+            case "molkerei"    -> cat.equals("animal");
+            case "möbelfabrik" -> cat.equals("production") || cat.equals("forest");
+            case "markthalle"  -> cat.equals("food");
+            case "käsefabrik"  -> cat.equals("animal");
+            case "obstmarkt"   -> cat.equals("food");
+            default -> false;
+        };
+    }
+
+    /** Returns the cost of the cheapest GP the player does not yet own, or 0 if all owned. */
+    private static int nextMissingGpCost(Player p) {
+        int[][] gpCosts = {{4, 0}, {10, 1}, {16, 2}, {22, 3}}; // cost, min-GPs-already-needed
+        String[] gpIds = {"bahnhof", "einkaufszentrum", "freizeitpark", "funkturm"};
+        for (int i = 0; i < gpIds.length; i++) {
+            if (!p.hasProject(gpIds[i])) return gpCosts[i][0];
+        }
+        return 0;
     }
 
     /**
@@ -1250,21 +1397,27 @@ public class MainWindow extends JFrame {
                  + ctx.lateStrength()  * wL[i];
         }
 
-        // Compute turns-to-win for the most threatening opponent
-        Player[] players = session.getState().getPlayers();
-        int n = players.length;
-        double minTurnsToWin = Double.MAX_VALUE;
-        for (int i = 0; i < n; i++) {
-            if (i == pi) continue;
-            double oppEv = ProbabilityCalc.portfolioEvPerRound(session.getState(), i);
-            if (oppEv <= 0) continue;
-            int oppLm = 0;
-            for (Project p : players[i].getOwned_projects()) if (p.isIs_grossprojekt()) oppLm++;
-            if (oppLm >= 4) { minTurnsToWin = 0; break; }
-            // Use Funkturm cost (22) as worst-case 4th GP cost
-            double turnsToWin = Math.max(0, (22.0 - players[i].getCoins()) / oppEv);
-            minTurnsToWin = Math.min(minTurnsToWin, turnsToWin);
-        }
+        // ── Position modifier: catch-up boosts Aggro+GPRush; pull-ahead boosts Safe+ROI ──
+        double cu = ctx.catchUpStrength();
+        double pa = ctx.pullAheadStrength();
+        w[AssistantConfig.W_GPRUSH] = Math.min(1.0, w[AssistantConfig.W_GPRUSH] + cu * 0.4);
+        w[AssistantConfig.W_AGGRO]  = Math.min(1.0, w[AssistantConfig.W_AGGRO]  + cu * 0.3);
+        w[AssistantConfig.W_CHEAP]  = Math.min(1.0, w[AssistantConfig.W_CHEAP]  + cu * 0.2);
+        w[AssistantConfig.W_ROI]    = Math.min(1.0, w[AssistantConfig.W_ROI]    + pa * 0.2);
+        w[AssistantConfig.W_SAFE]   = Math.min(1.0, w[AssistantConfig.W_SAFE]   + pa * 0.2);
+        w[AssistantConfig.W_LOWVAR] = Math.min(1.0, w[AssistantConfig.W_LOWVAR] + pa * 0.15);
+
+        // ── Coin advantage: coin-rich → prefer higher-cost/ROI cards (less Cheap weight) ──
+        double ca = ctx.coinAdvantage();  // -1=poor, +1=rich
+        w[AssistantConfig.W_CHEAP] = Math.max(0.0, w[AssistantConfig.W_CHEAP] - ca * 0.2);
+        w[AssistantConfig.W_ROI]   = Math.min(1.0, w[AssistantConfig.W_ROI]   + ca * 0.1);
+
+        // ── Diversity gap: very concentrated portfolio → boost LowVar (spread risk) ──
+        double diversityGap = 1.0 - ctx.portfolioDiversity();  // 1=concentrated, 0=spread
+        w[AssistantConfig.W_LOWVAR] = Math.min(1.0, w[AssistantConfig.W_LOWVAR] + diversityGap * 0.2);
+
+        // ── Opponent-pressure (existing modifier, now using ctx.minTurnsToOppWin) ──
+        double minTurnsToWin = ctx.minTurnsToOppWin();
         if (minTurnsToWin <= AssistantConfig.PRESSURE_EMERGENCY_TURNS) {
             w[AssistantConfig.W_GPRUSH] = Math.min(1.0, w[AssistantConfig.W_GPRUSH] + AssistantConfig.PRESSURE_EMERGENCY_GPRUSH);
             w[AssistantConfig.W_AGGRO]  = Math.min(1.0, w[AssistantConfig.W_AGGRO]  + AssistantConfig.PRESSURE_EMERGENCY_AGGRO);
@@ -1361,13 +1514,24 @@ public class MainWindow extends JFrame {
         titleLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
         ctxPanel.add(titleLabel);
 
-        // Phase line: shows continuous blend if mixed, or single phase if dominant
+        // Phase line: shows continuous blend
         JLabel phaseLabel = new JLabel(Strings.assistantContextPhase(ctx.phaseLabel(), ctx.maxOppLandmarks(),
                 ctx.earlyStrength(), ctx.midStrength(), ctx.lateStrength()));
         phaseLabel.setFont(new Font("Arial", Font.PLAIN, 10));
         phaseLabel.setForeground(new Color(0x555555));
         phaseLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
         ctxPanel.add(phaseLabel);
+
+        // Position line: catch-up vs pull-ahead
+        String posLine = Strings.assistantContextPosition(ctx.catchUpStrength(), ctx.pullAheadStrength(),
+                ctx.evGapVsLeader(), ctx.turnsToOwnWin(), ctx.minTurnsToOppWin());
+        if (posLine != null) {
+            JLabel posLabel = new JLabel("<html>" + posLine + "</html>");
+            posLabel.setFont(new Font("Arial", Font.PLAIN, 10));
+            posLabel.setForeground(new Color(0x444488));
+            posLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+            ctxPanel.add(posLabel);
+        }
 
         ctxPanel.add(Box.createVerticalStrut(4));
 
@@ -1377,10 +1541,9 @@ public class MainWindow extends JFrame {
         recLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
         ctxPanel.add(recLabel);
 
-        // Factors
+        // Factors (with blend explanation header)
         if (!factors.isEmpty()) {
             ctxPanel.add(Box.createVerticalStrut(3));
-            // Explain that weights come from phase interpolation
             JLabel weightsBlend = new JLabel("<html><i>" + Strings.assistantContextWeightsBlend() + "</i></html>");
             weightsBlend.setFont(new Font("Arial", Font.PLAIN, 9));
             weightsBlend.setForeground(new Color(0x666666));
@@ -1395,10 +1558,21 @@ public class MainWindow extends JFrame {
             ctxPanel.add(factorLabel);
         }
 
+        // Synergy gap hint
+        if (ctx.synergyGapExists()) {
+            ctxPanel.add(Box.createVerticalStrut(3));
+            JLabel synLabel = new JLabel("<html>" + Strings.assistantContextSynergyGap(
+                    ctx.synergyGapCard(), ctx.synergyGapGain()) + "</html>");
+            synLabel.setFont(new Font("Arial", Font.PLAIN, 10));
+            synLabel.setForeground(new Color(0x1a6600));
+            synLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+            ctxPanel.add(synLabel);
+        }
+
         // GP hints
         boolean anyHint = ctx.bahnhofSuggested() || ctx.ekzSuggested() || ctx.fpSuggested() || ctx.ftSuggested();
         if (anyHint) {
-            ctxPanel.add(Box.createVerticalStrut(4));
+            ctxPanel.add(Box.createVerticalStrut(3));
             java.util.function.BiConsumer<String, Double> addHint = (gp, evGain) -> {
                 JLabel h = new JLabel("<html>" + Strings.assistantContextGPHint(gp, evGain) + "</html>");
                 h.setFont(new Font("Arial", Font.PLAIN, 10));
@@ -1424,7 +1598,7 @@ public class MainWindow extends JFrame {
             }
         }
 
-        // Bahnhof dice-choice hint (shown when player owns Bahnhof)
+        // Bahnhof dice-choice hint
         int pi = session.nextPlayerIndex();
         if (session.getState().getPlayers()[pi].hasProject("bahnhof")) {
             ctxPanel.add(Box.createVerticalStrut(4));
@@ -1506,10 +1680,29 @@ public class MainWindow extends JFrame {
                 + " " + Strings.assistantAlso(shown, extra) + "</i>";
     }
 
-    /** Adds a profile row to the assistant panel. */
-    private void addAssistantRow(String profileLabel, String body) {
-        JPanel profileRow = new JPanel();
-        profileRow.setLayout(new BoxLayout(profileRow, BoxLayout.Y_AXIS));
+    /**
+     * Returns up to {@code max} runner-up names (best after the winner) for a profile metric.
+     * Used to populate the right-side "also: #2, #3" column in each assistant row.
+     */
+    private List<String> runnerUpNames(
+            java.util.function.ToDoubleFunction<RankEntry> metric,
+            boolean lowerIsBetter, String winnerId, int max) {
+        List<RankEntry> pool = lastRanking.stream()
+                .filter(e -> e.affordable && !e.isWaitEntry() && !e.project.getId().equals(winnerId))
+                .sorted(lowerIsBetter
+                        ? java.util.Comparator.comparingDouble(metric)
+                        : java.util.Comparator.comparingDouble(metric).reversed())
+                .toList();
+        List<String> names = new java.util.ArrayList<>();
+        for (int i = 0; i < Math.min(max, pool.size()); i++) {
+            names.add(pool.get(i).project.getLocalizedName());
+        }
+        return names;
+    }
+
+    /** Adds a profile row to the assistant panel with optional runner-up column. */
+    private void addAssistantRow(String profileLabel, String body, List<String> runnerUps) {
+        JPanel profileRow = new JPanel(new BorderLayout(6, 0));
         profileRow.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createMatteBorder(0, 0, 1, 0, new Color(0xDDDDDD)),
                 BorderFactory.createEmptyBorder(6, 10, 6, 10)));
@@ -1517,19 +1710,54 @@ public class MainWindow extends JFrame {
         profileRow.setAlignmentX(Component.LEFT_ALIGNMENT);
         profileRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, Integer.MAX_VALUE));
 
+        // Left: profile name + recommendation body
+        JPanel left = new JPanel();
+        left.setLayout(new BoxLayout(left, BoxLayout.Y_AXIS));
+        left.setOpaque(false);
+
         JLabel nameLabel = new JLabel(profileLabel);
         nameLabel.setFont(new Font("Arial", Font.BOLD, 11));
         nameLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
-        profileRow.add(nameLabel);
+        left.add(nameLabel);
 
-        JLabel bodyLabel = new JLabel("<html><body style='width:230px'>" + body + "</body></html>");
+        JLabel bodyLabel = new JLabel("<html><body style='width:180px'>" + body + "</body></html>");
         bodyLabel.setFont(new Font("Arial", Font.PLAIN, 11));
         bodyLabel.setForeground(new Color(0x333333));
         bodyLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
-        profileRow.add(Box.createVerticalStrut(2));
-        profileRow.add(bodyLabel);
+        left.add(Box.createVerticalStrut(2));
+        left.add(bodyLabel);
+
+        profileRow.add(left, BorderLayout.CENTER);
+
+        // Right: compact runner-up list
+        if (!runnerUps.isEmpty()) {
+            JPanel right = new JPanel();
+            right.setLayout(new BoxLayout(right, BoxLayout.Y_AXIS));
+            right.setOpaque(false);
+            right.setBorder(BorderFactory.createCompoundBorder(
+                    BorderFactory.createMatteBorder(0, 1, 0, 0, new Color(0xDDDDDD)),
+                    BorderFactory.createEmptyBorder(0, 6, 0, 0)));
+
+            JLabel ruHeader = new JLabel(Strings.isDE() ? "Alternativ:" : "Also:");
+            ruHeader.setFont(new Font("Arial", Font.PLAIN, 9));
+            ruHeader.setForeground(new Color(0x888888));
+            right.add(ruHeader);
+
+            for (int i = 0; i < runnerUps.size(); i++) {
+                JLabel ru = new JLabel((i + 2) + ". " + runnerUps.get(i));
+                ru.setFont(new Font("Arial", Font.PLAIN, 10));
+                ru.setForeground(new Color(0x666666));
+                right.add(ru);
+            }
+            profileRow.add(right, BorderLayout.EAST);
+        }
 
         assistantPanel.add(profileRow);
+    }
+
+    /** Overload without runner-ups (used by GP Rush which has no ranked alternative). */
+    private void addAssistantRow(String profileLabel, String body) {
+        addAssistantRow(profileLabel, body, List.of());
     }
 
     private void rebuildAssistantPanel() {
@@ -1560,35 +1788,40 @@ public class MainWindow extends JFrame {
         String bodyROI = trROI.hasWinner()
                 ? Strings.assistantExplainROI(trROI.winner().project.getLocalizedName(), trROI.winner().roiOverHorizon) + buildTieSuffix(trROI)
                 : Strings.assistantNoAffordable();
-        addAssistantRow(Strings.assistantProfileROI(), bodyROI);
+        addAssistantRow(Strings.assistantProfileROI(), bodyROI,
+                trROI.hasWinner() ? runnerUpNames(e -> e.roiOverHorizon, false, trROI.winner().project.getId(), 2) : List.of());
 
         // EV
         TieResult trEV = resolveWithTiebreaker(e -> e.evPerRound, false);
         String bodyEV = trEV.hasWinner()
                 ? Strings.assistantExplainEV(trEV.winner().project.getLocalizedName(), trEV.winner().evPerRound) + buildTieSuffix(trEV)
                 : Strings.assistantNoAffordable();
-        addAssistantRow(Strings.assistantProfileEV(), bodyEV);
+        addAssistantRow(Strings.assistantProfileEV(), bodyEV,
+                trEV.hasWinner() ? runnerUpNames(e -> e.evPerRound, false, trEV.winner().project.getId(), 2) : List.of());
 
         // Safe — lowest P0
         TieResult trSafe = resolveWithTiebreaker(e -> e.probNoIncomeRound, true);
         String bodySafe = trSafe.hasWinner()
                 ? Strings.assistantExplainSafe(trSafe.winner().project.getLocalizedName(), trSafe.winner().probNoIncomeRound) + buildTieSuffix(trSafe)
                 : Strings.assistantNoAffordable();
-        addAssistantRow(Strings.assistantProfileSafe(), bodySafe);
+        addAssistantRow(Strings.assistantProfileSafe(), bodySafe,
+                trSafe.hasWinner() ? runnerUpNames(e -> e.probNoIncomeRound, true, trSafe.winner().project.getId(), 2) : List.of());
 
         // LowVar
         TieResult trLowVar = resolveWithTiebreaker(e -> e.variance, true);
         String bodyLowVar = trLowVar.hasWinner()
                 ? Strings.assistantExplainLowVar(trLowVar.winner().project.getLocalizedName(), trLowVar.winner().variance) + buildTieSuffix(trLowVar)
                 : Strings.assistantNoAffordable();
-        addAssistantRow(Strings.assistantProfileLowVar(), bodyLowVar);
+        addAssistantRow(Strings.assistantProfileLowVar(), bodyLowVar,
+                trLowVar.hasWinner() ? runnerUpNames(e -> e.variance, true, trLowVar.winner().project.getId(), 2) : List.of());
 
         // Cheap — lowest cost
         TieResult trCheap = resolveWithTiebreaker(e -> e.project.getCost(), true);
         String bodyCheap = trCheap.hasWinner()
                 ? Strings.assistantExplainCheap(trCheap.winner().project.getLocalizedName(), trCheap.winner().project.getCost()) + buildTieSuffix(trCheap)
                 : Strings.assistantNoAffordable();
-        addAssistantRow(Strings.assistantProfileCheap(), bodyCheap);
+        addAssistantRow(Strings.assistantProfileCheap(), bodyCheap,
+                trCheap.hasWinner() ? runnerUpNames(e -> (double) e.project.getCost(), true, trCheap.winner().project.getId(), 2) : List.of());
 
         // WinProb
         boolean hasWinProb = lastRanking.stream().anyMatch(e -> e.winProbDelta != 0.0);
@@ -1596,7 +1829,8 @@ public class MainWindow extends JFrame {
         String bodyWin = trWin.hasWinner()
                 ? Strings.assistantExplainWinProb(trWin.winner().project.getLocalizedName(), trWin.winner().winProbDelta) + buildTieSuffix(trWin)
                 : Strings.assistantNoWinProb();
-        addAssistantRow(Strings.assistantProfileWinProb(), bodyWin);
+        addAssistantRow(Strings.assistantProfileWinProb(), bodyWin,
+                trWin.hasWinner() ? runnerUpNames(e -> e.winProbDelta, false, trWin.winner().project.getId(), 2) : List.of());
 
         // Aggro — rot/lila only
         List<RankEntry> aggroPool = lastRanking.stream()
@@ -1607,7 +1841,8 @@ public class MainWindow extends JFrame {
         String bodyAggro = trAggro.hasWinner()
                 ? Strings.assistantExplainAggro(trAggro.winner().project.getLocalizedName()) + buildTieSuffix(trAggro)
                 : Strings.assistantNoAffordable();
-        addAssistantRow(Strings.assistantProfileAggro(), bodyAggro);
+        addAssistantRow(Strings.assistantProfileAggro(), bodyAggro,
+                trAggro.hasWinner() ? runnerUpNames(e -> e.evPerRound, false, trAggro.winner().project.getId(), 2) : List.of());
 
         // GP Rush — cheapest unbuilt GP
         RankEntry bestGP = lastRanking.stream()

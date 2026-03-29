@@ -305,6 +305,45 @@ public final class Strings {
     public static String assistantContextRecommend(String card) {
         return s("Empfehlung: <b>" + card + "</b>", "Recommendation: <b>" + card + "</b>");
     }
+    /**
+     * Returns a one-line position description (Aufholjagd / Vorbeiziehen / neutral), or null
+     * if the situation is neutral (no strong signal).
+     */
+    public static String assistantContextPosition(double catchUp, double pullAhead,
+                                                   double evGap, double turnsOwn, double turnsOpp) {
+        String urgency = "";
+        if (turnsOpp < Double.MAX_VALUE && turnsOpp <= 4) {
+            urgency = isDE()
+                ? String.format("  [!] Gegner in ~%.0f Zügen fertig!", turnsOpp)
+                : String.format("  [!] Opponent ~%.0f turns from win!", turnsOpp);
+        } else if (turnsOwn < Double.MAX_VALUE && turnsOwn <= 4) {
+            urgency = isDE()
+                ? String.format("  → Du in ~%.0f Zügen fertig", turnsOwn)
+                : String.format("  → You ~%.0f turns from win", turnsOwn);
+        }
+
+        if (catchUp >= 0.35) {
+            String evStr = evGap < -0.1
+                    ? String.format(isDE() ? " (EV -%4.2f¢/Rd.)" : " (EV -%4.2f¢/rd.)", -evGap) : "";
+            return isDE()
+                ? "<b>Aufholjagd</b> — liegst zurück" + evStr + urgency
+                : "<b>Catch-up</b> — you're behind" + evStr + urgency;
+        } else if (pullAhead >= 0.35) {
+            String evStr = evGap > 0.1
+                    ? String.format(isDE() ? " (EV +%4.2f¢/Rd.)" : " (EV +%4.2f¢/rd.)", evGap) : "";
+            return isDE()
+                ? "<b>Vorbeiziehen</b> — liegst vorne" + evStr + urgency
+                : "<b>Pull-ahead</b> — you're leading" + evStr + urgency;
+        } else if (!urgency.isEmpty()) {
+            return urgency.trim();
+        }
+        return null;
+    }
+    public static String assistantContextSynergyGap(String card, double evGain) {
+        return isDE()
+            ? String.format("[+] %s fehlt — würde Portfolio um +%.2f¢/Runde steigern", card, evGain)
+            : String.format("[+] %s missing — would boost portfolio by +%.2f¢/round", card, evGain);
+    }
     public static String assistantContextWeightsBlend() {
         return s("Kriterien-Gewichte = interpoliert aus Frühphase/Mittelspiel/Endspiel-Profilen:",
                  "Criteria weights = interpolated from Early/Mid/Late profiles:");
@@ -314,11 +353,11 @@ public final class Strings {
     }
     public static String assistantContextGPHint(String gp, double evGain) {
         if (evGain > 0.01) {
-            return s("💡 " + gp + " lohnt sich (+" + String.format("%.2f", evGain) + "¢/Runde)",
-                     "💡 " + gp + " worth buying (+" + String.format("%.2f", evGain) + "¢/round)");
+            return s("[GP] " + gp + " lohnt sich (+" + String.format("%.2f", evGain) + "¢/Runde)",
+                     "[GP] " + gp + " worth buying (+" + String.format("%.2f", evGain) + "¢/round)");
         } else {
-            return s("💡 " + gp + " lohnt sich (Synergie mit Portfolio)",
-                     "💡 " + gp + " worth buying (synergy with portfolio)");
+            return s("[GP] " + gp + " lohnt sich (Synergie mit Portfolio)",
+                     "[GP] " + gp + " worth buying (synergy with portfolio)");
         }
     }
     public static String assistantContextNoAffordable() {
@@ -330,12 +369,12 @@ public final class Strings {
 
     /** Shown in the context profile when the player owns Bahnhof. */
     public static String assistantDiceHint1d6() {
-        return s("🎲 1W6 optimal — Portfolio aktiviert hauptsächlich auf 1–6",
-                 "🎲 1d6 optimal — portfolio activates mainly on 1–6");
+        return s("[W] 1W6 optimal — Portfolio aktiviert hauptsächlich auf 1–6",
+                 "[D] 1d6 optimal — portfolio activates mainly on 1–6");
     }
     public static String assistantDiceHint2d6() {
-        return s("🎲 2W6 optimal — Portfolio aktiviert hauptsächlich auf 7–12",
-                 "🎲 2d6 optimal — portfolio activates mainly on 7–12");
+        return s("[W] 2W6 optimal — Portfolio aktiviert hauptsächlich auf 7–12",
+                 "[D] 2d6 optimal — portfolio activates mainly on 7–12");
     }
 
     public static String deepAnalysisBtn()    { return s("Tiefenanalyse (MC)", "Deep Analysis (MC)"); }

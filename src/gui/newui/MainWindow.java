@@ -328,9 +328,11 @@ public class MainWindow extends JFrame {
         baselineWinProbLabel = new JLabel("Current win prob: —");
         baselineWinProbLabel.setFont(new Font("Arial", Font.BOLD, 12));
         baselineWinProbLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
-        JLabel winProbExplain = new JLabel("<html><small>Analytical softmax estimate based on relative EV score vs opponents</small></html>");
-        winProbExplain.setFont(new Font("Arial", Font.PLAIN, 10));
-        winProbExplain.setForeground(new Color(0x666666));
+        baselineWinProbLabel.setToolTipText(
+                "<html>Analytical softmax estimate: each player's win probability is proportional<br>" +
+                "to e^(EV score) / sum(e^(EV scores)). Higher own EV and lower opponent EV → higher probability.</html>");
+        JLabel winProbExplain = new JLabel(
+                "<html><small style='color:#666'>Softmax of relative EV scores — hover for details</small></html>");
         winProbExplain.setAlignmentX(Component.LEFT_ALIGNMENT);
         panel.add(wrap(baselineWinProbLabel));
         panel.add(wrap(winProbExplain));
@@ -615,7 +617,7 @@ public class MainWindow extends JFrame {
         topCardRisk.setText("—");
         topCardVar.setText("—");
         topCardWinProb.setText("—");
-        topCardWinProb.setVisible(false);
+        setWinProbRowVisible(false); // hide win-prob row consistently (uses the shared helper)
         baselineWinProbLabel.setText("Current win prob: 100%");
         topCardNote.setText("<html><i>Game over. Use Undo to continue or close the window.</i></html>");
 

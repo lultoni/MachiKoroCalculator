@@ -376,6 +376,55 @@ class CardIncome {
     }
 
     // -------------------------------------------------------------------------
+    // contextualCardEvPerRound — synergy-aware single-card EV
+    // -------------------------------------------------------------------------
+
+    /**
+     * Computes the per-round EV of a single card in the context of a specific player's
+     * actual stats (Einkaufszentrum, food/animal/production counts, opponent coins).
+     *
+     * <p>Unlike {@link #singleCardEvPerRound}, this method correctly reflects synergy
+     * multipliers: a Markthalle owned by a player with 3 food cards yields 3× the
+     * income of a Markthalle in a generic reference state.
+     *
+     * <p>Used by {@link BürohausLogic} to evaluate swap candidates in the active
+     * player's real context, and by {@link GameSimulator} for its greedy buy policy.
+     *
+     * @param card     the card to evaluate
+     * @param stats    pre-computed stats for the evaluating player
+     * @param numPlayers total player count (scales blue and red card income)
+     * @param oppCoins  opponent coin counts (used for Stadion/Fernsehsender)
+     * @return estimated per-round EV (≥ 0)
+     */
+    static double contextualCardEvPerRound(Project card, PlayerStats stats,
+                                            int numPlayers, int[] oppCoins) {
+        double ev = 0.0;
+        // 2d6 pass (main roll distribution)
+        for (int r = 2; r <= 12; r++) {
+            int income = get_I(r, card.getId(), true, stats.hasEinkaufszentrum,
+                    stats.foodCount, stats.animalCount, stats.productionCount,
+                    99, oppCoins);
+            if (income > 0) ev += P2[r] * income;
+        }
+        // 1d6 pass (captures roll-1 activations like weizenfeld)
+        double ev1d6 = 0.0;
+        for (int r = 1; r <= 6; r++) {
+            int income = get_I(r, card.getId(), true, stats.hasEinkaufszentrum,
+                    stats.foodCount, stats.animalCount, stats.productionCount,
+                    99, oppCoins);
+            if (income > 0) ev1d6 += P1[r] * income;
+        }
+        ev = Math.max(ev, ev1d6);
+
+        // Scale by turn frequency
+        return switch (card.getColor()) {
+            case "blau" -> ev * numPlayers;           // fires every player's turn
+            case "rot"  -> ev * (numPlayers - 1);     // fires on each opponent's turn
+            default     -> ev;                         // grün/lila: own turn only
+        };
+    }
+
+    // -------------------------------------------------------------------------
     // singleCardEvPerRound — isolated card EV for scoring
     // -------------------------------------------------------------------------
 

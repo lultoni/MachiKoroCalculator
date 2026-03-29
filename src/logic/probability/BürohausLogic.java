@@ -8,14 +8,14 @@ package logic.probability;
  *
  * <p>These methods implement a greedy heuristic: always trade the lowest-EV
  * card the active player owns for the highest-EV card any opponent owns,
- * provided the swap is beneficial (i.e. the opponent's card has higher
- * {@link CardIncome#singleCardEvPerRound} than the player's worst card).
+ * provided the swap is beneficial (i.e. the opponent's card has higher EV
+ * in the active player's context than the player's worst card).
  *
- * <p>All three methods have identical semantics for what counts as a candidate:
- * any non-landmark, non-bürohaus establishment. Bürohaus itself is excluded from
- * "worst own" to avoid giving it away.
+ * <p>Card EV is evaluated in the active player's real context (actual
+ * Einkaufszentrum status, food/animal/production counts) so that synergy
+ * multipliers like Markthalle and Molkerei are correctly captured.
  *
- * @see CardIncome#singleCardEvPerRound
+ * @see CardIncome#contextualCardEvPerRound
  */
 final class BürohausLogic {
 
@@ -27,7 +27,8 @@ final class BürohausLogic {
 
     /**
      * Identifies the best swap candidates: the active player's lowest-EV card
-     * (excluding bürohaus itself and landmarks) and each opponent's highest-EV card.
+     * (excluding bürohaus itself and landmarks) and each opponent's highest-EV card,
+     * both evaluated in the active player's real context (synergy-aware).
      *
      * @param state       current game state
      * @param playerIndex the active player
@@ -36,12 +37,16 @@ final class BürohausLogic {
     private static SwapCandidates findCandidates(GameState state, int playerIndex) {
         Player active = state.getPlayers()[playerIndex];
         int n = state.getPlayers().length;
+        // Use active player's real stats so Einkaufszentrum, food/animal/production
+        // multipliers are applied correctly when evaluating which cards to swap.
+        CardIncome.PlayerStats activeStats = CardIncome.PlayerStats.of(active);
+        int[] oppCoins = CardIncome.buildOpponentCoins(state.getPlayers(), playerIndex);
 
         Project worstOwn = null;
         double worstOwnEV = Double.MAX_VALUE;
         for (Project p : active.getOwned_projects()) {
             if (p.isIs_grossprojekt() || p.getId().equals("bürohaus")) continue;
-            double ev = CardIncome.singleCardEvPerRound(p, n);
+            double ev = CardIncome.contextualCardEvPerRound(p, activeStats, n, oppCoins);
             if (ev < worstOwnEV) { worstOwnEV = ev; worstOwn = p; }
         }
 
@@ -52,7 +57,9 @@ final class BürohausLogic {
             if (i == playerIndex) continue;
             for (Project p : state.getPlayers()[i].getOwned_projects()) {
                 if (p.isIs_grossprojekt()) continue;
-                double ev = CardIncome.singleCardEvPerRound(p, n);
+                // Evaluate the opponent's card in the active player's context:
+                // what would this card be worth if the active player owned it?
+                double ev = CardIncome.contextualCardEvPerRound(p, activeStats, n, oppCoins);
                 if (ev > bestOppEV) { bestOppEV = ev; bestOpp = p; bestOppPlayer = i; }
             }
         }

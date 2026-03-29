@@ -4,6 +4,17 @@ Implementierungsgeschichte: was gebaut wurde, warum, und welche Designentscheidu
 
 ---
 
+## M1: Math-Audit — drei Näherungen durch exakte Berechnungen ersetzt
+
+- **A1 → Schritt-bewusste Münzprojektion in `evPerRound`** — Statt eines einzelnen Vorwärtsprojektions-Schritts für alle Spieler wird jetzt pro Gegner-Position das akkumulierte Blau-Einkommen des aktiven Spielers berechnet (`step × bluePerOppTurn`). Ergebnis: Rote-Karten-Klammerung ist für frühe vs. späte Gegner im Rundenzyklus korrekt.
+- **A2 → Kontextbewusste Bürohaus-Swap-Bewertung in `BürohausLogic`** — `findCandidates` nutzt jetzt `contextualCardEvPerRound` statt `singleCardEvPerRound`. Sowohl die eigene schlechteste Karte als auch die Karte des Gegners werden im **echten Kontext des aktiven Spielers** bewertet (reale Einkaufszentrum-Flag, food/animal/production-Anzahl). Synergien (Markthalle mit vielen Food-Karten, Molkerei mit Bauernhöfen) werden korrekt berücksichtigt.
+- **A3 → Inline-Kontextevaluation im GameSimulator** — `STATIC_EV_PER_COST`-Tabelle entfernt. `greedyBuy` berechnet jetzt pro Kaufkandidat `contextualCardEvPerRound(card, playerStats, n, oppCoins)` inline (~12 `get_I`-Aufrufe pro Karte, allokationsfrei). Die Spielsimulation berücksichtigt jetzt korrekt, dass ein Spieler mit 3 Food-Karten Markthalle viel höher bewertet als ein Spieler ohne.
+- **`CardIncome.contextualCardEvPerRound`** — neue package-private Methode; 2d6-Pass + 1d6-Pass (max), skaliert nach Kartenfarbe (Blau ×N, Rot ×(N-1)). Wird von `BürohausLogic` und `GameSimulator` geteilt.
+
+**Tests:** 224 bestanden, 0 fehlgeschlagen.
+
+---
+
 ## Rechtes Panel: drei Tabs (Erschwinglich / Nicht erschwinglich / Alle)
 
 - **`ProbabilityCalc.rankAllProjects`** — neue öffentliche Methode, die alle Kandidaten (erschwinglich und nicht) berechnet und per `RankEntry.affordable`-Flag markiert. Win-Prob-Delta wird nur für erschwingliche Karten berechnet.

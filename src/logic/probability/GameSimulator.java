@@ -15,7 +15,9 @@ import java.util.concurrent.atomic.AtomicInteger;
  *   <li>If the player can afford the next unbuilt landmark (cheapest first),
  *       buy it — landmark progression is always strictly optimal.</li>
  *   <li>Otherwise buy the affordable establishment card with the highest
- *       {@code evPerRound / cost} ratio (simple ROI proxy), if any.</li>
+ *       contextual {@code evPerRound / cost} ratio, evaluated in the buying
+ *       player's actual synergy context (real Einkaufszentrum status and
+ *       food/animal/production counts).</li>
  *   <li>If nothing is affordable, save (skip buy phase).</li>
  * </ol>
  *
@@ -54,11 +56,6 @@ public class GameSimulator {
     /** Landmark IDs in purchase-priority order (cheapest first). */
     private static final String[] LANDMARK_ORDER =
             {"bahnhof", "einkaufszentrum", "freizeitpark", "funkturm"};
-
-    // Pre-computed static EV-per-turn/cost ratios for a neutral mid-game state
-    // (1 food, 1 animal, 1 production card, no landmarks, 4 opponents at 5 coins each).
-    // Used in greedy buy policy to avoid calling ProbabilityCalc.evPerRound in the inner loop.
-    private static final Map<String, Double> STATIC_EV_PER_COST = buildStaticEvPerCost();
 
     /**
      * Simulates a complete game from the given state using a greedy rollout policy.
@@ -197,6 +194,10 @@ public class GameSimulator {
 
     /**
      * Executes the greedy buy decision for the active player.
+     * Card scores are computed in the player's actual synergy context (real
+     * Einkaufszentrum, food/animal/production counts) using
+     * {@link CardIncome#contextualCardEvPerRound}, so synergy multipliers
+     * like Markthalle and Molkerei are correctly reflected in card rankings.
      *
      * @return the winner's player index if this purchase completes the game,
      *         or {@code -1} if the game continues
@@ -218,7 +219,12 @@ public class GameSimulator {
             }
         }
 
-        // 2. Try to buy the best-value establishment card
+        // 2. Try to buy the best-value establishment card using contextual EV.
+        // Build the player's stats and opponent coins once for this buy phase.
+        int n = state.getPlayers().length;
+        CardIncome.PlayerStats playerStats = CardIncome.PlayerStats.of(player);
+        int[] oppCoins = CardIncome.buildOpponentCoins(state.getPlayers(), activePlayer);
+
         Project best = null;
         double bestScore = -Double.MAX_VALUE;
         for (Project p : state.getUnbuilt_projects()) {
@@ -226,7 +232,9 @@ public class GameSimulator {
             if (player.getCoins() < p.getCost()) continue;
             int remaining = supply.getOrDefault(p.getId(), 0);
             if (remaining <= 0) continue;
-            double score = STATIC_EV_PER_COST.getOrDefault(p.getId(), 0.0);
+            // Evaluate in active player's real context (synergy-aware)
+            double ev = CardIncome.contextualCardEvPerRound(p, playerStats, n, oppCoins);
+            double score = p.getCost() > 0 ? ev / p.getCost() : 0.0;
             if (score > bestScore) {
                 bestScore = score;
                 best = p;
@@ -270,13 +278,11 @@ public class GameSimulator {
      */
     private static Map<String, Integer> buildSupply(GameState state) {
         Map<String, Integer> supply = new HashMap<>();
-        // Start with full supply for every non-landmark card
         for (Project p : ProjectLoader.getAllProjects()) {
             if (!p.isIs_grossprojekt()) {
                 supply.put(p.getId(), SUPPLY_PER_CARD);
             }
         }
-        // Subtract cards already owned by players
         for (Player player : state.getPlayers()) {
             for (Project p : player.getOwned_projects()) {
                 if (!p.isIs_grossprojekt()) {
@@ -285,43 +291,5 @@ public class GameSimulator {
             }
         }
         return supply;
-    }
-
-    // -------------------------------------------------------------------------
-    // Static EV-per-cost table (precomputed for greedy policy)
-    // -------------------------------------------------------------------------
-
-    /**
-     * Precomputes {@code evPerRound / cost} ratios for every establishment card
-     * using a neutral mid-game reference state: 4 players, each with 1 food/animal/
-     * production card, no landmarks, opponents at 5 coins each.
-     *
-     * <p>This table is used by the greedy buy policy to rank cards without calling
-     * {@link ProbabilityCalc#evPerRound} in the hot simulation loop.
-     */
-    private static Map<String, Double> buildStaticEvPerCost() {
-        Map<String, Double> table = new HashMap<>();
-        // Build a 4-player reference state with minimal owned cards
-        try {
-            GameStateBuilder builder = new GameStateBuilder(4);
-            for (int i = 0; i < 4; i++) {
-                builder.setPlayerName(i, "Sim" + i)
-                       .setCoins(i, 5)
-                       .addProject(i, "weizenfeld")
-                       .addProject(i, "bäckerei");
-            }
-            GameState refState = builder.build();
-
-            for (Project p : ProjectLoader.getAllProjects()) {
-                if (p.isIs_grossprojekt()) continue;
-                if (p.getCost() == 0) continue;
-                double ev = ProbabilityCalc.evPerRound(refState, 0, p);
-                table.put(p.getId(), ev / p.getCost());
-            }
-        } catch (Exception e) {
-            // If initialisation fails (e.g., during static class loading order issues),
-            // fall back to uniform score of 0 — greedy policy will buy any affordable card.
-        }
-        return table;
     }
 }

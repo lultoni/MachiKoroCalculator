@@ -129,18 +129,30 @@ This is enforced consistently in:
 
 The two older bridge methods (`computeNetGainForRollPublic`, `computeOpponentTurnGainForRollPublic`) are retained as `@Deprecated` for backward compatibility but are no longer used in the live game path.
 
-### 2.4b `evPerRound` — Projected Coin Correction
+### 2.4b `evPerRound` — Step-Aware Coin Projection
 
-`computeNetGainForRoll` uses the players' current coin counts for red card clamping. This creates a **static-snapshot bias**: a player with 0 coins appears unable to pay red cards in the EV model, even though they will accumulate blue/green income before the roll that triggers the red card.
+`computeNetGainForRoll` uses the players' current coin counts for red card clamping. This creates a **static-snapshot bias**: a player with 0 coins appears unable to pay red cards in the EV model, even though they will accumulate blue income on prior opponent turns before the triggering roll fires.
 
-`evPerRound` corrects for this by projecting each player's coins forward before evaluation:
+`evPerRound` corrects for this in two stages:
+
+**Stage 1 — base projection (all players):**
 ```
 projectedCoins(player) = currentCoins + round(estimateUncappedOwnTurnEV(player))
 ```
+`estimateUncappedOwnTurnEV` sums the player's own-turn blue+green income using `c=99` (no clamp).
 
-`estimateUncappedOwnTurnEV` sums the player's own-turn blue+green income using `c=99` (no clamp), giving the income they can expect regardless of current wallet. The rounding converts the fractional EV to the nearest integer coin count.
+**Stage 2 — step-aware accumulation (active player only):**
+The active player earns blue income on each opponent's turn. Before evaluating opponent turn #step, the active player's projected coins are updated:
+```
+coinsAtStep = baseProjectedCoins + step × bluePerOpponentTurn
 
-`immediateEV` is **not** affected — it correctly uses actual current coins for the turn happening right now (the player may genuinely have 0 coins on their current turn).
+where:
+  step              = position of this opponent in the turn order (1..n-1)
+  bluePerOppTurn    = Σ_r P2[r] × blueIncome(r)   (2d6 pass; takes max with 1d6 pass)
+```
+This ensures red card clamping reflects realistic coin accumulation for players earlier in the turn order.
+
+`immediateEV` is **not** affected — it correctly uses actual current coins for the turn happening right now.
 
 ### 2.5 Red Card Payment (Café, Familienrestaurant)
 
@@ -169,17 +181,15 @@ gain = min(5, max(opponent_coins))
 
 `get_I` returns `0` for bürohaus because card-swapping is non-monetary.
 
-The EV approximation is computed separately in `ProbabilityCalc.bürohausSwapEV()` and added
-to the output of `immediateEV()`:
+The EV is computed separately in `ProbabilityCalc.bürohausSwapEV()` and added to `immediateEV()`:
 ```
-bürohausSwapEV = max(0, singleCardEvPerRound(bestOppNonLandmark)
-                       − singleCardEvPerRound(worstOwnNonLandmark))
+bürohausSwapEV = max(0, contextualCardEvPerRound(bestOppNonLandmark, activePlayerStats)
+                       − contextualCardEvPerRound(worstOwnNonLandmark, activePlayerStats))
 
 Contribution to immediateEV = P(roll = 6 | dice_mode) × bürohausSwapEV
 ```
 
-**Limitation:** This assumes the player always makes the optimal swap. In reality the swap is
-optional and only favourable when `bestOppEV > worstOwnEV`.
+Both the opponent's card and the player's worst card are evaluated **in the active player's real context** (actual Einkaufszentrum, food/animal/production counts via `contextualCardEvPerRound`). This ensures synergy multipliers are correctly reflected: a player with Einkaufszentrum values café correctly at 2 coins/activation; a player with food cards values Markthalle at its true multiplied payout.
 
 ### 2.9 Category Multipliers
 
@@ -236,21 +246,22 @@ and file I/O on every call would be ~1000× slower.
 Each simulated player follows this buy priority each turn:
 
 1. **Landmark first:** if the player can afford the cheapest unbuilt landmark (Bahnhof → Einkaufszentrum → Freizeitpark → Funkturm in cost order), buy it.
-2. **Best establishment:** else buy the establishment with the highest `STATIC_EV_PER_COST` score that the player can afford and is still in supply.
+2. **Best establishment:** else buy the establishment with the highest contextual `evPerRound / cost` score that the player can afford and is still in supply. Card EV is computed inline using `CardIncome.contextualCardEvPerRound` with the player's actual `PlayerStats`, so synergy multipliers (Markthalle, Molkerei, Möbelfabrik, Einkaufszentrum) are correctly reflected.
 3. **Save:** if nothing is affordable, skip.
 
 The landmark order is always cheapest-first because landmark abilities stack and it is never
 correct to skip a cheaper landmark to buy a more expensive one.
 
-### 4.2 Static EV/Cost Table
+### 4.2 Card Evaluation in the Simulation Policy
 
-`GameSimulator.STATIC_EV_PER_COST` is precomputed once at class load using a 4-player neutral
-reference state (each player: Weizenfeld + Bäckerei, 5 coins, no landmarks). This avoids calling
-`ProbabilityCalc.evPerRound` inside the simulation hot loop, which would be ~100× more expensive.
+Card buy decisions use `CardIncome.contextualCardEvPerRound(card, playerStats, n, oppCoins)`:
+- 2d6 pass over rolls 2–12 plus a 1d6 pass for roll-1 activations (takes max)
+- Uses the buying player's real `PlayerStats` (Einkaufszentrum, food/animal/production counts)
+- Blue cards scaled by `n` (fire every turn); red cards scaled by `n-1`
+- Cost is `c=99` (no clamp) — evaluates the card's income potential, not payment ability
 
-**Trade-off:** The table uses a fixed reference state, so synergy effects (e.g. a player with
-3 food cards gets more from Markthalle) are not reflected in the buy decisions during simulation.
-This is an acceptable approximation for win-rate estimation.
+This inline computation (~12 `get_I` calls per candidate) is allocation-free and negligible
+compared to the `computeAllDeltasForRoll` calls that dominate each simulated turn.
 
 ### 4.3 Card Supply Tracking
 
@@ -269,12 +280,11 @@ non-landmark types (including weizenfeld and bäckerei — starter copies given 
 counted against the shared pool of 6). `GameSession.applyTurn` removes a type after the 6th
 copy is purchased; `GameStateBuilder.build()` excludes a type when its owned count ≥ 6.
 
-### 4.4 Known Approximations in the Simulator
+### 4.4 Remaining Approximations in the Simulator
 
 | Approximation | Impact | Location |
 |---------------|--------|----------|
-| Bahnhof always picks 2d6 | Overestimates income in early game when 1d6 might be better | `GameSimulator.rollDice()` |
-| Static EV/cost table ignores synergy | Suboptimal buy decisions for synergy-heavy builds | `GameSimulator.STATIC_EV_PER_COST` |
+| Bahnhof always picks 2d6 when high-range card present | Overestimates income in early game when 1d6 might be better | `GameSimulator.rollDice()` |
 | Bürohaus not executed in simulation | Bürohaus owners never swap; slightly underestimates their win rate | `GameSimulator.greedyBuy()` |
 | `MAX_TURNS = 200` cap | Rare timeout returns -1 (excluded from win rate denominator) | `GameSimulator.simulate()` |
 

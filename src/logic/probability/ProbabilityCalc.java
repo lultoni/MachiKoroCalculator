@@ -322,14 +322,36 @@ public class ProbabilityCalc {
 
         // Project each player's coins forward by their expected per-turn blue+green income.
         // This corrects the static-snapshot bias in red card clamping for the EV horizon.
-        for (Player p : state.getPlayers()) {
-            boolean pHasBahnhof = p.hasProject("bahnhof");
-            int projected = (int) Math.round(p.getCoins()
-                    + CardIncome.estimateUncappedOwnTurnEV(p, pHasBahnhof));
-            p.setCoins(projected);
-        }
-
+        // Step-index correction: the active player accumulates additional blue income
+        // on each prior opponent turn before a red card fires. We precompute the active
+        // player's expected blue-only income per opponent turn (P(r) × blue cards for each r),
+        // then add step × bluePerOppTurn when evaluating opponent turn #step.
         int n = state.getPlayers().length;
+        double[] baseCoins = new double[n];
+        for (int i = 0; i < n; i++) {
+            Player p = state.getPlayers()[i];
+            boolean pHasBahnhof = p.hasProject("bahnhof");
+            baseCoins[i] = p.getCoins()
+                    + CardIncome.estimateUncappedOwnTurnEV(p, pHasBahnhof);
+            p.setCoins((int) Math.round(baseCoins[i]));
+        }
+        // Blue income the active player earns per opponent turn (from blue cards firing
+        // on each opponent's turn). Used for step-aware coin projection below.
+        final Player activeP = state.getPlayers()[playerIndex];
+        final CardIncome.PlayerStats activeStats = CardIncome.PlayerStats.of(activeP);
+        double bluePerOppTurn = 0.0;
+        for (int r = 2; r <= 12; r++) {
+            int blueIncome = CardIncome.sumColorIncome(activeP, "blau", r, activeStats, 99, new int[0]);
+            bluePerOppTurn += CardIncome.P2[r] * blueIncome;
+        }
+        // Also capture roll-1 blue income (weizenfeld) via 1d6 distribution
+        double bluePerOppTurn1d6 = 0.0;
+        for (int r = 1; r <= 6; r++) {
+            int blueIncome = CardIncome.sumColorIncome(activeP, "blau", r, activeStats, 99, new int[0]);
+            bluePerOppTurn1d6 += CardIncome.P1[r] * blueIncome;
+        }
+        bluePerOppTurn = Math.max(bluePerOppTurn, bluePerOppTurn1d6);
+
         double total = 0.0;
 
         // Own turn: blue + green + purple + red costs paid
@@ -354,9 +376,17 @@ public class ProbabilityCalc {
             total += Math.max(ev1, ev2);
         }
 
-        // Opponent turns: tracked player gains from blue + red cards each opponent turn
+        // Opponent turns: tracked player gains from blue + red cards each opponent turn.
+        // For each step, the active player has accumulated 'step × bluePerOppTurn' coins
+        // since the round started, improving their ability to pay red cards.
+        int step = 0;
         for (int opponentIdx = 0; opponentIdx < n; opponentIdx++) {
             if (opponentIdx == playerIndex) continue;
+            step++;
+            // Update active player's projected coins for this step
+            int stepCoins = (int) Math.round(baseCoins[playerIndex] + step * bluePerOppTurn);
+            state.getPlayers()[playerIndex].setCoins(stepCoins);
+
             boolean opponentHasBahnhof = state.getPlayers()[opponentIdx].hasProject("bahnhof");
             final int oppIdx = opponentIdx;
             total += CardIncome.bestDiceEV(opponentHasBahnhof,

@@ -82,27 +82,14 @@ Deterministischer, regelbasierter Spielassistent. **Keine generative KI.** Werte
 
 | # | Thema | Erklärung |
 |---|-------|-----------|
-| A1 | Bürohaus — Optimal-Swap-Annahme | `bürohausSwapEV` nimmt an, der Spieler tauscht immer optimal. Swap ist eigentlich optional. Akzeptable Heuristik. Siehe `ARCHITECTURE.md §2.8`. |
-| A2 | GameSimulator — Statische EV/Cost-Tabelle | `STATIC_EV_PER_COST` ignoriert Synergien (z.B. viele Food-Karten + Markthalle). Akzeptabel für Gewinnraten-Schätzung. Siehe `ARCHITECTURE.md §4.2`. |
-| A3 | `evPerRound` — Einschritt-Münzprojektion | Projektion via `estimateUncappedOwnTurnEV` ist kein vollständiges Mehrrundenmodell. Akzeptierte Näherung. Siehe `ARCHITECTURE.md §2.4b`. |
+| A1 | Bürohaus — step-aware Projektion | Blaues Einkommen wird jetzt schrittsweise pro Gegner-Position akkumuliert; Rundungsfehler durch integer-Projektion sind vernachlässigbar. |
+| A2 | Bahnhof-Würfelwahl im Simulator | `GameSimulator.rollDice()` wählt 2d6 wenn der Spieler eine Karte mit Aktivierung ≥ 7 hat — Heuristik statt exakter EV-Berechnung. Akzeptabler Trade-off für Simulationsgeschwindigkeit. |
 
 ---
 
 ## Math-Audit (High — Priorität nach N1)
 
-### M1 · Tiefenanalyse der Berechnungsarchitektur — Näherungen entfernen
-
-Ziel: Die drei akzeptierten Näherungen (A1–A3) mathematisch präzise lösen. Dazu ist eine gründliche Analyse der bestehenden Formeln notwendig, ggf. mit Webrecherche zu exakten analytischen Methoden.
-
-**Scope:**
-
-| # | Näherung | Ziel |
-|---|----------|------|
-| A1 | Bürohaus-Swap als fixer "optimal swap immer" | Swap ist optional → EV-Berechnung muss den Erwartungswert beider Optionen (tauschen vs. nicht tauschen) gewichten |
-| A2 | `STATIC_EV_PER_COST` in GameSimulator ignoriert Synergien | Entweder dynamische Berechnung pro Simulationszustand oder verbesserte statische Tabelle mit Synergieboni |
-| A3 | `evPerRound` als Einschritt-Projektion (keine echte Mehrrundenmodellierung) | Mehrrundenmodell: EV-Wachstum durch Münzakkumulation korrekt in der Projektion abbilden |
-
-**Vorgehen:** Webrecherche zu Machi-Koro-Mathematik und verwandten stochastischen Spielmodellen → Formeln ableiten → in `ProbabilityCalc`/`CardIncome` implementieren → A1–A3 aus "Akzeptierte Näherungen" entfernen.
+### M1 · ~~Tiefenanalyse der Berechnungsarchitektur — Näherungen entfernen~~ ✓ (behoben)
 
 ---
 

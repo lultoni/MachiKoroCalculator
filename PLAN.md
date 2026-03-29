@@ -240,14 +240,9 @@ wobei:
 
 ---
 
-#### C5 · Deep Code Optimization (Medium, unpriorisiert)
+#### C5 · ~~Deep Code Optimization~~ ✓ (behoben)
 
-Vollständige Optimierungsrunde:
-- Hot-Path-Profiling: `rankAllProjects` → `evPerRound` → `computeNetGainForRoll`
-- `computeNetGainForRoll` wird pro `evPerRound`-Aufruf mehrfach für dieselbe `PlayerStats` aufgerufen — memoization prüfen
-- Redundante Bahnhof/Funkturm/Freizeitpark-Prüflogik in `immediateEV`, `evPerRound`, `computeVarianceOwnTurn`, `computeProbNoIncomeOwnTurn` — DRY-Kandidat
-
-**Voraussetzung:** Bestehende Tests müssen weiterhin bestehen; keine Verhaltensänderung.
+`buildRollGainCache(state, playerIndex)` → `double[13]` prefill, shared across `computeOwnTurnEV`, `computeVariance*`, `computeProbNoIncome*`, `optimalDiceCount`. `computeOwnTurnEV(state, pi, cache, ...)` extrahiert das duplizierte Bahnhof/FZP/FT-Entscheidungsblock aus `immediateEV` und `evPerRound`. Ergebnis: `computeNetGainForRoll` wird von ~84 auf 12 Aufrufe pro `immediateEV`/`evPerRound`-Aufruf reduziert.
 
 ---
 
@@ -290,6 +285,9 @@ Die 8 Kategorien mit kleinen Icons (16×16) in `src/resources/category_icons/` d
 
 ### Math-Audit ✓
 M1 (Architektur-Audit) · M2 (Funkturm-EV) · M3 (dynamisches remainingTurns) · M4 (Landmark-Gewichte) · M5 (Warten-Option) · M6 (Bahnhof-Synergie im 2-Turn-Lookahead) · M7 (Boltzmann-MC-Policy) · M8 (Bahnhof-Gate im Simulator)
+
+### Code-Qualität ✓
+C5 (buildRollGainCache + computeOwnTurnEV — DRY-Refactoring hot path)
 
 ### Features ✓
 N0 (Bürohaus-Tausch) · N1 (Game Assistant) · N2 (Bahnhof-Würfelwahl) · N3 (Phasenerkennung) · N4a–N4c (Snapshot/Labeling-System)

@@ -46,7 +46,25 @@ Vollständige Implementierung des in PLAN.md § "Dreistufiges Hybrid-System" bes
 
 ---
 
-## portfolioDeltaEV — Marginal-Portfolio-EV als neue Ranking-Metrik
+## C5 — buildRollGainCache + computeOwnTurnEV: Hot-Path-DRY-Refactoring
+
+**Problem:** `computeNetGainForRoll(state, playerIndex, r, false)` wurde pro `immediateEV`- oder `evPerRound`-Aufruf bis zu ~84 mal aufgerufen (6 für 1d6 + 36 für 2d6 + 36 für `funkturmEV` + 6 für 1d6-Funkturm), obwohl es für jeden der 12 distinkten Roll-Werte stets dasselbe Ergebnis liefert. Außerdem war die Bahnhof/Freizeitpark/Funkturm-Entscheidungslogik identisch in `immediateEV` und `evPerRound` dupliziert.
+
+**`buildRollGainCache(state, playerIndex)`** — neue private Hilfsmethode. Befüllt `double[13]` einmal (Index 0 ungenutzt, 1–12 = Ergebnis pro Roll). Da der `isDoubles`-Parameter in `computeNetGainForRoll` intern nicht ausgewertet wird (reserved hook), ist der Cache für alle Roll-Kontexte korrekt.
+
+**`computeOwnTurnEV(state, pi, cache, hasBahnhof, hasFreizeitpark, hasFunkturm)`** — neue private Hilfsmethode, extrahiert die gemeinsame Bahnhof/FZP/FT-Logik. Aufgerufen von `immediateEV` und `evPerRound`. Eliminiert ~50 Zeilen Code-Duplikat.
+
+**`computeVariance1d6(double[])`** / **`computeVariance2d6(double[])`** — neue cache-basierte Überladungen. Veraltete `(GameState, int)`-Überladungen rufen `buildRollGainCache` einmalig auf und delegieren.
+
+**`bestSecondRollEV`** — nutzt jetzt ebenfalls `buildRollGainCache` statt direkter Lambda-Closure.
+
+**`optimalDiceCount`** — ebenfalls auf Cache umgestellt.
+
+**Tests:** 224 PASS, 0 FAIL. Keine Verhaltensänderung.
+
+---
+
+
 
 `RankEntry.portfolioDeltaEV` = `playerEvPerRound(portfolio + card) − playerEvPerRound(portfolio)`. Erfasst Cross-Karten-Synergien die `evPerRound` (per-Karte-isoliert) verpasst: Bauernhof→Molkerei, Food→Markthalle, Bahnhof→alle 7–12-Karten.
 

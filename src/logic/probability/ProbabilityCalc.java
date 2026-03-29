@@ -264,11 +264,88 @@ public class ProbabilityCalc {
      */
     private static double bestSecondRollEV(GameState state, int playerIndex, int forcedDiceCount) {
         boolean hasBahnhof = state.getPlayers()[playerIndex].hasProject("bahnhof");
-        IntToDoubleFunction payout = r -> computeNetGainForRoll(state, playerIndex, r, false);
+        double[] cache = buildRollGainCache(state, playerIndex);
+        IntToDoubleFunction payout = r -> cache[r];
 
         if (forcedDiceCount == 1) return CardIncome.weightedRollEV(false, payout);
         if (forcedDiceCount == 2) return CardIncome.weightedRollEV(true, payout);
         return hasBahnhof ? CardIncome.bestDiceEV(true, payout) : CardIncome.weightedRollEV(false, payout);
+    }
+
+    // -------------------------------------------------------------------------
+    // buildRollGainCache — precompute roll payouts for a single-player/state pair
+    // -------------------------------------------------------------------------
+
+    /**
+     * Precomputes the net coin gain (isDoubles=false) for the active player over all
+     * possible roll values 1–12 and stores them in a {@code double[13]} array.
+     * Index 0 is unused; indices 1–6 cover 1d6 rolls, indices 2–12 cover 2d6 rolls.
+     *
+     * <p>Because {@link #computeNetGainForRoll}'s {@code isDoubles} parameter is unused
+     * in the computation (it was a reserved hook), the cache is valid for both the 1d6 and
+     * 2d6 roll paths. The array is built once per call to {@link #immediateEV} /
+     * {@link #evPerRound} and reused for every probability-weighted sum within that call.
+     */
+    private static double[] buildRollGainCache(GameState state, int playerIndex) {
+        double[] cache = new double[13];
+        for (int r = 1; r <= 12; r++) {
+            cache[r] = computeNetGainForRoll(state, playerIndex, r, false);
+        }
+        return cache;
+    }
+
+    // -------------------------------------------------------------------------
+    // computeOwnTurnEV — shared Bahnhof/Freizeitpark/Funkturm logic
+    // -------------------------------------------------------------------------
+
+    /**
+     * Returns the expected coin gain for the active player on their own turn, given a
+     * precomputed roll-gain cache. Centralises the Bahnhof/Freizeitpark/Funkturm decision
+     * logic that was previously duplicated across {@link #immediateEV} and {@link #evPerRound}.
+     *
+     * @param state           game state (with candidate already purchased)
+     * @param playerIndex     active player
+     * @param cache           roll-gain array from {@link #buildRollGainCache}; index = roll value
+     * @param hasBahnhof      whether the player owns Bahnhof
+     * @param hasFreizeitpark whether the player owns Freizeitpark
+     * @param hasFunkturm     whether the player owns Funkturm
+     * @return expected coin gain on the own turn (EV, excluding opponent turns)
+     */
+    private static double computeOwnTurnEV(GameState state, int playerIndex,
+                                           double[] cache,
+                                           boolean hasBahnhof,
+                                           boolean hasFreizeitpark,
+                                           boolean hasFunkturm) {
+        IntToDoubleFunction payout = r -> cache[r];
+
+        if (!hasBahnhof) {
+            return hasFunkturm
+                    ? funkturmEV(false, payout)
+                    : CardIncome.weightedRollEV(false, payout);
+        }
+
+        // 1d6 path
+        double ev1 = hasFunkturm
+                ? funkturmEV(false, payout)
+                : CardIncome.weightedRollEV(false, payout);
+
+        // 2d6 path
+        double ev2 = 0.0;
+        for (int d1 = 1; d1 <= 6; d1++) {
+            for (int d2 = 1; d2 <= 6; d2++) {
+                double p = 1.0 / 36.0;
+                boolean isDoubles = (d1 == d2);
+                ev2 += p * cache[d1 + d2];
+                if (hasFreizeitpark && isDoubles) {
+                    ev2 += p * bestSecondRollEV(state, playerIndex, hasFunkturm ? 2 : -1);
+                }
+            }
+        }
+        if (hasFunkturm) {
+            ev2 = Math.max(ev2, funkturmEV(true, payout));
+        }
+
+        return Math.max(ev1, ev2);
     }
 
     // -------------------------------------------------------------------------
@@ -298,47 +375,9 @@ public class ProbabilityCalc {
         boolean hasFreizeitpark = player.hasProject("freizeitpark");
         boolean hasFunkturm   = player.hasProject("funkturm");
 
-        double evTotal;
-
-        // Payout function without doubles-awareness (used for 1d6 paths and Funkturm)
-        IntToDoubleFunction payout1d6 = r -> computeNetGainForRoll(state, playerIndex, r, false);
-
-        if (!hasBahnhof) {
-            if (hasFunkturm) {
-                // Funkturm: re-roll once on dislike — strictly better than plain 1d6
-                evTotal = funkturmEV(false, payout1d6);
-            } else {
-                evTotal = CardIncome.weightedRollEV(false, payout1d6);
-            }
-        } else {
-            double ev1 = hasFunkturm
-                    ? funkturmEV(false, payout1d6)
-                    : CardIncome.weightedRollEV(false, payout1d6);
-
-            double ev2 = 0.0;
-            for (int d1 = 1; d1 <= 6; d1++) {
-                for (int d2 = 1; d2 <= 6; d2++) {
-                    double p = 1.0 / 36.0;
-                    boolean isDoubles = (d1 == d2);
-                    int net = computeNetGainForRoll(state, playerIndex, d1 + d2, isDoubles);
-                    ev2 += p * net;
-                    if (hasFreizeitpark && isDoubles) {
-                        int forcedDice = hasFunkturm ? 2 : -1;
-                        ev2 += p * bestSecondRollEV(state, playerIndex, forcedDice);
-                    }
-                }
-            }
-            // Funkturm with 2d6: if re-roll option improves the 2d6 EV beyond the doubles benefit,
-            // apply funkturmEV to the 2d6 base payout (without doubles bonus — Funkturm forces same
-            // dice count, and the second roll cannot chain Freizeitpark per rules).
-            if (hasFunkturm) {
-                IntToDoubleFunction payout2d6 = r -> computeNetGainForRoll(state, playerIndex, r, false);
-                double ev2WithFunkturm = funkturmEV(true, payout2d6);
-                ev2 = Math.max(ev2, ev2WithFunkturm);
-            }
-
-            evTotal = Math.max(ev1, ev2);
-        }
+        double[] cache = buildRollGainCache(state, playerIndex);
+        double evTotal = computeOwnTurnEV(state, playerIndex, cache,
+                hasBahnhof, hasFreizeitpark, hasFunkturm);
 
         // Bürohaus card-swap EV: fires on own turn when roll = 6 (lila, own-turn only).
         if (player.hasProject("bürohaus")) {
@@ -415,32 +454,8 @@ public class ProbabilityCalc {
         boolean hasBahnhof = state.getPlayers()[playerIndex].hasProject("bahnhof");
         boolean hasFreizeitpark = state.getPlayers()[playerIndex].hasProject("freizeitpark");
         boolean hasFunkturm    = state.getPlayers()[playerIndex].hasProject("funkturm");
-        IntToDoubleFunction payout1d6 = r -> computeNetGainForRoll(state, playerIndex, r, false);
-        if (!hasBahnhof) {
-            total += hasFunkturm
-                    ? funkturmEV(false, payout1d6)
-                    : CardIncome.weightedRollEV(false, payout1d6);
-        } else {
-            double ev1 = hasFunkturm
-                    ? funkturmEV(false, payout1d6)
-                    : CardIncome.weightedRollEV(false, payout1d6);
-            double ev2 = 0.0;
-            for (int d1 = 1; d1 <= 6; d1++) {
-                for (int d2 = 1; d2 <= 6; d2++) {
-                    double p = 1.0 / 36.0;
-                    boolean isDoubles = (d1 == d2);
-                    ev2 += p * computeNetGainForRoll(state, playerIndex, d1 + d2, isDoubles);
-                    if (hasFreizeitpark && isDoubles) {
-                        ev2 += p * bestSecondRollEV(state, playerIndex, hasFunkturm ? 2 : -1);
-                    }
-                }
-            }
-            if (hasFunkturm) {
-                IntToDoubleFunction payout2d6 = r -> computeNetGainForRoll(state, playerIndex, r, false);
-                ev2 = Math.max(ev2, funkturmEV(true, payout2d6));
-            }
-            total += Math.max(ev1, ev2);
-        }
+        double[] ownCache = buildRollGainCache(state, playerIndex);
+        total += computeOwnTurnEV(state, playerIndex, ownCache, hasBahnhof, hasFreizeitpark, hasFunkturm);
 
         // Opponent turns: tracked player gains from blue + red cards each opponent turn.
         // For each step, the active player has accumulated 'step × bluePerOppTurn' coins
@@ -507,15 +522,21 @@ public class ProbabilityCalc {
     private static double computeVarianceOwnTurn(GameState state, int playerIndex) {
         boolean hasBahnhof = state.getPlayers()[playerIndex].hasProject("bahnhof");
         if (!hasBahnhof) return computeVariance1d6(state, playerIndex);
-        IntToDoubleFunction payout = r -> computeNetGainForRoll(state, playerIndex, r, false);
+        double[] cache = buildRollGainCache(state, playerIndex);
+        IntToDoubleFunction payout = r -> cache[r];
         boolean use2d6 = CardIncome.weightedRollEV(true, payout) > CardIncome.weightedRollEV(false, payout);
-        return use2d6 ? computeVariance2d6(state, playerIndex) : computeVariance1d6(state, playerIndex);
+        return use2d6 ? computeVariance2d6(cache) : computeVariance1d6(cache);
     }
 
     private static double computeVariance1d6(GameState state, int playerIndex) {
+        double[] cache = buildRollGainCache(state, playerIndex);
+        return computeVariance1d6(cache);
+    }
+
+    private static double computeVariance1d6(double[] cache) {
         double ev = 0.0, e2 = 0.0;
         for (int d = 1; d <= 6; d++) {
-            double gain = computeNetGainForRoll(state, playerIndex, d, false);
+            double gain = cache[d];
             ev += P1[d] * gain;
             e2 += P1[d] * gain * gain;
         }
@@ -523,11 +544,16 @@ public class ProbabilityCalc {
     }
 
     private static double computeVariance2d6(GameState state, int playerIndex) {
+        double[] cache = buildRollGainCache(state, playerIndex);
+        return computeVariance2d6(cache);
+    }
+
+    private static double computeVariance2d6(double[] cache) {
         double ev = 0.0, e2 = 0.0;
         for (int d1 = 1; d1 <= 6; d1++) {
             for (int d2 = 1; d2 <= 6; d2++) {
                 double p    = 1.0 / 36.0;
-                double gain = computeNetGainForRoll(state, playerIndex, d1 + d2, false);
+                double gain = cache[d1 + d2];
                 ev += p * gain;
                 e2 += p * gain * gain;
             }
@@ -537,7 +563,8 @@ public class ProbabilityCalc {
 
     private static double computeProbNoIncomeOwnTurn(GameState state, int playerIndex) {
         boolean hasBahnhof = state.getPlayers()[playerIndex].hasProject("bahnhof");
-        IntToDoubleFunction payout = r -> computeNetGainForRoll(state, playerIndex, r, false);
+        double[] cache = buildRollGainCache(state, playerIndex);
+        IntToDoubleFunction payout = r -> cache[r];
         boolean use2d6 = hasBahnhof && CardIncome.weightedRollEV(true, payout) > CardIncome.weightedRollEV(false, payout);
         return CardIncome.weightedRollEV(use2d6, r -> payout.applyAsDouble(r) == 0 ? 1.0 : 0.0);
     }
@@ -642,7 +669,8 @@ public class ProbabilityCalc {
     public static int optimalDiceCount(GameState gs, int playerIndex) {
         Player player = gs.getPlayers()[playerIndex];
         if (!player.hasProject("bahnhof")) return 1;
-        IntToDoubleFunction payout = r -> computeNetGainForRoll(gs, playerIndex, r, false);
+        double[] cache = buildRollGainCache(gs, playerIndex);
+        IntToDoubleFunction payout = r -> cache[r];
         double ev1 = CardIncome.weightedRollEV(false, payout);
         double ev2 = CardIncome.weightedRollEV(true,  payout);
         return (ev2 - ev1 > 1e-6) ? 2 : 1;

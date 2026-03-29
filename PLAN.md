@@ -83,21 +83,7 @@ Programmatisch als kleine Kreise/Ovale zeichnen; für Rot zusätzlich Hinweis "W
 
 ---
 
-### M4 · Alle Landmark-Gewichte sind gleich (`LANDMARK_WEIGHT = 2.0`) (Low–Medium)
-
-**Problem:** In `WinProbabilityCalc.computeScores` erhält jedes Großprojekt den gleichen Bonus `+2.0`. Aber die Landmarks haben sehr unterschiedliche EV-Beiträge:
-- Bahnhof (4¢): moderate Würfelwahl-Verbesserung (~0.5–1.5 Münzen/Runde je nach Portfolio)
-- Einkaufszentrum (10¢): signifikanter Multiplikator für Grün-/Store-Karten
-- Freizeitpark (16¢): erheblicher Bonus durch Doppelwurf-EV
-- Funkturm (22¢): Neuwerf-EV (nach M2-Fix relevant)
-
-**Korrekte Berechnung:**
-```
-LANDMARK_WEIGHT(L) ≈ immediateEV_with_L − immediateEV_without_L × REMAINING_TURNS
-```
-Das ist mit bestehenden Methoden berechenbar, aber zu langsam für jeden `computeScores`-Aufruf.
-
-**Praktikabler Ansatz:** Precomputed Tabelle mit 4 landmark-spezifischen Gewichten, kalibriert aus MC-Daten oder aus dem EV-Delta bei einem Referenz-Spieler. Gewichte könnten z.B. `[1.5, 2.5, 3.5, 4.0]` sein statt `[2.0, 2.0, 2.0, 2.0]`.
+### M4 · ~~Alle Landmark-Gewichte sind gleich (`LANDMARK_WEIGHT = 2.0`)~~ ✓ (behoben)
 
 ---
 

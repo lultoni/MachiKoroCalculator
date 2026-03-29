@@ -11,8 +11,28 @@ import java.util.stream.IntStream;
  */
 class WinProbabilityCalc {
 
-    /** Landmark weight in the softmax score function. */
-    private static final double LANDMARK_WEIGHT = 2.0;
+    /**
+     * Per-landmark score bonus in the softmax win-probability scorer.
+     * Calibrated from evPerRound EV deltas on a typical mid-game portfolio
+     * (Weizenfeld, Bäckerei, Bauernhof, Wald, Bergwerk, Apfelplantage, Café, Familienrestaurant)
+     * multiplied by ~15 remaining turns and scaled to the [1–4] range:
+     * <ul>
+     *   <li>Bahnhof       (4¢):  +0.5/round → 1.5</li>
+     *   <li>Einkaufszentrum(10¢): +1.0/round → 3.0</li>
+     *   <li>Freizeitpark  (16¢): +0.3/round → 1.5  (low EV but strategic doubles synergy)</li>
+     *   <li>Funkturm      (22¢): +1.1/round → 4.0  (M2 re-roll EV fully reflected)</li>
+     * </ul>
+     * Any landmark not listed here (e.g. future expansion landmarks) gets the fallback weight 2.0.
+     */
+    private static final java.util.Map<String, Double> LANDMARK_WEIGHTS = java.util.Map.of(
+            "bahnhof",          1.5,
+            "einkaufszentrum",  3.0,
+            "freizeitpark",     1.5,
+            "funkturm",         4.0
+    );
+
+    /** Fallback landmark weight for any landmark not in {@link #LANDMARK_WEIGHTS}. */
+    private static final double LANDMARK_WEIGHT_DEFAULT = 2.0;
 
     /** Remaining-turns estimate used in softmax scoring when no elapsed-turn info is provided. */
     private static final double REMAINING_TURNS_FALLBACK = 12.0;
@@ -153,7 +173,9 @@ class WinProbabilityCalc {
             double score = CardIncome.playerEvPerRound(players[i], n, opponentCoins)
                     * remainingTurns;
             for (Project p : players[i].getOwned_projects()) {
-                if (p.isIs_grossprojekt()) score += LANDMARK_WEIGHT;
+                if (p.isIs_grossprojekt()) {
+                    score += LANDMARK_WEIGHTS.getOrDefault(p.getId(), LANDMARK_WEIGHT_DEFAULT);
+                }
             }
             scores[i] = score;
         }

@@ -4,6 +4,24 @@ Implementierungsgeschichte: was gebaut wurde, warum, und welche Designentscheidu
 
 ---
 
+## M4: Per-Landmark-Gewichte in WinProbabilityCalc
+
+**Problem:** `LANDMARK_WEIGHT = 2.0` war für alle 4 Großprojekte identisch, obwohl ihre EV-Beiträge stark variieren.
+
+**Kalibrierung** (mid-game Portfolio, 15 verbleibende Züge):
+| Landmark | evPerRound-Delta | Neues Gewicht |
+|---|---|---|
+| Bahnhof (4¢) | +0.5/Runde | 1.5 |
+| Einkaufszentrum (10¢) | +1.0/Runde | 3.0 |
+| Freizeitpark (16¢) | +0.3/Runde | 1.5 |
+| Funkturm (22¢) | +1.1/Runde | 4.0 (M2-Fix) |
+
+**Lösung:** `LANDMARK_WEIGHTS` Map in `WinProbabilityCalc`; `LANDMARK_WEIGHT_DEFAULT = 2.0` als Fallback für zukünftige Expansion-Landmarks. `computeScores` nutzt `LANDMARK_WEIGHTS.getOrDefault(id, DEFAULT)`.
+
+**Tests:** 224 bestanden, 0 fehlgeschlagen.
+
+---
+
 ## M3: Dynamischer REMAINING_TURNS_ESTIMATE in WinProbabilityCalc
 
 **Problem:** `REMAINING_TURNS_ESTIMATE = 12.0` war eine statische Konstante. Im Frühspiel (viele Züge übrig) wurde der EV-Term unterschätzt, im Endspiel (Gegner hat 3 GPs) dramatisch überschätzt.

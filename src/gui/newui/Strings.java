@@ -393,6 +393,19 @@ public final class Strings {
     public static String mcRunning()          { return s("MC läuft…", "Running MC…"); }
     public static String mcDone(int n)        { return s("MC fertig (" + n + " Sim.)", "MC done (" + n + " sims)"); }
 
+    public static String mcTempLabel()        { return "T:"; }
+    public static String mcTempTooltip()      {
+        return s(
+            "Boltzmann-Temperatur für MC-Kaufpolitik: " +
+            "0 = deterministisch greedy (alle Spieler kaufen immer optimal), " +
+            "0.7 = empfohlen (realistische Streuung), " +
+            "hoch = zufällig.",
+            "Boltzmann temperature for MC buy policy: " +
+            "0 = greedy (all players always buy optimally), " +
+            "0.7 = recommended (realistic spread), high = random."
+        );
+    }
+
     // =========================================================================
     // MainWindow — dynamic status strings
     // =========================================================================

@@ -4,6 +4,24 @@ Implementierungsgeschichte: was gebaut wurde, warum, und welche Designentscheidu
 
 ---
 
+## M7 — Boltzmann-Exploration Toggle für MC-Simulator
+
+Der MC-Simulator verwendete bisher eine rein deterministische Greedy-Policy: alle simulierten Spieler kaufen immer die Karte mit dem höchsten ROI-Score. Das führte zu systematisch verzerrten Win-Raten — Spieler die von der optimalen Strategie abweichen, wurden als schlechter dargestellt als sie tatsächlich sind.
+
+**`GameSimulator.simulate(state, rng, temperature)`** — neue Überladung mit Boltzmann-Temperatur T. Bei T=0 wird die bestehende `greedyBuy()`-Methode aufgerufen (identisches Verhalten). Bei T>0 ruft `boltzmannBuy()` auf: Scores aller erschwingl. Karten werden via Softmax in eine Wahrscheinlichkeitsverteilung umgewandelt, aus der stochastisch gesampelt wird.
+
+**Formel:** `P(buy X) ∝ exp((score(X) − max_score) / T)` mit max-Subtraktion für numerische Stabilität.
+
+**Landmark-Priorität** (Bahnhof-Gate + Kosten-Reihenfolge) bleibt in beiden Modi deterministisch — nur die Establishments werden stochastisch gewählt.
+
+**`RankingOptions.mcExplorationTemp`** (default 0.0) — neues Feld, wird durch `rankPurchasableProjects`, `rankAllProjects` und `mcWinRate` durchgereicht.
+
+**UI:** T-Spinner (Bereich 0.0–5.0, Schritt 0.1) neben dem N-Spinner in der Button-Bar. Empfohlener Wert: T=0.7.
+
+**Tests:** 228 PASS, 0 FAIL.
+
+---
+
 ## Bahnhof-Synergie-Fixes: M6 (Lookahead), M8 (Simulator-Gate)
 
 ### Problem

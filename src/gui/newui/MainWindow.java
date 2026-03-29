@@ -92,6 +92,7 @@ public class MainWindow extends JFrame {
     private JToggleButton deepAnalysisBtn;
     private JLabel statusLabel;
     private JSpinner mcSimSpinner;
+    private JSpinner mcTempSpinner;
     private JButton mcReloadBtn;
 
     // ---- snapshot / live state for the current-player recommendation ----
@@ -561,6 +562,16 @@ public class MainWindow extends JFrame {
         });
         btnBar.add(new JLabel("N:"));
         btnBar.add(mcSimSpinner);
+
+        // Boltzmann temperature spinner (T=0 greedy, T=0.7 recommended)
+        mcTempSpinner = new BoundedSpinner(new SpinnerNumberModel(0.0, 0.0, 5.0, 0.1));
+        ((JSpinner.NumberEditor) mcTempSpinner.getEditor()).getFormat().setMaximumFractionDigits(1);
+        mcTempSpinner.setPreferredSize(new Dimension(55, 24));
+        mcTempSpinner.setToolTipText(Strings.mcTempTooltip());
+        mcTempSpinner.addChangeListener(e ->
+            rankOpts.mcExplorationTemp = (double) mcTempSpinner.getValue());
+        btnBar.add(new JLabel(Strings.mcTempLabel()));
+        btnBar.add(mcTempSpinner);
 
         // Reload button for MC
         mcReloadBtn = new JButton("Reload MC");

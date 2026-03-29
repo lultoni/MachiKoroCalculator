@@ -635,7 +635,21 @@ public class ProbabilityCalc {
      * @return win rate in [0, 1]
      */
     public static double mcWinRate(GameState state, int playerIndex, int numSims) {
-        return WinProbabilityCalc.mcWinRate(state, playerIndex, numSims);
+        return WinProbabilityCalc.mcWinRate(state, playerIndex, numSims, 0.0);
+    }
+
+    /**
+     * Runs {@code numSims} Monte Carlo simulations in parallel with the specified
+     * Boltzmann temperature for the buy policy, and returns the win rate.
+     *
+     * @param state       starting state (read-only; a copy is taken per simulation)
+     * @param playerIndex player whose win rate is measured
+     * @param numSims     number of simulations to run
+     * @param temperature Boltzmann temperature (0.0 = greedy, 0.7 = recommended exploration)
+     * @return win rate in [0, 1]
+     */
+    public static double mcWinRate(GameState state, int playerIndex, int numSims, double temperature) {
+        return WinProbabilityCalc.mcWinRate(state, playerIndex, numSims, temperature);
     }
 
     // -------------------------------------------------------------------------
@@ -704,7 +718,7 @@ public class ProbabilityCalc {
 
         double mcBaseline = 0.0;
         if (opts.includeWinProbDelta && opts.mcSimulations > 0) {
-            mcBaseline = WinProbabilityCalc.mcWinRate(gs, playerIndex, opts.mcSimulations);
+            mcBaseline = WinProbabilityCalc.mcWinRate(gs, playerIndex, opts.mcSimulations, opts.mcExplorationTemp);
         }
 
         // Unbuilt pool (regular + lila cards already pre-filtered into this list)
@@ -749,7 +763,7 @@ public class ProbabilityCalc {
                 if (opts.mcSimulations > 0) {
                     GameState stateAfter = gs.copy();
                     stateAfter.getPlayers()[playerIndex].getOwned_projects().add(candidate);
-                    double afterBuy = WinProbabilityCalc.mcWinRate(stateAfter, playerIndex, opts.mcSimulations);
+                    double afterBuy = WinProbabilityCalc.mcWinRate(stateAfter, playerIndex, opts.mcSimulations, opts.mcExplorationTemp);
                     entry.winProbDelta = afterBuy - mcBaseline;
                 } else {
                     entry.winProbDelta = WinProbabilityCalc.estimateWinProbDelta(
@@ -782,7 +796,7 @@ public class ProbabilityCalc {
         // Build MC baseline once for affordable cards (if win-prob requested)
         double mcBaseline = 0.0;
         if (opts.includeWinProbDelta && opts.mcSimulations > 0) {
-            mcBaseline = WinProbabilityCalc.mcWinRate(gs, playerIndex, opts.mcSimulations);
+            mcBaseline = WinProbabilityCalc.mcWinRate(gs, playerIndex, opts.mcSimulations, opts.mcExplorationTemp);
         }
 
         ArrayList<Project> candidates = new ArrayList<>(gs.getUnbuilt_projects());
@@ -829,7 +843,7 @@ public class ProbabilityCalc {
                 if (opts.mcSimulations > 0) {
                     GameState stateAfter = gs.copy();
                     stateAfter.getPlayers()[playerIndex].getOwned_projects().add(candidate);
-                    double afterBuy = WinProbabilityCalc.mcWinRate(stateAfter, playerIndex, opts.mcSimulations);
+                    double afterBuy = WinProbabilityCalc.mcWinRate(stateAfter, playerIndex, opts.mcSimulations, opts.mcExplorationTemp);
                     entry.winProbDelta = afterBuy - mcBaseline;
                 } else {
                     entry.winProbDelta = WinProbabilityCalc.estimateWinProbDelta(

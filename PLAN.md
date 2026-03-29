@@ -255,17 +255,11 @@ Die 8 Kategorien mit kleinen Icons (16×16) in `src/resources/category_icons/` d
 
 ### Math-Items
 
-#### M7 · MC-Rollout-Policy: Boltzmann-Exploration Toggle (Prio: Hoch)
+#### M7 · ~~MC-Rollout-Policy: Boltzmann-Exploration Toggle~~ ✓ (behoben)
 
 Aktueller greedy Simulator wählt immer die Karte mit höchstem `evPerRound/cost`. Das führt zu systematisch verzerrten Win-Raten.
 
-**Geplante Änderung:**
-- `RankingOptions.mcExplorationTemp` (double, default 0.0 = greedy): Boltzmann-Temperatur T
-- Bei T > 0: `P(buy X) ∝ exp(score(X) / T)`
-- Empfohlener Standard: T = 0.7
-- Toggle in MainWindow: "Exploration" Checkbox neben MC-Slider
-
-**Scope:** ~80 Zeilen.
+**Implementiert:** `RankingOptions.mcExplorationTemp`, `GameSimulator.simulate(state, rng, temperature)`, `GameSimulator.boltzmannBuy(...)`. UI: T-Spinner neben N-Spinner in der Button-Bar.
 
 ---
 

@@ -61,6 +61,7 @@ public class GameSimulator {
 
     /**
      * Simulates a complete game from the given state using a greedy rollout policy.
+     * Equivalent to {@link #simulate(GameState, Random, double)} with temperature {@code 0.0}.
      *
      * <p>The supplied {@code state} is mutated during simulation — callers must
      * pass a deep copy (via {@link GameState#copy()}) if the original must be preserved.
@@ -71,6 +72,25 @@ public class GameSimulator {
      * @return index (0-based) of the winning player, or {@code -1} on timeout
      */
     public static int simulate(GameState state, Random rng) {
+        return simulate(state, rng, 0.0);
+    }
+
+    /**
+     * Simulates a complete game from the given state using the specified buy policy.
+     *
+     * <p>The supplied {@code state} is mutated during simulation — callers must
+     * pass a deep copy (via {@link GameState#copy()}) if the original must be preserved.
+     *
+     * @param state       initial game state (will be mutated)
+     * @param rng         random number source (use {@code ThreadLocalRandom.current()} in
+     *                    parallel contexts)
+     * @param temperature Boltzmann temperature for card selection:
+     *                    {@code 0.0} = greedy (always highest score);
+     *                    {@code 0.7} = recommended soft exploration;
+     *                    positive infinity = uniform random among affordable cards.
+     * @return index (0-based) of the winning player, or {@code -1} on timeout
+     */
+    public static int simulate(GameState state, Random rng, double temperature) {
         int n = state.getPlayers().length;
         Map<String, Integer> supply = buildSupply(state);
 
@@ -78,16 +98,16 @@ public class GameSimulator {
         int activePlayer = 0;
 
         while (totalTurns < MAX_TURNS) {
-            Player player = state.getPlayers()[activePlayer];
-
             // --- Roll phase ---
             int roll = rollDice(state, activePlayer, rng);
 
             // --- Income phase: apply roll effects to all players ---
             applyRoll(state, activePlayer, roll);
 
-            // --- Buy phase: greedy purchase ---
-            int winner = greedyBuy(state, activePlayer, supply);
+            // --- Buy phase ---
+            int winner = (temperature <= 0.0)
+                    ? greedyBuy(state, activePlayer, supply)
+                    : boltzmannBuy(state, activePlayer, supply, rng, temperature);
             if (winner >= 0) return winner;
 
             activePlayer = (activePlayer + 1) % n;
@@ -279,6 +299,83 @@ public class GameSimulator {
         if (!card.isIs_grossprojekt()) {
             supply.merge(card.getId(), -1, Integer::sum);
         }
+    }
+
+    /**
+     * Boltzmann (softmax) buy decision for the active player.
+     *
+     * <p>Scores all affordable cards with the same fast ROI approximation as
+     * {@link #greedyBuy}, then samples proportionally to {@code exp(score / T)}.
+     * The landmark-priority logic (cheapest-first, Bahnhof-gate) runs first and
+     * is always deterministic — only the establishment selection is stochastic.
+     *
+     * <p>When only one affordable option exists, it is selected deterministically.
+     * When no affordable option exists, the player saves (no purchase).
+     *
+     * @param temperature Boltzmann temperature T (must be &gt; 0)
+     * @return the winner's player index if this purchase completes the game,
+     *         or {@code -1} if the game continues
+     */
+    static int boltzmannBuy(GameState state, int activePlayer,
+                             Map<String, Integer> supply, Random rng, double temperature) {
+        Player player = state.getPlayers()[activePlayer];
+
+        // 1. Landmark priority — deterministic (same as greedyBuy)
+        for (String lmId : LANDMARK_ORDER) {
+            if (!player.hasProject(lmId)) {
+                if (lmId.equals("bahnhof") && !hasHighRangeCard(player)) break;
+                Project lm = ProjectLoader.getProject(lmId).orElse(null);
+                if (lm != null && player.getCoins() >= lm.getCost()) {
+                    purchase(player, lm, supply);
+                    if (hasWon(player)) return activePlayer;
+                }
+                break;
+            }
+        }
+
+        // 2. Collect all affordable establishment candidates with their scores
+        int n = state.getPlayers().length;
+        CardIncome.PlayerStats playerStats = CardIncome.PlayerStats.of(player);
+        int[] oppCoins = CardIncome.buildOpponentCoins(state.getPlayers(), activePlayer);
+
+        // Two passes: first collect all (card, score) pairs to build softmax denominator
+        java.util.List<Project> cards = new java.util.ArrayList<>();
+        double[] scores = new double[state.getUnbuilt_projects().size()];
+        int count = 0;
+        for (Project p : state.getUnbuilt_projects()) {
+            if (p.isIs_grossprojekt()) continue;
+            if (player.getCoins() < p.getCost()) continue;
+            if (supply.getOrDefault(p.getId(), 0) <= 0) continue;
+            double ev = CardIncome.contextualCardEvPerRound(p, playerStats, n, oppCoins);
+            double roi = ev * ROI_GEOMETRIC_SUM - p.getCost();
+            cards.add(p);
+            scores[count++] = roi;
+        }
+
+        if (count == 0) return -1; // nothing affordable — save
+
+        // Boltzmann sampling: P(card i) ∝ exp((score_i − max_score) / T)
+        // Subtract max for numerical stability (prevents overflow for large scores/small T)
+        double maxScore = scores[0];
+        for (int i = 1; i < count; i++) if (scores[i] > maxScore) maxScore = scores[i];
+
+        double[] weights = new double[count];
+        double total = 0.0;
+        for (int i = 0; i < count; i++) {
+            weights[i] = Math.exp((scores[i] - maxScore) / temperature);
+            total += weights[i];
+        }
+
+        // Sample via CDF walk
+        double r = rng.nextDouble() * total;
+        int chosen = count - 1; // fallback to last
+        for (int i = 0; i < count; i++) {
+            r -= weights[i];
+            if (r <= 0) { chosen = i; break; }
+        }
+
+        purchase(player, cards.get(chosen), supply);
+        return -1; // game continues (landmarks-only win already handled above)
     }
 
     /** Returns true if the player owns all 4 landmarks. */

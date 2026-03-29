@@ -47,4 +47,22 @@ public class RankingOptions {
      * <p>Pass {@code session.getEffectiveTurnCount()} here from the UI for improved accuracy.
      */
     public int turnsElapsed = 0;
+
+    /**
+     * Boltzmann temperature for the Monte Carlo buy policy (T ≥ 0).
+     *
+     * <p>Controls how randomly simulated players choose which card to buy:
+     * <ul>
+     *   <li>{@code T = 0.0} — greedy (always buy the highest-scoring card; current default)</li>
+     *   <li>{@code T = 0.7} — recommended: soft exploration around the greedy optimum</li>
+     *   <li>{@code T → ∞} — uniform random selection among affordable cards</li>
+     * </ul>
+     *
+     * <p>Higher temperature means more variety in opponent play-styles, which reduces
+     * systematic bias in win-rate estimates when the real player deviates from greedy.
+     * Only takes effect when {@link #mcSimulations} &gt; 0.
+     *
+     * <p>Default: {@code 0.0} (greedy, backward-compatible).
+     */
+    public double mcExplorationTemp = 0.0;
 }

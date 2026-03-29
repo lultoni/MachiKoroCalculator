@@ -110,17 +110,26 @@ class WinProbabilityCalc {
 
     /**
      * Runs {@code numSims} Monte Carlo simulations in parallel and returns the
+     * fraction in which {@code playerIndex} wins. Uses greedy buy policy (temperature=0).
+     */
+    static double mcWinRate(GameState state, int playerIndex, int numSims) {
+        return mcWinRate(state, playerIndex, numSims, 0.0);
+    }
+
+    /**
+     * Runs {@code numSims} Monte Carlo simulations in parallel and returns the
      * fraction in which {@code playerIndex} wins.
      *
      * @param state       starting state (read-only; a copy is taken per simulation)
      * @param playerIndex player whose win rate is measured
      * @param numSims     number of simulations to run
+     * @param temperature Boltzmann temperature for buy policy (0.0 = greedy)
      * @return win rate in [0, 1]
      */
-    static double mcWinRate(GameState state, int playerIndex, int numSims) {
+    static double mcWinRate(GameState state, int playerIndex, int numSims, double temperature) {
         int[] outcomes = IntStream.range(0, numSims)
                 .parallel()
-                .map(i -> GameSimulator.simulate(state.copy(), ThreadLocalRandom.current()))
+                .map(i -> GameSimulator.simulate(state.copy(), ThreadLocalRandom.current(), temperature))
                 .toArray();
 
         long wins = 0;
@@ -130,7 +139,7 @@ class WinProbabilityCalc {
             else if (w == -1) timeouts++;
         }
 
-        if (timeouts > numSims / 100) { // more than 1% timeouts
+        if (timeouts > numSims / 100) {
             System.err.println("[GameSimulator] WARNING: " + timeouts + "/" + numSims
                     + " simulations timed out (>" + GameSimulator.MAX_TURNS
                     + " turns). State may be degenerate.");

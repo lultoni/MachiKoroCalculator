@@ -491,6 +491,7 @@ public class ProbabilityCalc {
         entry.immediateEV          = immediateEV(gs, playerIndex, candidate, false);
         entry.immediateEV_afterCost = entry.immediateEV - candidate.getCost();
         entry.evPerRound           = evPerRound(gs, playerIndex, candidate);
+        entry.portfolioDeltaEV     = portfolioDeltaEV(gs, playerIndex, candidate);
 
         // Geometric-series ROI with L'Hôpital guard
         double geometricSum = geometricSum(horizonTurns, discountFactor);
@@ -580,6 +581,50 @@ public class ProbabilityCalc {
         Player player = gs.getPlayers()[playerIndex];
         int[] oppCoins = CardIncome.buildOpponentCoins(gs.getPlayers(), playerIndex);
         return CardIncome.playerEvPerRound(player, gs.getPlayers().length, oppCoins);
+    }
+
+    /**
+     * Returns the marginal per-round EV gain from adding {@code candidate} to the player's
+     * current portfolio.
+     *
+     * <p>Formula:
+     * <pre>
+     *   portfolioDeltaEV = playerEvPerRound(portfolio + candidate)
+     *                    − playerEvPerRound(portfolio)
+     * </pre>
+     *
+     * <p>Unlike {@link #evPerRound}, which evaluates only the candidate card's own income
+     * in the player's synergy context, this method captures cross-card interactions:
+     * <ul>
+     *   <li>Buying Bauernhof increases Molkerei's value (animal count rises).</li>
+     *   <li>Buying a food card increases Markthalle's value.</li>
+     *   <li>Buying Bahnhof increases all 7–12 cards' effective EV (2d6 now available).</li>
+     * </ul>
+     *
+     * <p>Uses {@link CardIncome#playerEvPerRound} for both measurements, so all synergies
+     * (multipliers, opponent coins, dice-distribution choice) are reflected correctly.
+     * Allocation cost: two {@link CardIncome.PlayerStats} objects; no {@link GameState#copy()}.
+     *
+     * @param gs          current game state (candidate not yet owned)
+     * @param playerIndex the buying player
+     * @param candidate   the card being considered
+     * @return marginal EV per round (can be negative if the card competes with owned cards)
+     */
+    public static double portfolioDeltaEV(GameState gs, int playerIndex, Project candidate) {
+        Player player = gs.getPlayers()[playerIndex];
+        int n = gs.getPlayers().length;
+        int[] oppCoins = CardIncome.buildOpponentCoins(gs.getPlayers(), playerIndex);
+
+        double before = CardIncome.playerEvPerRound(player, n, oppCoins);
+
+        // Temporarily add candidate to evaluate the post-purchase portfolio.
+        // Use withExtra for PlayerStats — no GameState.copy() needed for the EV calculation.
+        // playerEvPerRound needs an actual Player object, so we do a lightweight list add/remove.
+        player.getOwned_projects().add(candidate);
+        double after = CardIncome.playerEvPerRound(player, n, oppCoins);
+        player.getOwned_projects().remove(player.getOwned_projects().size() - 1);
+
+        return after - before;
     }
 
     /**

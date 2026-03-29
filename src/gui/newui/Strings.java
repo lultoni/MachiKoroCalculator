@@ -100,6 +100,15 @@ public final class Strings {
         return s("Änderung der geschätzten Gewinnwahrscheinlichkeit durch den Kauf dieser Karte. Erfordert Gewinnwahrscheinlichkeitsanalyse.",
                  "Change in estimated win probability from buying this card. Requires win-prob analysis.");
     }
+    public static String portfolioDeltaLabel()   { return s("Portfolio ΔEV:", "Portfolio ΔEV:"); }
+    public static String portfolioDeltaTooltip() {
+        return s(
+            "Marginaler EV-Gewinn pro Runde durch Kauf dieser Karte: playerEvPerRound(Portfolio + Karte) − playerEvPerRound(Portfolio). " +
+            "Erfasst Kreuz-Synergien: z.B. Bauernhof erhöht Molkerei's Wert, Bahnhof erhöht alle 7–12 Karten.",
+            "Marginal EV gain per round from buying this card: playerEvPerRound(portfolio + card) − playerEvPerRound(portfolio). " +
+            "Captures cross-card synergies: e.g. Bauernhof increases Molkerei's value, Bahnhof unlocks 7–12 cards."
+        );
+    }
     public static String metricLegendToggleOpen()  { return s("▼ Metriken-Legende", "▼ Metric legend"); }
     public static String metricLegendToggleClosed(){ return s("▶ Metriken-Legende", "▶ Metric legend"); }
 
@@ -155,6 +164,7 @@ public final class Strings {
     public static String colP0()              { return "P(0)"; }
     public static String colVar()             { return s("Var.", "Var"); }
     public static String colWinDelta()        { return s("Gew.-Δ", "Win Δ"); }
+    public static String colPortfolioDelta()  { return s("Port.ΔEV", "Port.ΔEV"); }
 
     public static String colTipCard()         { return s("Kartenname", "Card name"); }
     public static String colTipCost()         { return s("Kaufpreis (Münzen)", "Purchase cost (coins)"); }

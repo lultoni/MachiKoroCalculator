@@ -4,6 +4,20 @@ Implementierungsgeschichte: was gebaut wurde, warum, und welche Designentscheidu
 
 ---
 
+## portfolioDeltaEV — Marginal-Portfolio-EV als neue Ranking-Metrik
+
+`RankEntry.portfolioDeltaEV` = `playerEvPerRound(portfolio + card) − playerEvPerRound(portfolio)`. Erfasst Cross-Karten-Synergien die `evPerRound` (per-Karte-isoliert) verpasst: Bauernhof→Molkerei, Food→Markthalle, Bahnhof→alle 7–12-Karten.
+
+**`ProbabilityCalc.portfolioDeltaEV(gs, pi, candidate)`** — add/remove Pattern auf dem Spieler-Owned-Array (kein `GameState.copy()`, allokationsfrei). Wird von `roiOverHorizon` befüllt und an jede `RankEntry` weitergegeben.
+
+**UI:** Neue Spalte "ΔEV/Rd" in der Rangliste-Tabelle + neue Metrik-Zeile im Card-Details-Panel. `MetricColorScheme.PORTFOLIO_DELTA(0.30, 0.08, false)` für Farbkodierung. `TABLE_ORDER` hat jetzt 6 Einträge.
+
+**Rankingtabelle:** Spalte 7 = Portfolio-ΔEV/round. Sortierbar. Farbkodiert via `NumericCellRenderer`.
+
+**Akzeptierte Näherung A3** (per-Karte-Max für Bahnhof) bleibt in `contextualCardEvPerRound`, aber ist für das Ranking selbst nicht mehr relevant — `portfolioDeltaEV` nutzt `playerEvPerRound` direkt.
+
+---
+
 ## M7 — Boltzmann-Exploration Toggle für MC-Simulator
 
 Der MC-Simulator verwendete bisher eine rein deterministische Greedy-Policy: alle simulierten Spieler kaufen immer die Karte mit dem höchsten ROI-Score. Das führte zu systematisch verzerrten Win-Raten — Spieler die von der optimalen Strategie abweichen, wurden als schlechter dargestellt als sie tatsächlich sind.

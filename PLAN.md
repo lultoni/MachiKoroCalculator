@@ -144,33 +144,27 @@ wobei:
 | `computeSynergyNote` — Synergie-Hinweis (1 Partner) | ✓ vorhanden | Begrenzt (per-Karte, nicht Portfolio) |
 | `computeTwoTurnNote` — 2-Turn-Lookahead | ✓ vorhanden | Begrenzt (analytisch, nur Bahnhof als Landmark) |
 | **Stufe 1: Rollout-Tree Enumerator** | ❌ fehlt | — |
-| **Stufe 3: Boltzmann-MC-Policy** | ❌ fehlt (M7) | — |
-| **Portfolio-Synergie** (nicht per-Karte) | ❌ fehlt | — |
+| **Stufe 3: Boltzmann-MC-Policy** | ✓ M7 | — |
+| **Portfolio-Synergie** `portfolioDeltaEV` | ✓ implementiert | — |
 | **Gegner-Modellierung** (adaptive Strategie) | ❌ fehlt | — |
 
 ---
 
 ### Prioritäten für nächste Entwicklungsschritte
 
-#### Schritt 1 — M7: Boltzmann-MC-Policy (Fundament für alle weiteren MC-basierten Berechnungen)
+#### Schritt 1 — M7: Boltzmann-MC-Policy ✓ (implementiert)
 
 **Warum zuerst:** MC ist das stärkste Werkzeug. Solange die Policy deterministisch greedy ist, sind alle MC-Ergebnisse verzerrt. Das zu reparieren verbessert sofort die Win-Prob-Qualität und alle darauf aufbauenden Empfehlungen.
 
-**Scope:** ~80 Zeilen — `RankingOptions.mcExplorationTemp`, `GameSimulator.boltzmannBuy()`, UI-Toggle.
+**Scope:** ~80 Zeilen — `RankingOptions.mcExplorationTemp`, `GameSimulator.boltzmannBuy()`, UI-Toggle. ✓ Erledigt.
 
 ---
 
-#### Schritt 2 — Portfolio-Synergie: `portfolioDeltaEV`
+#### Schritt 2 — Portfolio-Synergie: `portfolioDeltaEV` ✓ (implementiert)
 
-**Problem heute:** `computeSynergyNote` bewertet die Synergie aus Sicht der Karte A ("macht B meine Karte A besser?"). Die relevantere Frage ist: "Erhöht das Paar (A, B) das **Gesamt-Portfolio-EV** mehr als A alleine?"
+**Problem heute (behoben):** `computeSynergyNote` bewertet die Synergie aus Sicht der Karte A ("macht B meine Karte A besser?"). Die relevantere Frage ist: "Erhöht das Paar (A, B) das **Gesamt-Portfolio-EV** mehr als A alleine?"
 
-**Neue Methode:** `portfolioDeltaEV(gs, pi, cardA)`:
-```
-Δ = playerEvPerRound(portfolio + A) − playerEvPerRound(portfolio)
-```
-Anstatt `contextualCardEvPerRound(A)` als Proxy. Nutzt bereits vorhandene `playerEvPerRound` — nur der Aufruf fehlt.
-
-**Warum besser:** `playerEvPerRound` berechnet das Portfolio korrekt als Ganzes (alle Karten zusammen, alle Würfelverteilungen, alle Spieler). Die Differenz ist exakt der Marginalwert von Karte A.
+**Implementiert:** `ProbabilityCalc.portfolioDeltaEV(gs, pi, cardA)` + `RankEntry.portfolioDeltaEV` + UI-Spalte + Card-Details-Zeile.
 
 **Scope:** ~30 Zeilen in `ProbabilityCalc` + Umbau `rankPurchasableProjects`.
 
@@ -268,14 +262,14 @@ Aktueller greedy Simulator wählt immer die Karte mit höchstem `evPerRound/cost
 - **Erweiterungskarten** — Hafen/Millionärsreihe. Architektur ist bereit (JSON-getrieben).
 - **Gegner-Archetypen** — Verschiedene Buy-Strategien für realistischere Win-Raten.
 - **Rollout-Tree** — Schritt 3 der Vision oben. Kernarchitektur für exakte Empfehlungen.
-- **Portfolio-Synergie** — Schritt 2: `portfolioDeltaEV` als Basis für alle Ranking-Berechnungen.
+- **Portfolio-Synergie** — ✓ implementiert als `portfolioDeltaEV`.
 
 ---
 
 ## Geschichte abgeschlossener Items
 
 ### Math-Audit ✓
-M1 (Architektur-Audit) · M2 (Funkturm-EV) · M3 (dynamisches remainingTurns) · M4 (Landmark-Gewichte) · M5 (Warten-Option) · M6 (Bahnhof-Synergie im 2-Turn-Lookahead) · M8 (Bahnhof-Gate im Simulator)
+M1 (Architektur-Audit) · M2 (Funkturm-EV) · M3 (dynamisches remainingTurns) · M4 (Landmark-Gewichte) · M5 (Warten-Option) · M6 (Bahnhof-Synergie im 2-Turn-Lookahead) · M7 (Boltzmann-MC-Policy) · M8 (Bahnhof-Gate im Simulator)
 
 ### Features ✓
 N0 (Bürohaus-Tausch) · N1 (Game Assistant) · N2 (Bahnhof-Würfelwahl) · N3 (Phasenerkennung) · N4a–N4c (Snapshot/Labeling-System)

@@ -87,6 +87,25 @@ public class RankEntry {
     public double winProbDelta;
 
     /**
+     * Portfolio marginal EV per round: the increase in the player's total per-round income
+     * that results from adding this card to their current portfolio.
+     *
+     * <p>Formula: {@code playerEvPerRound(portfolio + card) − playerEvPerRound(portfolio)}
+     *
+     * <p>Unlike {@link #evPerRound} (which measures only this card's own income contribution),
+     * this captures cross-card synergies:
+     * <ul>
+     *   <li>Buying Bauernhof raises this value for Molkerei because the animal-card count
+     *       increases, boosting Molkerei's payout on roll 7.</li>
+     *   <li>Buying a food card raises this value for Markthalle.</li>
+     *   <li>Buying Bahnhof raises this value for all 7–12 cards because the player will
+     *       use 2d6 more often.</li>
+     * </ul>
+     * Use this as the primary signal for synergy-aware ranking.
+     */
+    public double portfolioDeltaEV;
+
+    /**
      * Optional human-readable annotation displayed alongside this entry in the UI.
      * {@code null} if no annotation was set.
      */

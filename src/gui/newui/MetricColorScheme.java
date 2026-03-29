@@ -38,7 +38,11 @@ enum MetricColorScheme {
 
     // col 6 — Win Prob Δ: higher is better
     //   ≥ 0.02 strong green  |  ≥ 0.00 light green  |  < −0.01 red
-    WIN_PROB_DELTA(0.02, 0.0, false);
+    WIN_PROB_DELTA(0.02, 0.0, false),
+
+    // col 7 — Portfolio ΔEV/round: higher is better; range roughly 0 – 1.0
+    //   ≥ 0.30 strong green  |  ≥ 0.08 light green  |  < 0 red
+    PORTFOLIO_DELTA(0.30, 0.08, false);
 
     // -------------------------------------------------------------------------
 
@@ -105,8 +109,8 @@ enum MetricColorScheme {
         return null;
     }
 
-    /** The five metric schemes in table-column order (columns 2–6). */
-    static final MetricColorScheme[] TABLE_ORDER = { EV, ROI, P0, VARIANCE, WIN_PROB_DELTA };
+    /** The six metric schemes in table-column order (columns 2–7). */
+    static final MetricColorScheme[] TABLE_ORDER = { EV, ROI, P0, VARIANCE, WIN_PROB_DELTA, PORTFOLIO_DELTA };
 
     /**
      * Returns a rank-relative background colour.

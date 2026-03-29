@@ -13,26 +13,35 @@ class WinProbabilityCalc {
 
     /**
      * Per-landmark score bonus in the softmax win-probability scorer.
-     * Calibrated from evPerRound EV deltas on a typical mid-game portfolio
-     * (Weizenfeld, Bäckerei, Bauernhof, Wald, Bergwerk, Apfelplantage, Café, Familienrestaurant)
-     * multiplied by ~15 remaining turns and scaled to the [1–4] range:
+     * Calibrated to approximate the coin-equivalent benefit of each landmark over
+     * a typical {@link #REMAINING_TURNS_FALLBACK}-turn horizon:
      * <ul>
-     *   <li>Bahnhof       (4¢):  +0.5/round → 1.5</li>
-     *   <li>Einkaufszentrum(10¢): +1.0/round → 3.0</li>
-     *   <li>Freizeitpark  (16¢): +0.3/round → 1.5  (low EV but strategic doubles synergy)</li>
-     *   <li>Funkturm      (22¢): +1.1/round → 4.0  (M2 re-roll EV fully reflected)</li>
+     *   <li>Bahnhof       (4¢):  ~+2 EV/round × 12 turns  = 24</li>
+     *   <li>Einkaufszentrum(10¢): ~+3 EV/round × 12 turns  = 36</li>
+     *   <li>Freizeitpark  (16¢): ~+2 EV/round × 12 turns  = 24</li>
+     *   <li>Funkturm      (22¢): ~+4 EV/round × 12 turns  = 48</li>
      * </ul>
-     * Any landmark not listed here (e.g. future expansion landmarks) gets the fallback weight 2.0.
+     * These values are in the same unit (coins) as the
+     * {@code portfolioEvPerRound × remainingTurns} term, so the softmax scoring
+     * gives each landmark meaningful weight in the win-probability estimate.
+     * Any landmark not listed here gets the fallback weight 20.0.
      */
     private static final java.util.Map<String, Double> LANDMARK_WEIGHTS = java.util.Map.of(
-            "bahnhof",          1.5,
-            "einkaufszentrum",  3.0,
-            "freizeitpark",     1.5,
-            "funkturm",         4.0
+            "bahnhof",          24.0,
+            "einkaufszentrum",  36.0,
+            "freizeitpark",     24.0,
+            "funkturm",         48.0
     );
 
     /** Fallback landmark weight for any landmark not in {@link #LANDMARK_WEIGHTS}. */
-    private static final double LANDMARK_WEIGHT_DEFAULT = 2.0;
+    private static final double LANDMARK_WEIGHT_DEFAULT = 20.0;
+
+    /**
+     * Scaling divisor for the coin-advantage term in {@link #computeScores}.
+     * With typical mid-game coin spreads of ~10 coins, this yields a contribution
+     * of ~±2 per coin advantage, or ~±10 total — roughly 10–20% of the EV component.
+     */
+    private static final double COIN_ADVANTAGE_SCALE = 5.0;
 
     /** Remaining-turns estimate used in softmax scoring when no elapsed-turn info is provided. */
     private static final double REMAINING_TURNS_FALLBACK = 12.0;
@@ -154,12 +163,28 @@ class WinProbabilityCalc {
     // -------------------------------------------------------------------------
 
     /**
-     * Computes a heuristic score for each player using synergy-aware per-round EV:
-     * {@code score(p) = playerEvPerRound(p) × remainingTurns + Σ LANDMARK_WEIGHT}.
+     * Computes a heuristic score for each player:
+     * <pre>
+     *   score(p) = playerEvPerRound(p) × remainingTurns
+     *            + Σ LANDMARK_WEIGHT(p)
+     *            + coinAdvantage(p)
+     *            [× endgameProximityBonus if applicable]
+     * </pre>
      *
      * <p>Unlike the previous isolated {@code singleCardEvPerRound} approach, this accounts
      * for each player's actual card synergies (Einkaufszentrum bonuses, category multipliers
      * for Molkerei/Möbelfabrik/Markthalle, and opponent coin counts for Stadion/Fernsehsender).
+     *
+     * <h3>coinAdvantage term</h3>
+     * {@code (coins_p − avg_opponent_coins) / COIN_ADVANTAGE_SCALE} — adds a coin-level
+     * signal that is otherwise only captured indirectly through red-card EV. Contributes
+     * roughly 10–20% of the EV component for typical mid-game coin spreads.
+     *
+     * <h3>endgameProximityBonus</h3>
+     * If a player owns exactly 3 landmarks and has enough coins to buy the last one,
+     * their score is multiplied by 2.5. This prevents Softmax from underestimating
+     * imminent-win states: without this term a player about to win looks similar to one
+     * who is 5+ turns away.
      *
      * @param turnsElapsed effective turns elapsed across all players (0 = use static fallback).
      *                     Used to compute a dynamic remaining-turns estimate.
@@ -175,20 +200,56 @@ class WinProbabilityCalc {
                 ? Math.max(3.0, TOTAL_EXPECTED_TURNS - (double) turnsElapsed / n)
                 : REMAINING_TURNS_FALLBACK;
 
+        // Precompute average coins per player for the coinAdvantage term
+        double totalCoins = 0;
+        for (Player p : players) totalCoins += p.getCoins();
+        double avgCoins = totalCoins / n;
+
         double[] scores = new double[n];
 
         for (int i = 0; i < n; i++) {
             int[] opponentCoins = CardIncome.buildOpponentCoins(players, i);
             double score = CardIncome.playerEvPerRound(players[i], n, opponentCoins)
                     * remainingTurns;
+
+            // Landmark weights
+            int landmarkCount = 0;
             for (Project p : players[i].getOwned_projects()) {
                 if (p.isIs_grossprojekt()) {
                     score += LANDMARK_WEIGHTS.getOrDefault(p.getId(), LANDMARK_WEIGHT_DEFAULT);
+                    landmarkCount++;
                 }
             }
+
+            // coinAdvantage term: relative coin position contributes a direct score bonus
+            double coinAdv = (players[i].getCoins() - avgCoins) / COIN_ADVANTAGE_SCALE;
+            score += coinAdv;
+
+            // endgameProximityBonus: player has 3 GPs and can buy the last one immediately
+            if (landmarkCount == 3) {
+                int lastLmCost = cheapestMissingLandmarkCost(players[i]);
+                if (lastLmCost > 0 && players[i].getCoins() >= lastLmCost) {
+                    score *= 2.5;
+                }
+            }
+
             scores[i] = score;
         }
         return scores;
+    }
+
+    /**
+     * Returns the cost of the cheapest landmark not yet owned by {@code player},
+     * or {@code -1} if no unowned landmark exists.
+     */
+    private static int cheapestMissingLandmarkCost(Player player) {
+        int cheapest = Integer.MAX_VALUE;
+        for (Project p : ProjectLoader.getAllProjects()) {
+            if (p.isIs_grossprojekt() && !player.hasProject(p.getId())) {
+                if (p.getCost() < cheapest) cheapest = p.getCost();
+            }
+        }
+        return cheapest == Integer.MAX_VALUE ? -1 : cheapest;
     }
 
     /**

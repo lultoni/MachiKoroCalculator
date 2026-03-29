@@ -231,6 +231,10 @@ public class GameSimulator {
         // 1. Try to buy the next unbuilt landmark (priority)
         for (String lmId : LANDMARK_ORDER) {
             if (!player.hasProject(lmId)) {
+                // Bahnhof-gate: only buy Bahnhof when the player already has at least one
+                // card activating on 7–12. Without such cards, 2d6 provides no advantage
+                // over 1d6 and buying Bahnhof wastes coins that could fund better cards.
+                if (lmId.equals("bahnhof") && !hasHighRangeCard(player)) break;
                 Project lm = ProjectLoader.getProject(lmId).orElse(null);
                 if (lm != null && player.getCoins() >= lm.getCost()) {
                     purchase(player, lm, supply);
@@ -284,6 +288,21 @@ public class GameSimulator {
             if (p.isIs_grossprojekt()) landmarkCount++;
         }
         return landmarkCount >= 4;
+    }
+
+    /**
+     * Returns true if the player owns at least one non-landmark card that activates
+     * on a roll of 7 or higher. Used as the Bahnhof-buy gate: 2d6 only improves
+     * expected income when the player can actually trigger cards in the 7–12 range.
+     */
+    private static boolean hasHighRangeCard(Player player) {
+        for (Project p : player.getOwned_projects()) {
+            if (p.isIs_grossprojekt()) continue;
+            for (int activation : p.getDice_activation()) {
+                if (activation >= 7) return true;
+            }
+        }
+        return false;
     }
 
     // -------------------------------------------------------------------------

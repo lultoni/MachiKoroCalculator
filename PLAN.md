@@ -31,9 +31,9 @@ Vollständige Optimierungsrunde über alle Schichten:
 
 **Code-Qualität:**
 - Redundante Bahnhof/Funkturm/Freizeitpark-Prüflogik taucht in `immediateEV`, `evPerRound`, `computeVarianceOwnTurn`, `computeProbNoIncomeOwnTurn` auf — DRY-Kandidat
-- Hilfsmethoden `buildStatsWithCard`, `buildStatsWithCards`, `buildStatsWithEkz`, `applyToStats` duplizieren Logik aus `CardIncome.PlayerStats.of()` — zusammenführen oder delegieren
+- ~~Hilfsmethoden `buildStatsWithCard`, `buildStatsWithCards`, `buildStatsWithEkz`, `applyToStats` duplizieren Logik aus `CardIncome.PlayerStats.of()` — zusammenführen oder delegieren~~ ✓
 
-**Voraussetzung:** Bestehende 224 Tests müssen weiterhin bestehen; keine Verhaltensänderung.
+**Voraussetzung:** Bestehende Tests müssen weiterhin bestehen; keine Verhaltensänderung.
 
 ---
 
@@ -162,3 +162,52 @@ Konzept für datengetriebene Gewichtskalibrierung. Besteht aus drei Teilsystemen
 | **Synergy-Lookahead** — für jede Karte berechne `evPerRound_after_best_synergy_card` | ~~50 Zeilen~~ | ~~Mittel: "Molkerei wird besser wenn du noch Bauernhöfe kaufst"~~ | ✓ |
 | **2-Turn Lookahead** — beste zwei Käufe in Folge, O(n²) | ~100 Zeilen | Hoch: erkennt Ketten wie "Bahnhof → dann lohnen sich 2d6-Karten" | ✓ |
 | **MC-Policy verbessern** — statt greedy `evPerRound/cost` die `roiOverHorizon`-Rangliste nutzen | ~~30 Zeilen~~ | ~~Mittel: realistischere Win-Raten, da Spieler die tatsächlich beste Strategie spielen~~ | ✓ |
+
+---
+
+## Offene Math-Items (Prio mittel)
+
+### M6 · ~~Landmark-Synergien in 2-Turn-Lookahead~~ ✓ (behoben)
+
+`computeTwoTurnNote` überspringt aktuell alle Landmarks (`is_grossprojekt`-Filter). Das bedeutet, dass z.B. die Kette „Bahnhof → Bergwerk wird besser" nie als Note erscheint.
+
+**Fix:** Landmarks als `cardB`-Kandidaten zulassen wenn das Portflio nach Kauf von `cardA` die Schwelle überschreitet:
+- Wenn `cardA == bahnhof`: Alle 2d6-Karten (Aktivierung ≥ 7) als beste B suchen, da `statsAfterA.hasBahnhof = true` die EV korrekt erhöht
+- Wenn `cardB == bahnhof`: nicht sinnvoll (Bahnhof ist kein Einkommen direkt)
+- Einschränkung: Landmark `cardB` darf nur vorgeschlagen werden wenn der Spieler sie noch nicht besitzt
+
+**Scope:** ~20 Zeilen in `computeTwoTurnNote`.
+
+---
+
+### M7 · MC-Rollout-Policy: Boltzmann-Exploration Toggle (Medium)
+
+Aktueller greedy Simulator (`GameSimulator.greedyBuy`) wählt immer die Karte mit höchstem `evPerRound/cost`. Das führt zu systematisch verzerrten Win-Raten: Spieler, die eine „zweitbeste" Karte kaufen (wie der User), wirken schlechter als sie sind.
+
+**Geplante Änderung:**
+- `RankingOptions.mcExplorationTemp` (double, default 0.0 = greedy): Boltzmann-Temperatur T
+- Bei T > 0: `P(buy X) ∝ exp(score(X) / T)` — höheres T = mehr Zufall, T → ∞ = uniform random
+- Empfohlener Standardwert: T = 0.5–1.0 (sanfte Streuung um greedy-Optimum)
+- Toggle in MainWindow: "Exploration" Checkbox neben MC-Slider (nur wenn MC aktiv)
+
+**Zusatz:** MC-Limit auf 10.000 Sims/Kandidat erhöhen (Benchmark: ~28k parallel Sims/sec → <2s bei 10k; 100k = ~50s, zu langsam für UI).
+
+**Scope:** ~80 Zeilen: `GameSimulator` (Boltzmann-Sampling), `RankingOptions` (neues Feld), `MainWindow` (Toggle + erhöhtes Default-Limit).
+
+---
+
+### M8 · ~~Bahnhof-Gate im Simulator~~ ✓ (behoben)
+
+`GameSimulator.greedyBuy()` kauft Landmarks blindly in Kosten-Reihenfolge. ~~Das führt dazu, dass simulierte Spieler den Bahnhof früh kaufen, auch wenn sie keine Karten mit Aktivierung ≥ 7 besitzen — was den Bahnhof-Kauf faktisch wertlos macht.~~
+
+~~**Fix:** Bahnhof nur kaufen wenn `hasHighRangeCard(player)`:~~
+```java
+private static boolean hasHighRangeCard(Player p) {
+    return p.getOwned_projects().stream()
+        .anyMatch(c -> !c.isIs_grossprojekt()
+                    && c.getDice_activation().stream().anyMatch(r -> r >= 7));
+}
+```
+~~Vor Bahnhof-Kauf: `if (lm.getId().equals("bahnhof") && !hasHighRangeCard(player)) continue;`~~
+
+~~**Scope:** ~10 Zeilen in `GameSimulator.greedyBuy`.~~

@@ -4,7 +4,24 @@ Implementierungsgeschichte: was gebaut wurde, warum, und welche Designentscheidu
 
 ---
 
-## 2-Turn Lookahead in Card Notes
+## Bahnhof-Synergie-Fixes: M6 (Lookahead), M8 (Simulator-Gate)
+
+### Problem
+Simulierte Spieler (MC/Labeling) kauften Bahnhof in `GameSimulator.greedyBuy` zu früh — ohne Karten mit Aktivierung ≥ 7 bringt 2d6 keinen EV-Vorteil, der Kauf ist wertlos. Außerdem zeigte `computeTwoTurnNote` keine Bahnhof-Synergien: „Bergwerk kaufen → dann lohnt sich Bahnhof" war nie als Note sichtbar.
+
+### M8 — Bahnhof-Gate in `GameSimulator.greedyBuy`
+Vor Bahnhof-Kauf wird jetzt `hasHighRangeCard(player)` geprüft — gibt `true` zurück wenn der Spieler mindestens eine Nicht-Landmark mit Aktivierung ≥ 7 besitzt. Ohne solche Karte wird der Bahnhof-Kauf übersprungen (nächste Landmark in der Prioritätsreihenfolge wird probiert, oder Establishment-Phase tritt ein). Die gleiche Logik war bereits in `rollDice` implementiert; jetzt konsistent für den Kauf.
+
+### M6 — Bahnhof-Synergie in `computeTwoTurnNote`
+Der generelle Landmark-Skip (`continue` für alle `is_grossprojekt`) wurde durch eine gezielte Bahnhof-Behandlung ersetzt:
+- Wenn `cardB=Bahnhof` und Spieler hat ihn noch nicht: berechne `contextualCardEvPerRound(cardA, statsWithAB)` vs `contextualCardEvPerRound(cardA, statsAfterA)`. Die Differenz ist der Synergy-Gewinn den Bahnhof für Karte A bringt. ROI(Bahnhof für A) = synergyGain × geometricSum − cost(Bahnhof). Konservative Untergrenze — berücksichtigt nur A's Synergy, nicht andere Karten. Wenn selbst das ROI > 0.5 ergibt, erscheint die Note.
+- Wenn `cardA=Bahnhof`: `statsAfterA.hasBahnhof=true` → `contextualCardEvPerRound(Bergwerk, statsAfterA)` berechnet automatisch 2d6-EV für Bergwerk. Die beste 7–12 Karte erscheint dann korrekt als Follow-up.
+
+**Tests:** 228 PASS, 0 FAIL.
+
+---
+
+
 
 **`computeTwoTurnNote(gs, pi, cardA, candidates, horizon, discount)`** — new package-private static method in `ProbabilityCalc`. For each affordable candidate card A, evaluates all remaining candidates as a potential follow-up purchase B. Uses `CardIncome.contextualCardEvPerRound(B, statsAfterA, n, oppCoins)` — no `GameState.copy()` needed, only `PlayerStats` are constructed. Selects B with the highest estimated `roiOverHorizon` in the post-A portfolio state. Returns a note like "Danach: Bergwerk (ROI +4.2)" when the follow-up ROI exceeds 0.5 (threshold to avoid noise). Landmarks excluded from candidates (their interaction is too complex for this level).
 

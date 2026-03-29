@@ -1018,11 +1018,37 @@ public class ProbabilityCalc {
 
         for (Project cardB : candidates) {
             if (cardB == cardA) continue;
-            if (cardB.isIs_grossprojekt()) continue; // landmarks interact differently — skip for simplicity
             if (player.hasProject(cardB.getId())) continue;
             if (cardB.getColor().equals("lila") && player.hasProject(cardB.getId())) continue;
 
-            double evB = CardIncome.contextualCardEvPerRound(cardB, statsAfterA, n, oppCoins);
+            double evB;
+            if (cardB.isIs_grossprojekt()) {
+                // For Bahnhof: evaluate the synergy gain it brings to cardA's income.
+                // Instead of evB(cardB), compute the EV boost that cardB gives to cardA
+                // when both are owned: i.e. contextualCardEvPerRound(cardA, statsWithAB) vs
+                // contextualCardEvPerRound(cardA, statsAfterA). This captures "Bahnhof makes
+                // Bergwerk 2× better because it activates on 9 via 2d6."
+                if ("bahnhof".equals(cardB.getId()) && !player.hasProject("bahnhof")) {
+                    CardIncome.PlayerStats statsAfterAB = buildStatsWithCards(player, cardA, cardB);
+                    double evAWithBahnhof    = CardIncome.contextualCardEvPerRound(cardA, statsAfterAB, n, oppCoins);
+                    double evAWithoutBahnhof = CardIncome.contextualCardEvPerRound(cardA, statsAfterA, n, oppCoins);
+                    double synergyGain = evAWithBahnhof - evAWithoutBahnhof;
+                    // The synergy gain is the annualized benefit of buying Bahnhof for card A only.
+                    // ROI = synergyGain × geometricSum - cost(Bahnhof).
+                    // This under-counts Bahnhof's value for other owned cards, but gives a
+                    // conservative lower bound: if even just for cardA it's worthwhile, recommend it.
+                    double roiSynergy = synergyGain * geometricSum - cardB.getCost();
+                    if (roiSynergy > bestRoiB) {
+                        bestRoiB = roiSynergy;
+                        bestB = cardB;
+                    }
+                }
+                // Other landmarks (EKZ, FP, Funkturm) are handled well by the normal ranking
+                // and have no direct synergy with cardA's per-card EV — skip them.
+                continue;
+            }
+
+            evB = CardIncome.contextualCardEvPerRound(cardB, statsAfterA, n, oppCoins);
             double roiB = evB * geometricSum - cardB.getCost();
 
             if (roiB > bestRoiB) {

@@ -2,12 +2,15 @@ package gui.newui;
 
 import logic.probability.*;
 
+import javax.imageio.ImageIO;
 import javax.swing.*;
 import javax.swing.border.TitledBorder;
 import javax.swing.filechooser.FileNameExtensionFilter;
 import javax.swing.table.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
+import java.awt.image.BufferedImage;
+import java.io.InputStream;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -35,6 +38,8 @@ public class MainWindow extends JFrame {
             new Color(0x7030A0),  // lila
             new Color(0xFFD700),  // gelb
     };
+    /** Coin icon scaled to 18×18, or null if the resource could not be loaded. */
+    private static final ImageIcon COIN_ICON = loadCoinIcon(18);
 
     // ---- state ----
     private GameSession session;
@@ -50,7 +55,8 @@ public class MainWindow extends JFrame {
     private JComboBox<String> buyCombo;
     private JButton confirmBtn;
     private JButton undoBtn;
-    private JLabel coinsLabel;
+    private JLabel coinsLabel;      // shows current coins with coin icon
+    private JLabel coinsAfterLabel; // shows post-roll delta (hidden when no change)
     private JPanel historyPanel;
     private JPanel rollPreviewPanel;
 
@@ -137,11 +143,20 @@ public class MainWindow extends JFrame {
         activePlayerLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
         controls.add(wrap(activePlayerLabel));
 
-        // Coins display
-        coinsLabel = new JLabel("Coins: 3");
-        coinsLabel.setFont(new Font("Arial", Font.BOLD, 14));
+        // Coins display — icon + current coins, with post-roll delta below
+        coinsLabel = new JLabel("3", COIN_ICON, SwingConstants.LEFT);
+        coinsLabel.setFont(new Font("Arial", Font.BOLD, 16));
+        coinsLabel.setIconTextGap(4);
         coinsLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
         controls.add(wrap(coinsLabel));
+
+        coinsAfterLabel = new JLabel();
+        coinsAfterLabel.setFont(new Font("Arial", Font.PLAIN, 11));
+        coinsAfterLabel.setForeground(new Color(0x007700));
+        coinsAfterLabel.setIconTextGap(3);
+        coinsAfterLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        coinsAfterLabel.setVisible(false);
+        controls.add(wrap(coinsAfterLabel));
 
         controls.add(Box.createVerticalStrut(8));
 
@@ -640,16 +655,15 @@ public class MainWindow extends JFrame {
         } else {
             activePlayerLabel.setText(activePlayer.getName() + "'s turn");
         }
-        coinsLabel.setText("Coins: " + activePlayer.getCoins());
+        coinsLabel.setText(String.valueOf(activePlayer.getCoins()));
+        coinsLabel.setIcon(COIN_ICON);
 
         updateRollSpinner(activePlayer);
 
         GameState postRoll = postRollState();
         Player postRollPlayer = postRoll.getPlayers()[pi];
         int postRollCoins = postRollPlayer.getCoins();
-        if (postRollCoins != activePlayer.getCoins()) {
-            coinsLabel.setText(activePlayer.getCoins() + " → " + postRollCoins + " coins (after roll)");
-        }
+        updateCoinsAfterLabel(activePlayer.getCoins(), postRollCoins);
 
         rebuildBuyCombo(pi, postRollPlayer, postRoll);
 
@@ -768,11 +782,7 @@ public class MainWindow extends JFrame {
         Player postRollPlayer = postRoll.getPlayers()[pi];
         int preCoins  = preRollPlayer.getCoins();
         int postCoins = postRollPlayer.getCoins();
-        if (postCoins != preCoins) {
-            coinsLabel.setText(preCoins + " → " + postCoins + " coins (after roll)");
-        } else {
-            coinsLabel.setText("Coins: " + preCoins);
-        }
+        updateCoinsAfterLabel(preCoins, postCoins);
 
         rebuildBuyCombo(pi, postRollPlayer, postRoll);
 
@@ -1070,6 +1080,41 @@ public class MainWindow extends JFrame {
     }
 
     // ---- Layout helpers ----
+
+    /**
+     * Updates the post-roll coins label below the main coin display.
+     * Shows the delta as "+N" (green) or "−N" (red) next to a coin icon when the roll changes
+     * the active player's coin count; hides the label when the roll has no effect.
+     */
+    private void updateCoinsAfterLabel(int preCoins, int postCoins) {
+        int delta = postCoins - preCoins;
+        if (delta != 0) {
+            String sign = delta > 0 ? "+" : "";
+            coinsAfterLabel.setText(sign + delta + " after roll  (= " + postCoins + ")");
+            coinsAfterLabel.setIcon(COIN_ICON);
+            coinsAfterLabel.setForeground(delta > 0 ? new Color(0x007700) : new Color(0xAA0000));
+            coinsAfterLabel.setVisible(true);
+        } else {
+            coinsAfterLabel.setVisible(false);
+        }
+    }
+
+    /**
+     * Loads and scales COIN.png from classpath resources. Returns null if the resource
+     * is unavailable so callers can degrade gracefully (label shows text only).
+     */
+    private static ImageIcon loadCoinIcon(int size) {
+        try (InputStream is = MainWindow.class.getClassLoader()
+                .getResourceAsStream("resources/other_icons/COIN.png")) {
+            if (is == null) return null;
+            BufferedImage img = ImageIO.read(is);
+            Image scaled = img.getScaledInstance(size, size, Image.SCALE_SMOOTH);
+            return new ImageIcon(scaled);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     private static JPanel wrap(JComponent c) {
         JPanel p = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 2));
         p.add(c);

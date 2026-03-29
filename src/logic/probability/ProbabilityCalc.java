@@ -514,6 +514,17 @@ public class ProbabilityCalc {
     }
 
     /**
+     * Returns the synergy-aware expected-coin-per-round for {@code playerIndex}'s current portfolio.
+     * This evaluates all owned cards together (own turn + opponent turns), accounting for
+     * Einkaufszentrum, food/animal/production counts. No candidate card is added.
+     */
+    public static double portfolioEvPerRound(GameState gs, int playerIndex) {
+        Player player = gs.getPlayers()[playerIndex];
+        int[] oppCoins = CardIncome.buildOpponentCoins(gs.getPlayers(), playerIndex);
+        return CardIncome.playerEvPerRound(player, gs.getPlayers().length, oppCoins);
+    }
+
+    /**
      * Estimates the change in win probability for playerIndex from buying {@code candidate}.
      *
      * <h3>Analytical mode ({@code mcSimulations == 0})</h3>

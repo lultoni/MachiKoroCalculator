@@ -43,9 +43,14 @@ enum MetricColorScheme {
     // -------------------------------------------------------------------------
 
     private static final Color GREEN_STRONG = new Color(0xB8F0C0);
+    static final Color GREEN_STRONG_REF = GREEN_STRONG; // package-visible reference for renderers
     private static final Color GREEN_LIGHT  = new Color(0xDDFFDD);
     private static final Color RED_LIGHT    = new Color(0xFFDDDD);
     private static final Color RED_STRONG   = new Color(0xFFBBBB);
+    /** Used by the rank-relative coloring in the Card Details panel. */
+    static final Color YELLOW_LIGHT = new Color(0xFFF4CC);
+    /** Used by the rank-relative coloring in the Card Details panel. */
+    static final Color ORANGE_LIGHT = new Color(0xFFE0B0);
 
     /**
      * For normal metrics: values ≥ this receive GREEN_STRONG.
@@ -102,4 +107,18 @@ enum MetricColorScheme {
 
     /** The five metric schemes in table-column order (columns 2–6). */
     static final MetricColorScheme[] TABLE_ORDER = { EV, ROI, P0, VARIANCE, WIN_PROB_DELTA };
+
+    /**
+     * Returns a rank-relative background colour.
+     *
+     * @param rankPct position in ranking: 0.0 = best, 1.0 = worst
+     * @return tint colour, or {@code null} for neutral middle range
+     */
+    public Color rankedBackgroundFor(double rankPct) {
+        if (rankPct <= 0.15) return GREEN_STRONG;
+        if (rankPct <= 0.40) return GREEN_LIGHT;
+        if (rankPct <= 0.65) return null;
+        if (rankPct <= 0.85) return YELLOW_LIGHT;
+        return ORANGE_LIGHT;
+    }
 }

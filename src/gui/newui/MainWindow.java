@@ -71,6 +71,7 @@ public class MainWindow extends JFrame {
     private JLabel topCardRisk;
     private JLabel topCardVar;
     private JLabel topCardWinProb;
+    private JLabel topCardRank;     // rank context: "#X / Y affordable · #Z / N total"
     private JLabel topCardNote;
     private JPanel topCardColorBar;
     private JLabel baselineWinProbLabel;
@@ -364,6 +365,13 @@ public class MainWindow extends JFrame {
         metricsWrapper.add(metricsGrid, BorderLayout.NORTH);
         metricsWrapper.setAlignmentX(Component.LEFT_ALIGNMENT);
         panel.add(metricsWrapper);
+
+        // Rank context label: "#X / Y affordable · #Z / N total"
+        topCardRank = new JLabel("—");
+        topCardRank.setFont(new Font("Arial", Font.ITALIC, 10));
+        topCardRank.setForeground(new Color(0x666666));
+        topCardRank.setAlignmentX(Component.LEFT_ALIGNMENT);
+        panel.add(wrap(topCardRank));
 
         panel.add(Box.createVerticalStrut(4));
 
@@ -795,6 +803,7 @@ public class MainWindow extends JFrame {
         topCardRisk.setText("—");
         topCardVar.setText("—");
         topCardWinProb.setText("—");
+        topCardRank.setText("—");
         setWinProbRowVisible(false); // hide win-prob row consistently (uses the shared helper)
         baselineWinProbLabel.setText(Strings.baselineWinProbFmt(100.0));
         topCardNote.setText(Strings.gameOverNote());
@@ -1015,10 +1024,361 @@ public class MainWindow extends JFrame {
         rebuildAssistantPanel();
     }
 
+    // =========================================================================
+    // Game Assistant — phase context + helpers
+    // =========================================================================
+
+    /** Snapshot of strategic context used for the Spiellage-Analyse profile. */
+    private record GamePhaseContext(
+            String phaseLabel,
+            int ownLandmarks,
+            int maxOppLandmarks,
+            boolean bahnhofSuggested, double bahnhofEvGain,
+            boolean ekzSuggested,
+            boolean fpSuggested,
+            boolean ftSuggested
+    ) {}
+
+    /**
+     * Computes the current game phase and GP synergy hints for the active player {@code pi}.
+     */
+    private GamePhaseContext computePhaseContext(int pi) {
+        Player[] players = session.getState().getPlayers();
+        Player active = players[pi];
+        int n = players.length;
+
+        // Count own and opponent landmarks
+        int ownLm = 0;
+        for (Project p : active.getOwned_projects()) if (p.isIs_grossprojekt()) ownLm++;
+        int maxOppLm = 0;
+        for (int i = 0; i < n; i++) {
+            if (i == pi) continue;
+            int lm = 0;
+            for (Project p : players[i].getOwned_projects()) if (p.isIs_grossprojekt()) lm++;
+            maxOppLm = Math.max(maxOppLm, lm);
+        }
+
+        int etc = session.getEffectiveTurnCount();
+        String phase;
+        if (ownLm == 0 && etc < n * 3) phase = Strings.assistantPhaseEarly();
+        else if (maxOppLm >= 3)         phase = Strings.assistantPhaseLate();
+        else                             phase = Strings.assistantPhaseMid();
+
+        boolean hasBahnhof = active.hasProject("bahnhof");
+        boolean hasEkz     = active.hasProject("einkaufszentrum");
+        boolean hasFp      = active.hasProject("freizeitpark");
+        boolean hasFt      = active.hasProject("funkturm");
+
+        // Bahnhof: worth buying if player has a high-range card + EV gain > 0.2
+        boolean bahnhofSuggested = false;
+        double bahnhofEvGain = 0.0;
+        if (!hasBahnhof) {
+            boolean hasHighRange = false;
+            for (Project p : active.getOwned_projects()) {
+                for (int act : p.getDice_activation()) if (act >= 7) { hasHighRange = true; break; }
+                if (hasHighRange) break;
+            }
+            if (hasHighRange) {
+                // Estimate EV gain: portfolioEV with vs without Bahnhof
+                double evWithout = ProbabilityCalc.portfolioEvPerRound(session.getState(), pi);
+                GameState withBahnhof = session.getState().copy();
+                logic.probability.ProjectLoader.getProject("bahnhof").ifPresent(bp ->
+                        withBahnhof.getPlayers()[pi].getOwned_projects().add(bp));
+                double evWith = ProbabilityCalc.portfolioEvPerRound(withBahnhof, pi);
+                bahnhofEvGain = evWith - evWithout;
+                bahnhofSuggested = bahnhofEvGain > 0.2;
+            }
+        }
+
+        // Einkaufszentrum: worth buying if player has ≥ 2 green or store cards
+        boolean ekzSuggested = false;
+        if (!hasEkz) {
+            int greenOrStore = 0;
+            for (Project p : active.getOwned_projects()) {
+                if ((p.getColor().equals("grün") || p.getCategory().equals("store")) && !p.isIs_grossprojekt()) {
+                    greenOrStore++;
+                }
+            }
+            ekzSuggested = greenOrStore >= 2;
+        }
+
+        // Freizeitpark: worth buying if player has Bahnhof + cards activating on 6–8
+        boolean fpSuggested = false;
+        if (!hasFp && hasBahnhof) {
+            for (Project p : active.getOwned_projects()) {
+                for (int act : p.getDice_activation()) {
+                    if (act >= 6 && act <= 8) { fpSuggested = true; break; }
+                }
+                if (fpSuggested) break;
+            }
+        }
+
+        // Funkturm: worth buying if player has Freizeitpark (doubles already possible)
+        boolean ftSuggested = !hasFt && hasFp;
+
+        return new GamePhaseContext(phase, ownLm, maxOppLm,
+                bahnhofSuggested, bahnhofEvGain, ekzSuggested, fpSuggested, ftSuggested);
+    }
+
+    /**
+     * Adds the Spiellage-Analyse context profile block to the top of the assistant panel.
+     * Uses a weighted scoring of all 8 profile metrics to pick a final recommendation.
+     */
+    private void addContextProfile(GamePhaseContext ctx, int coins, int pi) {
+        List<RankEntry> affordable = lastRanking.stream().filter(e -> e.affordable).toList();
+        if (affordable.isEmpty()) {
+            addAssistantContextRow(ctx, Strings.assistantContextNoAffordable(), List.of(), null);
+            return;
+        }
+
+        // Determine weights by phase
+        boolean late  = ctx.phaseLabel().equals(Strings.assistantPhaseLate());
+        boolean early = ctx.phaseLabel().equals(Strings.assistantPhaseEarly());
+        // [ROI, EV, Safe, LowVar, Cheap, WinProb, Aggro, GPRush]
+        double[] w = late  ? new double[]{0.6, 0.5, 0.2, 0.2, 0.2, 1.0, 0.8, 1.0}
+                  : early ? new double[]{0.8, 0.6, 0.4, 0.3, 0.9, 0.2, 0.2, 0.7}
+                           : new double[]{1.0, 0.8, 0.4, 0.4, 0.3, 0.6, 0.5, 0.8};
+        // Opponent-pressure modifier
+        if (ctx.maxOppLandmarks() >= 3) { w[6] = Math.min(1.0, w[6] + 0.3); w[7] = Math.min(1.0, w[7] + 0.3); }
+
+        // Compute per-profile normalized rank vectors (best = 1.0, worst = 0.0)
+        int m = affordable.size();
+        // Sort copies for each metric
+        List<RankEntry> byROI   = sorted(affordable, e -> e.roiOverHorizon, false);
+        List<RankEntry> byEV    = sorted(affordable, e -> e.evPerRound, false);
+        List<RankEntry> bySafe  = sorted(affordable, e -> e.probNoIncomeRound, true);
+        List<RankEntry> byVar   = sorted(affordable, e -> e.variance, true);
+        List<RankEntry> byCost  = sorted(affordable, e -> (double) e.project.getCost(), true);
+        List<RankEntry> byWin   = sorted(affordable, e -> e.winProbDelta, false);
+        List<RankEntry> byAggro = sorted(affordable, e ->
+                (e.project.getColor().equals("rot") || e.project.getColor().equals("lila")) ? e.evPerRound : -999, false);
+        List<RankEntry> byGP    = sorted(affordable, e -> e.project.isIs_grossprojekt() ? -e.project.getCost() : -99999, false);
+
+        // Compute combined score per card
+        RankEntry bestCard = null;
+        double bestScore = Double.NEGATIVE_INFINITY;
+        for (RankEntry e : affordable) {
+            double score = w[0] * normRank(byROI, e)
+                         + w[1] * normRank(byEV, e)
+                         + w[2] * normRank(bySafe, e)
+                         + w[3] * normRank(byVar, e)
+                         + w[4] * normRank(byCost, e)
+                         + w[5] * normRank(byWin, e)
+                         + w[6] * normRank(byAggro, e)
+                         + w[7] * normRank(byGP, e);
+            if (score > bestScore) { bestScore = score; bestCard = e; }
+        }
+
+        // Build factor list: show profiles with weight ≥ 0.5, ordered desc by weight
+        String[] profileNames = {
+            Strings.colROI(), Strings.colEV(),
+            Strings.assistantProfileSafe(), Strings.assistantProfileLowVar(),
+            Strings.assistantProfileCheap(), Strings.assistantProfileWinProb(),
+            Strings.assistantProfileAggro(), Strings.assistantProfileGPRush()
+        };
+        @SuppressWarnings("unchecked")
+        List<RankEntry>[] sortedByProfile = new List[]{byROI, byEV, bySafe, byVar, byCost, byWin, byAggro, byGP};
+        List<String> factors = new java.util.ArrayList<>();
+        // Sort profile indices by weight desc
+        Integer[] order = {0,1,2,3,4,5,6,7};
+        java.util.Arrays.sort(order, (a, b) -> Double.compare(w[b], w[a]));
+        for (int idx : order) {
+            if (w[idx] < 0.5) continue;
+            int rank = 1 + sortedByProfile[idx].indexOf(bestCard);
+            if (rank <= 0) rank = m;
+            factors.add(Strings.assistantContextFactor(profileNames[idx], w[idx], rank));
+        }
+
+        String recommend = bestCard != null ? Strings.assistantContextRecommend(bestCard.project.getLocalizedName()) : "";
+        addAssistantContextRow(ctx, recommend, factors, bestCard);
+    }
+
+    /** Sorts entries by metric, best first. For inverted metrics, lower value = better. */
+    private static List<RankEntry> sorted(
+            List<RankEntry> entries, java.util.function.ToDoubleFunction<RankEntry> metric, boolean lowerBetter) {
+        return entries.stream()
+                .sorted(lowerBetter
+                        ? java.util.Comparator.comparingDouble(metric)
+                        : java.util.Comparator.comparingDouble(metric).reversed())
+                .toList();
+    }
+
+    /** Returns the normalized rank of {@code entry} in the sorted list: 0.0 = best, but used as 1.0 here (best=1). */
+    private static double normRank(List<RankEntry> sortedBestFirst, RankEntry entry) {
+        int idx = sortedBestFirst.indexOf(entry);
+        if (idx < 0 || sortedBestFirst.size() == 1) return 1.0;
+        return 1.0 - (double) idx / (sortedBestFirst.size() - 1);
+    }
+
+    /** Renders the Spiellage context block at the top of the assistant panel. */
+    @SuppressWarnings("unused")
+    private void addAssistantContextRow(GamePhaseContext ctx, String body, List<String> factors, RankEntry winner) {
+        JPanel ctxPanel = new JPanel();
+        ctxPanel.setLayout(new BoxLayout(ctxPanel, BoxLayout.Y_AXIS));
+        ctxPanel.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createMatteBorder(0, 0, 2, 0, new Color(0xAAAAAA)),
+                BorderFactory.createEmptyBorder(8, 10, 8, 10)));
+        ctxPanel.setBackground(new Color(0xF0F4FF));
+        ctxPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        ctxPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, Integer.MAX_VALUE));
+
+        // Title
+        JLabel titleLabel = new JLabel(Strings.assistantContextTitle());
+        titleLabel.setFont(new Font("Arial", Font.BOLD, 12));
+        titleLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        ctxPanel.add(titleLabel);
+
+        // Phase line
+        JLabel phaseLabel = new JLabel(Strings.assistantContextPhase(ctx.phaseLabel(), ctx.maxOppLandmarks()));
+        phaseLabel.setFont(new Font("Arial", Font.PLAIN, 10));
+        phaseLabel.setForeground(new Color(0x555555));
+        phaseLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        ctxPanel.add(phaseLabel);
+
+        ctxPanel.add(Box.createVerticalStrut(4));
+
+        // Recommendation
+        JLabel recLabel = new JLabel("<html>" + body + "</html>");
+        recLabel.setFont(new Font("Arial", Font.BOLD, 11));
+        recLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        ctxPanel.add(recLabel);
+
+        // Factors
+        if (!factors.isEmpty()) {
+            ctxPanel.add(Box.createVerticalStrut(3));
+            StringBuilder sb = new StringBuilder("<html><body style='font-size:10px;color:#444'>");
+            for (String f : factors) sb.append(f).append("<br>");
+            sb.append("</body></html>");
+            JLabel factorLabel = new JLabel(sb.toString());
+            factorLabel.setFont(new Font("Arial", Font.PLAIN, 10));
+            factorLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+            ctxPanel.add(factorLabel);
+        }
+
+        // GP hints
+        boolean anyHint = ctx.bahnhofSuggested() || ctx.ekzSuggested() || ctx.fpSuggested() || ctx.ftSuggested();
+        if (anyHint) {
+            ctxPanel.add(Box.createVerticalStrut(4));
+            java.util.function.BiConsumer<String, Double> addHint = (gp, evGain) -> {
+                JLabel h = new JLabel("<html>" + Strings.assistantContextGPHint(gp, evGain) + "</html>");
+                h.setFont(new Font("Arial", Font.PLAIN, 10));
+                h.setForeground(new Color(0x2244AA));
+                h.setAlignmentX(Component.LEFT_ALIGNMENT);
+                ctxPanel.add(h);
+            };
+            if (ctx.bahnhofSuggested()) {
+                logic.probability.ProjectLoader.getProject("bahnhof").ifPresent(p ->
+                        addHint.accept(p.getLocalizedName(), ctx.bahnhofEvGain()));
+            }
+            if (ctx.ekzSuggested()) {
+                logic.probability.ProjectLoader.getProject("einkaufszentrum").ifPresent(p ->
+                        addHint.accept(p.getLocalizedName(), 0.0));
+            }
+            if (ctx.fpSuggested()) {
+                logic.probability.ProjectLoader.getProject("freizeitpark").ifPresent(p ->
+                        addHint.accept(p.getLocalizedName(), 0.0));
+            }
+            if (ctx.ftSuggested()) {
+                logic.probability.ProjectLoader.getProject("funkturm").ifPresent(p ->
+                        addHint.accept(p.getLocalizedName(), 0.0));
+            }
+        }
+
+        assistantPanel.add(ctxPanel);
+    }
+
     /**
      * Rebuilds the Game Assistant tab from the current {@code lastRanking}.
-     * Shows 8 strategy-profile rows, each with a bold profile name and an HTML explanation.
+     * Shows the Spiellage-Analyse block plus 8 strategy-profile rows.
      */
+    // ---- Assistant helpers ----
+
+    /** Result of profile resolution: winner, optional tiebreaker note, names of other tied entries. */
+    private record TieResult(RankEntry winner, String tiebreakerNote, java.util.List<String> otherNames) {
+        boolean hasWinner() { return winner != null; }
+    }
+
+    /**
+     * Picks the best affordable entry for an assistant profile using {@code metric},
+     * resolving ties with a three-level tiebreaker (ROI → EV/round → lowest cost).
+     */
+    private TieResult resolveWithTiebreaker(
+            java.util.function.ToDoubleFunction<RankEntry> metric, boolean lowerIsBetter) {
+
+        List<RankEntry> pool = lastRanking.stream().filter(e -> e.affordable).toList();
+        if (pool.isEmpty()) return new TieResult(null, null, List.of());
+
+        // Find best value
+        double best = lowerIsBetter
+                ? pool.stream().mapToDouble(metric).min().orElse(0)
+                : pool.stream().mapToDouble(metric).max().orElse(0);
+        final double EPS = 1e-6;
+        List<RankEntry> tied = pool.stream()
+                .filter(e -> Math.abs(metric.applyAsDouble(e) - best) <= EPS)
+                .collect(java.util.stream.Collectors.toCollection(java.util.ArrayList::new));
+
+        if (tied.size() == 1) return new TieResult(tied.get(0), null, List.of());
+
+        // Tiebreaker 1: highest ROI
+        double bestROI = tied.stream().mapToDouble(e -> e.roiOverHorizon).max().orElse(0);
+        List<RankEntry> t1 = tied.stream().filter(e -> Math.abs(e.roiOverHorizon - bestROI) <= EPS).toList();
+        if (t1.size() == 1) {
+            List<String> others = tied.stream().filter(e -> e != t1.get(0)).map(e -> e.project.getLocalizedName()).toList();
+            return new TieResult(t1.get(0), Strings.assistantTiebreakerNote(Strings.colROI()), others);
+        }
+
+        // Tiebreaker 2: highest EV/round
+        double bestEV = t1.stream().mapToDouble(e -> e.evPerRound).max().orElse(0);
+        List<RankEntry> t2 = t1.stream().filter(e -> Math.abs(e.evPerRound - bestEV) <= EPS).toList();
+        if (t2.size() == 1) {
+            List<String> others = tied.stream().filter(e -> e != t2.get(0)).map(e -> e.project.getLocalizedName()).toList();
+            return new TieResult(t2.get(0), Strings.assistantTiebreakerNote(Strings.colEV()), others);
+        }
+
+        // Tiebreaker 3: lowest cost
+        int minCost = t2.stream().mapToInt(e -> e.project.getCost()).min().orElse(0);
+        RankEntry winner = t2.stream().filter(e -> e.project.getCost() == minCost).findFirst().orElse(tied.get(0));
+        List<String> others = tied.stream().filter(e -> e != winner).map(e -> e.project.getLocalizedName()).toList();
+        return new TieResult(winner, Strings.assistantTiebreakerNote(Strings.colCost()), others);
+    }
+
+    /** Builds the tie/also suffix HTML fragment for a {@link TieResult}. Empty string if no ties. */
+    private static String buildTieSuffix(TieResult result) {
+        if (result.tiebreakerNote() == null || result.otherNames().isEmpty()) return "";
+        List<String> shown = result.otherNames().size() <= 3
+                ? result.otherNames()
+                : result.otherNames().subList(0, 3);
+        int extra = result.otherNames().size() - shown.size();
+        return "<br><i style='color:#777'>" + result.tiebreakerNote()
+                + " " + Strings.assistantAlso(shown, extra) + "</i>";
+    }
+
+    /** Adds a profile row to the assistant panel. */
+    private void addAssistantRow(String profileLabel, String body) {
+        JPanel profileRow = new JPanel();
+        profileRow.setLayout(new BoxLayout(profileRow, BoxLayout.Y_AXIS));
+        profileRow.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createMatteBorder(0, 0, 1, 0, new Color(0xDDDDDD)),
+                BorderFactory.createEmptyBorder(6, 10, 6, 10)));
+        profileRow.setBackground(Color.WHITE);
+        profileRow.setAlignmentX(Component.LEFT_ALIGNMENT);
+        profileRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, Integer.MAX_VALUE));
+
+        JLabel nameLabel = new JLabel(profileLabel);
+        nameLabel.setFont(new Font("Arial", Font.BOLD, 11));
+        nameLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        profileRow.add(nameLabel);
+
+        JLabel bodyLabel = new JLabel("<html><body style='width:230px'>" + body + "</body></html>");
+        bodyLabel.setFont(new Font("Arial", Font.PLAIN, 11));
+        bodyLabel.setForeground(new Color(0x333333));
+        bodyLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        profileRow.add(Box.createVerticalStrut(2));
+        profileRow.add(bodyLabel);
+
+        assistantPanel.add(profileRow);
+    }
+
     private void rebuildAssistantPanel() {
         assistantPanel.removeAll();
 
@@ -1034,104 +1394,92 @@ public class MainWindow extends JFrame {
         int pi = session.nextPlayerIndex();
         int coins = session.getState().getPlayers()[pi].getCoins();
 
-        // --- compute each profile's recommendation from lastRanking ---
+        // ---- Phase context (built first, used by context profile AND GP Rush) ----
+        GamePhaseContext ctx = computePhaseContext(pi);
 
-        // ROI — highest roiOverHorizon among affordable
-        RankEntry bestROI = lastRanking.stream().filter(e -> e.affordable)
-                .max((a, b) -> Double.compare(a.roiOverHorizon, b.roiOverHorizon)).orElse(null);
+        // ---- Context profile (9th, shown first) ----
+        addContextProfile(ctx, coins, pi);
 
-        // EV — highest evPerRound among affordable
-        RankEntry bestEV = lastRanking.stream().filter(e -> e.affordable)
-                .max((a, b) -> Double.compare(a.evPerRound, b.evPerRound)).orElse(null);
+        // ---- 8 individual strategy profiles (with tie-breaking) ----
 
-        // Safe — lowest probNoIncomeRound (P0) among affordable
-        RankEntry bestSafe = lastRanking.stream().filter(e -> e.affordable)
-                .min((a, b) -> Double.compare(a.probNoIncomeRound, b.probNoIncomeRound)).orElse(null);
+        // ROI
+        TieResult trROI = resolveWithTiebreaker(e -> e.roiOverHorizon, false);
+        String bodyROI = trROI.hasWinner()
+                ? Strings.assistantExplainROI(trROI.winner().project.getLocalizedName(), trROI.winner().roiOverHorizon) + buildTieSuffix(trROI)
+                : Strings.assistantNoAffordable();
+        addAssistantRow(Strings.assistantProfileROI(), bodyROI);
 
-        // LowVar — lowest variance among affordable
-        RankEntry bestLowVar = lastRanking.stream().filter(e -> e.affordable)
-                .min((a, b) -> Double.compare(a.variance, b.variance)).orElse(null);
+        // EV
+        TieResult trEV = resolveWithTiebreaker(e -> e.evPerRound, false);
+        String bodyEV = trEV.hasWinner()
+                ? Strings.assistantExplainEV(trEV.winner().project.getLocalizedName(), trEV.winner().evPerRound) + buildTieSuffix(trEV)
+                : Strings.assistantNoAffordable();
+        addAssistantRow(Strings.assistantProfileEV(), bodyEV);
 
-        // Cheap — lowest cost among affordable
-        RankEntry bestCheap = lastRanking.stream().filter(e -> e.affordable)
-                .min((a, b) -> Integer.compare(a.project.getCost(), b.project.getCost())).orElse(null);
+        // Safe — lowest P0
+        TieResult trSafe = resolveWithTiebreaker(e -> e.probNoIncomeRound, true);
+        String bodySafe = trSafe.hasWinner()
+                ? Strings.assistantExplainSafe(trSafe.winner().project.getLocalizedName(), trSafe.winner().probNoIncomeRound) + buildTieSuffix(trSafe)
+                : Strings.assistantNoAffordable();
+        addAssistantRow(Strings.assistantProfileSafe(), bodySafe);
 
-        // WinProb — highest winProbDelta among affordable (requires delta computed)
+        // LowVar
+        TieResult trLowVar = resolveWithTiebreaker(e -> e.variance, true);
+        String bodyLowVar = trLowVar.hasWinner()
+                ? Strings.assistantExplainLowVar(trLowVar.winner().project.getLocalizedName(), trLowVar.winner().variance) + buildTieSuffix(trLowVar)
+                : Strings.assistantNoAffordable();
+        addAssistantRow(Strings.assistantProfileLowVar(), bodyLowVar);
+
+        // Cheap — lowest cost
+        TieResult trCheap = resolveWithTiebreaker(e -> e.project.getCost(), true);
+        String bodyCheap = trCheap.hasWinner()
+                ? Strings.assistantExplainCheap(trCheap.winner().project.getLocalizedName(), trCheap.winner().project.getCost()) + buildTieSuffix(trCheap)
+                : Strings.assistantNoAffordable();
+        addAssistantRow(Strings.assistantProfileCheap(), bodyCheap);
+
+        // WinProb
         boolean hasWinProb = lastRanking.stream().anyMatch(e -> e.winProbDelta != 0.0);
-        RankEntry bestWinProb = hasWinProb
-                ? lastRanking.stream().filter(e -> e.affordable)
-                        .max((a, b) -> Double.compare(a.winProbDelta, b.winProbDelta)).orElse(null)
-                : null;
+        TieResult trWin = hasWinProb ? resolveWithTiebreaker(e -> e.winProbDelta, false) : new TieResult(null, null, List.of());
+        String bodyWin = trWin.hasWinner()
+                ? Strings.assistantExplainWinProb(trWin.winner().project.getLocalizedName(), trWin.winner().winProbDelta) + buildTieSuffix(trWin)
+                : Strings.assistantNoWinProb();
+        addAssistantRow(Strings.assistantProfileWinProb(), bodyWin);
 
-        // Aggro — prefer rot/lila affordable cards; highest evPerRound among them
-        RankEntry bestAggro = lastRanking.stream()
+        // Aggro — rot/lila only
+        List<RankEntry> aggroPool = lastRanking.stream()
                 .filter(e -> e.affordable && (e.project.getColor().equals("rot") || e.project.getColor().equals("lila")))
-                .max((a, b) -> Double.compare(a.evPerRound, b.evPerRound)).orElse(null);
+                .collect(java.util.stream.Collectors.toCollection(java.util.ArrayList::new));
+        TieResult trAggro = aggroPool.isEmpty() ? new TieResult(null, null, List.of())
+                : resolveAggroWithTiebreaker(aggroPool);
+        String bodyAggro = trAggro.hasWinner()
+                ? Strings.assistantExplainAggro(trAggro.winner().project.getLocalizedName()) + buildTieSuffix(trAggro)
+                : Strings.assistantNoAffordable();
+        addAssistantRow(Strings.assistantProfileAggro(), bodyAggro);
 
-        // GP Rush — cheapest unbuilt Großprojekt (affordable or not, closest to coins)
+        // GP Rush — cheapest unbuilt GP
         RankEntry bestGP = lastRanking.stream()
                 .filter(e -> e.project.isIs_grossprojekt())
-                .min((a, b) -> Integer.compare(a.project.getCost(), b.project.getCost())).orElse(null);
-
-        // --- render profile rows ---
-        Object[][] profiles = {
-            { Strings.assistantProfileROI(),
-              bestROI != null ? Strings.assistantExplainROI(bestROI.project.getLocalizedName(), bestROI.roiOverHorizon) : null },
-            { Strings.assistantProfileEV(),
-              bestEV != null ? Strings.assistantExplainEV(bestEV.project.getLocalizedName(), bestEV.evPerRound) : null },
-            { Strings.assistantProfileSafe(),
-              bestSafe != null ? Strings.assistantExplainSafe(bestSafe.project.getLocalizedName(), bestSafe.probNoIncomeRound) : null },
-            { Strings.assistantProfileLowVar(),
-              bestLowVar != null ? Strings.assistantExplainLowVar(bestLowVar.project.getLocalizedName(), bestLowVar.variance) : null },
-            { Strings.assistantProfileCheap(),
-              bestCheap != null ? Strings.assistantExplainCheap(bestCheap.project.getLocalizedName(), bestCheap.project.getCost()) : null },
-            { Strings.assistantProfileWinProb(),
-              bestWinProb != null ? Strings.assistantExplainWinProb(bestWinProb.project.getLocalizedName(), bestWinProb.winProbDelta) : null },
-            { Strings.assistantProfileAggro(),
-              bestAggro != null ? Strings.assistantExplainAggro(bestAggro.project.getLocalizedName()) : null },
-            { Strings.assistantProfileGPRush(),
-              bestGP != null ? Strings.assistantExplainGPRush(bestGP.project.getLocalizedName(), bestGP.project.getCost(), coins) : null },
-        };
-
-        for (Object[] row : profiles) {
-            String profileLabel = (String) row[0];
-            String explanation  = (String) row[1];
-
-            JPanel profileRow = new JPanel();
-            profileRow.setLayout(new BoxLayout(profileRow, BoxLayout.Y_AXIS));
-            profileRow.setBorder(BorderFactory.createCompoundBorder(
-                    BorderFactory.createMatteBorder(0, 0, 1, 0, new Color(0xDDDDDD)),
-                    BorderFactory.createEmptyBorder(6, 10, 6, 10)));
-            profileRow.setBackground(Color.WHITE);
-            profileRow.setAlignmentX(Component.LEFT_ALIGNMENT);
-            profileRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, Integer.MAX_VALUE));
-
-            JLabel nameLabel = new JLabel(profileLabel);
-            nameLabel.setFont(new Font("Arial", Font.BOLD, 11));
-            nameLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
-            profileRow.add(nameLabel);
-
-            String body;
-            if (explanation == null && profileLabel.equals(Strings.assistantProfileWinProb())) {
-                body = Strings.assistantNoWinProb();
-            } else if (explanation == null) {
-                body = Strings.assistantNoAffordable();
-            } else {
-                body = explanation;
-            }
-
-            JLabel bodyLabel = new JLabel("<html><body style='width:230px'>" + body + "</body></html>");
-            bodyLabel.setFont(new Font("Arial", Font.PLAIN, 11));
-            bodyLabel.setForeground(new Color(0x333333));
-            bodyLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
-            profileRow.add(Box.createVerticalStrut(2));
-            profileRow.add(bodyLabel);
-
-            assistantPanel.add(profileRow);
-        }
+                .min(java.util.Comparator.comparingInt(e -> e.project.getCost())).orElse(null);
+        String bodyGP = bestGP != null
+                ? Strings.assistantExplainGPRush(bestGP.project.getLocalizedName(), bestGP.project.getCost(), coins)
+                : Strings.assistantNoAffordable();
+        addAssistantRow(Strings.assistantProfileGPRush(), bodyGP);
 
         assistantPanel.revalidate();
         assistantPanel.repaint();
+    }
+
+    /** Resolves the Aggro profile from a pre-filtered rot/lila pool. */
+    private TieResult resolveAggroWithTiebreaker(List<RankEntry> pool) {
+        double best = pool.stream().mapToDouble(e -> e.evPerRound).max().orElse(0);
+        final double EPS = 1e-6;
+        List<RankEntry> tied = pool.stream().filter(e -> Math.abs(e.evPerRound - best) <= EPS).toList();
+        if (tied.size() == 1) return new TieResult(tied.get(0), null, List.of());
+        // Tiebreaker: highest ROI
+        double bestROI = tied.stream().mapToDouble(e -> e.roiOverHorizon).max().orElse(0);
+        RankEntry winner = tied.stream().filter(e -> Math.abs(e.roiOverHorizon - bestROI) <= EPS).findFirst().orElse(tied.get(0));
+        List<String> others = tied.stream().filter(e -> e != winner).map(e -> e.project.getLocalizedName()).toList();
+        return new TieResult(winner, Strings.assistantTiebreakerNote(Strings.colROI()), others);
     }
 
     /**
@@ -1221,13 +1569,27 @@ public class MainWindow extends JFrame {
         String desc = p.getLocalizedDescription();
         topCardDesc.setText("<html><i>" + (desc != null && !desc.isEmpty() ? desc : "—") + "</i></html>");
 
-        applyMetricColor(topCardEV,    MetricColorScheme.EV,            entry.evPerRound);
-        applyMetricColor(topCardROI,   MetricColorScheme.ROI,           entry.roiOverHorizon);
-        applyMetricColor(topCardRisk,  MetricColorScheme.P0,            entry.probNoIncomeOwnTurn);
-        applyMetricColor(topCardVar,   MetricColorScheme.VARIANCE,      entry.variance);
-        applyMetricColor(topCardWinProb, MetricColorScheme.WIN_PROB_DELTA, entry.winProbDelta);
+        applyRankedMetricColor(topCardEV,    MetricColorScheme.EV,            entry.evPerRound,          computeMetricRankPct(lastRanking, p.getId(), MetricColorScheme.EV));
+        applyRankedMetricColor(topCardROI,   MetricColorScheme.ROI,           entry.roiOverHorizon,       computeMetricRankPct(lastRanking, p.getId(), MetricColorScheme.ROI));
+        applyRankedMetricColor(topCardRisk,  MetricColorScheme.P0,            entry.probNoIncomeOwnTurn,  computeMetricRankPct(lastRanking, p.getId(), MetricColorScheme.P0));
+        applyRankedMetricColor(topCardVar,   MetricColorScheme.VARIANCE,      entry.variance,             computeMetricRankPct(lastRanking, p.getId(), MetricColorScheme.VARIANCE));
+        applyRankedMetricColor(topCardWinProb, MetricColorScheme.WIN_PROB_DELTA, entry.winProbDelta,      computeMetricRankPct(lastRanking, p.getId(), MetricColorScheme.WIN_PROB_DELTA));
         topCardNote.setText("<html><i>" + buildNote(entry) + "</i></html>");
         topCardColorBar.setBackground(colorForCard(p));
+
+        // Rank context: "#X / Y affordable · #Z / N total"
+        int rankAffordable = 0, totalAffordable = 0;
+        int rankAll = 0, totalAll = 0;
+        for (RankEntry e : lastRanking) {
+            totalAll++;
+            if (e.affordable) totalAffordable++;
+            if (e.project.getId().equals(p.getId())) {
+                rankAll = totalAll;
+                if (e.affordable) rankAffordable = totalAffordable;
+            }
+        }
+        topCardRank.setText(Strings.rankLabel(rankAffordable, totalAffordable, rankAll, totalAll));
+
         // Always re-apply visibility to keep it in sync with the global toggle
         setWinProbRowVisible(showWinProb);
     }
@@ -1237,6 +1599,53 @@ public class MainWindow extends JFrame {
         label.setText(fmt2(value));
         Color bg = scheme.backgroundFor(value);
         Color fg = scheme.foregroundFor(value);
+        label.setOpaque(bg != null);
+        label.setBackground(bg != null ? bg : label.getParent() != null ? label.getParent().getBackground() : Color.WHITE);
+        label.setForeground(fg != null ? fg : Color.BLACK);
+    }
+
+    /**
+     * Computes the relative rank of {@code projectId}'s metric value within {@code ranking}.
+     *
+     * @param ranking   the full ranking list
+     * @param projectId the card to look up
+     * @param scheme    determines which metric field and whether lower = better
+     * @return rank as a fraction in [0.0, 1.0]: 0.0 = best, 1.0 = worst; or 0.5 if not found
+     */
+    private static double computeMetricRankPct(
+            List<RankEntry> ranking, String projectId, MetricColorScheme scheme) {
+        if (ranking.isEmpty()) return 0.5;
+        java.util.function.ToDoubleFunction<RankEntry> extractor = switch (scheme) {
+            case EV           -> e -> e.evPerRound;
+            case ROI          -> e -> e.roiOverHorizon;
+            case P0           -> e -> e.probNoIncomeOwnTurn;
+            case VARIANCE     -> e -> e.variance;
+            case WIN_PROB_DELTA -> e -> e.winProbDelta;
+            default           -> e -> 0.0;
+        };
+        // For inverted metrics lower is better → sort ascending for "best first"
+        java.util.Comparator<RankEntry> comp = java.util.Comparator.comparingDouble(extractor);
+        if (scheme != MetricColorScheme.P0 && scheme != MetricColorScheme.VARIANCE) {
+            comp = comp.reversed(); // higher is better: best = largest
+        }
+        List<RankEntry> sorted = new java.util.ArrayList<>(ranking);
+        sorted.sort(comp);
+        for (int i = 0; i < sorted.size(); i++) {
+            if (sorted.get(i).project.getId().equals(projectId)) {
+                return ranking.size() == 1 ? 0.0 : (double) i / (sorted.size() - 1);
+            }
+        }
+        return 0.5;
+    }
+
+    /**
+     * Sets a metric label's text and background using rank-relative colour (0 = best, 1 = worst).
+     */
+    private static void applyRankedMetricColor(
+            JLabel label, MetricColorScheme scheme, double value, double rankPct) {
+        label.setText(fmt2(value));
+        Color bg = scheme.rankedBackgroundFor(rankPct);
+        Color fg = (bg == MetricColorScheme.GREEN_STRONG_REF) ? new Color(0x1A5C28) : null;
         label.setOpaque(bg != null);
         label.setBackground(bg != null ? bg : label.getParent() != null ? label.getParent().getBackground() : Color.WHITE);
         label.setForeground(fg != null ? fg : Color.BLACK);
@@ -1253,6 +1662,7 @@ public class MainWindow extends JFrame {
         topCardRisk.setText("—");
         topCardVar.setText("—");
         topCardWinProb.setText("—");
+        topCardRank.setText("—");
         topCardNote.setText("<html><i>" + message + "</i></html>");
         topCardColorBar.setBackground(Color.LIGHT_GRAY);
     }

@@ -188,7 +188,21 @@ public final class Strings {
     public static String noAffordableCardsTab() { return s("Keine erschwinglichen Karten — sparen!", "No affordable cards — save up!"); }
     public static String noUnaffordableCards()  { return s("Alle Karten sind erschwinglich!", "All cards are affordable!"); }
 
-    // ---- Game Assistant strategy profile labels ----
+    // ---- Card Details: rank context ----
+    /**
+     * Shows the card's rank among affordable cards and all cards.
+     * If rAffordable == 0, the card is not affordable.
+     */
+    public static String rankLabel(int rAffordable, int nAffordable, int rAll, int nAll) {
+        String allPart = "#" + rAll + " / " + nAll + s(" gesamt", " total");
+        if (rAffordable > 0) {
+            return "#" + rAffordable + " / " + nAffordable + s(" erschwinglich  ·  ", " affordable  ·  ") + allPart;
+        } else {
+            return s("nicht erschwinglich  ·  ", "not affordable  ·  ") + allPart;
+        }
+    }
+
+
     public static String assistantProfileROI()      { return s("Bestes Investment", "Best Investment"); }
     public static String assistantProfileEV()       { return s("Maximaler Ertrag", "Max Income"); }
     public static String assistantProfileSafe()     { return s("Sicherheitsstrategie", "Safety Strategy"); }
@@ -255,6 +269,45 @@ public final class Strings {
     public static String assistantNoWinProb() {
         return s("Win Prob Δ nicht verfügbar — 'Gewinnw.-Δ anzeigen' aktivieren.", "Win Prob Δ not available — enable 'Show Win Prob Δ'.");
     }
+
+    // ---- Game Assistant: tie-breaking ----
+    /** Note shown when a tiebreaker was needed. {@code criterion} is the winning criterion label. */
+    public static String assistantTiebreakerNote(String criterion) {
+        return s("Gleichstand — entschieden per: " + criterion + ".",
+                 "Tied — chosen by: " + criterion + ".");
+    }
+    /** Compact "Also: X, Y, +N more" suffix appended after tiebreaker note. */
+    public static String assistantAlso(java.util.List<String> names, int extra) {
+        String joined = String.join(", ", names);
+        if (extra > 0) joined += s(", +" + extra + " weitere", ", +" + extra + " more");
+        return s("Auch: ", "Also: ") + joined + ".";
+    }
+
+    // ---- Game Assistant: Spiellage-Analyse (9th profile) ----
+    public static String assistantContextTitle() {
+        return s("Spiellage-Analyse", "Situation Analysis");
+    }
+    public static String assistantContextPhase(String phase, int maxOppLandmarks) {
+        return s("Phase: " + phase + "  ·  Gegner max. " + maxOppLandmarks + " GPs",
+                 "Phase: " + phase + "  ·  Opponents max. " + maxOppLandmarks + " GPs");
+    }
+    public static String assistantContextRecommend(String card) {
+        return s("Empfehlung: <b>" + card + "</b>", "Recommendation: <b>" + card + "</b>");
+    }
+    public static String assistantContextFactor(String profile, double weight, int rank) {
+        return String.format("×%.1f  %s", weight, profile) + s("  — Rang #" + rank, "  — rank #" + rank);
+    }
+    public static String assistantContextGPHint(String gp, double evGain) {
+        return s("💡 " + gp + " lohnt sich (+" + String.format("%.2f", evGain) + "¢/Runde)",
+                 "💡 " + gp + " worth buying (+" + String.format("%.2f", evGain) + "¢/round)");
+    }
+    public static String assistantContextNoAffordable() {
+        return s("Keine erschwinglichen Karten — sparen.", "No affordable cards — save up.");
+    }
+    public static String assistantPhaseEarly()  { return s("Frühphase", "Early Game"); }
+    public static String assistantPhaseMid()    { return s("Mittelspiel", "Mid Game"); }
+    public static String assistantPhaseLate()   { return s("Endspiel", "Late Game"); }
+
     public static String deepAnalysisBtn()    { return s("Tiefenanalyse (MC)", "Deep Analysis (MC)"); }
     public static String deepAnalysisBtnOn()  { return s("Tiefenanalyse AN (MC)", "Deep Analysis ON (MC)"); }
     public static String deepAnalysisTooltip(){ return s("Monte-Carlo-Simulationen pro Karte für genaues Gewinnwahrscheinlichkeits-Delta.",

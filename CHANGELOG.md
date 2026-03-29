@@ -4,6 +4,35 @@ Implementierungsgeschichte: was gebaut wurde, warum, und welche Designentscheidu
 
 ---
 
+## UI-Batch: Rang-Kontext, relative Farben, Tie-Handling, Spiellage-Assistent
+
+### Rang-Kontext im Kartendetail
+- **`topCardRank`-Label** — neue Zeile unterhalb des Metrik-Grids: "#X / Y erschwinglich · #Z / N gesamt". Zeigt wo die gewählte Karte im gesamten Ranking steht (nach ROI sortiert), sowohl unter den erschwingli­chen Karten als auch absolut.
+
+### Relative Farben
+- **`MetricColorScheme.rankedBackgroundFor(double rankPct)`** — neue Methode; nimmt Rang-Prozentsatz (0.0 = bester, 1.0 = schlechtester) statt absolutem Wert. Neue Farben `YELLOW_LIGHT` (0xFFF4CC) und `ORANGE_LIGHT` (0xFFE0B0) für mittleres/unteres Drittel.
+- **`applyRankedMetricColor`** — alle 5 Metrik-Labels im Kartendetail nutzen jetzt rang-relative Farben: Platz 1 der jeweiligen Metrik = dunkelgrün, letzter Platz = orange. Tabellenspalten bleiben unverändert (absolute Schwellen).
+- **`computeMetricRankPct`** — Hilfsmethode sortiert `lastRanking` nach der jeweiligen Metrik und gibt normierte Rang-Position zurück; beachtet `inverted`-Flag für P0/Varianz.
+
+### Tie-Handling im Assistenten
+- **`resolveWithTiebreaker`** — neue Methode; findet alle Einträge innerhalb `1e-6` des Bestwertes, wendet 3-stufigen Tiebreaker an (ROI → EV/Runde → Kosten), gibt `TieResult` (winner, tiebreakerNote, otherNames) zurück.
+- **`TieResult`** record — `winner`, `tiebreakerNote` (warum dieser gewann), `otherNames` (übrige Gleichstands-Karten).
+- **`buildTieSuffix`** — HTML-Suffix nach Erklärung: kursiv grau, zeigt Tiebreaker-Grund und "Auch: X, Y, ...".
+- Alle 8 Einzel-Profile nutzen `resolveWithTiebreaker` statt einfachem `.max()/.min()`.
+
+### Spiellage-Analyse (9. Profil, oben im Assistenten)
+- **`GamePhaseContext`** record — Spielphase (Früh/Mittel/Endspiel), GP-Zähler, GP-Synergy-Flags (bahnhofSuggested, ekzSuggested, fpSuggested, ftSuggested + bahnhofEvGain).
+- **`computePhaseContext`** — berechnet Phase aus `effectiveTurnCount` und Landmark-Besitz; prüft GP-Synergien via `portfolioEvPerRound`-Vergleich.
+- **`addContextProfile`** — gewichtete Gesamt-Empfehlung: pro Phase eigene Gewichte [ROI/EV/Safe/LowVar/Cheap/WinProb/Aggro/GPRush]; Gegner-Druck-Modifikator (+0.3 auf Aggro+GPRush wenn Gegner ≥3 GPs); normRank-Scoring bestimmt finale Empfehlung; zeigt Faktoren mit Gewicht ≥ 0.5 und GP-Hinweise.
+- **Rendering** — blauer Hintergrund-Block (0xF0F4FF), TitledBorder; Phasen-Header, Empfehlung in fett, Faktorliste, GP-Hinweise in blau.
+- **`GameSession.getEffectiveTurnCount()`** — neuer public Getter.
+- **`ProbabilityCalc.portfolioEvPerRound(GameState, int)`** — neuer public Wrapper für `CardIncome.playerEvPerRound`.
+- **`Strings`** — neue Strings: `rankLabel`, `assistantTiebreakerNote`, `assistantAlso`, `assistantContextTitle/Phase/Recommend/Factor/GPHint`, `assistantPhaseEarly/Mid/Late`, `assistantContextNoAffordable`.
+
+**Tests:** 224 bestanden, 0 fehlgeschlagen.
+
+---
+
 ## N1: Game Assistant — 4th Tab mit 8 Strategieprofilen
 
 Deterministischer, regelbasierter Spielassistent als vierter Tab im rechten Panel.

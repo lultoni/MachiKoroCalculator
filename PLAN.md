@@ -162,3 +162,22 @@ Erfordert UI-Anpassung: Die Zeile ist nicht kaufbar, hat keinen Kartendetail-Ein
 
 - **Erweiterungskarten** — Hafen/Millionärsreihe. Architektur ist bereit (JSON-getrieben, `get_I` dispatcht per ID).
 - **Gegner-Archetypen** — Simulierte Spieler folgen aktuell einer greedy Policy. Verschiedene Archetypen würden realistischere Gewinnraten liefern. Basis: Strategieprofile aus N1.
+
+---
+
+## Future Strategy — Konzept
+
+### Was wird bereits berücksichtigt?
+- `roiOverHorizon` diskontiert zukünftige Erträge über 10 Runden (γ=0.95) — time-value of money
+- Win-Prob via MC spielt komplette Spiele durch → berücksichtigt indirekt alle Folgekäufe
+- `contextualCardEvPerRound` bewertet Synergien (Markthalle+food, Molkerei+animal) — impliziter 1-Step-Synergy-Lookahead
+- GP-Synergy-Hints im Spiellage-Assistenten zeigen wenn Bahnhof/EKZ/FP/Funkturm sich gerade lohnen würden
+- MC-Simulation korrekt implementiert: `computeAllDeltasForRoll` in `GameSimulator.applyRoll`, Freizeitpark, Bürohaus-Swap, Supply-Tracking — verifiziert ✓
+
+### Mögliche Verbesserungen (nicht priorisiert)
+
+| Verbesserung | Aufwand | Mehrwert |
+|---|---|---|
+| **Synergy-Lookahead** — für jede Karte berechne `evPerRound_after_best_synergy_card` | ~50 Zeilen | Mittel: "Molkerei wird besser wenn du noch Bauernhöfe kaufst" |
+| **2-Turn Lookahead** — beste zwei Käufe in Folge, O(n²) | ~100 Zeilen | Hoch: erkennt Ketten wie "Bahnhof → dann lohnen sich 2d6-Karten" |
+| **MC-Policy verbessern** — statt greedy `evPerRound/cost` die `roiOverHorizon`-Rangliste nutzen | ~30 Zeilen | Mittel: realistischere Win-Raten, da Spieler die tatsächlich beste Strategie spielen |

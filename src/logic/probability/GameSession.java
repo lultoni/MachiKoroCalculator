@@ -268,6 +268,11 @@ public class GameSession {
         return effectiveTurnCount % state.getPlayers().length;
     }
 
+    /** Returns the number of non-bonus turns completed so far across all players. */
+    public int getEffectiveTurnCount() {
+        return effectiveTurnCount;
+    }
+
     /** Returns true when the next turn is a Freizeitpark bonus turn for the same player. */
     public boolean isBonusTurnPending() {
         return bonusTurnPending;

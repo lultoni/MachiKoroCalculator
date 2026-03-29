@@ -8,11 +8,14 @@ package logic.probability;
  */
 public class RankingOptions {
 
+    /** Default horizon (turns) used when no instance is available, e.g. in UI string formatting. */
+    public static final int DEFAULT_HORIZON = 10;
+
     /**
      * Number of future turns to look ahead when computing discounted ROI.
      * Default: {@code 10}.
      */
-    public int horizonTurns = 10;
+    public int horizonTurns = DEFAULT_HORIZON;
 
     /**
      * Per-turn discount factor for the geometric ROI series (0 &lt; γ ≤ 1).

@@ -184,8 +184,77 @@ public final class Strings {
     public static String tabAffordable()      { return s("Erschwinglich", "Affordable"); }
     public static String tabNotAffordable()   { return s("Nicht erschwinglich", "Not Affordable"); }
     public static String tabAll()             { return s("Alle", "All"); }
+    public static String tabAssistant()       { return s("Assistent", "Assistant"); }
     public static String noAffordableCardsTab() { return s("Keine erschwinglichen Karten — sparen!", "No affordable cards — save up!"); }
     public static String noUnaffordableCards()  { return s("Alle Karten sind erschwinglich!", "All cards are affordable!"); }
+
+    // ---- Game Assistant strategy profile labels ----
+    public static String assistantProfileROI()      { return s("Bestes Investment", "Best Investment"); }
+    public static String assistantProfileEV()       { return s("Maximaler Ertrag", "Max Income"); }
+    public static String assistantProfileSafe()     { return s("Sicherheitsstrategie", "Safety Strategy"); }
+    public static String assistantProfileLowVar()   { return s("Niedrige Varianz", "Low Variance"); }
+    public static String assistantProfileCheap()    { return s("Sparsam", "Frugal"); }
+    public static String assistantProfileWinProb()  { return s("Gewinnwahrscheinlichkeit", "Win Probability"); }
+    public static String assistantProfileAggro()    { return s("Aggressiv", "Aggressive"); }
+    public static String assistantProfileGPRush()   { return s("GP Rush", "GP Rush"); }
+
+    // ---- Game Assistant explanations (profile, card name) ----
+    public static String assistantExplainROI(String card, double roi) {
+        return s("Kaufe <b>" + card + "</b> — höchster ROI (" + String.format("%.2f", roi) + "¢). "
+                + "Maximiert den Münzgewinn pro eingesetzter Münze über 10 Runden.",
+                 "Buy <b>" + card + "</b> — highest ROI (" + String.format("%.2f", roi) + "¢). "
+                + "Maximises coin gain per coin spent over 10 turns.");
+    }
+    public static String assistantExplainEV(String card, double ev) {
+        return s("Kaufe <b>" + card + "</b> — höchstes EV/Runde (+" + String.format("%.2f", ev) + "¢). "
+                + "Liefert den größten erwarteten Münzzuwachs pro Runde unabhängig von Kosten.",
+                 "Buy <b>" + card + "</b> — highest EV/round (+" + String.format("%.2f", ev) + "¢). "
+                + "Provides the greatest expected coin gain per round regardless of cost.");
+    }
+    public static String assistantExplainSafe(String card, double p0) {
+        return s("Kaufe <b>" + card + "</b> — niedrigstes P(0) (" + String.format("%.0f", p0 * 100) + "%). "
+                + "Am seltensten leer ausgehen — gut bei knapper Kasse oder starken Gegnern.",
+                 "Buy <b>" + card + "</b> — lowest P(0) (" + String.format("%.0f", p0 * 100) + "%). "
+                + "Least likely to yield no income — good when cash is tight or opponents are strong.");
+    }
+    public static String assistantExplainLowVar(String card, double var) {
+        return s("Kaufe <b>" + card + "</b> — niedrigste Varianz (" + String.format("%.2f", var) + "). "
+                + "Stabile Auszahlung ohne große Ausreißer nach oben oder unten.",
+                 "Buy <b>" + card + "</b> — lowest variance (" + String.format("%.2f", var) + "). "
+                + "Consistent payout with no large swings in either direction.");
+    }
+    public static String assistantExplainCheap(String card, int cost) {
+        return s("Kaufe <b>" + card + "</b> — günstigste Karte (" + cost + "¢). "
+                + "Schnellster Weg zurück ins Spiel; Münzen sofort wieder investierbar.",
+                 "Buy <b>" + card + "</b> — cheapest card (" + cost + "¢). "
+                + "Fastest way back into action; coins immediately available for reinvestment.");
+    }
+    public static String assistantExplainWinProb(String card, double delta) {
+        String sign = delta >= 0 ? "+" : "";
+        return s("Kaufe <b>" + card + "</b> — bestes Win Prob Δ (" + sign + String.format("%.1f", delta * 100) + "%). "
+                + "Verbessert deine Siegchance am stärksten.",
+                 "Buy <b>" + card + "</b> — best Win Prob Δ (" + sign + String.format("%.1f", delta * 100) + "%). "
+                + "Improves your win probability the most.");
+    }
+    public static String assistantExplainAggro(String card) {
+        return s("Kaufe <b>" + card + "</b> — aggressivste Option. "
+                + "Rot/Lila-Karten entziehen Gegnern Münzen und stören ihre Pläne.",
+                 "Buy <b>" + card + "</b> — most aggressive option. "
+                + "Red/purple cards drain opponent coins and disrupt their plans.");
+    }
+    public static String assistantExplainGPRush(String card, int cost, int coins) {
+        int missing = Math.max(0, cost - coins);
+        return s("Kaufe <b>" + card + "</b> — nächstes Großprojekt (" + cost + "¢). "
+                + (missing == 0 ? "Jetzt erschwinglich!" : "Noch " + missing + "¢ fehlen."),
+                 "Buy <b>" + card + "</b> — next landmark (" + cost + "¢). "
+                + (missing == 0 ? "Affordable now!" : missing + "¢ still needed."));
+    }
+    public static String assistantNoAffordable() {
+        return s("Keine erschwinglichen Karten für dieses Profil.", "No affordable cards match this profile.");
+    }
+    public static String assistantNoWinProb() {
+        return s("Win Prob Δ nicht verfügbar — 'Gewinnw.-Δ anzeigen' aktivieren.", "Win Prob Δ not available — enable 'Show Win Prob Δ'.");
+    }
     public static String deepAnalysisBtn()    { return s("Tiefenanalyse (MC)", "Deep Analysis (MC)"); }
     public static String deepAnalysisBtnOn()  { return s("Tiefenanalyse AN (MC)", "Deep Analysis ON (MC)"); }
     public static String deepAnalysisTooltip(){ return s("Monte-Carlo-Simulationen pro Karte für genaues Gewinnwahrscheinlichkeits-Delta.",

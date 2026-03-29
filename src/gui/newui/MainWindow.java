@@ -83,6 +83,7 @@ public class MainWindow extends JFrame {
     private JTable rankTableUnaffordable;
     private JTable rankTableAll;
     private JTabbedPane rankTabs;
+    private JPanel assistantPanel;
     private JButton toggleWinProbBtn;
     private JToggleButton deepAnalysisBtn;
     private JLabel statusLabel;
@@ -486,6 +487,12 @@ public class MainWindow extends JFrame {
         rankTabs.addTab(Strings.tabNotAffordable(), new JScrollPane(rankTableUnaffordable));
         rankTabs.addTab(Strings.tabAll(),           new JScrollPane(rankTableAll));
 
+        assistantPanel = new JPanel();
+        assistantPanel.setLayout(new BoxLayout(assistantPanel, BoxLayout.Y_AXIS));
+        JScrollPane assistantScroll = new JScrollPane(assistantPanel);
+        assistantScroll.getVerticalScrollBar().setUnitIncrement(16);
+        rankTabs.addTab(Strings.tabAssistant(), assistantScroll);
+
         panel.add(rankTabs, BorderLayout.CENTER);
 
         // Button bar at bottom
@@ -795,6 +802,9 @@ public class MainWindow extends JFrame {
         tableModel.setRowCount(0);
         tableModelUnaffordable.setRowCount(0);
         tableModelAll.setRowCount(0);
+        assistantPanel.removeAll();
+        assistantPanel.revalidate();
+        assistantPanel.repaint();
         statusLabel.setText(Strings.gameOverStatus());
     }
 
@@ -996,10 +1006,132 @@ public class MainWindow extends JFrame {
         rankTabs.setTitleAt(0, Strings.tabAffordable());
         rankTabs.setTitleAt(1, Strings.tabNotAffordable());
         rankTabs.setTitleAt(2, Strings.tabAll());
+        rankTabs.setTitleAt(3, Strings.tabAssistant());
 
         fillRankTableModel(tableModel,             rankTable,             cols, lastRanking, true,  false);
         fillRankTableModel(tableModelUnaffordable, rankTableUnaffordable, cols, lastRanking, false, false);
         fillRankTableModel(tableModelAll,          rankTableAll,          cols, lastRanking, null,  true);
+
+        rebuildAssistantPanel();
+    }
+
+    /**
+     * Rebuilds the Game Assistant tab from the current {@code lastRanking}.
+     * Shows 8 strategy-profile rows, each with a bold profile name and an HTML explanation.
+     */
+    private void rebuildAssistantPanel() {
+        assistantPanel.removeAll();
+
+        if (lastRanking.isEmpty()) {
+            JLabel empty = new JLabel(Strings.noAffordableCardsTab());
+            empty.setBorder(BorderFactory.createEmptyBorder(8, 10, 4, 10));
+            assistantPanel.add(empty);
+            assistantPanel.revalidate();
+            assistantPanel.repaint();
+            return;
+        }
+
+        int pi = session.nextPlayerIndex();
+        int coins = session.getState().getPlayers()[pi].getCoins();
+
+        // --- compute each profile's recommendation from lastRanking ---
+
+        // ROI — highest roiOverHorizon among affordable
+        RankEntry bestROI = lastRanking.stream().filter(e -> e.affordable)
+                .max((a, b) -> Double.compare(a.roiOverHorizon, b.roiOverHorizon)).orElse(null);
+
+        // EV — highest evPerRound among affordable
+        RankEntry bestEV = lastRanking.stream().filter(e -> e.affordable)
+                .max((a, b) -> Double.compare(a.evPerRound, b.evPerRound)).orElse(null);
+
+        // Safe — lowest probNoIncomeRound (P0) among affordable
+        RankEntry bestSafe = lastRanking.stream().filter(e -> e.affordable)
+                .min((a, b) -> Double.compare(a.probNoIncomeRound, b.probNoIncomeRound)).orElse(null);
+
+        // LowVar — lowest variance among affordable
+        RankEntry bestLowVar = lastRanking.stream().filter(e -> e.affordable)
+                .min((a, b) -> Double.compare(a.variance, b.variance)).orElse(null);
+
+        // Cheap — lowest cost among affordable
+        RankEntry bestCheap = lastRanking.stream().filter(e -> e.affordable)
+                .min((a, b) -> Integer.compare(a.project.getCost(), b.project.getCost())).orElse(null);
+
+        // WinProb — highest winProbDelta among affordable (requires delta computed)
+        boolean hasWinProb = lastRanking.stream().anyMatch(e -> e.winProbDelta != 0.0);
+        RankEntry bestWinProb = hasWinProb
+                ? lastRanking.stream().filter(e -> e.affordable)
+                        .max((a, b) -> Double.compare(a.winProbDelta, b.winProbDelta)).orElse(null)
+                : null;
+
+        // Aggro — prefer rot/lila affordable cards; highest evPerRound among them
+        RankEntry bestAggro = lastRanking.stream()
+                .filter(e -> e.affordable && (e.project.getColor().equals("rot") || e.project.getColor().equals("lila")))
+                .max((a, b) -> Double.compare(a.evPerRound, b.evPerRound)).orElse(null);
+
+        // GP Rush — cheapest unbuilt Großprojekt (affordable or not, closest to coins)
+        RankEntry bestGP = lastRanking.stream()
+                .filter(e -> e.project.isIs_grossprojekt())
+                .min((a, b) -> Integer.compare(a.project.getCost(), b.project.getCost())).orElse(null);
+
+        // --- render profile rows ---
+        Object[][] profiles = {
+            { Strings.assistantProfileROI(),
+              bestROI != null ? Strings.assistantExplainROI(bestROI.project.getLocalizedName(), bestROI.roiOverHorizon) : null },
+            { Strings.assistantProfileEV(),
+              bestEV != null ? Strings.assistantExplainEV(bestEV.project.getLocalizedName(), bestEV.evPerRound) : null },
+            { Strings.assistantProfileSafe(),
+              bestSafe != null ? Strings.assistantExplainSafe(bestSafe.project.getLocalizedName(), bestSafe.probNoIncomeRound) : null },
+            { Strings.assistantProfileLowVar(),
+              bestLowVar != null ? Strings.assistantExplainLowVar(bestLowVar.project.getLocalizedName(), bestLowVar.variance) : null },
+            { Strings.assistantProfileCheap(),
+              bestCheap != null ? Strings.assistantExplainCheap(bestCheap.project.getLocalizedName(), bestCheap.project.getCost()) : null },
+            { Strings.assistantProfileWinProb(),
+              bestWinProb != null ? Strings.assistantExplainWinProb(bestWinProb.project.getLocalizedName(), bestWinProb.winProbDelta) : null },
+            { Strings.assistantProfileAggro(),
+              bestAggro != null ? Strings.assistantExplainAggro(bestAggro.project.getLocalizedName()) : null },
+            { Strings.assistantProfileGPRush(),
+              bestGP != null ? Strings.assistantExplainGPRush(bestGP.project.getLocalizedName(), bestGP.project.getCost(), coins) : null },
+        };
+
+        for (Object[] row : profiles) {
+            String profileLabel = (String) row[0];
+            String explanation  = (String) row[1];
+
+            JPanel profileRow = new JPanel();
+            profileRow.setLayout(new BoxLayout(profileRow, BoxLayout.Y_AXIS));
+            profileRow.setBorder(BorderFactory.createCompoundBorder(
+                    BorderFactory.createMatteBorder(0, 0, 1, 0, new Color(0xDDDDDD)),
+                    BorderFactory.createEmptyBorder(6, 10, 6, 10)));
+            profileRow.setBackground(Color.WHITE);
+            profileRow.setAlignmentX(Component.LEFT_ALIGNMENT);
+            profileRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, Integer.MAX_VALUE));
+
+            JLabel nameLabel = new JLabel(profileLabel);
+            nameLabel.setFont(new Font("Arial", Font.BOLD, 11));
+            nameLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+            profileRow.add(nameLabel);
+
+            String body;
+            if (explanation == null && profileLabel.equals(Strings.assistantProfileWinProb())) {
+                body = Strings.assistantNoWinProb();
+            } else if (explanation == null) {
+                body = Strings.assistantNoAffordable();
+            } else {
+                body = explanation;
+            }
+
+            JLabel bodyLabel = new JLabel("<html><body style='width:230px'>" + body + "</body></html>");
+            bodyLabel.setFont(new Font("Arial", Font.PLAIN, 11));
+            bodyLabel.setForeground(new Color(0x333333));
+            bodyLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+            profileRow.add(Box.createVerticalStrut(2));
+            profileRow.add(bodyLabel);
+
+            assistantPanel.add(profileRow);
+        }
+
+        assistantPanel.revalidate();
+        assistantPanel.repaint();
     }
 
     /**

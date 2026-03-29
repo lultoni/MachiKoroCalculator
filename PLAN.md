@@ -56,29 +56,7 @@ Programmatisch als kleine Kreise/Ovale zeichnen; für Rot zusätzlich Hinweis "W
 
 ---
 
-### N1 · Game Assistant (Medium)
-
-Deterministischer, regelbasierter Spielassistent. **Keine generative KI.** Wertet alle Metriken aus und gibt pro Strategie eine Empfehlung mit 2–3 Sätzen Begründung aus.
-
-**Strategieprofile:**
-
-| Profil | Kriterium | Kurzbeschreibung |
-|--------|-----------|-----------------|
-| Bestes Investment | höchster ROI | Standard-Empfehlung — maximiert Gewinn pro eingesetzter Münze über 10 Runden |
-| Maximaler Ertrag | höchstes EV/round | Höchster erwarteter Münzgewinn pro Runde, unabhängig von Kosten |
-| Sicherheitsstrategie | niedrigstes P(0) | Karte die am seltensten leer ausgeht — gut bei knapper Kasse oder starken Gegnern |
-| Niedrige Varianz | niedrigste Varianz | Stabile Auszahlung ohne Ausreißer |
-| Sparsam | günstigste Karte | Schnellster Kauf um sofort ins Spiel zurückzukehren |
-| Gewinnwahrscheinlichkeit | höchstes Win Prob Δ | Verbessert die eigene Siegchance am stärksten (nur wenn Win Prob Δ berechnet) |
-| Aggressiv | max. Gegnerschaden | Bevorzugt Rot/Lila (Stadion, Bürohaus) die Gegner Münzen kosten |
-| GP Rush | nächste GP-Schwelle | Strategie die am schnellsten das nächste Großprojekt finanzierbar macht |
-
-**Ausgabe-Beispiel:**
-> **Bestes Investment:** Kaufe Café (2¢). ROI 1.84 — du bekommst die Investition in ~5.4 Runden zurück. Besonders effektiv, weil du noch kein Café besitzt.
-
-**UI:** Vierter Tab im rechten Panel oder eigener Bereich unter Kartendetails. Dropdown / Buttons zur Strategiewahl; Empfehlung aktualisiert sich automatisch bei jedem `refreshAll()`.
-
-**Langfristig:** Die Strategieprofile können als Entscheidungslogik für simulierte Gegner in `GameSimulator` genutzt werden (→ Future: Opponent Modeling).
+### N1 · ~~Game Assistant~~ ✓ (behoben)
 
 ---
 

@@ -4,6 +4,28 @@ Implementierungsgeschichte: was gebaut wurde, warum, und welche Designentscheidu
 
 ---
 
+## N1: Game Assistant — 4th Tab mit 8 Strategieprofilen
+
+Deterministischer, regelbasierter Spielassistent als vierter Tab im rechten Panel.
+
+- **4. Tab "Assistent"** — `JScrollPane` über `assistantPanel` (BoxLayout Y); `rebuildAssistantPanel()` wird am Ende von `rebuildTable()` aufgerufen und bei `showGameOver()` geleert.
+- **8 Strategieprofile** — jedes Profil wählt den besten erschwingli­chen Eintrag aus `lastRanking` nach eigenem Kriterium:
+  - **Bestes Investment** — höchster `roiOverHorizon`
+  - **Maximaler Ertrag** — höchstes `evPerRound`
+  - **Sicherheitsstrategie** — niedrigstes `probNoIncomeRound` (P0)
+  - **Niedrige Varianz** — niedrigste `variance`
+  - **Sparsam** — niedrigster Kartenpreis
+  - **Gewinnwahrscheinlichkeit** — höchstes `winProbDelta` (zeigt Hinweis wenn nicht berechnet)
+  - **Aggressiv** — höchstes `evPerRound` unter `rot`/`lila`-Karten
+  - **GP Rush** — günstigstes ungebautes Großprojekt (erschwinglich oder nicht)
+- **Rendering** — jede Zeile: fetter Profilname + HTML-Label mit Karte und 1-2 Sätzen Begründung; durch graue Trennlinie getrennt.
+- **i18n** — `Strings.tabAssistant()`, `assistantProfileROI/EV/...()`, `assistantExplainROI/EV/...()`, `assistantNoAffordable()`, `assistantNoWinProb()` in DE und EN.
+- **`RankingOptions.DEFAULT_HORIZON = 10`** — neue Klassenkonstante für externe Referenz aus UI-Code.
+
+**Tests:** 224 bestanden, 0 fehlgeschlagen.
+
+---
+
 ## N0: Bürohaus-Tausch im UI — Dialog, Verlauf, Undo, Persistence
 
 Der Bürohaus-Tausch (lila, Roll=6) war bisher nur in der Monte-Carlo-Simulation automatisch implementiert. In der echten Spielsession passierte nichts. Jetzt:

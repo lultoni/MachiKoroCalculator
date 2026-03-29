@@ -185,6 +185,32 @@ class CardIncome {
             }
             return s;
         }
+
+        /** Returns a copy of this stats with additional projects applied. */
+        PlayerStats withExtra(Project... extras) {
+            PlayerStats s = new PlayerStats();
+            s.hasEinkaufszentrum = this.hasEinkaufszentrum;
+            s.hasBahnhof         = this.hasBahnhof;
+            s.hasFreizeitpark    = this.hasFreizeitpark;
+            s.hasFunkturm        = this.hasFunkturm;
+            s.foodCount          = this.foodCount;
+            s.animalCount        = this.animalCount;
+            s.productionCount    = this.productionCount;
+            for (Project p : extras) {
+                switch (p.getId()) {
+                    case "einkaufszentrum" -> s.hasEinkaufszentrum = true;
+                    case "bahnhof"         -> s.hasBahnhof         = true;
+                    case "freizeitpark"    -> s.hasFreizeitpark    = true;
+                    case "funkturm"        -> s.hasFunkturm        = true;
+                }
+                switch (p.getCategory()) {
+                    case "food"       -> s.foodCount++;
+                    case "animal"     -> s.animalCount++;
+                    case "production" -> s.productionCount++;
+                }
+            }
+            return s;
+        }
     }
 
     // -------------------------------------------------------------------------

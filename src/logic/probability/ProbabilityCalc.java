@@ -1043,43 +1043,18 @@ public class ProbabilityCalc {
     }
 
     private static CardIncome.PlayerStats buildStatsWithCard(Player player, Project extra) {
-        CardIncome.PlayerStats s = new CardIncome.PlayerStats();
-        for (Project p : player.getOwned_projects()) applyToStats(s, p);
-        applyToStats(s, extra);
-        return s;
+        return CardIncome.PlayerStats.of(player).withExtra(extra);
     }
 
     /** Creates PlayerStats for {@code player} as if they also own {@code extra1} and {@code extra2}. */
     private static CardIncome.PlayerStats buildStatsWithCards(Player player, Project extra1, Project extra2) {
-        CardIncome.PlayerStats s = new CardIncome.PlayerStats();
-        for (Project p : player.getOwned_projects()) applyToStats(s, p);
-        applyToStats(s, extra1);
-        applyToStats(s, extra2);
-        return s;
+        return CardIncome.PlayerStats.of(player).withExtra(extra1, extra2);
     }
 
     /** Creates PlayerStats for {@code player} as if they also own {@code extra} and Einkaufszentrum. */
     private static CardIncome.PlayerStats buildStatsWithEkz(Player player, Project extra) {
-        CardIncome.PlayerStats s = new CardIncome.PlayerStats();
-        for (Project p : player.getOwned_projects()) applyToStats(s, p);
-        applyToStats(s, extra);
-        s.hasEinkaufszentrum = true;
-        return s;
-    }
-
-    /** Applies a single project's contribution to a PlayerStats instance. */
-    private static void applyToStats(CardIncome.PlayerStats s, Project p) {
-        switch (p.getId()) {
-            case "einkaufszentrum" -> s.hasEinkaufszentrum = true;
-            case "bahnhof"         -> s.hasBahnhof         = true;
-            case "freizeitpark"    -> s.hasFreizeitpark    = true;
-            case "funkturm"        -> s.hasFunkturm        = true;
-        }
-        switch (p.getCategory()) {
-            case "food"       -> s.foodCount++;
-            case "animal"     -> s.animalCount++;
-            case "production" -> s.productionCount++;
-        }
+        Project ekz = ProjectLoader.getProject("einkaufszentrum").orElseThrow();
+        return CardIncome.PlayerStats.of(player).withExtra(extra, ekz);
     }
 
     // -------------------------------------------------------------------------

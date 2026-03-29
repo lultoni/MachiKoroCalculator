@@ -119,7 +119,11 @@ public class GameSession {
             }
         }
 
-        history.add(record);
+        // Store an augmented copy of the record that includes the computed coin deltas.
+        // If the caller already supplied deltas (e.g. replay path), keep them; otherwise attach.
+        TurnRecord stored = (record.coinDeltas != null) ? record
+                : new TurnRecord(record.playerIndex, record.roll, record.bought, record.isDoubles, deltas);
+        history.add(stored);
 
         // Determine if a Freizeitpark bonus turn is pending:
         // The player gets a bonus turn if:

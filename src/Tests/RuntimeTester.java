@@ -96,6 +96,14 @@ public class RuntimeTester {
         test_freizeitpark_bonus_advances_player_after_bonus();
         test_freizeitpark_undo_restores_correct_state();
 
+        System.out.println("\n=== TurnRecord CoinDeltas Tests ===\n");
+        test_coin_deltas_stored_in_turn_record();
+        test_coin_deltas_null_for_externally_constructed_record();
+        test_coin_deltas_correct_values_blue_card();
+        test_coin_deltas_correct_values_red_card();
+        test_coin_deltas_preserved_after_undo_replay();
+        test_coin_deltas_roundtrip_save_load();
+
         System.out.println("\n--- Results: " + passed + " passed, " + failed + " failed ---");
 
         System.out.println("\n=== Runtime Benchmarks ===\n");
@@ -1092,6 +1100,92 @@ public class RuntimeTester {
         session.undoLastTurn();
         assertTrue("Bonus NOT pending after undo", !session.isBonusTurnPending());
         assertEq("After undo: P0's turn again (index 0)", 0, session.nextPlayerIndex());
+    }
+
+    private static void test_coin_deltas_stored_in_turn_record() {
+        // After applyTurn, the stored TurnRecord should have non-null coinDeltas.
+        GameState gs = GameState.initial(2);
+        GameSession session = new GameSession(gs, new String[]{"P0", "P1"});
+        // Roll 1 activates weizenfeld (blue) — both players have it, each gets +1
+        session.applyTurn(new TurnRecord(0, 1, null, false));
+        TurnRecord stored = session.getHistory().get(0);
+        assertTrue("coinDeltas non-null after applyTurn", stored.coinDeltas != null);
+        assertTrue("coinDeltas length equals player count", stored.coinDeltas.length == 2);
+    }
+
+    private static void test_coin_deltas_null_for_externally_constructed_record() {
+        // 3-arg and 4-arg constructors leave coinDeltas null (caller did not supply them)
+        TurnRecord r3 = new TurnRecord(0, 3, null);
+        TurnRecord r4 = new TurnRecord(0, 3, null, false);
+        assertTrue("3-arg TurnRecord: coinDeltas is null", r3.coinDeltas == null);
+        assertTrue("4-arg TurnRecord: coinDeltas is null", r4.coinDeltas == null);
+    }
+
+    private static void test_coin_deltas_correct_values_blue_card() {
+        // Weizenfeld (blau, roll 1) gives +1 to all players.
+        // Starting state: each player has weizenfeld. Roll 1 from P0.
+        GameState gs = GameState.initial(3);
+        GameSession session = new GameSession(gs, new String[]{"P0", "P1", "P2"});
+        session.applyTurn(new TurnRecord(0, 1, null, false));
+        TurnRecord stored = session.getHistory().get(0);
+        assertTrue("3-player blue roll: 3 deltas", stored.coinDeltas.length == 3);
+        // Each player has exactly weizenfeld → +1 for roll 1
+        assertEq("P0 delta for blue roll 1", 1, stored.coinDeltas[0]);
+        assertEq("P1 delta for blue roll 1", 1, stored.coinDeltas[1]);
+        assertEq("P2 delta for blue roll 1", 1, stored.coinDeltas[2]);
+    }
+
+    private static void test_coin_deltas_correct_values_red_card() {
+        // Café (rot, roll 3) takes 1 coin from the rolling player for P1's benefit.
+        GameStateBuilder b = new GameStateBuilder(2);
+        b.setPlayerName(0, "P0").setCoins(0, 5).addProject(0, "weizenfeld");
+        b.setPlayerName(1, "P1").setCoins(1, 3).addProject(1, "weizenfeld").addProject(1, "café");
+        GameState gs = b.build();
+        GameSession session = new GameSession(gs, new String[]{"P0", "P1"});
+        // P0 rolls 3: café triggers, P1 takes 1 coin from P0.
+        session.applyTurn(new TurnRecord(0, 3, null, false));
+        TurnRecord stored = session.getHistory().get(0);
+        assertEq("P0 delta (red card paid)", -1, stored.coinDeltas[0]);
+        assertEq("P1 delta (café income)",   +1, stored.coinDeltas[1]);
+    }
+
+    private static void test_coin_deltas_preserved_after_undo_replay() {
+        // After undoLastTurn + applyTurn replay, coinDeltas should still be populated.
+        GameState gs = GameState.initial(2);
+        GameSession session = new GameSession(gs, new String[]{"P0", "P1"});
+        session.applyTurn(new TurnRecord(0, 1, null, false));
+        TurnRecord first = session.getHistory().get(0);
+        assertTrue("First turn has deltas", first.coinDeltas != null);
+
+        session.applyTurn(new TurnRecord(1, 2, null, false));
+        session.undoLastTurn(); // removes second turn, replays first
+        TurnRecord replayed = session.getHistory().get(0);
+        assertTrue("Replayed first turn still has deltas", replayed.coinDeltas != null);
+        assertEq("Replayed P0 delta matches", first.coinDeltas[0], replayed.coinDeltas[0]);
+    }
+
+    private static void test_coin_deltas_roundtrip_save_load() throws Exception {
+        // Save a session and load it back — coinDeltas should survive the JSON round-trip.
+        GameStateBuilder b = new GameStateBuilder(2);
+        b.setPlayerName(0, "P0").setCoins(0, 5).addProject(0, "weizenfeld");
+        b.setPlayerName(1, "P1").setCoins(1, 3).addProject(1, "weizenfeld").addProject(1, "café");
+        GameState gs = b.build();
+        GameSession session = new GameSession(gs, new String[]{"P0", "P1"});
+        session.applyTurn(new TurnRecord(0, 3, null, false)); // P0 rolls 3 → café triggers
+
+        TurnRecord original = session.getHistory().get(0);
+
+        Path tmp = Files.createTempFile("mkoro_delta_test", ".mkoro");
+        try {
+            session.save(tmp);
+            GameSession loaded = GameSession.load(tmp);
+            TurnRecord roundTripped = loaded.getHistory().get(0);
+            assertTrue("Loaded TurnRecord has coinDeltas", roundTripped.coinDeltas != null);
+            assertEq("Loaded P0 delta matches", original.coinDeltas[0], roundTripped.coinDeltas[0]);
+            assertEq("Loaded P1 delta matches", original.coinDeltas[1], roundTripped.coinDeltas[1]);
+        } finally {
+            Files.deleteIfExists(tmp);
+        }
     }
 
     private static void test_gp_ranking_separate_from_regular_cards() {

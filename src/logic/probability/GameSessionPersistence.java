@@ -126,6 +126,11 @@ final class GameSessionPersistence {
                 turn.add("boughtId", com.google.gson.JsonNull.INSTANCE);
             }
             if (t.isDoubles) turn.addProperty("isDoubles", true); // omit when false for compactness
+            if (t.coinDeltas != null) {
+                JsonArray da = new JsonArray();
+                for (int d : t.coinDeltas) da.add(d);
+                turn.add("coinDeltas", da);
+            }
             turns.add(turn);
         }
         return turns;
@@ -169,7 +174,14 @@ final class GameSessionPersistence {
             }
             // isDoubles defaults to false if absent (backward compatible with old saves)
             boolean isDoubles = t.has("isDoubles") && t.get("isDoubles").getAsBoolean();
-            session.applyTurn(new TurnRecord(pi, roll, bought, isDoubles));
+            // coinDeltas defaults to null if absent (backward compatible with old saves)
+            int[] coinDeltas = null;
+            if (t.has("coinDeltas") && t.get("coinDeltas").isJsonArray()) {
+                JsonArray da = t.getAsJsonArray("coinDeltas");
+                coinDeltas = new int[da.size()];
+                for (int i = 0; i < da.size(); i++) coinDeltas[i] = da.get(i).getAsInt();
+            }
+            session.applyTurn(new TurnRecord(pi, roll, bought, isDoubles, coinDeltas));
         }
     }
 }

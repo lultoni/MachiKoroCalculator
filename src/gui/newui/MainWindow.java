@@ -910,36 +910,51 @@ public class MainWindow extends JFrame {
         historyPanel.removeAll();
         List<TurnRecord> history = session.getHistory();
         String[] names = session.getPlayerNames();
-        GameState current = session.getState();
-        String[] playerColors = new String[current.getPlayers().length];
-        for (int i = 0; i < current.getPlayers().length; i++) {
-            // Assign a distinct color per player for history display
-            Color c = playerIndexColor(i);
-            playerColors[i] = String.format("#%02x%02x%02x", c.getRed(), c.getGreen(), c.getBlue());
-        }
+        int nPlayers = session.getState().getPlayers().length;
 
         for (int i = history.size() - 1; i >= 0; i--) {
             TurnRecord t = history.get(i);
             String pName = names[t.playerIndex];
-            String colorHex = playerColors[t.playerIndex];
+            Color pColor = playerIndexColor(t.playerIndex);
+            String colorHex = String.format("#%02x%02x%02x",
+                    pColor.getRed(), pColor.getGreen(), pColor.getBlue());
 
-            StringBuilder html = new StringBuilder("<html>");
+            StringBuilder html = new StringBuilder("<html><body style='padding:1px'>");
+
+            // Line 1: who rolled what (+ doubles badge)
             html.append("<b style='color:").append(colorHex).append("'>").append(pName).append("</b>");
             html.append(" rolled <b>").append(t.roll).append("</b>");
-            if (t.isDoubles) html.append(" 🎲🎲 <b style='color:#7030A0'>DOUBLES!</b>");
+            if (t.isDoubles) html.append(" 🎲 <b style='color:#7030A0'>DOUBLES!</b>");
+
+            // Line 2: coin deltas per player
+            if (t.coinDeltas != null) {
+                html.append("<br><small style='color:#555'>");
+                for (int p = 0; p < Math.min(t.coinDeltas.length, nPlayers); p++) {
+                    if (p > 0) html.append("  ");
+                    int d = t.coinDeltas[p];
+                    String sign = d >= 0 ? "+" : "";
+                    String col = d > 0 ? "#007700" : (d < 0 ? "#AA0000" : "#888888");
+                    html.append("<b style='color:").append(col).append("'>")
+                        .append(names[p]).append(": ").append(sign).append(d).append("¢</b>");
+                }
+                html.append("</small>");
+            }
+
+            // Line 3: purchase (if any)
             if (t.bought != null) {
                 String gpMark = t.bought.isIs_grossprojekt() ? " [GP]" : "";
-                html.append(" → bought <b>").append(UIUtils.capitalize(t.bought.getId()))
-                    .append(gpMark).append("</b> (−").append(t.bought.getCost()).append("¢)");
+                html.append("<br><small>→ bought <b>")
+                    .append(UIUtils.capitalize(t.bought.getId())).append(gpMark)
+                    .append("</b> (−").append(t.bought.getCost()).append("¢)</small>");
             } else {
-                html.append(" → saved");
+                html.append("<br><small style='color:#888'>→ saved</small>");
             }
-            html.append("</html>");
+
+            html.append("</body></html>");
 
             JLabel lbl = new JLabel(html.toString());
             lbl.setFont(new Font("Arial", Font.PLAIN, 11));
-            lbl.setBorder(BorderFactory.createEmptyBorder(2, 4, 2, 4));
-            // Alternate row background
+            lbl.setBorder(BorderFactory.createEmptyBorder(3, 4, 3, 4));
             lbl.setOpaque(true);
             lbl.setBackground((i % 2 == 0) ? Color.WHITE : new Color(0xF5F5F5));
             historyPanel.add(lbl);

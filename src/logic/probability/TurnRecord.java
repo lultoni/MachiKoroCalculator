@@ -1,5 +1,7 @@
 package logic.probability;
 
+import java.util.Arrays;
+
 /**
  * Immutable record of what happened in a single turn.
  *
@@ -13,6 +15,11 @@ package logic.probability;
  * (granting a bonus turn on doubles), {@link #isDoubles} must be set to {@code true}
  * when the two dice showed the same face. {@link GameSession#nextPlayerIndex()} uses
  * this flag to grant the same player an extra turn.
+ *
+ * <p>{@link #coinDeltas} stores the net coin change for every player caused by this roll
+ * (red card payments + blue/green/purple income, in official turn order). The array is
+ * indexed by player index and may be {@code null} for records loaded from old save files
+ * that predate this field.
  */
 public class TurnRecord {
 
@@ -37,6 +44,16 @@ public class TurnRecord {
     public final boolean isDoubles;
 
     /**
+     * Net coin change per player caused by this roll's income/payment step, indexed by
+     * player index. Positive = gained coins, negative = paid coins. Does NOT include the
+     * purchase cost (that is tracked separately by {@link #bought}).
+     *
+     * <p>May be {@code null} for records loaded from save files written before this field
+     * was introduced. UI code must null-check before using.
+     */
+    public final int[] coinDeltas;
+
+    /**
      * Constructs a turn record without doubles information (backwards-compatible).
      *
      * @param playerIndex index of the active player (0-based)
@@ -44,7 +61,7 @@ public class TurnRecord {
      * @param bought      project purchased this turn, or null
      */
     public TurnRecord(int playerIndex, int roll, Project bought) {
-        this(playerIndex, roll, bought, false);
+        this(playerIndex, roll, bought, false, null);
     }
 
     /**
@@ -56,18 +73,33 @@ public class TurnRecord {
      * @param isDoubles   true if two dice were rolled and both showed the same face
      */
     public TurnRecord(int playerIndex, int roll, Project bought, boolean isDoubles) {
+        this(playerIndex, roll, bought, isDoubles, null);
+    }
+
+    /**
+     * Constructs a full turn record with doubles flag and per-player coin deltas.
+     *
+     * @param playerIndex index of the active player (0-based)
+     * @param roll        dice total (1–12)
+     * @param bought      project purchased this turn, or null
+     * @param isDoubles   true if two dice were rolled and both showed the same face
+     * @param coinDeltas  net coin change per player from this roll, or null if unknown
+     */
+    public TurnRecord(int playerIndex, int roll, Project bought, boolean isDoubles, int[] coinDeltas) {
         if (playerIndex < 0) throw new IllegalArgumentException("playerIndex must be >= 0");
         if (roll < 1 || roll > 12) throw new IllegalArgumentException("roll must be 1–12, got: " + roll);
         this.playerIndex = playerIndex;
         this.roll = roll;
         this.bought = bought;
         this.isDoubles = isDoubles;
+        this.coinDeltas = coinDeltas != null ? coinDeltas.clone() : null;
     }
 
     @Override
     public String toString() {
         String buyStr = (bought != null) ? "bought=" + bought.getId() : "no purchase";
         String doublesStr = isDoubles ? ", DOUBLES" : "";
-        return "Turn{player=" + playerIndex + ", roll=" + roll + ", " + buyStr + doublesStr + "}";
+        String deltaStr = coinDeltas != null ? ", deltas=" + Arrays.toString(coinDeltas) : "";
+        return "Turn{player=" + playerIndex + ", roll=" + roll + ", " + buyStr + doublesStr + deltaStr + "}";
     }
 }

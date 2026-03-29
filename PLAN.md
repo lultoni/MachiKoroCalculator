@@ -2,29 +2,9 @@
 
 Open items only. For history see `CHANGELOG.md`, for math see `ARCHITECTURE.md`.
 
-Progress key: `[ ]` open · `[~]` in progress · `[x]` done
-
----
-
-## Bugs
-
-### B1 · ~~Würfelaktivierung > 6 zeigt leeren Würfel~~ ✓ (behoben)
-
-### B2 · ~~Rechtes Panel zu schmal — Reload-Button und Status-Text abgeschnitten~~ ✓ (behoben)
-
-### B3 · ~~"coins" im Würfelergebnis-Preview nicht lokalisiert~~ ✓ (behoben)
-
 ---
 
 ## Code-Qualität
-
-### C1 · ~~Metrik-Färbung: gemeinsame Basisklasse~~ ✓ (behoben)
-
-### C2 · ~~Language Deep Clean — UX-Lesbarkeit des gesamten UI~~ ✓ (behoben)
-
-### C3 · ~~Codeduplizierungen und Dead Code entfernen~~ ✓ (behoben)
-
----
 
 ### C4 · File Split Priority 2 (Low, deferred)
 

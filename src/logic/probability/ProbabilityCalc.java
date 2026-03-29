@@ -209,6 +209,45 @@ public class ProbabilityCalc {
     }
 
     // -------------------------------------------------------------------------
+    // funkturmEV — EV gain from Funkturm re-roll option
+    // -------------------------------------------------------------------------
+
+    /**
+     * Returns the expected coin gain from the Funkturm (radio tower) re-roll option on a
+     * single turn, given the payout function {@code g(r)} and the number of dice used.
+     *
+     * <p>Funkturm allows the player to discard their first roll and roll again <em>once</em>
+     * if they don't like the outcome. The optimal strategy is to re-roll whenever the first
+     * roll is below the expected value of re-rolling (which equals E_baseline, the plain
+     * expected value without Funkturm).
+     *
+     * <p>Correct formula:
+     * <pre>
+     *   E[Funkturm] = E_baseline + Σ_{r : g(r) &lt; E_baseline} P(r) × (E_baseline − g(r))
+     * </pre>
+     *
+     * @param use2d6    if true, compute using 2d6 distribution; otherwise 1d6
+     * @param payoutFn  maps a roll result to the coin payout for that roll
+     * @return EV of one turn under the Funkturm re-roll policy
+     */
+    private static double funkturmEV(boolean use2d6, IntToDoubleFunction payoutFn) {
+        double baseline = CardIncome.weightedRollEV(use2d6, payoutFn);
+        double gain = 0.0;
+        if (use2d6) {
+            for (int r = 2; r <= 12; r++) {
+                double g = payoutFn.applyAsDouble(r);
+                if (g < baseline) gain += P2[r] * (baseline - g);
+            }
+        } else {
+            for (int r = 1; r <= 6; r++) {
+                double g = payoutFn.applyAsDouble(r);
+                if (g < baseline) gain += P1[r] * (baseline - g);
+            }
+        }
+        return baseline + gain;
+    }
+
+    // -------------------------------------------------------------------------
     // bestSecondRollEV
     // -------------------------------------------------------------------------
 
@@ -261,10 +300,20 @@ public class ProbabilityCalc {
 
         double evTotal;
 
+        // Payout function without doubles-awareness (used for 1d6 paths and Funkturm)
+        IntToDoubleFunction payout1d6 = r -> computeNetGainForRoll(state, playerIndex, r, false);
+
         if (!hasBahnhof) {
-            evTotal = CardIncome.weightedRollEV(false, r -> computeNetGainForRoll(state, playerIndex, r, false));
+            if (hasFunkturm) {
+                // Funkturm: re-roll once on dislike — strictly better than plain 1d6
+                evTotal = funkturmEV(false, payout1d6);
+            } else {
+                evTotal = CardIncome.weightedRollEV(false, payout1d6);
+            }
         } else {
-            double ev1 = CardIncome.weightedRollEV(false, r -> computeNetGainForRoll(state, playerIndex, r, false));
+            double ev1 = hasFunkturm
+                    ? funkturmEV(false, payout1d6)
+                    : CardIncome.weightedRollEV(false, payout1d6);
 
             double ev2 = 0.0;
             for (int d1 = 1; d1 <= 6; d1++) {
@@ -278,6 +327,14 @@ public class ProbabilityCalc {
                         ev2 += p * bestSecondRollEV(state, playerIndex, forcedDice);
                     }
                 }
+            }
+            // Funkturm with 2d6: if re-roll option improves the 2d6 EV beyond the doubles benefit,
+            // apply funkturmEV to the 2d6 base payout (without doubles bonus — Funkturm forces same
+            // dice count, and the second roll cannot chain Freizeitpark per rules).
+            if (hasFunkturm) {
+                IntToDoubleFunction payout2d6 = r -> computeNetGainForRoll(state, playerIndex, r, false);
+                double ev2WithFunkturm = funkturmEV(true, payout2d6);
+                ev2 = Math.max(ev2, ev2WithFunkturm);
             }
 
             evTotal = Math.max(ev1, ev2);
@@ -356,12 +413,17 @@ public class ProbabilityCalc {
 
         // Own turn: blue + green + purple + red costs paid
         boolean hasBahnhof = state.getPlayers()[playerIndex].hasProject("bahnhof");
+        boolean hasFreizeitpark = state.getPlayers()[playerIndex].hasProject("freizeitpark");
+        boolean hasFunkturm    = state.getPlayers()[playerIndex].hasProject("funkturm");
+        IntToDoubleFunction payout1d6 = r -> computeNetGainForRoll(state, playerIndex, r, false);
         if (!hasBahnhof) {
-            total += CardIncome.weightedRollEV(false, r -> computeNetGainForRoll(state, playerIndex, r, false));
+            total += hasFunkturm
+                    ? funkturmEV(false, payout1d6)
+                    : CardIncome.weightedRollEV(false, payout1d6);
         } else {
-            double ev1 = CardIncome.weightedRollEV(false, r -> computeNetGainForRoll(state, playerIndex, r, false));
-            boolean hasFreizeitpark = state.getPlayers()[playerIndex].hasProject("freizeitpark");
-            boolean hasFunkturm    = state.getPlayers()[playerIndex].hasProject("funkturm");
+            double ev1 = hasFunkturm
+                    ? funkturmEV(false, payout1d6)
+                    : CardIncome.weightedRollEV(false, payout1d6);
             double ev2 = 0.0;
             for (int d1 = 1; d1 <= 6; d1++) {
                 for (int d2 = 1; d2 <= 6; d2++) {
@@ -372,6 +434,10 @@ public class ProbabilityCalc {
                         ev2 += p * bestSecondRollEV(state, playerIndex, hasFunkturm ? 2 : -1);
                     }
                 }
+            }
+            if (hasFunkturm) {
+                IntToDoubleFunction payout2d6 = r -> computeNetGainForRoll(state, playerIndex, r, false);
+                ev2 = Math.max(ev2, funkturmEV(true, payout2d6));
             }
             total += Math.max(ev1, ev2);
         }

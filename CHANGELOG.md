@@ -4,6 +4,26 @@ Implementierungsgeschichte: was gebaut wurde, warum, und welche Designentscheidu
 
 ---
 
+## M2: Funkturm-EV in immediateEV und evPerRound
+
+**Problem:** `hasFunkturm` wurde bisher nur im Freizeitpark-Doppelwurf-Pfad (`bestSecondRollEV`) genutzt. Ein Spieler mit Funkturm aber ohne Freizeitpark bekam null Funkturm-Nutzen im EV-Modell.
+
+**Lösung:** Neue private Methode `funkturmEV(boolean use2d6, IntToDoubleFunction payoutFn)`:
+```
+E[Funkturm] = E_baseline + Σ_{r : g(r) < E_baseline} P(r) × (E_baseline − g(r))
+```
+Der Spieler re-rollt optimal — nur wenn der erste Wurf unter dem Erwartungswert liegt. Das ergibt einen EV, der strikt höher als `E_baseline` und niedriger als ein erzwungenes Neu-Würfeln ist.
+
+- **`immediateEV`**: wenn `hasFunkturm`, verwendet `funkturmEV(false, ...)` statt `weightedRollEV(false, ...)` für 1d6; bei Bahnhof zusätzlich `funkturmEV(true, ...)` für 2d6 (ohne Doubles-Freizeitpark-Bonus, da Funkturm dieselbe Würfelanzahl erzwingt).
+- **`evPerRound`**: gleiche Logik im Eigenzug-Block.
+- **`bestSecondRollEV`**: unverändert (Freizeitpark-Pfad; Funkturm+Freizeitpark erzwingt `forcedDice=2` für den zweiten Wurf wie bisher).
+
+Sanity-Check: Weizenfeld+Bäckerei, 2 Spieler — `immediateEV` steigt von 0.667 auf 1.000 mit Funkturm allein; `evPerRound` von 1.000 auf 1.333.
+
+**Tests:** 224 bestanden, 0 fehlgeschlagen.
+
+---
+
 ## UI-Batch: Rang-Kontext, relative Farben, Tie-Handling, Spiellage-Assistent
 
 ### Rang-Kontext im Kartendetail

@@ -75,27 +75,7 @@ Programmatisch als kleine Kreise/Ovale zeichnen; für Rot zusätzlich Hinweis "W
 
 ---
 
-### M2 · Funkturm-EV fehlt vollständig in `immediateEV` und `evPerRound` (High)
-
-**Problem:** In `immediateEV` und `evPerRound` wird `hasFunkturm` ausschließlich im Freizeitpark-Doppelwurf-Pfad verwendet (`bestSecondRollEV`). Ein Spieler mit Funkturm aber ohne Freizeitpark bekommt **null Funkturm-Nutzen** im EV-Modell — das ist ein echter Bug.
-
-**Korrekte Formel:**
-```
-E[Funkturm-Zug, 1d6] = Σ_r P1[r] × max(g(r), E_baseline_1d6)
-                     = E_baseline + Σ_{r: g(r) < E_baseline} P1[r] × (E_baseline − g(r))
-```
-Mit Bahnhof: analog für 2d6 → dann `max(FunkturmEV_1d6, FunkturmEV_2d6)`.
-
-Die aktuelle Berechnung `max(EV_1d6, EV_2d6)` ist der EV, wenn man **immer** neu würfelt — aber Funkturm erlaubt nur ein Neuwerfen, wenn das erste Ergebnis schlecht war. Der korrekte EV ist höher als `E_baseline` aber niedriger als `bestDiceEV`.
-
-**Betroffene Methoden:**
-- `ProbabilityCalc.immediateEV` — Funkturm-EV fehlt für den Nicht-Freizeitpark-Fall
-- `ProbabilityCalc.evPerRound` — gleicher Fehler in der Eigenzug-Berechnung
-
-**Implementierungsschritte:**
-1. Nach dem `ev1`/`ev2`-Block in `immediateEV`: wenn `hasFunkturm`, berechne `FunkturmEV(1d6)` und ggf. `FunkturmEV(2d6)`, ersetze `evTotal` durch das Maximum.
-2. Gleiche Logik in `evPerRound` im Eigenzug-Block.
-3. `bestSecondRollEV` bleibt unverändert (nur Freizeitpark-Pfad).
+### M2 · ~~Funkturm-EV fehlt vollständig in `immediateEV` und `evPerRound`~~ ✓ (behoben)
 
 ---
 

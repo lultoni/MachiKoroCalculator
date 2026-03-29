@@ -34,7 +34,7 @@ final class BürohausLogic {
      * @param playerIndex the active player
      * @return a {@link SwapCandidates} record, or one with null fields if no swap is possible
      */
-    private static SwapCandidates findCandidates(GameState state, int playerIndex) {
+    static SwapCandidates findCandidates(GameState state, int playerIndex) {
         Player active = state.getPlayers()[playerIndex];
         int n = state.getPlayers().length;
         // Use active player's real stats so Einkaufszentrum, food/animal/production
@@ -67,7 +67,7 @@ final class BürohausLogic {
         return new SwapCandidates(worstOwn, worstOwnEV, bestOpp, bestOppEV, bestOppPlayer);
     }
 
-    private record SwapCandidates(
+    record SwapCandidates(
             Project worstOwn,  double worstOwnEV,
             Project bestOpp,   double bestOppEV,
             int bestOppPlayer) {

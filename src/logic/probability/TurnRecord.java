@@ -54,6 +54,18 @@ public class TurnRecord {
     public final int[] coinDeltas;
 
     /**
+     * The card the active player gave away during a bürohaus swap this turn, or {@code null}
+     * if no swap was executed. Always null unless {@link #swappedIn} is also non-null.
+     */
+    public final Project swappedAway;
+
+    /**
+     * The card the active player received during a bürohaus swap this turn, or {@code null}
+     * if no swap was executed. Always null unless {@link #swappedAway} is also non-null.
+     */
+    public final Project swappedIn;
+
+    /**
      * Constructs a turn record without doubles information (backwards-compatible).
      *
      * @param playerIndex index of the active player (0-based)
@@ -61,7 +73,7 @@ public class TurnRecord {
      * @param bought      project purchased this turn, or null
      */
     public TurnRecord(int playerIndex, int roll, Project bought) {
-        this(playerIndex, roll, bought, false, null);
+        this(playerIndex, roll, bought, false, null, null, null);
     }
 
     /**
@@ -73,7 +85,7 @@ public class TurnRecord {
      * @param isDoubles   true if two dice were rolled and both showed the same face
      */
     public TurnRecord(int playerIndex, int roll, Project bought, boolean isDoubles) {
-        this(playerIndex, roll, bought, isDoubles, null);
+        this(playerIndex, roll, bought, isDoubles, null, null, null);
     }
 
     /**
@@ -86,6 +98,22 @@ public class TurnRecord {
      * @param coinDeltas  net coin change per player from this roll, or null if unknown
      */
     public TurnRecord(int playerIndex, int roll, Project bought, boolean isDoubles, int[] coinDeltas) {
+        this(playerIndex, roll, bought, isDoubles, coinDeltas, null, null);
+    }
+
+    /**
+     * Constructs a complete turn record including an optional bürohaus card swap.
+     *
+     * @param playerIndex index of the active player (0-based)
+     * @param roll        dice total (1–12)
+     * @param bought      project purchased this turn, or null
+     * @param isDoubles   true if two dice were rolled and both showed the same face
+     * @param coinDeltas  net coin change per player from this roll, or null if unknown
+     * @param swappedAway card the active player gave away via bürohaus, or null
+     * @param swappedIn   card the active player received via bürohaus, or null
+     */
+    public TurnRecord(int playerIndex, int roll, Project bought, boolean isDoubles,
+                      int[] coinDeltas, Project swappedAway, Project swappedIn) {
         if (playerIndex < 0) throw new IllegalArgumentException("playerIndex must be >= 0");
         if (roll < 1 || roll > 12) throw new IllegalArgumentException("roll must be 1–12, got: " + roll);
         this.playerIndex = playerIndex;
@@ -93,6 +121,8 @@ public class TurnRecord {
         this.bought = bought;
         this.isDoubles = isDoubles;
         this.coinDeltas = coinDeltas != null ? coinDeltas.clone() : null;
+        this.swappedAway = swappedAway;
+        this.swappedIn = swappedIn;
     }
 
     @Override
@@ -100,6 +130,7 @@ public class TurnRecord {
         String buyStr = (bought != null) ? "bought=" + bought.getId() : "no purchase";
         String doublesStr = isDoubles ? ", DOUBLES" : "";
         String deltaStr = coinDeltas != null ? ", deltas=" + Arrays.toString(coinDeltas) : "";
-        return "Turn{player=" + playerIndex + ", roll=" + roll + ", " + buyStr + doublesStr + deltaStr + "}";
+        String swapStr = (swappedAway != null) ? ", swap=" + swappedAway.getId() + "→" + swappedIn.getId() : "";
+        return "Turn{player=" + playerIndex + ", roll=" + roll + ", " + buyStr + doublesStr + deltaStr + swapStr + "}";
     }
 }

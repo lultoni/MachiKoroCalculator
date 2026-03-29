@@ -131,6 +131,8 @@ final class GameSessionPersistence {
                 for (int d : t.coinDeltas) da.add(d);
                 turn.add("coinDeltas", da);
             }
+            if (t.swappedAway != null) turn.addProperty("swappedAway", t.swappedAway.getId());
+            if (t.swappedIn   != null) turn.addProperty("swappedIn",   t.swappedIn.getId());
             turns.add(turn);
         }
         return turns;
@@ -181,7 +183,21 @@ final class GameSessionPersistence {
                 coinDeltas = new int[da.size()];
                 for (int i = 0; i < da.size(); i++) coinDeltas[i] = da.get(i).getAsInt();
             }
-            session.applyTurn(new TurnRecord(pi, roll, bought, isDoubles, coinDeltas));
+            // swappedAway / swappedIn default to null (backward compatible with old saves)
+            Project swappedAway = null, swappedIn = null;
+            if (t.has("swappedAway") && !t.get("swappedAway").isJsonNull()) {
+                swappedAway = ProjectLoader.getProject(t.get("swappedAway").getAsString()).orElse(null);
+            }
+            if (t.has("swappedIn") && !t.get("swappedIn").isJsonNull()) {
+                swappedIn = ProjectLoader.getProject(t.get("swappedIn").getAsString()).orElse(null);
+            }
+            session.applyTurn(new TurnRecord(pi, roll, bought, isDoubles, coinDeltas, swappedAway, swappedIn));
+            // Re-apply bürohaus swap to restore live state. The TurnRecord above already carries the
+            // swap fields, and applyTurn stores it as-is when coinDeltas != null (which is always true
+            // for saves that include swap fields). executeSwap here mutates the state to match.
+            if (swappedAway != null) {
+                BürohausLogic.executeSwap(session.getState(), pi);
+            }
         }
     }
 }

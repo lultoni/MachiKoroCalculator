@@ -83,6 +83,19 @@ public class TurnEntryPanel extends JPanel {
             add(row3);
         }
         // No "→ saved" text when nothing was bought — silence is fine.
+
+        // ── Row 4: bürohaus swap (if any) ─────────────────────────────────────────
+        if (t.swappedAway != null && t.swappedIn != null) {
+            JPanel row4 = new JPanel(new FlowLayout(FlowLayout.LEFT, 3, 0));
+            row4.setOpaque(false);
+            JLabel swapLabel = new JLabel("↔ " + t.swappedAway.getLocalizedName()
+                    + " → " + t.swappedIn.getLocalizedName());
+            swapLabel.setFont(new Font("Arial", Font.ITALIC, 10));
+            swapLabel.setForeground(new Color(0x555555));
+            row4.add(swapLabel);
+            row4.setAlignmentX(Component.LEFT_ALIGNMENT);
+            add(row4);
+        }
     }
 
     /**

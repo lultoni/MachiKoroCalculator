@@ -191,6 +191,8 @@ Contribution to immediateEV = P(roll = 6 | dice_mode) × bürohausSwapEV
 
 Both the opponent's card and the player's worst card are evaluated **in the active player's real context** (actual Einkaufszentrum, food/animal/production counts via `contextualCardEvPerRound`). This ensures synergy multipliers are correctly reflected: a player with Einkaufszentrum values café correctly at 2 coins/activation; a player with food cards values Markthalle at its true multiplied payout.
 
+**Live session flow:** In `MainWindow.onConfirmTurn`, after `session.applyTurn()` succeeds on a roll=6 with Bürohaus in the active player's portfolio, `ProbabilityCalc.bürohausSwapNote` is called. If a beneficial swap exists, a `JOptionPane.showConfirmDialog` is shown to the player. If accepted, `session.applyBürohausSwap(pi)` is called, which executes the swap and patches the last `TurnRecord` with the `swappedAway`/`swappedIn` fields. These fields are serialized to save files and replayed correctly on load.
+
 ### 2.9 Category Multipliers
 
 | Card | Category multiplier |

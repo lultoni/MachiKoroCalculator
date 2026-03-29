@@ -4,6 +4,23 @@ Implementierungsgeschichte: was gebaut wurde, warum, und welche Designentscheidu
 
 ---
 
+## N0: Bürohaus-Tausch im UI — Dialog, Verlauf, Undo, Persistence
+
+Der Bürohaus-Tausch (lila, Roll=6) war bisher nur in der Monte-Carlo-Simulation automatisch implementiert. In der echten Spielsession passierte nichts. Jetzt:
+
+- **Swap-Dialog** — nach `session.applyTurn()` in `MainWindow.onConfirmTurn`: wenn Roll=6 und der aktive Spieler Bürohaus besitzt, wird `ProbabilityCalc.bürohausSwapNote` aufgerufen. Falls ein lohnender Tausch existiert, erscheint `JOptionPane.showConfirmDialog` mit Empfehlung und EV-Gewinn. Spieler kann "Ja" oder "Nein" wählen.
+- **`GameSession.applyBürohausSwap(pi)`** — neue öffentliche Methode: ruft `BürohausLogic.executeSwap` auf dem State auf und patcht den letzten `TurnRecord` mit den Feldern `swappedAway`/`swappedIn`.
+- **`TurnRecord` erweitert** — zwei neue optionale Felder (`swappedAway`, `swappedIn`, beide `Project` oder null) und ein 7-arg-Konstruktor. Alle kürzeren Konstruktoren delegieren mit `null`-Defaults. Vollständig rückwärtskompatibel.
+- **Undo-Korrektheit** — `undoLastTurn()` replayed die History; bei Turns mit `swappedAway != null` wird `BürohausLogic.executeSwap` nach `applyTurn` erneut aufgerufen, um den Swap-State wiederherzustellen.
+- **Persistence** — `GameSessionPersistence` serialisiert `swappedAway`/`swappedIn` als optionale Felder (nur wenn nicht null). Beim Laden wird `executeSwap` nach `applyTurn` für Turns mit Swap-Daten aufgerufen. Alte Saves ohne diese Felder laden korrekt.
+- **Zugverlauf** — `TurnEntryPanel` zeigt eine neue Zeile "↔ [abgegebene Karte] → [erhaltene Karte]" kursiv in grau, wenn ein Tausch stattfand.
+- **i18n** — `Strings.bürohausSwapTitle()` und `bürohausSwapPrompt()` in DE/EN.
+- **`BürohausLogic`** — `findCandidates` und `SwapCandidates` von `private` auf package-private gesetzt, damit `GameSession` darauf zugreifen kann. `ProbabilityCalc.bürohausSwapNote` und `bürohausSwapEV` auf `public` gesetzt.
+
+**Tests:** 224 bestanden, 0 fehlgeschlagen.
+
+---
+
 ## M1: Math-Audit — drei Näherungen durch exakte Berechnungen ersetzt
 
 - **A1 → Schritt-bewusste Münzprojektion in `evPerRound`** — Statt eines einzelnen Vorwärtsprojektions-Schritts für alle Spieler wird jetzt pro Gegner-Position das akkumulierte Blau-Einkommen des aktiven Spielers berechnet (`step × bluePerOppTurn`). Ergebnis: Rote-Karten-Klammerung ist für frühe vs. späte Gegner im Rundenzyklus korrekt.

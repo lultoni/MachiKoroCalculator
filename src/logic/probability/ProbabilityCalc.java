@@ -560,7 +560,7 @@ public class ProbabilityCalc {
      * @param playerIndex the active player
      * @return per-activation EV gain (≥ 0)
      */
-    private static double bürohausSwapEV(GameState state, int playerIndex) {
+    public static double bürohausSwapEV(GameState state, int playerIndex) {
         return BürohausLogic.swapEV(state, playerIndex);
     }
 
@@ -572,7 +572,7 @@ public class ProbabilityCalc {
      * @param playerIndex the active player
      * @return swap description, or {@code null} if no swap is beneficial
      */
-    static String bürohausSwapNote(GameState state, int playerIndex) {
+    public static String bürohausSwapNote(GameState state, int playerIndex) {
         return BürohausLogic.swapNote(state, playerIndex);
     }
 

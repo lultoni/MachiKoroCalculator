@@ -144,6 +144,30 @@ public class GameSession {
     }
 
     /**
+     * Executes the bürohaus card swap for the active player and amends the last TurnRecord
+     * to record which cards were exchanged.
+     *
+     * <p>Must be called immediately after {@link #applyTurn} on a roll=6 turn where the
+     * active player owns bürohaus. No-ops if no beneficial swap exists (the last TurnRecord
+     * is left unchanged in that case).
+     *
+     * @param playerIndex the active player (must match the last recorded turn)
+     */
+    public void applyBürohausSwap(int playerIndex) {
+        BürohausLogic.SwapCandidates c = BürohausLogic.findCandidates(state, playerIndex);
+        if (!c.isBeneficial()) return;
+
+        BürohausLogic.executeSwap(state, playerIndex);
+
+        // Amend the last TurnRecord to include the swap info
+        TurnRecord last = history.get(history.size() - 1);
+        history.set(history.size() - 1,
+                new TurnRecord(last.playerIndex, last.roll, last.bought,
+                        last.isDoubles, last.coinDeltas,
+                        c.worstOwn(), c.bestOpp()));
+    }
+
+    /**
      * Undoes the last applied turn, restoring the game state to what it was before that turn.
      *
      * @throws IllegalStateException if there are no turns to undo
@@ -161,7 +185,20 @@ public class GameSession {
 
         ArrayList<TurnRecord> toReplay = new ArrayList<>(history.subList(0, history.size() - 1));
         history.clear();
-        for (TurnRecord r : toReplay) applyTurn(r);
+        for (TurnRecord r : toReplay) {
+            applyTurn(r);
+            // Re-apply any bürohaus swap that was recorded with this turn
+            if (r.swappedAway != null) {
+                BürohausLogic.executeSwap(state, r.playerIndex);
+                // Amend the stored record to preserve the swap fields (applyTurn stores
+                // a fresh record without swap info; we need to restore it)
+                TurnRecord last = history.get(history.size() - 1);
+                history.set(history.size() - 1,
+                        new TurnRecord(last.playerIndex, last.roll, last.bought,
+                                last.isDoubles, last.coinDeltas,
+                                r.swappedAway, r.swappedIn));
+            }
+        }
     }
 
     // -------------------------------------------------------------------------

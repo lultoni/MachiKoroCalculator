@@ -225,6 +225,11 @@ public final class Strings {
     public static String gameOverStatus()     { return s("Spiel vorbei!", "Game over!"); }
     public static String gpTag()              { return "[GP]"; }
     public static String grossProjekt()       { return s("Großprojekt", "Landmark"); }
+    public static String bürohausSwapTitle()  { return s("Bürohaus: Karte tauschen?", "Office Building: Swap Card?"); }
+    public static String bürohausSwapPrompt(String note, double evGain) {
+        return s(note + "\nGeschätzter EV-Gewinn: +" + String.format("%.2f", evGain) + " Münzen/Runde.\nTauschen?",
+                 note + "\nEstimated EV gain: +" + String.format("%.2f", evGain) + " coins/round.\nSwap?");
+    }
 
     // =========================================================================
     // MainWindow — file dialogs & errors

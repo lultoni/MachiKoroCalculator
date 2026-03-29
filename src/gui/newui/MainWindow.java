@@ -622,6 +622,22 @@ public class MainWindow extends JFrame {
         // Reset doubles checkbox after confirming
         doublesCheckBox.setSelected(false);
 
+        // --- Bürohaus swap dialog ---
+        // After the turn's coin income is applied, offer the player a chance to swap cards
+        // if they own bürohaus and rolled a 6 (bürohaus fires on lila/roll=6, own turn only).
+        if (roll == 6 && session.getState().getPlayers()[pi].hasProject("bürohaus")) {
+            String note = ProbabilityCalc.bürohausSwapNote(session.getState(), pi);
+            if (note != null) {
+                double ev = ProbabilityCalc.bürohausSwapEV(session.getState(), pi);
+                String msg = Strings.bürohausSwapPrompt(note, ev);
+                int choice = JOptionPane.showConfirmDialog(this, msg,
+                        Strings.bürohausSwapTitle(), JOptionPane.YES_NO_OPTION);
+                if (choice == JOptionPane.YES_OPTION) {
+                    session.applyBürohausSwap(pi);
+                }
+            }
+        }
+
         if (session.isFinished()) {
             String winner = session.getPlayerNames()[session.getWinnerIndex()];
             showGameOver(winner);

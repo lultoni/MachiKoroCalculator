@@ -72,7 +72,8 @@ public class MainWindow extends JFrame {
     private JLabel topCardRisk;
     private JLabel topCardVar;
     private JLabel topCardWinProb;
-    private JLabel topCardRank;     // rank context: "#X / Y affordable · #Z / N total"
+    /** Per-metric rank labels in the 3-column metrics grid: [EV, ROI, P0, VAR, WIN]. */
+    private JLabel[] topCardMetricRank = new JLabel[5];
     private JLabel topCardNote;
     private JPanel topCardColorBar;
     private JLabel baselineWinProbLabel;
@@ -358,30 +359,24 @@ public class MainWindow extends JFrame {
 
         panel.add(Box.createVerticalStrut(8));
 
-        // Metrics in two-column grid with labels + values
-        JPanel metricsGrid = new JPanel(new GridLayout(0, 2, 4, 3));
+        // Metrics in three-column grid: label | value | rank (#X/N)
+        JPanel metricsGrid = new JPanel(new GridLayout(0, 3, 4, 3));
         metricsGrid.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        topCardEV    = addMetricRow(metricsGrid, Strings.evRoundLabel(), Strings.evRoundTooltip());
-        topCardROI   = addMetricRow(metricsGrid, Strings.roiLabel(), Strings.roiTooltip());
-        topCardRisk  = addMetricRow(metricsGrid, Strings.p0Label(), Strings.p0Tooltip());
-        topCardVar   = addMetricRow(metricsGrid, Strings.varianceLabel(), Strings.varianceTooltip());
-        topCardWinProb = addMetricRow(metricsGrid, Strings.winProbLabel(), Strings.winProbTooltip());
+        topCardEV    = addMetricRow(metricsGrid, Strings.evRoundLabel(), Strings.evRoundTooltip(),    0);
+        topCardROI   = addMetricRow(metricsGrid, Strings.roiLabel(), Strings.roiTooltip(),             1);
+        topCardRisk  = addMetricRow(metricsGrid, Strings.p0Label(), Strings.p0Tooltip(),              2);
+        topCardVar   = addMetricRow(metricsGrid, Strings.varianceLabel(), Strings.varianceTooltip(),  3);
+        topCardWinProb = addMetricRow(metricsGrid, Strings.winProbLabel(), Strings.winProbTooltip(),  4);
         topCardWinProb.setVisible(false);
-        // Also hide its label
-        ((JLabel) metricsGrid.getComponent(metricsGrid.getComponentCount() - 2)).setVisible(false);
+        // Also hide its label and rank label
+        ((JLabel) metricsGrid.getComponent(metricsGrid.getComponentCount() - 3)).setVisible(false);
+        topCardMetricRank[4].setVisible(false);
 
         JPanel metricsWrapper = new JPanel(new BorderLayout());
         metricsWrapper.add(metricsGrid, BorderLayout.NORTH);
         metricsWrapper.setAlignmentX(Component.LEFT_ALIGNMENT);
         panel.add(metricsWrapper);
-
-        // Rank context label: "#X / Y affordable · #Z / N total"
-        topCardRank = new JLabel("—");
-        topCardRank.setFont(new Font("Arial", Font.ITALIC, 10));
-        topCardRank.setForeground(new Color(0x666666));
-        topCardRank.setAlignmentX(Component.LEFT_ALIGNMENT);
-        panel.add(wrap(topCardRank));
 
         panel.add(Box.createVerticalStrut(4));
 
@@ -463,18 +458,23 @@ public class MainWindow extends JFrame {
         return panel;
     }
 
-    /** Adds a two-cell metric row (label + value) to the grid panel and returns the value label.
-     * The label gets a tooltip with the explanation text.
+    /** Adds a three-cell metric row (label | value | rank "#X/N") to the grid panel.
+     * Returns the value label; the rank label is stored in {@code topCardMetricRank[rankIdx]}.
      */
-    private JLabel addMetricRow(JPanel grid, String labelText, String tooltip) {
+    private JLabel addMetricRow(JPanel grid, String labelText, String tooltip, int rankIdx) {
         JLabel lbl = new JLabel(labelText);
         lbl.setFont(new Font("Arial", Font.BOLD, 12));
         lbl.setToolTipText(tooltip);
         JLabel val = new JLabel("—");
         val.setFont(MONO_FONT);
         val.setToolTipText(tooltip);
+        JLabel rank = new JLabel("—");
+        rank.setFont(new Font("Arial", Font.PLAIN, 10));
+        rank.setForeground(new Color(0x777777));
+        topCardMetricRank[rankIdx] = rank;
         grid.add(lbl);
         grid.add(val);
+        grid.add(rank);
         return val;
     }
 
@@ -756,7 +756,7 @@ public class MainWindow extends JFrame {
                     clearCenter("");
                     topCardName.setText(Strings.waitLabel());
                     if (entry.notes != null) topCardDesc.setText(entry.notes);
-                    topCardRank.setText("");
+                    for (JLabel r : topCardMetricRank) if (r != null) r.setText("");
                     return;
                 }
                 continue;
@@ -824,7 +824,7 @@ public class MainWindow extends JFrame {
         topCardRisk.setText("—");
         topCardVar.setText("—");
         topCardWinProb.setText("—");
-        topCardRank.setText("—");
+        for (JLabel r : topCardMetricRank) if (r != null) r.setText("—");
         setWinProbRowVisible(false); // hide win-prob row consistently (uses the shared helper)
         baselineWinProbLabel.setText(Strings.baselineWinProbFmt(100.0));
         topCardNote.setText(Strings.gameOverNote());
@@ -1646,26 +1646,23 @@ public class MainWindow extends JFrame {
         String desc = p.getLocalizedDescription();
         topCardDesc.setText("<html><i>" + (desc != null && !desc.isEmpty() ? desc : "—") + "</i></html>");
 
-        applyRankedMetricColor(topCardEV,    MetricColorScheme.EV,            entry.evPerRound,          computeMetricRankPct(lastRanking, p.getId(), MetricColorScheme.EV));
-        applyRankedMetricColor(topCardROI,   MetricColorScheme.ROI,           entry.roiOverHorizon,       computeMetricRankPct(lastRanking, p.getId(), MetricColorScheme.ROI));
-        applyRankedMetricColor(topCardRisk,  MetricColorScheme.P0,            entry.probNoIncomeRound,    computeMetricRankPct(lastRanking, p.getId(), MetricColorScheme.P0));
-        applyRankedMetricColor(topCardVar,   MetricColorScheme.VARIANCE,      entry.variance,             computeMetricRankPct(lastRanking, p.getId(), MetricColorScheme.VARIANCE));
-        applyRankedMetricColor(topCardWinProb, MetricColorScheme.WIN_PROB_DELTA, entry.winProbDelta,      computeMetricRankPct(lastRanking, p.getId(), MetricColorScheme.WIN_PROB_DELTA));
+        MetricColorScheme[] schemes = {
+            MetricColorScheme.EV, MetricColorScheme.ROI,
+            MetricColorScheme.P0, MetricColorScheme.VARIANCE, MetricColorScheme.WIN_PROB_DELTA
+        };
+        double[] values = {
+            entry.evPerRound, entry.roiOverHorizon,
+            entry.probNoIncomeRound, entry.variance, entry.winProbDelta
+        };
+        JLabel[] valueLabels = { topCardEV, topCardROI, topCardRisk, topCardVar, topCardWinProb };
+        for (int i = 0; i < schemes.length; i++) {
+            double rankPct = computeMetricRankPct(lastRanking, p.getId(), schemes[i]);
+            applyRankedMetricColor(valueLabels[i], schemes[i], values[i], rankPct);
+            topCardMetricRank[i].setText(metricRankText(lastRanking, p.getId(), schemes[i]));
+        }
+
         topCardNote.setText("<html><i>" + buildNote(entry) + "</i></html>");
         topCardColorBar.setBackground(colorForCard(p));
-
-        // Rank context: "#X / Y affordable · #Z / N total"
-        int rankAffordable = 0, totalAffordable = 0;
-        int rankAll = 0, totalAll = 0;
-        for (RankEntry e : lastRanking) {
-            totalAll++;
-            if (e.affordable) totalAffordable++;
-            if (e.project.getId().equals(p.getId())) {
-                rankAll = totalAll;
-                if (e.affordable) rankAffordable = totalAffordable;
-            }
-        }
-        topCardRank.setText(Strings.rankLabel(rankAffordable, totalAffordable, rankAll, totalAll));
 
         // Always re-apply visibility to keep it in sync with the global toggle
         setWinProbRowVisible(showWinProb);
@@ -1728,6 +1725,39 @@ public class MainWindow extends JFrame {
         label.setForeground(fg != null ? fg : Color.BLACK);
     }
 
+    /**
+     * Returns a short rank string like "#2 / 15" for a given metric within the ranking.
+     * Excludes the wait-sentinel from counting.
+     */
+    private static String metricRankText(
+            List<RankEntry> ranking, String projectId, MetricColorScheme scheme) {
+        if (ranking.isEmpty()) return "";
+        java.util.function.ToDoubleFunction<RankEntry> extractor = switch (scheme) {
+            case EV             -> e -> e.evPerRound;
+            case ROI            -> e -> e.roiOverHorizon;
+            case P0             -> e -> e.probNoIncomeRound;
+            case VARIANCE       -> e -> e.variance;
+            case WIN_PROB_DELTA -> e -> e.winProbDelta;
+            default             -> e -> 0.0;
+        };
+        java.util.Comparator<RankEntry> comp = java.util.Comparator.comparingDouble(extractor);
+        if (scheme != MetricColorScheme.P0 && scheme != MetricColorScheme.VARIANCE) {
+            comp = comp.reversed();
+        }
+        // Filter out the wait sentinel
+        List<RankEntry> valid = ranking.stream()
+                .filter(e -> !e.isWaitEntry()).toList();
+        List<RankEntry> sorted = new java.util.ArrayList<>(valid);
+        sorted.sort(comp);
+        int total = sorted.size();
+        for (int i = 0; i < total; i++) {
+            if (sorted.get(i).project.getId().equals(projectId)) {
+                return "#" + (i + 1) + "/" + total;
+            }
+        }
+        return "";
+    }
+
     private void clearCenter(String message) {
         topCardName.setText("—");
         topCardColorTag.setText("");
@@ -1740,7 +1770,7 @@ public class MainWindow extends JFrame {
         topCardRisk.setText("—");
         topCardVar.setText("—");
         topCardWinProb.setText("—");
-        topCardRank.setText("—");
+        for (JLabel r : topCardMetricRank) if (r != null) r.setText("—");
         topCardNote.setText("<html><i>" + message + "</i></html>");
         topCardColorBar.setBackground(Color.LIGHT_GRAY);
     }

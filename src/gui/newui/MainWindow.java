@@ -122,49 +122,53 @@ public class MainWindow extends JFrame {
     // ---- Left panel: turn input ----
 
     private JPanel buildLeftPanel() {
-        JPanel panel = new JPanel();
-        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+        // Outer panel uses BorderLayout so the history scroll fills all remaining vertical space.
+        JPanel panel = new JPanel(new BorderLayout());
         panel.setBorder(titledBorder("Current Turn Tracker"));
         panel.setPreferredSize(new Dimension(240, 0));
+
+        // Controls sub-panel (fixed height): everything except the history log
+        JPanel controls = new JPanel();
+        controls.setLayout(new BoxLayout(controls, BoxLayout.Y_AXIS));
 
         // Active player
         activePlayerLabel = new JLabel("Player 1's turn");
         activePlayerLabel.setFont(HEADER_FONT);
         activePlayerLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
-        panel.add(wrap(activePlayerLabel));
+        controls.add(wrap(activePlayerLabel));
 
         // Coins display
         coinsLabel = new JLabel("Coins: 3");
         coinsLabel.setFont(new Font("Arial", Font.BOLD, 14));
         coinsLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
-        panel.add(wrap(coinsLabel));
+        controls.add(wrap(coinsLabel));
 
-        panel.add(Box.createVerticalStrut(8));
+        controls.add(Box.createVerticalStrut(8));
 
         // Roll input
         rollRangeLabel = bold("Dice roll (1–6):");
         rollRangeLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
-        panel.add(wrap(rollRangeLabel));
+        controls.add(wrap(rollRangeLabel));
         rollSpinner = new BoundedSpinner(new SpinnerNumberModel(3, 1, 6, 1));
         rollSpinner.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
         rollSpinner.setAlignmentX(Component.LEFT_ALIGNMENT);
-        panel.add(rollSpinner);
+        controls.add(rollSpinner);
 
         // Doubles (Pasch) checkbox: only shown when player has Bahnhof + Freizeitpark
         doublesCheckBox = new JCheckBox("Doubles (Pasch)!");
         doublesCheckBox.setFont(new Font("Arial", Font.BOLD, 12));
-        doublesCheckBox.setForeground(new Color(0x7030A0)); // lila / purple for emphasis
+        doublesCheckBox.setForeground(new Color(0x7030A0));
         doublesCheckBox.setAlignmentX(Component.LEFT_ALIGNMENT);
         doublesCheckBox.setToolTipText(
                 "<html>Check this if you rolled doubles (both dice show same face).<br>" +
                 "Freizeitpark grants you a bonus second turn!</html>");
-        doublesCheckBox.setVisible(false); // shown only when player has Bahnhof + Freizeitpark
-        panel.add(wrap(doublesCheckBox));
+        doublesCheckBox.setVisible(false);
+        controls.add(wrap(doublesCheckBox));
 
-        panel.add(Box.createVerticalStrut(8));
+        controls.add(Box.createVerticalStrut(8));
 
         // Roll preview (compact, inline with turn input)
-        panel.add(wrap(bold("Roll outcome:")));
+        controls.add(wrap(bold("Roll outcome:")));
         rollPreviewPanel = new JPanel();
         rollPreviewPanel.setLayout(new BoxLayout(rollPreviewPanel, BoxLayout.Y_AXIS));
         rollPreviewPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -173,72 +177,72 @@ public class MainWindow extends JFrame {
         previewScroll.setAlignmentX(Component.LEFT_ALIGNMENT);
         previewScroll.setMaximumSize(new Dimension(Integer.MAX_VALUE, 70));
         previewScroll.setBorder(BorderFactory.createLineBorder(new Color(0xCCCCCC)));
-        panel.add(previewScroll);
+        controls.add(previewScroll);
 
-        panel.add(Box.createVerticalStrut(8));
+        controls.add(Box.createVerticalStrut(8));
 
         // Buy dropdown
-        panel.add(wrap(bold("Purchase (optional):")));
+        controls.add(wrap(bold("Purchase (optional):")));
         buyCombo = new JComboBox<>();
         buyCombo.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
         buyCombo.setAlignmentX(Component.LEFT_ALIGNMENT);
-        panel.add(buyCombo);
+        controls.add(buyCombo);
 
-        panel.add(Box.createVerticalStrut(10));
+        controls.add(Box.createVerticalStrut(10));
 
         // Confirm button
         confirmBtn = new JButton("Confirm Turn");
         confirmBtn.setAlignmentX(Component.LEFT_ALIGNMENT);
         confirmBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 34));
         confirmBtn.addActionListener(this::onConfirmTurn);
-        panel.add(confirmBtn);
+        controls.add(confirmBtn);
 
-        panel.add(Box.createVerticalStrut(4));
+        controls.add(Box.createVerticalStrut(4));
 
         // Undo button
         undoBtn = new JButton("Undo Last Turn");
         undoBtn.setAlignmentX(Component.LEFT_ALIGNMENT);
         undoBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 34));
         undoBtn.addActionListener(this::onUndo);
-        panel.add(undoBtn);
+        controls.add(undoBtn);
 
-        panel.add(Box.createVerticalStrut(10));
+        controls.add(Box.createVerticalStrut(10));
 
         // Snapshot button
         JButton snapshotBtn = new JButton("Enter Snapshot…");
         snapshotBtn.setAlignmentX(Component.LEFT_ALIGNMENT);
         snapshotBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 34));
         snapshotBtn.addActionListener(this::onOpenSnapshot);
-        panel.add(snapshotBtn);
+        controls.add(snapshotBtn);
 
-        panel.add(Box.createVerticalStrut(4));
+        controls.add(Box.createVerticalStrut(4));
 
         // Save / Load buttons
         JButton saveBtn = new JButton("Save Game…");
         saveBtn.setAlignmentX(Component.LEFT_ALIGNMENT);
         saveBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 34));
         saveBtn.addActionListener(this::onSave);
-        panel.add(saveBtn);
+        controls.add(saveBtn);
 
-        panel.add(Box.createVerticalStrut(2));
+        controls.add(Box.createVerticalStrut(2));
 
         JButton loadBtn = new JButton("Load Game…");
         loadBtn.setAlignmentX(Component.LEFT_ALIGNMENT);
         loadBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 34));
         loadBtn.addActionListener(this::onLoad);
-        panel.add(loadBtn);
+        controls.add(loadBtn);
 
-        panel.add(Box.createVerticalStrut(12));
+        controls.add(Box.createVerticalStrut(8));
+        controls.add(wrap(bold("Turn history:")));
 
-        // History area
-        panel.add(wrap(bold("Turn history:")));
+        panel.add(controls, BorderLayout.NORTH);
+
+        // History scroll fills all remaining vertical space (CENTER stretches in BorderLayout)
         historyPanel = new JPanel();
         historyPanel.setLayout(new BoxLayout(historyPanel, BoxLayout.Y_AXIS));
         historyPanel.setBackground(Color.WHITE);
         JScrollPane histScroll = new JScrollPane(historyPanel);
-        histScroll.setAlignmentX(Component.LEFT_ALIGNMENT);
-        histScroll.setMaximumSize(new Dimension(Integer.MAX_VALUE, 200));
-        panel.add(histScroll);
+        panel.add(histScroll, BorderLayout.CENTER);
 
         return panel;
     }
@@ -491,15 +495,6 @@ public class MainWindow extends JFrame {
         mcSimSpinner.setEnabled(enabled);
         // Reload button is only active when both deep analysis is on AND win prob is shown
         mcReloadBtn.setEnabled(enabled && showWinProb);
-
-        // Auto-show win-prob column when deep analysis is activated
-        if (enabled && !showWinProb) {
-            showWinProb = true;
-            rankOpts.includeWinProbDelta = true;
-            toggleWinProbBtn.setText("Hide Win Prob Δ");
-            setWinProbRowVisible(true);
-            mcReloadBtn.setEnabled(true);
-        }
         refreshAll();
     }
 
@@ -813,6 +808,11 @@ public class MainWindow extends JFrame {
     }
 
     private void rebuildTable() {
+        // Preserve the user's current sort order across rebuilds
+        RowSorter<?> existingSorter = rankTable.getRowSorter();
+        java.util.List<? extends RowSorter.SortKey> savedSortKeys =
+                (existingSorter != null) ? existingSorter.getSortKeys() : null;
+
         String[] cols = showWinProb
                 ? new String[]{"Card", "Cost", "EV/rnd", "ROI", "P(0)", "Var", "Win Δ"}
                 : new String[]{"Card", "Cost", "EV/rnd", "ROI", "P(0)", "Var"};
@@ -854,6 +854,15 @@ public class MainWindow extends JFrame {
             for (int c = 1; c < cols.length; c++) {
                 trs.setComparator(c, java.util.Comparator.comparingDouble(o -> (Double) o));
             }
+            // Restore the previously saved sort order (or keep default ROI-descending)
+            if (savedSortKeys != null && !savedSortKeys.isEmpty()) {
+                // Clamp sort key columns to valid range after possible column count change
+                java.util.List<RowSorter.SortKey> restored = new java.util.ArrayList<>();
+                for (RowSorter.SortKey sk : savedSortKeys) {
+                    if (sk.getColumn() < cols.length) restored.add(sk);
+                }
+                if (!restored.isEmpty()) trs.setSortKeys(restored);
+            }
         }
     }
 
@@ -878,6 +887,8 @@ public class MainWindow extends JFrame {
         topCardWinProb.setText(fmt2(entry.winProbDelta));
         topCardNote.setText("<html><i>" + buildNote(entry) + "</i></html>");
         topCardColorBar.setBackground(colorForCard(p));
+        // Always re-apply visibility to keep it in sync with the global toggle
+        setWinProbRowVisible(showWinProb);
     }
 
     private void clearCenter(String message) {

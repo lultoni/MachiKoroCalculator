@@ -67,11 +67,8 @@ Done. `BoundedSpinner` wraps `JSpinner` and disables increment/decrement at mode
 #### [x] Doubles tracking (Freizeitpark/Bahnhof)
 Done. "Doubles?" checkbox shown when player owns both. Bonus turn logic in `GameSession`.
 
-#### [ ] Coin display — visual overhaul (coin icon + denominations)
-Current state: bold label "N → M coins (after roll)".
-Requested: Use `COIN.png` with number overlaid; optionally show bronze/silver/gold denominations
-(1/5/10 coin variants). Below the current coins, show a second row for coins-after-roll (delta only — e.g. if player has 3 and earns 1, only show a single bronze coin in the "after roll" delta section).
-**Decision needed:** Simple icon+number label vs. full denomination rendering — ask user before implementing.
+#### [x] Coin display — coin icon + post-roll delta
+Done. `coinsLabel` now uses `COIN.png` (scaled 18×18) as icon with the coin count as text. A second `coinsAfterLabel` appears below when the current roll changes the player's coins, showing the delta as "+N" (green) or "−N" (red) next to the amount. Full denomination rendering (bronze/silver/gold) deferred — accepted as-is.
 
 #### [ ] Roll input — slider instead of spinner
 Low priority. Slider would require a separate label to show the current value and is less precise for keyboard input. Deferred unless user explicitly prefers it.
@@ -99,8 +96,8 @@ Done. `populateCenter` now calls `setWinProbRowVisible(showWinProb)` after setti
 #### [x] Sort order preserved in ranking table after table rebuild
 Done. `rebuildTable` saves `sorter.getSortKeys()` before column rebuild and restores them after, with column-index clamping for the case where the Win Δ column is added/removed.
 
-#### [x] Deep Analysis toggle should NOT auto-show win prob column
-Done. `onToggleDeepAnalysis` no longer sets `showWinProb = true`; the "Show Win Prob Δ" button is the sole gate for column visibility.
+#### [x] Deep Analysis toggle should NOT auto-show win prob column; MC only computed when win prob is shown
+Done. `onToggleDeepAnalysis` sets `rankOpts.mcSimulations` to the MC count only when **both** deep analysis is enabled **and** win prob is shown; otherwise it stays 0. `onToggleWinProb` sets the correct MC count when showing, and resets it to 0 when hiding. This means: enabling Deep Analysis alone does not run MC; enabling "Show Win Prob Δ" while Deep Analysis is on triggers the first MC run; the ⟳ button re-runs at any time.
 
 ### Right panel — All Affordable Cards
 

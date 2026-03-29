@@ -4,6 +4,30 @@ All phases of the original implementation plan are complete. This file records w
 
 ---
 
+## Coin icon display, win-prob interaction fixes, game-over row fix
+
+**Goal:** Fix the remaining Deep Analysis / Win Prob interaction bug, improve the coin display, and clean up two minor correctness issues.
+
+### Deep Analysis × Win Prob toggle — correct MC gating
+
+The previous fix removed auto-show of the win-prob column but left a second bug: when Deep Analysis was on and Win Prob was hidden, `rankOpts.mcSimulations` was still set to the MC count, so MC was computed on every turn even though its results were invisible. `onToggleDeepAnalysis` now only sets `rankOpts.mcSimulations > 0` when **both** flags are active. `onToggleWinProb` sets the correct count when showing and resets to 0 when hiding, and always triggers a fresh computation when showing (so "Show Win Prob Δ" always produces actual results, never zeros).
+
+### Coin display with COIN.png icon and post-roll delta
+
+The plain bold text label is replaced by a `JLabel` with the `COIN.png` icon (scaled 18×18) and the coin count as text. A second `coinsAfterLabel` below shows the post-roll delta as "+N" (green) or "−N" (red) alongside the resulting total; it is hidden when the roll has no effect on the active player's coins.
+
+### `showGameOver` win-prob row consistency
+
+`showGameOver` was calling `topCardWinProb.setVisible(false)` directly, which bypassed `setWinProbRowVisible` and left the label sibling in the metrics grid visible. Now uses the shared helper.
+
+### Win-prob explain text truncation
+
+The `winProbExplain` label was a long single-line HTML string that got cut off when the center panel was narrow. Replaced with a short one-liner that links to a hover tooltip containing the full explanation.
+
+**Tests:** 224 passed, 0 failed (unchanged — no logic changes that require new tests).
+
+---
+
 ## UI bug fixes and enriched turn history
 
 **Goal:** Fix three UI correctness bugs uncovered in review, improve the left panel's resize behavior, and make the turn history show meaningful coin-flow information per turn.

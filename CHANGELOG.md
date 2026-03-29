@@ -4,6 +4,25 @@ Implementierungsgeschichte: was gebaut wurde, warum, und welche Designentscheidu
 
 ---
 
+## Synergy-Lookahead im Ranking + P(0)-Metrik auf vollständige Runde umgestellt
+
+**Synergy-Lookahead:** `ProbabilityCalc.computeSynergyNote(gs, pi, card, candidates, n)` — neue package-private Methode. Berechnet für jede Karte im Ranking die beste Folgekarte (Partner), die ihren Wert am meisten steigern würde. Methode:
+
+1. Erstellt `PlayerStats` als ob der Spieler `card` bereits besitzt (via `buildStatsWithCard`)
+2. Für jede Nicht-Landmark-Karte S im Pool: erstellt `PlayerStats` mit card + S (`buildStatsWithCards`) und berechnet `contextualCardEvPerRound(card, statsWithS)` − Baseline
+3. Für grün/store-Karten (Bäckerei, Mini-Markt): testet zusätzlich Einkaufszentrum via `buildStatsWithEkz`
+4. Gibt `Strings.synergyNote(partnerName, gain)` zurück wenn Gewinn ≥ 0.05¢/Runde
+
+Ergebnis: `entry.notes` im Ranking-Eintrag enthält z.B. "Gut mit: Bauernhof (+0.30¢/Runde)". Hilfsmethoden `applyToStats`, `buildStatsWithCard`, `buildStatsWithCards`, `buildStatsWithEkz` im selben `ProbabilityCalc`. Keine `GameState.copy()`-Aufrufe nötig → allokationsfrei.
+
+Wird in `rankPurchasableProjects` und `rankAllProjects` aufgerufen. Bürohaus-Hinweis und Synergy-Note werden mit `"  |  "` kombiniert wenn beide vorhanden.
+
+**P(0)-Metrik auf Rundenbasis:** `probNoIncomeRound` ersetzt `probNoIncomeOwnTurn` in Rankingtabelle, Kartendetail-Panel und `computeMetricRankPct`. Berechnet `P(0 Münzen über komplette Runde) = P(0 eigener Zug) × Π P(0 je Gegner-Zug)`. Dies ist konsistent mit dem "Sicherheitsstrategie"-Profil im Game Assistant, das bereits `probNoIncomeRound` verwendete. Beschreibungstexte in `Strings.legendP0Desc()` und `Strings.colTipP0()` aktualisiert.
+
+**Tests:** 224 bestanden, 0 fehlgeschlagen.
+
+---
+
 ## MC-Policy: ROI-basiertes Scoring in GameSimulator
 
 **Problem:** `greedyBuy` benutzte `contextualEvPerRound / cost` als Kaufentscheidung. Das ignoriert die zeitliche Diskontierung — ein teurer 5-Münzen-Return-Karte sah gleich aus wie 5 billige 1-Münzen-Karten.

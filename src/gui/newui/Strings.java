@@ -115,8 +115,8 @@ public final class Strings {
     }
     public static String legendP0Abbr()       { return "P(0)"; }
     public static String legendP0Desc()       {
-        return s("Wahrscheinlichkeit, 0 Münzen im eigenen Zug zu erhalten. Niedriger = zuverlässig.",
-                 "Probability of earning 0 coins on your own turn. Lower = reliable.");
+        return s("Wahrscheinlichkeit, 0 Münzen in der gesamten Runde zu erhalten. Niedriger = zuverlässig.",
+                 "Probability of earning 0 coins across the full round. Lower = reliable.");
     }
     public static String legendVarAbbr()      { return s("Varianz", "Var"); }
     public static String legendVarDesc()      {
@@ -167,8 +167,8 @@ public final class Strings {
                  "ROI: discounted return on investment over 10 rounds minus purchase cost. Positive = profitable.");
     }
     public static String colTipP0()           {
-        return s("P(0): Wahrscheinlichkeit, im eigenen Zug null Münzen zu erhalten. Niedriger = zuverlässiger.",
-                 "P(0): probability of earning zero coins on your own turn. Lower = more reliable income.");
+        return s("P(0): Wahrscheinlichkeit, in der gesamten Runde (eigener + Gegner-Züge) null Münzen zu erhalten. Niedriger = zuverlässiger.",
+                 "P(0): probability of earning zero coins across the full round (own turn + opponent turns). Lower = more reliable income.");
     }
     public static String colTipVar()          {
         return s("Var: statistische Varianz des Einkommens. Höher = Boom-oder-Pleite.",
@@ -362,6 +362,17 @@ public final class Strings {
         String turns = String.format("%.1f", turnsToSave);
         return s("Spare auf: " + cardName + " (~" + turns + " Züge)",
                  "Save for: " + cardName + " (~" + turns + " turns)");
+    }
+
+    /**
+     * Short synergy hint appended to card notes, e.g. "Kombiniert gut mit Bauernhof (+0.30¢)".
+     *
+     * @param partnerName  localized name of the synergy partner card
+     * @param gainPerRound expected EV gain per round from owning the partner
+     */
+    public static String synergyNote(String partnerName, double gainPerRound) {
+        return s("Gut mit: " + partnerName + " (+" + String.format("%.2f", gainPerRound) + "¢/Runde)",
+                 "Pairs with: " + partnerName + " (+" + String.format("%.2f", gainPerRound) + "¢/round)");
     }
 
     public static String bürohausSwapTitle()  { return s("Bürohaus: Karte tauschen?", "Office Building: Swap Card?"); }

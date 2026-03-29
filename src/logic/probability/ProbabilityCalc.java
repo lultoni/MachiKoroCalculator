@@ -718,6 +718,13 @@ public class ProbabilityCalc {
                 entry.notes = bürohausSwapNote(stateWithBuerohaus, playerIndex);
             }
 
+            // Synergy lookahead: show best partner card that increases this card's value
+            String synergyNote = computeSynergyNote(gs, playerIndex, candidate, candidates,
+                    gs.getPlayers().length);
+            if (synergyNote != null) {
+                entry.notes = entry.notes == null ? synergyNote : entry.notes + "  |  " + synergyNote;
+            }
+
             if (opts.includeWinProbDelta) {
                 if (opts.mcSimulations > 0) {
                     GameState stateAfter = gs.copy();
@@ -780,6 +787,13 @@ public class ProbabilityCalc {
                 GameState stateWithBuerohaus = gs.copy();
                 stateWithBuerohaus.getPlayers()[playerIndex].getOwned_projects().add(candidate);
                 entry.notes = bürohausSwapNote(stateWithBuerohaus, playerIndex);
+            }
+
+            // Synergy lookahead: show best partner card that increases this card's value
+            String synergyNote = computeSynergyNote(gs, playerIndex, candidate, candidates,
+                    gs.getPlayers().length);
+            if (synergyNote != null) {
+                entry.notes = entry.notes == null ? synergyNote : entry.notes + "  |  " + synergyNote;
             }
 
             if (canAfford && opts.includeWinProbDelta) {
@@ -858,6 +872,130 @@ public class ProbabilityCalc {
         }
         results.add(insertIdx, waitEntry);
     }
+
+    // -------------------------------------------------------------------------
+    // Synergy lookahead
+    // -------------------------------------------------------------------------
+
+    /**
+     * Minimum synergy gain (in coins per round) required to show a synergy note.
+     * Gains below this threshold are not reported to avoid noise.
+     */
+    private static final double SYNERGY_THRESHOLD = 0.05;
+
+    /**
+     * Computes a human-readable synergy note for {@code card} explaining which unowned card
+     * from the pool would most increase {@code card}'s per-round EV if also purchased.
+     *
+     * <p>The synergy gain is estimated using {@link CardIncome#contextualCardEvPerRound} with a
+     * modified {@link CardIncome.PlayerStats} that includes the partner card — no
+     * {@link GameState#copy()} is required.
+     *
+     * <p>Synergy exists between:
+     * <ul>
+     *   <li>Markthalle ↔ any food card (increases {@code f_c} which scales Markthalle by 2×)</li>
+     *   <li>Molkerei ↔ any animal card (increases {@code a_c} which scales Molkerei by 3×)</li>
+     *   <li>Möbelfabrik ↔ any production card (increases {@code p_c} which scales Möbelfabrik by 3×)</li>
+     *   <li>Bäckerei / Mini-Markt ↔ Einkaufszentrum (adds +1/+1 per activation)</li>
+     * </ul>
+     *
+     * @param gs          current game state (player does NOT yet own {@code card})
+     * @param playerIndex the player evaluating card purchases
+     * @param card        the card being evaluated
+     * @param candidates  all candidate cards in the pool (including landmarks)
+     * @param n           total player count
+     * @return synergy note string, or {@code null} if no significant synergy found
+     */
+    static String computeSynergyNote(GameState gs, int playerIndex, Project card,
+                                     ArrayList<Project> candidates, int n) {
+        Player player = gs.getPlayers()[playerIndex];
+        int[] oppCoins = CardIncome.buildOpponentCoins(gs.getPlayers(), playerIndex);
+
+        // Stats as if the player already owns 'card'
+        CardIncome.PlayerStats baseStats = buildStatsWithCard(player, card);
+
+        double baseEv = CardIncome.contextualCardEvPerRound(card, baseStats, n, oppCoins);
+        if (baseEv <= 0) return null; // card has no relevant synergy income
+
+        Project bestPartner = null;
+        double bestGain = SYNERGY_THRESHOLD;
+
+        for (Project partner : candidates) {
+            if (partner == card) continue;
+            if (partner.isIs_grossprojekt()) continue; // landmarks don't affect category counts
+            if ("einkaufszentrum".equals(partner.getId())) {
+                // Einkaufszentrum is a landmark — handled above
+                continue;
+            }
+            // Check if adding partner as owned changes the EV of card
+            CardIncome.PlayerStats statsWithPartner = buildStatsWithCards(player, card, partner);
+            double evWithPartner = CardIncome.contextualCardEvPerRound(card, statsWithPartner, n, oppCoins);
+            double gain = evWithPartner - baseEv;
+            if (gain > bestGain) {
+                bestGain = gain;
+                bestPartner = partner;
+            }
+        }
+
+        // Also check Einkaufszentrum (green/store cards benefit from it)
+        if ("grün".equals(card.getColor()) && "store".equals(card.getCategory())) {
+            if (!player.hasProject("einkaufszentrum")) {
+                CardIncome.PlayerStats statsWithEkz = buildStatsWithEkz(player, card);
+                double evWithEkz = CardIncome.contextualCardEvPerRound(card, statsWithEkz, n, oppCoins);
+                double gain = evWithEkz - baseEv;
+                if (gain > bestGain) {
+                    bestGain = gain;
+                    // Use the Einkaufszentrum project as partner
+                    bestPartner = ProjectLoader.getProject("einkaufszentrum").orElse(null);
+                }
+            }
+        }
+
+        if (bestPartner == null) return null;
+        return gui.newui.Strings.synergyNote(bestPartner.getLocalizedName(), bestGain);
+    }
+
+    /** Creates PlayerStats for {@code player} as if they also own {@code extra}. */
+    private static CardIncome.PlayerStats buildStatsWithCard(Player player, Project extra) {
+        CardIncome.PlayerStats s = new CardIncome.PlayerStats();
+        for (Project p : player.getOwned_projects()) applyToStats(s, p);
+        applyToStats(s, extra);
+        return s;
+    }
+
+    /** Creates PlayerStats for {@code player} as if they also own {@code extra1} and {@code extra2}. */
+    private static CardIncome.PlayerStats buildStatsWithCards(Player player, Project extra1, Project extra2) {
+        CardIncome.PlayerStats s = new CardIncome.PlayerStats();
+        for (Project p : player.getOwned_projects()) applyToStats(s, p);
+        applyToStats(s, extra1);
+        applyToStats(s, extra2);
+        return s;
+    }
+
+    /** Creates PlayerStats for {@code player} as if they also own {@code extra} and Einkaufszentrum. */
+    private static CardIncome.PlayerStats buildStatsWithEkz(Player player, Project extra) {
+        CardIncome.PlayerStats s = new CardIncome.PlayerStats();
+        for (Project p : player.getOwned_projects()) applyToStats(s, p);
+        applyToStats(s, extra);
+        s.hasEinkaufszentrum = true;
+        return s;
+    }
+
+    /** Applies a single project's contribution to a PlayerStats instance. */
+    private static void applyToStats(CardIncome.PlayerStats s, Project p) {
+        switch (p.getId()) {
+            case "einkaufszentrum" -> s.hasEinkaufszentrum = true;
+            case "bahnhof"         -> s.hasBahnhof         = true;
+            case "freizeitpark"    -> s.hasFreizeitpark    = true;
+            case "funkturm"        -> s.hasFunkturm        = true;
+        }
+        switch (p.getCategory()) {
+            case "food"       -> s.foodCount++;
+            case "animal"     -> s.animalCount++;
+            case "production" -> s.productionCount++;
+        }
+    }
+
     // -------------------------------------------------------------------------
 
     /**

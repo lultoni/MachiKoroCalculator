@@ -1531,11 +1531,11 @@ public class MainWindow extends JFrame {
             Object[] row = showWinProb
                     ? new Object[]{cardLabel, cost,
                                    e.evPerRound, e.roiOverHorizon,
-                                   e.probNoIncomeOwnTurn, e.variance,
+                                   e.probNoIncomeRound, e.variance,
                                    e.winProbDelta}
                     : new Object[]{cardLabel, cost,
                                    e.evPerRound, e.roiOverHorizon,
-                                   e.probNoIncomeOwnTurn, e.variance};
+                                   e.probNoIncomeRound, e.variance};
             model.addRow(row);
         }
 
@@ -1593,7 +1593,7 @@ public class MainWindow extends JFrame {
 
         applyRankedMetricColor(topCardEV,    MetricColorScheme.EV,            entry.evPerRound,          computeMetricRankPct(lastRanking, p.getId(), MetricColorScheme.EV));
         applyRankedMetricColor(topCardROI,   MetricColorScheme.ROI,           entry.roiOverHorizon,       computeMetricRankPct(lastRanking, p.getId(), MetricColorScheme.ROI));
-        applyRankedMetricColor(topCardRisk,  MetricColorScheme.P0,            entry.probNoIncomeOwnTurn,  computeMetricRankPct(lastRanking, p.getId(), MetricColorScheme.P0));
+        applyRankedMetricColor(topCardRisk,  MetricColorScheme.P0,            entry.probNoIncomeRound,    computeMetricRankPct(lastRanking, p.getId(), MetricColorScheme.P0));
         applyRankedMetricColor(topCardVar,   MetricColorScheme.VARIANCE,      entry.variance,             computeMetricRankPct(lastRanking, p.getId(), MetricColorScheme.VARIANCE));
         applyRankedMetricColor(topCardWinProb, MetricColorScheme.WIN_PROB_DELTA, entry.winProbDelta,      computeMetricRankPct(lastRanking, p.getId(), MetricColorScheme.WIN_PROB_DELTA));
         topCardNote.setText("<html><i>" + buildNote(entry) + "</i></html>");
@@ -1640,7 +1640,7 @@ public class MainWindow extends JFrame {
         java.util.function.ToDoubleFunction<RankEntry> extractor = switch (scheme) {
             case EV           -> e -> e.evPerRound;
             case ROI          -> e -> e.roiOverHorizon;
-            case P0           -> e -> e.probNoIncomeOwnTurn;
+            case P0           -> e -> e.probNoIncomeRound;
             case VARIANCE     -> e -> e.variance;
             case WIN_PROB_DELTA -> e -> e.winProbDelta;
             default           -> e -> 0.0;

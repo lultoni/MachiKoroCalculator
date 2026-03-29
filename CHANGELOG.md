@@ -4,6 +4,23 @@ Implementierungsgeschichte: was gebaut wurde, warum, und welche Designentscheidu
 
 ---
 
+## N2+N3: Bahnhof-Würfelwahl im Assistenten + wirtschaftsbasierte Phasenerkennung
+
+**N2 — `optimalDiceCount(gs, pi)`:** Neuer public wrapper in `ProbabilityCalc`. Vergleicht `weightedRollEV(1d6)` vs `weightedRollEV(2d6)` mit aktuellem Portfolio (kein Kandidat). Gibt 1 oder 2 zurück. Im Assistenten: wenn Bahnhof besessen → neuer Hint "🎲 1W6 optimal — Portfolio aktiviert hauptsächlich auf 1–6" (oder 2W6). Strings: `assistantDiceHint1d6()` / `assistantDiceHint2d6()`.
+
+**N3 — `AssistantConfig.java`:** Neue package-private Klasse in `gui.newui`. Zentralisiert alle Schwellwerte und Gewichtsarrays — kein Magic-Number-Streuer mehr in `rebuildAssistantPanel`. Konstanten: `EARLY_AVG_EV_THRESHOLD`, `EARLY_SAVE_ROUNDS`, `EKZ_COST`, `LATE_GP_THRESHOLD`, Pressure-Modifier-Werte, drei Gewichtsarrays (EARLY/MID/LATE). Methode `weightsForPhase(String)` gibt mutable Clone zurück.
+
+**N3 — Wirtschaftsbasierte Phasenerkennung** ersetzt einfachen GP-Zähler-Check:
+- **Frühphase**: `avgPortfolioEV < 1.2` UND EKZ nicht innerhalb 2 Runden erreichbar (`coins + 2×ownEv < 10`)
+- **Endspiel**: `max(eigene GPs, maxOppGPs) >= 3`
+- **Mittelspiel**: alles andere
+
+**N3 — Rückstand-Modifier**: `minTurnsToWin` des gefährlichsten Gegners berechnet als `(22 - oppCoins) / oppEv` (Worst-Case 4. GP = Funkturm 22 Münzen). Notfall (≤3 Züge): GP-Rush +0.5, Aggro +0.3. Druck (≤6 Züge): GP-Rush +0.2, Aggro +0.1. Modifier via `AssistantConfig`-Konstanten.
+
+**Tests:** 224 bestanden, 0 fehlgeschlagen.
+
+---
+
 ## Synergy-Lookahead im Ranking + P(0)-Metrik auf vollständige Runde umgestellt
 
 **Synergy-Lookahead:** `ProbabilityCalc.computeSynergyNote(gs, pi, card, candidates, n)` — neue package-private Methode. Berechnet für jede Karte im Ranking die beste Folgekarte (Partner), die ihren Wert am meisten steigern würde. Methode:

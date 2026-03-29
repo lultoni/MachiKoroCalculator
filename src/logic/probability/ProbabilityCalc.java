@@ -591,6 +591,27 @@ public class ProbabilityCalc {
     }
 
     /**
+     * Returns the optimal dice count (1 or 2) for the active player on their own turn,
+     * based on a comparison of expected net gain under each dice distribution.
+     * <p>
+     * If the player does not own Bahnhof, always returns 1 (no choice available).
+     * If 2d6 yields strictly higher EV, returns 2; otherwise returns 1.
+     * A tie ({@code |ev1 - ev2| < 1e-6}) is treated as 1d6 (no need to switch).
+     *
+     * @param gs          current game state (no candidate added — evaluates current portfolio)
+     * @param playerIndex the active player
+     * @return 1 if 1d6 is optimal or equal, 2 if 2d6 is strictly better
+     */
+    public static int optimalDiceCount(GameState gs, int playerIndex) {
+        Player player = gs.getPlayers()[playerIndex];
+        if (!player.hasProject("bahnhof")) return 1;
+        IntToDoubleFunction payout = r -> computeNetGainForRoll(gs, playerIndex, r, false);
+        double ev1 = CardIncome.weightedRollEV(false, payout);
+        double ev2 = CardIncome.weightedRollEV(true,  payout);
+        return (ev2 - ev1 > 1e-6) ? 2 : 1;
+    }
+
+    /**
      * Estimates the change in win probability for playerIndex from buying {@code candidate}.
      *
      * <h3>Analytical mode ({@code mcSimulations == 0})</h3>

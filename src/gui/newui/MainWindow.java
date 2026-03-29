@@ -1057,6 +1057,12 @@ public class MainWindow extends JFrame {
 
     /**
      * Computes the current game phase and GP synergy hints for the active player {@code pi}.
+     * Phase detection is economics-based (coin flows), not just GP-count-based:
+     * <ul>
+     *   <li>Early: avg portfolio EV is low AND Einkaufszentrum not reachable within 2 rounds</li>
+     *   <li>Late: max(own GPs, any opponent GPs) ≥ 3</li>
+     *   <li>Mid: everything else</li>
+     * </ul>
      */
     private GamePhaseContext computePhaseContext(int pi) {
         Player[] players = session.getState().getPlayers();
@@ -1074,11 +1080,24 @@ public class MainWindow extends JFrame {
             maxOppLm = Math.max(maxOppLm, lm);
         }
 
-        int etc = session.getEffectiveTurnCount();
+        // Economic phase detection
+        double ownEv  = ProbabilityCalc.portfolioEvPerRound(session.getState(), pi);
+        double avgEv  = 0.0;
+        for (int i = 0; i < n; i++) avgEv += ProbabilityCalc.portfolioEvPerRound(session.getState(), i);
+        avgEv /= n;
+
         String phase;
-        if (ownLm == 0 && etc < n * 3) phase = Strings.assistantPhaseEarly();
-        else if (maxOppLm >= 3)         phase = Strings.assistantPhaseLate();
-        else                             phase = Strings.assistantPhaseMid();
+        if (Math.max(ownLm, maxOppLm) >= AssistantConfig.LATE_GP_THRESHOLD) {
+            phase = Strings.assistantPhaseLate();
+        } else {
+            double ownCoins = active.getCoins();
+            boolean ekzReachable = (ownCoins + AssistantConfig.EARLY_SAVE_ROUNDS * ownEv)
+                                    >= AssistantConfig.EKZ_COST;
+            boolean economyWeak  = avgEv < AssistantConfig.EARLY_AVG_EV_THRESHOLD;
+            phase = (economyWeak && !ekzReachable)
+                    ? Strings.assistantPhaseEarly()
+                    : Strings.assistantPhaseMid();
+        }
 
         boolean hasBahnhof = active.hasProject("bahnhof");
         boolean hasEkz     = active.hasProject("einkaufszentrum");
@@ -1095,8 +1114,7 @@ public class MainWindow extends JFrame {
                 if (hasHighRange) break;
             }
             if (hasHighRange) {
-                // Estimate EV gain: portfolioEV with vs without Bahnhof
-                double evWithout = ProbabilityCalc.portfolioEvPerRound(session.getState(), pi);
+                double evWithout = ownEv; // already computed above
                 GameState withBahnhof = session.getState().copy();
                 logic.probability.ProjectLoader.getProject("bahnhof").ifPresent(bp ->
                         withBahnhof.getPlayers()[pi].getOwned_projects().add(bp));
@@ -1138,7 +1156,7 @@ public class MainWindow extends JFrame {
 
     /**
      * Adds the Spiellage-Analyse context profile block to the top of the assistant panel.
-     * Uses a weighted scoring of all 8 profile metrics to pick a final recommendation.
+     * Weights come from {@link AssistantConfig} and are modified by opponent-pressure.
      */
     private void addContextProfile(GamePhaseContext ctx, int coins, int pi) {
         List<RankEntry> affordable = lastRanking.stream().filter(e -> e.affordable).toList();
@@ -1147,17 +1165,34 @@ public class MainWindow extends JFrame {
             return;
         }
 
-        // Determine weights by phase
-        boolean late  = ctx.phaseLabel().equals(Strings.assistantPhaseLate());
-        boolean early = ctx.phaseLabel().equals(Strings.assistantPhaseEarly());
-        // [ROI, EV, Safe, LowVar, Cheap, WinProb, Aggro, GPRush]
-        double[] w = late  ? new double[]{0.6, 0.5, 0.2, 0.2, 0.2, 1.0, 0.8, 1.0}
-                  : early ? new double[]{0.8, 0.6, 0.4, 0.3, 0.9, 0.2, 0.2, 0.7}
-                           : new double[]{1.0, 0.8, 0.4, 0.4, 0.3, 0.6, 0.5, 0.8};
-        // Opponent-pressure modifier
-        if (ctx.maxOppLandmarks() >= 3) { w[6] = Math.min(1.0, w[6] + 0.3); w[7] = Math.min(1.0, w[7] + 0.3); }
+        // Weights from AssistantConfig, then apply opponent-pressure modifier
+        double[] w = AssistantConfig.weightsForPhase(ctx.phaseLabel());
+
+        // Compute turns-to-win for the most threatening opponent
+        Player[] players = session.getState().getPlayers();
+        int n = players.length;
+        double minTurnsToWin = Double.MAX_VALUE;
+        for (int i = 0; i < n; i++) {
+            if (i == pi) continue;
+            double oppEv = ProbabilityCalc.portfolioEvPerRound(session.getState(), i);
+            if (oppEv <= 0) continue;
+            int oppLm = 0;
+            for (Project p : players[i].getOwned_projects()) if (p.isIs_grossprojekt()) oppLm++;
+            if (oppLm >= 4) { minTurnsToWin = 0; break; }
+            // Use Funkturm cost (22) as worst-case 4th GP cost
+            double turnsToWin = Math.max(0, (22.0 - players[i].getCoins()) / oppEv);
+            minTurnsToWin = Math.min(minTurnsToWin, turnsToWin);
+        }
+        if (minTurnsToWin <= AssistantConfig.PRESSURE_EMERGENCY_TURNS) {
+            w[AssistantConfig.W_GPRUSH] = Math.min(1.0, w[AssistantConfig.W_GPRUSH] + AssistantConfig.PRESSURE_EMERGENCY_GPRUSH);
+            w[AssistantConfig.W_AGGRO]  = Math.min(1.0, w[AssistantConfig.W_AGGRO]  + AssistantConfig.PRESSURE_EMERGENCY_AGGRO);
+        } else if (minTurnsToWin <= AssistantConfig.PRESSURE_WARNING_TURNS) {
+            w[AssistantConfig.W_GPRUSH] = Math.min(1.0, w[AssistantConfig.W_GPRUSH] + AssistantConfig.PRESSURE_WARNING_GPRUSH);
+            w[AssistantConfig.W_AGGRO]  = Math.min(1.0, w[AssistantConfig.W_AGGRO]  + AssistantConfig.PRESSURE_WARNING_AGGRO);
+        }
 
         // Compute per-profile normalized rank vectors (best = 1.0, worst = 0.0)
+
         int m = affordable.size();
         // Sort copies for each metric
         List<RankEntry> byROI   = sorted(affordable, e -> e.roiOverHorizon, false);
@@ -1298,6 +1333,19 @@ public class MainWindow extends JFrame {
                 logic.probability.ProjectLoader.getProject("funkturm").ifPresent(p ->
                         addHint.accept(p.getLocalizedName(), 0.0));
             }
+        }
+
+        // Bahnhof dice-choice hint (shown when player owns Bahnhof)
+        int pi = session.nextPlayerIndex();
+        if (session.getState().getPlayers()[pi].hasProject("bahnhof")) {
+            ctxPanel.add(Box.createVerticalStrut(4));
+            int optDice = ProbabilityCalc.optimalDiceCount(session.getState(), pi);
+            String diceHint = optDice == 2 ? Strings.assistantDiceHint2d6() : Strings.assistantDiceHint1d6();
+            JLabel diceLabel = new JLabel("<html>" + diceHint + "</html>");
+            diceLabel.setFont(new Font("Arial", Font.PLAIN, 10));
+            diceLabel.setForeground(new Color(0x444444));
+            diceLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+            ctxPanel.add(diceLabel);
         }
 
         assistantPanel.add(ctxPanel);

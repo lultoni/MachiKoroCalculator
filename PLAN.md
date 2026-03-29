@@ -71,44 +71,11 @@ d. `IconTextRenderer`: Custom-Renderer der Kategorienamen durch Icons ersetzt �
 
 ---
 
-### N2 · Bahnhof-Würfelwahl explizit im UI anzeigen (Medium)
-
-**Problem:** Ob 1d6 oder 2d6 optimal ist, wird intern korrekt berechnet (`bestDiceEV`), aber dem Nutzer nie mitgeteilt. Außerdem ignorieren Kartenempfehlungen ob ein Spieler bewusst im 1–6-Bereich bleibt (Low-Range-Strategie).
-
-**Fehlende Teile:**
-
-a. **UI-Hinweis in Kartendetails / Assistent:** Wenn der Spieler Bahnhof besitzt, zeige welche Würfelwahl aktuell optimal ist und warum (z.B. "1d6 optimal — dein Portfolio aktiviert hauptsächlich auf 1–6"). `ProbabilityCalc.bestDiceChoice(gs, pi)` gibt zurück: `1d6`, `2d6`, oder `indifferent`.
-
-b. **Würfelwahl-Bewusstsein im Assistenten:** Das Spiellage-Profil und Synergy-Lookahead sollten unterscheiden:
-   - "Low-Range-Strategie" (Spieler hat Bahnhof aber 1d6 ist besser): Karten auf 1–6 hochgewichten
-   - "High-Range-Expansion" (2d6 besser): Karten auf 7–12 empfehlen
-
-c. **Akzeptierte Näherung A2 im Simulator** bleibt bestehen (Heuristik ist OK für MC-Speed). Die analytische Berechnung (`bestDiceEV`) ist bereits exakt — nur Exposition fehlt.
-
-**Technisch:** `CardIncome.bestDiceEV(hasBahnhof, payoutFn)` ist bereits vorhanden. Neuer public wrapper `ProbabilityCalc.optimalDiceCount(gs, pi) → int` (1 oder 2). Im Assistenten: neuer Hint wenn Würfelwahl nicht trivial.
+### N2 · ~~Bahnhof-Würfelwahl explizit im UI anzeigen~~ ✓ (behoben)
 
 ---
 
-### N3 · Assistent-Gewichte: wirtschaftsbasierte Phasenerkennung (Medium)
-
-Ersetzt die aktuelle feste `"Frühphase"/"Mittelspiel"/"Endspiel"`-Logik durch kontinuierliche, messwertbasierte Phasenerkennung.
-
-**Phasendefinitionen (aus User-Feedback):**
-
-| Phase | Bedingung |
-|-------|-----------|
-| Frühphase | `avgPortfolioEV < 1.2` UND `eigene_coins + 2×eigene_evPerRound < 10` (EKZ nicht in Reichweite) |
-| Endspiel | `max(eigene GPs, max Gegner-GPs) >= 3` |
-| Mittelspiel | alles andere |
-
-Optional: Portfolio-Größe (Kartenzahl aller Spieler) als zusätzlicher Indikator.
-
-**Rückstand-Modifier:**
-- `opponentTurnsToWin = (cost_4th_GP - best_opp_coins) / best_opp_evPerRound`
-- ≤ 3 Züge → Notfall: GP-Rush +0.5, Aggro +0.3
-- ≤ 6 Züge → Druck: GP-Rush +0.2, Aggro +0.1
-
-**Neue Klasse `AssistantConfig`** (package-private, `gui.newui`): zentralisiert alle Phasen-Schwellwerte und Gewichte als benannte Konstanten, damit sie schnell justierbar sind. Kein hardcodierter Magic-Number-Streuer mehr in `rebuildAssistantPanel`.
+### N3 · ~~Assistent-Gewichte: wirtschaftsbasierte Phasenerkennung~~ ✓ (behoben)
 
 ---
 

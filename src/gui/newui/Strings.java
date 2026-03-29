@@ -308,6 +308,16 @@ public final class Strings {
     public static String assistantPhaseMid()    { return s("Mittelspiel", "Mid Game"); }
     public static String assistantPhaseLate()   { return s("Endspiel", "Late Game"); }
 
+    /** Shown in the context profile when the player owns Bahnhof. */
+    public static String assistantDiceHint1d6() {
+        return s("🎲 1W6 optimal — Portfolio aktiviert hauptsächlich auf 1–6",
+                 "🎲 1d6 optimal — portfolio activates mainly on 1–6");
+    }
+    public static String assistantDiceHint2d6() {
+        return s("🎲 2W6 optimal — Portfolio aktiviert hauptsächlich auf 7–12",
+                 "🎲 2d6 optimal — portfolio activates mainly on 7–12");
+    }
+
     public static String deepAnalysisBtn()    { return s("Tiefenanalyse (MC)", "Deep Analysis (MC)"); }
     public static String deepAnalysisBtnOn()  { return s("Tiefenanalyse AN (MC)", "Deep Analysis ON (MC)"); }
     public static String deepAnalysisTooltip(){ return s("Monte-Carlo-Simulationen pro Karte für genaues Gewinnwahrscheinlichkeits-Delta.",

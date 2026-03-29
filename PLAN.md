@@ -167,14 +167,14 @@ wobei:
 | `computeAllDeltasForRoll` — single turn resolution | ✓ vollständig | Exakt (Rot→Blau/Grün→Lila, counter-clockwise) |
 | `evPerRound` — 1-Runden-EV mit step-aware Münzprojektion | ✓ vollständig | Gut (Näherung bei Rot) |
 | `roiOverHorizon` — diskontierter ROI | ✓ vollständig | Gut |
-| `computeBaselineWinProb` — analytische Siegwahrscheinlichkeit | ✓ vollständig | Mittel (softmax ohne Coin-Term, ohne Endspiel-Bonus) |
+| `computeBaselineWinProb` — analytische Siegwahrscheinlichkeit | ✓ vollständig | Gut (softmax mit Coin-Term, Endspiel-Bonus, kalibrierte Landmark-Gewichte) |
 | `mcWinRate` — MC-Simulation | ✓ vorhanden | Mittel (Boltzmann-Policy, aber unkalibriert) |
 | `computeSynergyNote` — Synergie-Hinweis (1 Partner) | ✓ vorhanden | Begrenzt (per-Karte, nicht Portfolio) |
 | `computeTwoTurnNote` — 2-Turn-Lookahead | ✓ vorhanden | Begrenzt (analytisch, nur Bahnhof als Landmark) |
-| **Stufe 1: Expectimax-Rollout-Tree mit Gegner-Zügen** | ❌ fehlt | — |
-| **Stufe 2: coinAdvantage + endgameProximityBonus** | ❌ fehlt | — |
-| **Stufe 2: LANDMARK_WEIGHTS Neukalibrierung** | ❌ fehlt | — |
-| **Stufe 3: Adaptives Budget-Splitting** | ❌ fehlt | — |
+| **Stufe 1: Expectimax-Rollout-Tree mit Gegner-Zügen** | ✓ implementiert | `RolloutTree.evaluate()` + UI-Tab |
+| **Stufe 2: coinAdvantage + endgameProximityBonus** | ✓ implementiert | `computeScores` |
+| **Stufe 2: LANDMARK_WEIGHTS Neukalibrierung** | ✓ implementiert | Bahnhof=24, EKZ=36, FZP=24, FT=48 |
+| **Stufe 3: Adaptives Budget-Splitting** | ✓ implementiert | `adaptiveMCRefinement` in `rankPurchasableProjects` |
 | **Stufe 3: Boltzmann-MC-Policy** | ✓ M7 | Implementiert |
 | **Portfolio-Synergie** `portfolioDeltaEV` | ✓ implementiert | Implementiert |
 | **Gegner-Modellierung** (adaptive Archetypen) | ❌ fehlt | Future Feature |
@@ -195,71 +195,21 @@ wobei:
 
 ---
 
-#### Schritt 3 — Leaf-Evaluator verbessern (Voraussetzung für Rollout-Tree)
+#### Schritt 3 — Leaf-Evaluator verbessern ✓ (implementiert)
 
-**Warum zuerst:** Der Rollout-Tree (Stufe 1) ist nur so gut wie sein Blatt-Evaluator. Bevor der Baum gebaut wird, muss Stufe 2 die bekannten Schwächen beheben — sonst propagiert der Baum systematische Fehler über mehrere Tiefen.
-
-**Aufgaben:**
-
-a) **`coinAdvantage`-Term:** `(coins_p − avg_opponent_coins) / scalingFactor` zur `computeScores`-Formel hinzufügen. `scalingFactor` so wählen dass der Term ~10–20% der EV-Komponente beisteuert.
-
-b) **`endgameProximityBonus`:** In `computeScores`: wenn `player.landmarkCount == 3` und Münzen ≥ Kosten des letzten Großprojekts → großer additiver Bonus (~2× aktueller Score). Verhindert dass der Evaluator Endspielsituationen falsch bewertet.
-
-c) **LANDMARK_WEIGHTS Neukalibrierung:** Aktuelle Gewichte (max 4.0) werden von `evPerRound × remainingTurns` (~20–80) dominiert. Effektive Kalibrierung: Landmark-Gewicht sollte dem Münzäquivalent des Landmark-Nutzens über `remainingTurns` entsprechen. Bahnhof ≈ +2 EV/Runde × 12 Runden = 24; EKZ ≈ +3 EV × 12 = 36; etc.
-
-**Scope:** ~30 Zeilen in `WinProbabilityCalc.computeScores`.
+**Implementiert:** `coinAdvantage`-Term (`COIN_ADVANTAGE_SCALE=5.0`), `endgameProximityBonus` (×2.5 wenn 3 LMs und Coins ≥ letzte LM-Kosten), LANDMARK_WEIGHTS neukalibriert (Bahnhof=24, EKZ=36, FZP=24, FT=48, Default=20). ~30 Zeilen in `WinProbabilityCalc.computeScores`.
 
 ---
 
-#### Schritt 4 — Rollout-Tree Enumerator (Kernarchitektur)
+#### Schritt 4 — Rollout-Tree Enumerator ✓ (implementiert)
 
-**Neue Klasse:** `RolloutTree` in `logic.probability`
+**Implementiert:** `RolloutTree.evaluate(gs, pi, depth, topK)` in `logic.probability`. `RolloutResult` record. Kandidaten-Pruning via `portfolioDeltaEV`, Gegner-Simulation via `GameSimulator.boltzmannBuy(T=0.7)`, Blatt-Evaluation via `computeBaselineWinProb`. Sonderfälle: Bahnhof (1d6 vs 2d6), Freizeitpark (Pasch → Bonus-Zug), Funkturm (Re-Roll wenn schlechter als Baseline). UI: 5. Tab "Rollout" in `MainWindow` mit Tiefe/Top-K-Spinnern und Run-Button (SwingWorker-Hintergrundausführung).
 
-```java
-class RolloutTree {
-    /**
-     * Evaluiert alle Kaufoptionen für den aktiven Spieler via Expectimax-Baum.
-     *
-     * Eine Runde = eigener Zug (exakt expandiert) + N-1 Gegner-Züge (Boltzmann-Policy).
-     * Supply-State wird durch alle Tiefen korrekt mitgeführt (GameState.copy() pro Knoten).
-     * Blatt-Evaluation via WinProbabilityCalc.computeBaselineWinProb (Stufe 2).
-     *
-     * @param gs         Post-Roll GameState (Münzen schon verteilt)
-     * @param pi         Aktiver Spieler-Index
-     * @param depth      Suchtiefe in vollen Runden (empfohlen: 1 für 4 Spieler, 2 für 2 Spieler)
-     * @param topK       Max. Kaufoptionen pro Entscheidungsknoten (empfohlen: 5)
-     */
-    static RolloutResult evaluate(GameState gs, int pi, int depth, int topK);
+---
 
-    record RolloutResult(
-        Project bestAction,           // Empfohlene Kaufoption (oder WAIT_SENTINEL)
-        double expectedWinProb,       // E[Siegwahrscheinlichkeit] für bestAction
-        Map<Project, Double> allValues // Win-Prob für alle untersuchten Optionen
-    ) {}
-}
-```
+#### Schritt 5 — Adaptives MC-Budget (Stufe 3) ✓ (implementiert)
 
-**Knoten-Expansion (eigener Zug):**
-1. Würfelergebnis bekannt (Post-Roll) → Entscheidungsknoten über Top-k Kaufoptionen
-2. Für jede Kaufoption: `gs.copy()`, Kauf anwenden, Supply updaten
-3. Wenn `depth > 1`: N−1 Gegner-Züge simulieren (je: Zufallsknoten → Boltzmann-Kauf → nächster Gegner)
-4. Dann: Zufallsknoten über alle Würfelergebnisse des nächsten eigenen Zugs (P1 oder P2 je nach Bahnhof-Besitz)
-5. Erneut Entscheidungsknoten → rekursiv bis `depth == 0`
-6. An Blättern: `WinProbabilityCalc.computeBaselineWinProb(leafState, pi)`
-
-**Sonderfälle:**
-- Freizeitpark (Pasch): Pasch-Outcomes (6/36) expandieren einen zusätzlichen Zufallsknoten (Bonuszug) bevor Gegner dran sind
-- Funkturm (Re-Roll): Entscheidungsknoten "neu würfeln?" wenn erster Roll unter Erwartung; expandiert zweiten Zufallsknoten
-- Bürohaus (Roll=6): Zusätzlicher Tausch-Entscheidungsknoten nach dem Würfeln, vor dem Kauf
-
-**Tiefenwahl:**
-- 4 Spieler: d=1 (≈200 Blätter, ~21ms Stufe-2 + ~90ms Stufe-3)
-- 2 Spieler: d=2 (≈1.800 Blätter, ~180ms Stufe-2 + ~90ms Stufe-3)
-- Endspiel-Extension: +1 wenn beliebiger Spieler ≤ 8 Münzen vom Sieg
-
-**Integration in UI:** Optionaler "Tiefen-Analyse"-Modus neben aktuellem Greedy-Ranking. Ergebnisse ersetzen die `rankPurchasableProjects`-Rangliste wenn aktiviert.
-
-**Scope:** ~250 Zeilen neue Klasse + ~30 Zeilen UI-Integration.
+**Implementiert:** `adaptiveMCRefinement` in `ProbabilityCalc.rankPurchasableProjects`. Konstanten: `MC_TOP_K=5`, `MC_EQUAL_BUDGET_EPSILON=0.02`, `MC_DOMINANT_LEAD_THRESHOLD=0.05`, `MC_SIMS_PER_CANDIDATE_EQUAL=2500`. Budget-Logik: wenn Spread ≤ 0.02 oder kein dominanter Anführer → alle Top-k validieren; sonst Anführer überspringen, Verfolger validieren. MC-Ergebnisse überschreiben Stufe-2-Schätzungen.
 
 ---
 
@@ -348,4 +298,4 @@ N0 (Bürohaus-Tausch) · N1 (Game Assistant) · N2 (Bahnhof-Würfelwahl) · N3 (
 U1 (rechtes Panel) · U3 (Trigger-Modus-Anzeige)
 
 ### Future Strategy ✓
-Synergy-Lookahead · 2-Turn Lookahead · MC-Policy (greedy → roiOverHorizon)
+Synergy-Lookahead · 2-Turn Lookahead · MC-Policy (greedy → roiOverHorizon) · Stufe-2 (coinAdvantage + endgameProximityBonus + LANDMARK_WEIGHTS) · Stufe-1 RolloutTree · Stufe-3 Adaptives MC-Budget

@@ -56,8 +56,15 @@ This is the **primary sort key** used by `rankPurchasableProjects`.
 
 Used in `estimateWinProbDelta` when `mcSimulations == 0`:
 ```
-score(player p) = playerEvPerRound(p) × REMAINING_TURNS_ESTIMATE
-                + Σ_{built landmark} LANDMARK_WEIGHT
+score(player p) = playerEvPerRound(p) × remainingTurns
+                + Σ_{built landmark} LANDMARK_WEIGHT(landmark)
+                + coinAdvantage(p)
+                [× endgameProximityBonus if applicable]
+
+coinAdvantage(p)         = (coins_p − avgCoins) / COIN_ADVANTAGE_SCALE (5.0)
+endgameProximityBonus(p) = score × 2.5 if landmarkCount == 3 and coins_p ≥ cheapestMissingLandmarkCost
+remainingTurns           = max(3, TOTAL_EXPECTED_TURNS(25) − turnsElapsed/n)
+                           or REMAINING_TURNS_FALLBACK(12) when turnsElapsed == 0
 
 P_win(player i) = exp(score_i) / Σ_j exp(score_j)
 
@@ -66,9 +73,12 @@ winProbDelta(candidate) = P_win(state_after_buy, i) − P_win(state_before_buy, 
 
 `playerEvPerRound` uses the player's actual `PlayerStats` (Einkaufszentrum, food/animal/production counts) and real opponent coin counts, so category multipliers (Molkerei, Möbelfabrik, Markthalle) and purple card values (Stadion, Fernsehsender) are scored correctly.
 
-Constants in `WinProbabilityCalc`:
-- `REMAINING_TURNS_ESTIMATE` — fixed estimate of turns left in the game
-- `LANDMARK_WEIGHT` — bonus added per completed landmark
+LANDMARK_WEIGHTS (coin-equivalent units, Bahnhof ≈ +2 EV/round × 12 turns = 24):
+- Bahnhof: 24
+- Einkaufszentrum: 36
+- Freizeitpark: 24
+- Funkturm: 48
+- Default (any other landmark): 20
 
 The softmax is computed with max-subtraction for numerical stability (see `softmaxEntry()`).
 
@@ -342,16 +352,16 @@ Ein vollständiger Baum bis Spielende ist nicht realisierbar (~150^30 Knoten). D
 
 ### 6.3 Zielarchitektur: Dreistufiges Hybrid-System
 
-**Stufe 1 — Rollout-Tree (geplant, `RolloutTree.java`):**
-Enumiert alle `(Würfelwurf × Kaufaktion)`-Pfade bis Tiefe `d` für den aktuellen Spieler. Knoten-Typen: Entscheidungsknoten (Kauf, d Zweige) und Zufallsknoten (Würfel, gewichtet nach `P1`/`P2`). Pruning: Top-k Kaufoptionen per Knoten (k=5), Abbruch wenn Δ-Sieg < ε=0.001.
+**Stufe 1 — Rollout-Tree (implementiert, `RolloutTree.java`):**
+`RolloutTree.evaluate(gs, pi, depth, topK)` enumiert Kaufoptionen bis Tiefe `d`. Eine Tiefe = eigener Zug (probabilistisch über alle Würfelwürfe) + N−1 Gegner-Züge (stochastisch, einzelner Sample-Roll + Boltzmann-Policy T=0.7). Sonderfälle: Bahnhof (1d6 vs 2d6), Freizeitpark (Pasch→Bonus-Zug), Funkturm (Re-Roll wenn g(r)<Baseline). `RolloutResult` record: `(Project bestAction, double expectedWinProb, Map<Project,Double> allValues)`. UI: 5. Tab "Rollout" in MainWindow.
 
-Geschätzte Kosten bei d=2, k=5: ~275 Blätter × 0.1ms = ~28ms → akzeptabel.
+Kosten bei d=1, k=5, 4 Spieler: ~12ms (gemessen).
 
 **Stufe 2 — Analytische Blatt-Evaluation (implementiert, `WinProbabilityCalc`):**
-`portfolioEvPerRound × remainingTurns + LANDMARK_WEIGHTS` → Softmax-Win-Prob. Kosten: ~0.1ms/Knoten. Wird als Blatt-Evaluator in Stufe 1 verwendet.
+`portfolioEvPerRound × remainingTurns + LANDMARK_WEIGHTS + coinAdvantage + endgameProximityBonus` → Softmax-Win-Prob. Formel und Konstanten: siehe §1.4. Kosten: ~0.1ms/Knoten.
 
-**Stufe 3 — MC-Rollout (implementiert, `GameSimulator` + `mcWinRate`):**
-Parallele Monte Carlo-Spiele ab Blatt-Zustand. Wird nur für die Top-3 Blätter aufgerufen um Rechenzeit zu sparen. Geplante Erweiterung: Boltzmann-Policy (M7) ersetzt deterministisch-greedy Buy-Policy für realistischere Gegenersimulation.
+**Stufe 3 — Adaptives MC-Budget (implementiert, `ProbabilityCalc.adaptiveMCRefinement`):**
+Top-k=5 Kandidaten analytisch vorfiltern. Budget-Splitting: wenn Spread ≤ 0.02 → alle Top-k mit je 2.500 Sims; wenn ein Kandidat klar führt (>0.05 Vorsprung) → nur Verfolger validieren. MC-Ergebnisse überschreiben Stufe-2-Schätzungen in den `RankEntry`-Objekten.
 
 ### 6.4 Synergie-Bewertung: per-Karte vs. Portfolio
 

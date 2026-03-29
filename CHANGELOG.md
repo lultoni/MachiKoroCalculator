@@ -4,6 +4,48 @@ Implementierungsgeschichte: was gebaut wurde, warum, und welche Designentscheidu
 
 ---
 
+## Dreistufiges Hybrid-System: Stufe 1 (RolloutTree) + Stufe 2 (verbesserter Leaf-Evaluator) + Stufe 3 (Adaptives MC-Budget)
+
+Vollständige Implementierung des in PLAN.md § "Dreistufiges Hybrid-System" beschriebenen Architektur-Ziels.
+
+### Stufe 2 — Leaf-Evaluator-Verbesserungen in `WinProbabilityCalc`
+
+**Problem:** `computeBaselineWinProb` lieferte zu ungenaue Endspielwerte. Drei konkrete Schwächen: (1) Landmark-Gewichte (max 4.0) wurden vom `evPerRound × remainingTurns`-Term dominiert (~20–80) und hatten keinen messbaren Einfluss auf den Softmax; (2) kein Münzvorteil-Signal — ein Spieler mit 20 Münzen mehr als alle anderen sah für den Evaluator genauso aus wie ein Spieler ohne Münzvorsprung; (3) Endspiel-Blindheit: ein Spieler mit 3 Landmarks und genug Münzen für die letzte erhielt keine Bonusgewichtung.
+
+**`LANDMARK_WEIGHTS` Neukalibrierung:** Werte von (max 4.0) auf münzäquivalente Einheiten skaliert. Formel: Landmark-Gewicht = ΔEV/Runde × ~12 Runden. Neue Werte: Bahnhof=24, Einkaufszentrum=36, Freizeitpark=24, Funkturm=48, Default=20. Jetzt in derselben Größenordnung wie die EV-Komponente.
+
+**`coinAdvantage`-Term:** `(coins_p − avgCoins) / COIN_ADVANTAGE_SCALE (5.0)` direkt zu `score(p)` addiert. Bei typischen Münzabständen von ~10 ergibt das ±2 pro Münzeinheit, ~±10 gesamt — ca. 10–20% der EV-Komponente. Stärkerer Münzvorteil-Signal für den Softmax.
+
+**`endgameProximityBonus`:** Wenn `landmarkCount == 3` und `player.coins >= cheapestMissingLandmarkCost(player)`, wird `score *= 2.5` angewandt. Verhindert dass ein unmittelbar gewinnender Spieler vom Evaluator mit einem Spieler 5+ Züge vom Sieg verwechselt wird. Neuer privater Helper `cheapestMissingLandmarkCost(Player)`.
+
+### Stufe 1 — `RolloutTree.java` (neue Klasse)
+
+**Neue Klasse** `logic.probability.RolloutTree` (~250 Zeilen). Implementiert Expectimax-Suchbaum für Tiefe d.
+
+**`RolloutResult` record:** `(Project bestAction, double expectedWinProb, Map<Project, Double> allValues)`. `bestAction` ist `RankEntry.WAIT_SENTINEL` wenn Sparen optimal ist.
+
+**`evaluate(gs, pi, depth, topK)`:** Endspiel-Extension (+1 Tiefe wenn ≤8 Münzen vom Sieg), Kandidaten via `portfolioDeltaEV` gefiltert (Top-k), immer `WAIT_SENTINEL` als Spar-Option inkludiert. Tiefe-1: `simulateOpponentTurns` (stochastisch, einzelner Sample-Roll pro Gegner) + `computeBaselineWinProb`. Tiefe>1: `expandOwnTurnChanceNode` (probabilistisch gewichtet über alle Würfelergebnisse).
+
+**Sonderfälle:** Bahnhof (1d6 vs 2d6 je nach Kartenbesitz), Freizeitpark (Pasch 6/36 → rekursiver Bonus-Zug), Funkturm (Re-Roll-Entscheidung wenn g(r) < EV-Baseline).
+
+**Gegner-Simulation:** `boltzmannBuy(T=0.7)` aus `GameSimulator` — einzelner stochastischer Sample pro Gegner-Zug, nicht probability-weighted. Akzeptierte Näherung A5 (stochastisch statt exakt für Performance).
+
+**Konvergenz:** `allConverged(ε=0.01)` — informationell, kein frühzeitiger Abbruch im Baum.
+
+**UI-Integration:** 5. Tab "Rollout" in `MainWindow`. Tiefe-Spinner (1–3), Top-K-Spinner (2–8), Run-Button mit SwingWorker-Hintergrundausführung. Ergebnis-Tabelle sortiert nach Win-Prob mit Grün/Gelb-Farbkodierung. Strings in `Strings.java` (DE/EN).
+
+### Stufe 3 — Adaptives MC-Budget in `ProbabilityCalc.rankPurchasableProjects`
+
+**Problem:** Vorher wurden alle Kandidaten einzeln mit MC validiert (langsam) oder gar nicht (ungenau). Neues System: Top-k analytisch vorfiltern, dann Budget adaptiv verteilen.
+
+**`adaptiveMCRefinement(results, gs, playerIndex, opts, mcBaseline)`:** Privater Helper in `ProbabilityCalc`. Nimmt Top-k = `min(MC_TOP_K=5, results.size())`. Berechnet analytische Win-Prob-Deltas für alle Top-k. Wenn `spread ≤ 0.02` (alle eng beieinander) oder kein Kandidat dominiert (Vorsprung ≤ 0.05): alle Top-k mit je 2.500 MC-Sims validieren. Wenn ein Kandidat klar dominiert: nur die Verfolger validieren (Anführer spart Budget). MC-Ergebnisse überschreiben die Stufe-2-Schätzungen in den entsprechenden `RankEntry`-Objekten.
+
+**Neue Konstanten:** `MC_TOP_K=5`, `MC_EQUAL_BUDGET_EPSILON=0.02`, `MC_DOMINANT_LEAD_THRESHOLD=0.05`, `MC_SIMS_PER_CANDIDATE_EQUAL=2500`.
+
+**Tests:** 224 PASS, 0 FAIL.
+
+---
+
 ## portfolioDeltaEV — Marginal-Portfolio-EV als neue Ranking-Metrik
 
 `RankEntry.portfolioDeltaEV` = `playerEvPerRound(portfolio + card) − playerEvPerRound(portfolio)`. Erfasst Cross-Karten-Synergien die `evPerRound` (per-Karte-isoliert) verpasst: Bauernhof→Molkerei, Food→Markthalle, Bahnhof→alle 7–12-Karten.

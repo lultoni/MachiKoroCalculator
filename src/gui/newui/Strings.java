@@ -195,6 +195,14 @@ public final class Strings {
     public static String tabNotAffordable()   { return s("Nicht erschwinglich", "Not Affordable"); }
     public static String tabAll()             { return s("Alle", "All"); }
     public static String tabAssistant()       { return s("Assistent", "Assistant"); }
+    public static String tabRollout()         { return s("Rollout", "Rollout"); }
+    public static String rolloutRunBtn()      { return s("Rollout starten", "Run Rollout"); }
+    public static String rolloutRunningMsg()  { return s("Rollout läuft...", "Running rollout..."); }
+    public static String rolloutDepthLabel()  { return s("Tiefe:", "Depth:"); }
+    public static String rolloutTopKLabel()   { return s("Top-K:", "Top-K:"); }
+    public static String rolloutBestLabel()   { return s("Empfehlung: ", "Recommendation: "); }
+    public static String rolloutWinProbLabel(){ return s("Win-Prob: ", "Win-Prob: "); }
+    public static String rolloutNoResult()    { return s("Noch kein Rollout. Tiefe und Top-K wählen, dann starten.", "No rollout yet. Choose depth and top-K, then run."); }
     public static String noAffordableCardsTab() { return s("Keine erschwinglichen Karten — sparen!", "No affordable cards — save up!"); }
     public static String noUnaffordableCards()  { return s("Alle Karten sind erschwinglich!", "All cards are affordable!"); }
 

@@ -96,6 +96,13 @@ public class MainWindow extends JFrame {
     private JSpinner mcTempSpinner;
     private JButton mcReloadBtn;
 
+    // ---- rollout tab components ----
+    private JPanel rolloutPanel;
+    private JSpinner rolloutDepthSpinner;
+    private JSpinner rolloutTopKSpinner;
+    private JLabel rolloutStatusLabel;
+    private JPanel rolloutResultPanel;
+
     // ---- snapshot / live state for the current-player recommendation ----
     private ArrayList<RankEntry> lastRanking = new ArrayList<>();
 
@@ -541,6 +548,12 @@ public class MainWindow extends JFrame {
         JScrollPane assistantScroll = new JScrollPane(assistantPanel);
         assistantScroll.getVerticalScrollBar().setUnitIncrement(16);
         rankTabs.addTab(Strings.tabAssistant(), assistantScroll);
+
+        // ---- Rollout tab (5th tab, index 4) ----
+        rolloutPanel = buildRolloutControlPanel();
+        JScrollPane rolloutScroll = new JScrollPane(rolloutPanel);
+        rolloutScroll.getVerticalScrollBar().setUnitIncrement(16);
+        rankTabs.addTab(Strings.tabRollout(), rolloutScroll);
 
         panel.add(rankTabs, BorderLayout.CENTER);
 
@@ -1170,6 +1183,7 @@ public class MainWindow extends JFrame {
         rankTabs.setTitleAt(1, Strings.tabNotAffordable());
         rankTabs.setTitleAt(2, Strings.tabAll());
         rankTabs.setTitleAt(3, Strings.tabAssistant());
+        rankTabs.setTitleAt(4, Strings.tabRollout());
 
         fillRankTableModel(tableModel,             rankTable,             cols, lastRanking, true,  false);
         fillRankTableModel(tableModelUnaffordable, rankTableUnaffordable, cols, lastRanking, false, false);
@@ -2630,5 +2644,153 @@ public class MainWindow extends JFrame {
 
             g2.dispose();
         }
+    }
+
+    // =========================================================================
+    // Rollout tab — Expectimax tree UI
+    // =========================================================================
+
+    /** Builds the static control panel for the Rollout tab. */
+    private JPanel buildRolloutControlPanel() {
+        JPanel outer = new JPanel();
+        outer.setLayout(new BoxLayout(outer, BoxLayout.Y_AXIS));
+        outer.setBorder(BorderFactory.createEmptyBorder(8, 10, 8, 10));
+
+        // Controls row
+        JPanel controls = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 4));
+        controls.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        controls.add(new JLabel(Strings.rolloutDepthLabel()));
+        rolloutDepthSpinner = new BoundedSpinner(new SpinnerNumberModel(1, 1, 3, 1));
+        rolloutDepthSpinner.setPreferredSize(new Dimension(50, 24));
+        controls.add(rolloutDepthSpinner);
+
+        controls.add(new JLabel(Strings.rolloutTopKLabel()));
+        rolloutTopKSpinner = new BoundedSpinner(new SpinnerNumberModel(5, 2, 8, 1));
+        rolloutTopKSpinner.setPreferredSize(new Dimension(50, 24));
+        controls.add(rolloutTopKSpinner);
+
+        JButton runBtn = new JButton(Strings.rolloutRunBtn());
+        runBtn.addActionListener(e -> triggerRollout());
+        controls.add(runBtn);
+
+        rolloutStatusLabel = new JLabel(Strings.rolloutNoResult());
+        rolloutStatusLabel.setFont(new Font("Arial", Font.ITALIC, 11));
+        controls.add(rolloutStatusLabel);
+
+        outer.add(controls);
+        outer.add(Box.createVerticalStrut(4));
+
+        // Result panel (populated by rebuildRolloutPanel)
+        rolloutResultPanel = new JPanel();
+        rolloutResultPanel.setLayout(new BoxLayout(rolloutResultPanel, BoxLayout.Y_AXIS));
+        rolloutResultPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        outer.add(rolloutResultPanel);
+
+        return outer;
+    }
+
+    /** Runs the RolloutTree on a background thread and updates the result panel. */
+    private void triggerRollout() {
+        int depth = (int) rolloutDepthSpinner.getValue();
+        int topK  = (int) rolloutTopKSpinner.getValue();
+        int pi    = session.nextPlayerIndex();
+        GameState snapState = postRollState();
+
+        rolloutStatusLabel.setText(Strings.rolloutRunningMsg());
+        rolloutResultPanel.removeAll();
+        rolloutResultPanel.revalidate();
+        rolloutResultPanel.repaint();
+
+        SwingWorker<RolloutTree.RolloutResult, Void> worker = new SwingWorker<>() {
+            @Override
+            protected RolloutTree.RolloutResult doInBackground() {
+                return RolloutTree.evaluate(snapState, pi, depth, topK);
+            }
+            @Override
+            protected void done() {
+                try {
+                    RolloutTree.RolloutResult result = get();
+                    rebuildRolloutPanel(result, pi);
+                    rolloutStatusLabel.setText("");
+                } catch (Exception ex) {
+                    rolloutStatusLabel.setText("Error: " + ex.getMessage());
+                }
+            }
+        };
+        worker.execute();
+    }
+
+    /** Populates the rollout result panel from a completed RolloutResult. */
+    private void rebuildRolloutPanel(RolloutTree.RolloutResult result, int pi) {
+        rolloutResultPanel.removeAll();
+
+        // Best action header
+        String bestName = (result.bestAction() == null || "_wait_".equals(result.bestAction().getId()))
+                ? Strings.waitLabel()
+                : result.bestAction().getLocalizedName();
+        JLabel bestLabel = new JLabel("<html><b>" + Strings.rolloutBestLabel()
+                + bestName + "</b>&nbsp;&nbsp;"
+                + Strings.rolloutWinProbLabel()
+                + String.format("%.1f%%", result.expectedWinProb() * 100) + "</html>");
+        bestLabel.setFont(new Font("Arial", Font.PLAIN, 13));
+        bestLabel.setBorder(BorderFactory.createEmptyBorder(4, 0, 6, 0));
+        bestLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        rolloutResultPanel.add(bestLabel);
+
+        // All-values table
+        String[] cols = {Strings.colCard(), Strings.rolloutWinProbLabel().trim()};
+        DefaultTableModel model = new DefaultTableModel(cols, 0) {
+            @Override public boolean isCellEditable(int r, int c) { return false; }
+            @Override public Class<?> getColumnClass(int c) {
+                return c == 0 ? String.class : Double.class;
+            }
+        };
+
+        // Sort entries descending by win-prob
+        result.allValues().entrySet().stream()
+                .sorted((a, b) -> Double.compare(b.getValue(), a.getValue()))
+                .forEach(e -> {
+                    String name = (e.getKey() == null || "_wait_".equals(e.getKey().getId()))
+                            ? Strings.waitLabel()
+                            : e.getKey().getLocalizedName();
+                    model.addRow(new Object[]{name, e.getValue()});
+                });
+
+        JTable table = new JTable(model);
+        table.setFont(MONO_FONT);
+        table.setRowHeight(22);
+        table.setAutoResizeMode(JTable.AUTO_RESIZE_LAST_COLUMN);
+        table.getColumnModel().getColumn(0).setPreferredWidth(200);
+        table.getColumnModel().getColumn(1).setPreferredWidth(100);
+
+        // Color the win-prob column
+        table.getColumnModel().getColumn(1).setCellRenderer(new DefaultTableCellRenderer() {
+            @Override
+            public Component getTableCellRendererComponent(JTable t, Object v, boolean sel,
+                                                           boolean foc, int row, int col) {
+                super.getTableCellRendererComponent(t, v, sel, foc, row, col);
+                if (v instanceof Double d) {
+                    setText(String.format("%.1f%%", d * 100));
+                    if (!sel) {
+                        double best = result.expectedWinProb();
+                        double ratio = best > 0 ? d / best : 0;
+                        if (ratio >= 0.99) setBackground(new Color(0xC6EFCE));
+                        else if (ratio >= 0.90) setBackground(new Color(0xFFEB9C));
+                        else setBackground(null);
+                    }
+                }
+                setHorizontalAlignment(SwingConstants.RIGHT);
+                return this;
+            }
+        });
+
+        JScrollPane tableScroll = new JScrollPane(table);
+        tableScroll.setPreferredSize(new Dimension(340, Math.min(300, 24 + model.getRowCount() * 22)));
+        tableScroll.setAlignmentX(Component.LEFT_ALIGNMENT);
+        rolloutResultPanel.add(tableScroll);
+
+        rolloutResultPanel.revalidate();
+        rolloutResultPanel.repaint();
     }
 }

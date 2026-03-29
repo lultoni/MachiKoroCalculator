@@ -1,0 +1,1643 @@
+[
+  {
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 2,
+        "gps": 1,
+        "cards": 7
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gps": 1,
+        "cards": 7
+      },
+      {
+        "name": "Player 3",
+        "coins": 1,
+        "gps": 1,
+        "cards": 8
+      }
+    ],
+    "labels": {
+      "early": 0.27,
+      "mid": 0.88,
+      "late": 0.0
+    }
+  },
+  {
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 2,
+        "gps": 1,
+        "cards": 6
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gps": 1,
+        "cards": 6
+      },
+      {
+        "name": "Player 3",
+        "coins": 0,
+        "gps": 1,
+        "cards": 8
+      }
+    ],
+    "labels": {
+      "early": 0.21,
+      "mid": 0.74,
+      "late": 0.0
+    }
+  },
+  {
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 1,
+        "gps": 0,
+        "cards": 4
+      },
+      {
+        "name": "Player 2",
+        "coins": 2,
+        "gps": 0,
+        "cards": 3
+      },
+      {
+        "name": "Player 3",
+        "coins": 2,
+        "gps": 0,
+        "cards": 3
+      }
+    ],
+    "labels": {
+      "early": 0.85,
+      "mid": 0.14,
+      "late": 0.0
+    }
+  },
+  {
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 2,
+        "gps": 1,
+        "cards": 8
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gps": 1,
+        "cards": 8
+      },
+      {
+        "name": "Player 3",
+        "coins": 2,
+        "gps": 1,
+        "cards": 8
+      }
+    ],
+    "labels": {
+      "early": 0.0,
+      "mid": 1.0,
+      "late": 0.0
+    }
+  },
+  {
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gps": 1,
+        "cards": 12
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gps": 1,
+        "cards": 9
+      },
+      {
+        "name": "Player 3",
+        "coins": 1,
+        "gps": 2,
+        "cards": 12
+      }
+    ],
+    "labels": {
+      "early": 0.0,
+      "mid": 1.0,
+      "late": 0.35
+    }
+  },
+  {
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 20,
+        "gps": 4,
+        "cards": 16
+      },
+      {
+        "name": "Player 2",
+        "coins": 7,
+        "gps": 1,
+        "cards": 11
+      },
+      {
+        "name": "Player 3",
+        "coins": 2,
+        "gps": 3,
+        "cards": 16
+      }
+    ],
+    "labels": {
+      "early": 0.0,
+      "mid": 0.0,
+      "late": 1.0
+    }
+  },
+  {
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 12,
+        "gps": 3,
+        "cards": 15
+      },
+      {
+        "name": "Player 2",
+        "coins": 12,
+        "gps": 3,
+        "cards": 14
+      },
+      {
+        "name": "Player 3",
+        "coins": 12,
+        "gps": 1,
+        "cards": 12
+      }
+    ],
+    "labels": {
+      "early": 0.0,
+      "mid": 0.0,
+      "late": 1.0
+    }
+  },
+  {
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gps": 1,
+        "cards": 12
+      },
+      {
+        "name": "Player 2",
+        "coins": 2,
+        "gps": 2,
+        "cards": 17
+      },
+      {
+        "name": "Player 3",
+        "coins": 3,
+        "gps": 1,
+        "cards": 10
+      }
+    ],
+    "labels": {
+      "early": 0.0,
+      "mid": 0.39,
+      "late": 0.59
+    }
+  },
+  {
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 6,
+        "gps": 2,
+        "cards": 16
+      },
+      {
+        "name": "Player 2",
+        "coins": 3,
+        "gps": 4,
+        "cards": 17
+      },
+      {
+        "name": "Player 3",
+        "coins": 2,
+        "gps": 2,
+        "cards": 17
+      }
+    ],
+    "labels": {
+      "early": 0.0,
+      "mid": 0.0,
+      "late": 1.0
+    }
+  },
+  {
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 1,
+        "gps": 2,
+        "cards": 14
+      },
+      {
+        "name": "Player 2",
+        "coins": 1,
+        "gps": 2,
+        "cards": 12
+      },
+      {
+        "name": "Player 3",
+        "coins": 0,
+        "gps": 2,
+        "cards": 13
+      }
+    ],
+    "labels": {
+      "early": 0.0,
+      "mid": 0.8,
+      "late": 0.18
+    }
+  },
+  {
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gps": 2,
+        "cards": 13
+      },
+      {
+        "name": "Player 2",
+        "coins": 4,
+        "gps": 1,
+        "cards": 7
+      },
+      {
+        "name": "Player 3",
+        "coins": 3,
+        "gps": 1,
+        "cards": 9
+      }
+    ],
+    "labels": {
+      "early": 0.31,
+      "mid": 0.69,
+      "late": 0.0
+    }
+  },
+  {
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 2,
+        "gps": 0,
+        "cards": 5
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gps": 1,
+        "cards": 4
+      },
+      {
+        "name": "Player 3",
+        "coins": 0,
+        "gps": 1,
+        "cards": 5
+      }
+    ],
+    "labels": {
+      "early": 0.72,
+      "mid": 0.15,
+      "late": 0.0
+    }
+  },
+  {
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 2,
+        "gps": 1,
+        "cards": 11
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gps": 1,
+        "cards": 9
+      },
+      {
+        "name": "Player 3",
+        "coins": 11,
+        "gps": 2,
+        "cards": 13
+      }
+    ],
+    "labels": {
+      "early": 0.11,
+      "mid": 0.69,
+      "late": 0.0
+    }
+  },
+  {
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 2,
+        "gps": 0,
+        "cards": 4
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gps": 1,
+        "cards": 3
+      },
+      {
+        "name": "Player 3",
+        "coins": 0,
+        "gps": 1,
+        "cards": 3
+      }
+    ],
+    "labels": {
+      "early": 1.0,
+      "mid": 0.0,
+      "late": 0.0
+    }
+  },
+  {
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 2,
+        "gps": 1,
+        "cards": 4
+      },
+      {
+        "name": "Player 2",
+        "coins": 2,
+        "gps": 1,
+        "cards": 4
+      },
+      {
+        "name": "Player 3",
+        "coins": 1,
+        "gps": 1,
+        "cards": 4
+      }
+    ],
+    "labels": {
+      "early": 1.0,
+      "mid": 0.17,
+      "late": 0.0
+    }
+  },
+  {
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 1,
+        "gps": 1,
+        "cards": 6
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gps": 1,
+        "cards": 7
+      },
+      {
+        "name": "Player 3",
+        "coins": 0,
+        "gps": 1,
+        "cards": 7
+      }
+    ],
+    "labels": {
+      "early": 0.48,
+      "mid": 0.47,
+      "late": 0.0
+    }
+  },
+  {
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 1,
+        "gps": 1,
+        "cards": 10
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gps": 1,
+        "cards": 10
+      },
+      {
+        "name": "Player 3",
+        "coins": 0,
+        "gps": 1,
+        "cards": 8
+      }
+    ],
+    "labels": {
+      "early": 0.28,
+      "mid": 0.76,
+      "late": 0.0
+    }
+  },
+  {
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gps": 1,
+        "cards": 10
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gps": 1,
+        "cards": 9
+      },
+      {
+        "name": "Player 3",
+        "coins": 0,
+        "gps": 1,
+        "cards": 8
+      }
+    ],
+    "labels": {
+      "early": 0.1,
+      "mid": 0.85,
+      "late": 0.0
+    }
+  },
+  {
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gps": 1,
+        "cards": 8
+      },
+      {
+        "name": "Player 2",
+        "coins": 5,
+        "gps": 1,
+        "cards": 8
+      },
+      {
+        "name": "Player 3",
+        "coins": 1,
+        "gps": 1,
+        "cards": 9
+      }
+    ],
+    "labels": {
+      "early": 0.15,
+      "mid": 0.76,
+      "late": 0.0
+    }
+  },
+  {
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 1,
+        "gps": 1,
+        "cards": 10
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gps": 1,
+        "cards": 8
+      },
+      {
+        "name": "Player 3",
+        "coins": 0,
+        "gps": 1,
+        "cards": 6
+      }
+    ],
+    "labels": {
+      "early": 0.21,
+      "mid": 0.86,
+      "late": 0.0
+    }
+  },
+  {
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 2,
+        "gps": 1,
+        "cards": 6
+      },
+      {
+        "name": "Player 2",
+        "coins": 2,
+        "gps": 1,
+        "cards": 4
+      },
+      {
+        "name": "Player 3",
+        "coins": 1,
+        "gps": 1,
+        "cards": 5
+      }
+    ],
+    "labels": {
+      "early": 0.63,
+      "mid": 0.23,
+      "late": 0.0
+    }
+  },
+  {
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gps": 1,
+        "cards": 3
+      },
+      {
+        "name": "Player 2",
+        "coins": 3,
+        "gps": 0,
+        "cards": 2
+      },
+      {
+        "name": "Player 3",
+        "coins": 3,
+        "gps": 0,
+        "cards": 2
+      }
+    ],
+    "labels": {
+      "early": 1.0,
+      "mid": 0.0,
+      "late": 0.0
+    }
+  },
+  {
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gps": 1,
+        "cards": 14
+      },
+      {
+        "name": "Player 2",
+        "coins": 6,
+        "gps": 1,
+        "cards": 14
+      }
+    ],
+    "labels": {
+      "early": 0.0,
+      "mid": 1.0,
+      "late": 0.0
+    }
+  },
+  {
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gps": 1,
+        "cards": 4
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gps": 0,
+        "cards": 4
+      }
+    ],
+    "labels": {
+      "early": 0.87,
+      "mid": 0.32,
+      "late": 0.0
+    }
+  },
+  {
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 6,
+        "gps": 1,
+        "cards": 17
+      },
+      {
+        "name": "Player 2",
+        "coins": 5,
+        "gps": 4,
+        "cards": 17
+      }
+    ],
+    "labels": {
+      "early": 0.0,
+      "mid": 0.0,
+      "late": 1.0
+    }
+  },
+  {
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gps": 1,
+        "cards": 9
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gps": 1,
+        "cards": 6
+      }
+    ],
+    "labels": {
+      "early": 0.48,
+      "mid": 0.47,
+      "late": 0.0
+    }
+  },
+  {
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gps": 1,
+        "cards": 12
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gps": 1,
+        "cards": 7
+      }
+    ],
+    "labels": {
+      "early": 0.29,
+      "mid": 0.74,
+      "late": 0.0
+    }
+  },
+  {
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gps": 0,
+        "cards": 4
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gps": 1,
+        "cards": 4
+      }
+    ],
+    "labels": {
+      "early": 1.0,
+      "mid": 0.0,
+      "late": 0.0
+    }
+  },
+  {
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gps": 1,
+        "cards": 4
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gps": 1,
+        "cards": 4
+      }
+    ],
+    "labels": {
+      "early": 0.87,
+      "mid": 0.18,
+      "late": 0.0
+    }
+  },
+  {
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gps": 0,
+        "cards": 4
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gps": 1,
+        "cards": 3
+      }
+    ],
+    "labels": {
+      "early": 0.98,
+      "mid": 0.03,
+      "late": 0.0
+    }
+  },
+  {
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 1,
+        "gps": 2,
+        "cards": 14
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gps": 1,
+        "cards": 9
+      }
+    ],
+    "labels": {
+      "early": 0.2,
+      "mid": 0.8,
+      "late": 0.0
+    }
+  },
+  {
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 4,
+        "gps": 2,
+        "cards": 13
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gps": 1,
+        "cards": 13
+      }
+    ],
+    "labels": {
+      "early": 0.21,
+      "mid": 0.64,
+      "late": 0.0
+    }
+  },
+  {
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gps": 0,
+        "cards": 5
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gps": 1,
+        "cards": 7
+      }
+    ],
+    "labels": {
+      "early": 0.68,
+      "mid": 0.23,
+      "late": 0.0
+    }
+  },
+  {
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gps": 1,
+        "cards": 5
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gps": 1,
+        "cards": 4
+      }
+    ],
+    "labels": {
+      "early": 1.0,
+      "mid": 0.0,
+      "late": 0.0
+    }
+  },
+  {
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gps": 2,
+        "cards": 18
+      },
+      {
+        "name": "Player 2",
+        "coins": 5,
+        "gps": 3,
+        "cards": 16
+      }
+    ],
+    "labels": {
+      "early": 0.0,
+      "mid": 1.0,
+      "late": 0.28
+    }
+  },
+  {
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gps": 2,
+        "cards": 16
+      },
+      {
+        "name": "Player 2",
+        "coins": 1,
+        "gps": 2,
+        "cards": 14
+      }
+    ],
+    "labels": {
+      "early": 0.0,
+      "mid": 0.87,
+      "late": 0.08
+    }
+  },
+  {
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 1,
+        "gps": 1,
+        "cards": 15
+      },
+      {
+        "name": "Player 2",
+        "coins": 1,
+        "gps": 4,
+        "cards": 19
+      }
+    ],
+    "labels": {
+      "early": 0.0,
+      "mid": 0.0,
+      "late": 1.0
+    }
+  },
+  {
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 1,
+        "gps": 1,
+        "cards": 11
+      },
+      {
+        "name": "Player 2",
+        "coins": 3,
+        "gps": 1,
+        "cards": 11
+      }
+    ],
+    "labels": {
+      "early": 0.5,
+      "mid": 0.5,
+      "late": 0.0
+    }
+  },
+  {
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 15,
+        "gps": 3,
+        "cards": 17
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gps": 3,
+        "cards": 15
+      }
+    ],
+    "labels": {
+      "early": 0.0,
+      "mid": 0.38,
+      "late": 0.69
+    }
+  },
+  {
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gps": 1,
+        "cards": 11
+      },
+      {
+        "name": "Player 2",
+        "coins": 5,
+        "gps": 4,
+        "cards": 15
+      }
+    ],
+    "labels": {
+      "early": 0.0,
+      "mid": 0.0,
+      "late": 1.0
+    }
+  },
+  {
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gps": 0,
+        "cards": 6
+      },
+      {
+        "name": "Player 2",
+        "coins": 2,
+        "gps": 1,
+        "cards": 4
+      }
+    ],
+    "labels": {
+      "early": 1.0,
+      "mid": 0.11,
+      "late": 0.0
+    }
+  },
+  {
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gps": 4,
+        "cards": 18
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gps": 1,
+        "cards": 12
+      }
+    ],
+    "labels": {
+      "early": 0.0,
+      "mid": 0.0,
+      "late": 1.0
+    }
+  },
+  {
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 1,
+        "gps": 1,
+        "cards": 8
+      },
+      {
+        "name": "Player 2",
+        "coins": 6,
+        "gps": 1,
+        "cards": 9
+      },
+      {
+        "name": "Player 3",
+        "coins": 4,
+        "gps": 0,
+        "cards": 6
+      },
+      {
+        "name": "Player 4",
+        "coins": 0,
+        "gps": 1,
+        "cards": 10
+      }
+    ],
+    "labels": {
+      "early": 0.66,
+      "mid": 0.44,
+      "late": 0.0
+    }
+  },
+  {
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 1,
+        "gps": 1,
+        "cards": 10
+      },
+      {
+        "name": "Player 2",
+        "coins": 10,
+        "gps": 1,
+        "cards": 8
+      },
+      {
+        "name": "Player 3",
+        "coins": 4,
+        "gps": 1,
+        "cards": 9
+      },
+      {
+        "name": "Player 4",
+        "coins": 1,
+        "gps": 2,
+        "cards": 8
+      }
+    ],
+    "labels": {
+      "early": 0.3,
+      "mid": 0.68,
+      "late": 0.0
+    }
+  },
+  {
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gps": 0,
+        "cards": 9
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gps": 1,
+        "cards": 9
+      },
+      {
+        "name": "Player 3",
+        "coins": 3,
+        "gps": 1,
+        "cards": 8
+      },
+      {
+        "name": "Player 4",
+        "coins": 0,
+        "gps": 1,
+        "cards": 7
+      }
+    ],
+    "labels": {
+      "early": 0.5,
+      "mid": 0.5,
+      "late": 0.0
+    }
+  },
+  {
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 1,
+        "gps": 1,
+        "cards": 3
+      },
+      {
+        "name": "Player 2",
+        "coins": 2,
+        "gps": 1,
+        "cards": 4
+      },
+      {
+        "name": "Player 3",
+        "coins": 2,
+        "gps": 1,
+        "cards": 4
+      },
+      {
+        "name": "Player 4",
+        "coins": 0,
+        "gps": 0,
+        "cards": 4
+      }
+    ],
+    "labels": {
+      "early": 0.76,
+      "mid": 0.21,
+      "late": 0.0
+    }
+  },
+  {
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gps": 1,
+        "cards": 5
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gps": 1,
+        "cards": 7
+      },
+      {
+        "name": "Player 3",
+        "coins": 0,
+        "gps": 1,
+        "cards": 6
+      },
+      {
+        "name": "Player 4",
+        "coins": 0,
+        "gps": 1,
+        "cards": 6
+      }
+    ],
+    "labels": {
+      "early": 0.28,
+      "mid": 0.69,
+      "late": 0.0
+    }
+  },
+  {
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 3,
+        "gps": 1,
+        "cards": 10
+      },
+      {
+        "name": "Player 2",
+        "coins": 2,
+        "gps": 1,
+        "cards": 8
+      },
+      {
+        "name": "Player 3",
+        "coins": 5,
+        "gps": 2,
+        "cards": 11
+      },
+      {
+        "name": "Player 4",
+        "coins": 8,
+        "gps": 1,
+        "cards": 10
+      }
+    ],
+    "labels": {
+      "early": 0.0,
+      "mid": 0.81,
+      "late": 0.11
+    }
+  },
+  {
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gps": 1,
+        "cards": 10
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gps": 1,
+        "cards": 8
+      },
+      {
+        "name": "Player 3",
+        "coins": 0,
+        "gps": 1,
+        "cards": 9
+      },
+      {
+        "name": "Player 4",
+        "coins": 0,
+        "gps": 1,
+        "cards": 9
+      }
+    ],
+    "labels": {
+      "early": 0.1,
+      "mid": 0.78,
+      "late": 0.0
+    }
+  },
+  {
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gps": 0,
+        "cards": 6
+      },
+      {
+        "name": "Player 2",
+        "coins": 3,
+        "gps": 1,
+        "cards": 5
+      },
+      {
+        "name": "Player 3",
+        "coins": 1,
+        "gps": 1,
+        "cards": 4
+      },
+      {
+        "name": "Player 4",
+        "coins": 2,
+        "gps": 1,
+        "cards": 6
+      }
+    ],
+    "labels": {
+      "early": 0.42,
+      "mid": 0.68,
+      "late": 0.0
+    }
+  },
+  {
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 2,
+        "gps": 1,
+        "cards": 5
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gps": 1,
+        "cards": 6
+      },
+      {
+        "name": "Player 3",
+        "coins": 0,
+        "gps": 1,
+        "cards": 6
+      },
+      {
+        "name": "Player 4",
+        "coins": 2,
+        "gps": 1,
+        "cards": 5
+      }
+    ],
+    "labels": {
+      "early": 0.37,
+      "mid": 0.69,
+      "late": 0.0
+    }
+  },
+  {
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 1,
+        "gps": 1,
+        "cards": 6
+      },
+      {
+        "name": "Player 2",
+        "coins": 2,
+        "gps": 1,
+        "cards": 8
+      },
+      {
+        "name": "Player 3",
+        "coins": 0,
+        "gps": 1,
+        "cards": 7
+      },
+      {
+        "name": "Player 4",
+        "coins": 0,
+        "gps": 1,
+        "cards": 8
+      }
+    ],
+    "labels": {
+      "early": 0.33,
+      "mid": 0.72,
+      "late": 0.0
+    }
+  },
+  {
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gps": 0,
+        "cards": 4
+      },
+      {
+        "name": "Player 2",
+        "coins": 1,
+        "gps": 0,
+        "cards": 5
+      },
+      {
+        "name": "Player 3",
+        "coins": 0,
+        "gps": 1,
+        "cards": 4
+      },
+      {
+        "name": "Player 4",
+        "coins": 1,
+        "gps": 1,
+        "cards": 4
+      }
+    ],
+    "labels": {
+      "early": 0.79,
+      "mid": 0.24,
+      "late": 0.0
+    }
+  },
+  {
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gps": 1,
+        "cards": 6
+      },
+      {
+        "name": "Player 2",
+        "coins": 1,
+        "gps": 1,
+        "cards": 6
+      },
+      {
+        "name": "Player 3",
+        "coins": 1,
+        "gps": 1,
+        "cards": 6
+      },
+      {
+        "name": "Player 4",
+        "coins": 1,
+        "gps": 1,
+        "cards": 5
+      }
+    ],
+    "labels": {
+      "early": 0.5,
+      "mid": 0.5,
+      "late": 0.0
+    }
+  },
+  {
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gps": 1,
+        "cards": 6
+      },
+      {
+        "name": "Player 2",
+        "coins": 1,
+        "gps": 1,
+        "cards": 7
+      },
+      {
+        "name": "Player 3",
+        "coins": 0,
+        "gps": 1,
+        "cards": 6
+      },
+      {
+        "name": "Player 4",
+        "coins": 1,
+        "gps": 1,
+        "cards": 6
+      }
+    ],
+    "labels": {
+      "early": 0.31,
+      "mid": 0.77,
+      "late": 0.0
+    }
+  },
+  {
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 1,
+        "gps": 2,
+        "cards": 11
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gps": 1,
+        "cards": 8
+      },
+      {
+        "name": "Player 3",
+        "coins": 0,
+        "gps": 1,
+        "cards": 9
+      },
+      {
+        "name": "Player 4",
+        "coins": 1,
+        "gps": 1,
+        "cards": 9
+      }
+    ],
+    "labels": {
+      "early": 0.06,
+      "mid": 1.0,
+      "late": 0.0
+    }
+  },
+  {
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gps": 1,
+        "cards": 8
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gps": 1,
+        "cards": 9
+      },
+      {
+        "name": "Player 3",
+        "coins": 0,
+        "gps": 1,
+        "cards": 7
+      },
+      {
+        "name": "Player 4",
+        "coins": 0,
+        "gps": 1,
+        "cards": 8
+      }
+    ],
+    "labels": {
+      "early": 0.0,
+      "mid": 0.84,
+      "late": 0.04
+    }
+  },
+  {
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gps": 1,
+        "cards": 9
+      },
+      {
+        "name": "Player 2",
+        "coins": 3,
+        "gps": 1,
+        "cards": 8
+      },
+      {
+        "name": "Player 3",
+        "coins": 3,
+        "gps": 1,
+        "cards": 8
+      },
+      {
+        "name": "Player 4",
+        "coins": 2,
+        "gps": 1,
+        "cards": 7
+      }
+    ],
+    "labels": {
+      "early": 0.0,
+      "mid": 1.0,
+      "late": 0.0
+    }
+  },
+  {
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gps": 1,
+        "cards": 8
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gps": 1,
+        "cards": 7
+      },
+      {
+        "name": "Player 3",
+        "coins": 0,
+        "gps": 1,
+        "cards": 8
+      },
+      {
+        "name": "Player 4",
+        "coins": 1,
+        "gps": 1,
+        "cards": 6
+      }
+    ],
+    "labels": {
+      "early": 0.0,
+      "mid": 1.0,
+      "late": 0.0
+    }
+  },
+  {
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gps": 1,
+        "cards": 11
+      },
+      {
+        "name": "Player 2",
+        "coins": 2,
+        "gps": 1,
+        "cards": 11
+      },
+      {
+        "name": "Player 3",
+        "coins": 11,
+        "gps": 3,
+        "cards": 16
+      },
+      {
+        "name": "Player 4",
+        "coins": 10,
+        "gps": 2,
+        "cards": 15
+      }
+    ],
+    "labels": {
+      "early": 0.0,
+      "mid": 0.0,
+      "late": 1.0
+    }
+  },
+  {
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gps": 1,
+        "cards": 8
+      },
+      {
+        "name": "Player 2",
+        "coins": 3,
+        "gps": 1,
+        "cards": 8
+      },
+      {
+        "name": "Player 3",
+        "coins": 0,
+        "gps": 1,
+        "cards": 7
+      },
+      {
+        "name": "Player 4",
+        "coins": 0,
+        "gps": 1,
+        "cards": 7
+      }
+    ],
+    "labels": {
+      "early": 0.0,
+      "mid": 1.0,
+      "late": 0.08
+    }
+  }
+]

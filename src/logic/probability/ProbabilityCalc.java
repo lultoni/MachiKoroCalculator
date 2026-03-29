@@ -493,15 +493,7 @@ public class ProbabilityCalc {
         entry.evPerRound           = evPerRound(gs, playerIndex, candidate);
 
         // Geometric-series ROI with L'Hôpital guard
-        final double eps = 1e-9;
-        double geometricSum;
-        if (Math.abs(discountFactor - 1.0) < eps) {
-            geometricSum = horizonTurns;
-        } else {
-            geometricSum = discountFactor
-                    * (1.0 - Math.pow(discountFactor, horizonTurns))
-                    / (1.0 - discountFactor);
-        }
+        double geometricSum = geometricSum(horizonTurns, discountFactor);
         entry.roiOverHorizon = entry.evPerRound * geometricSum - candidate.getCost();
 
         entry.variance             = computeVarianceOwnTurn(state, playerIndex);
@@ -1019,14 +1011,7 @@ public class ProbabilityCalc {
         CardIncome.PlayerStats statsAfterA = buildStatsWithCard(player, cardA);
 
         // Geometric sum for ROI formula
-        final double eps = 1e-9;
-        double geometricSum;
-        if (Math.abs(discountFactor - 1.0) < eps) {
-            geometricSum = horizonTurns;
-        } else {
-            geometricSum = discountFactor * (1.0 - Math.pow(discountFactor, horizonTurns))
-                    / (1.0 - discountFactor);
-        }
+        double geometricSum = geometricSum(horizonTurns, discountFactor);
 
         Project bestB = null;
         double bestRoiB = 0.5; // minimum threshold: only suggest if ROI > 0.5
@@ -1050,6 +1035,12 @@ public class ProbabilityCalc {
         return gui.newui.Strings.twoTurnNote(bestB.getLocalizedName(), bestRoiB);
     }
 
+
+    /** Geometric-series sum γ + γ² + … + γ^T = γ(1−γ^T)/(1−γ), with L'Hôpital guard for γ≈1. */
+    static double geometricSum(int horizonTurns, double discountFactor) {
+        if (Math.abs(discountFactor - 1.0) < 1e-9) return horizonTurns;
+        return discountFactor * (1.0 - Math.pow(discountFactor, horizonTurns)) / (1.0 - discountFactor);
+    }
 
     private static CardIncome.PlayerStats buildStatsWithCard(Player player, Project extra) {
         CardIncome.PlayerStats s = new CardIncome.PlayerStats();

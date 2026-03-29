@@ -347,6 +347,23 @@ public final class Strings {
     public static String gameOverStatus()     { return s("Spiel vorbei!", "Game over!"); }
     public static String gpTag()              { return "[GP]"; }
     public static String grossProjekt()       { return s("Großprojekt", "Landmark"); }
+
+    /** Label shown in the ranking table for the synthetic "Wait/Save" entry. */
+    public static String waitLabel()          { return s("≡ Sparen", "≡ Save"); }
+
+    /**
+     * Notes line for the "Wait/Save" entry: explains which card to save for and how many
+     * turns until it's affordable.
+     *
+     * @param cardName    localized name of the card to save for
+     * @param turnsToSave estimated turns until the player can afford the card (may be fractional)
+     */
+    public static String waitEntryNotes(String cardName, double turnsToSave) {
+        String turns = String.format("%.1f", turnsToSave);
+        return s("Spare auf: " + cardName + " (~" + turns + " Züge)",
+                 "Save for: " + cardName + " (~" + turns + " turns)");
+    }
+
     public static String bürohausSwapTitle()  { return s("Bürohaus: Karte tauschen?", "Office Building: Swap Card?"); }
     public static String bürohausSwapPrompt(String note, double evGain) {
         return s(note + "\nGeschätzter EV-Gewinn: +" + String.format("%.2f", evGain) + " Münzen/Runde.\nTauschen?",

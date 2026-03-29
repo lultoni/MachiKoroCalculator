@@ -8,8 +8,26 @@ package logic.probability;
  * {@link ProbabilityCalc#roiOverHorizon(GameState, int, Project, int, double)}.
  * Fields are populated in that order; {@link #winProbDelta} is only set when
  * {@link RankingOptions#includeWinProbDelta} is true.
+ *
+ * <p>The special {@link #WAIT_SENTINEL} project is used for the synthetic "Wait/Save" entry
+ * that {@link ProbabilityCalc#rankAllProjects} may insert to represent the option of saving
+ * coins for a future purchase. Callers should test {@link #isWaitEntry()} before accessing
+ * project-specific fields.
  */
 public class RankEntry {
+
+    /**
+     * Sentinel project used to mark a "Wait/Save" synthetic RankEntry.
+     * Never appears in {@code projects.json}; use {@link #isWaitEntry()} to detect it.
+     */
+    public static final Project WAIT_SENTINEL = new Project(
+            "_wait_", "wait", false, 0, new int[0], "none",
+            "Save coins for a better card", "Save coins for a better card", "Save coins for a better card");
+
+    /** Returns true if this entry represents the synthetic "Wait/Save" option. */
+    public boolean isWaitEntry() {
+        return project == WAIT_SENTINEL;
+    }
 
     /** The candidate project this entry describes. */
     public Project project;

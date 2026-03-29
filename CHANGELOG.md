@@ -4,6 +4,21 @@ Implementierungsgeschichte: was gebaut wurde, warum, und welche Designentscheidu
 
 ---
 
+## M5: "Warten/Sparen" als synthetischer RankEntry im "Alle"-Tab
+
+**Problem:** Das Ranking zeigte nie die Option, Münzen für eine bessere Karte zu sparen.
+
+**Lösung:**
+- `RankEntry.WAIT_SENTINEL` — statisches Sentinel-`Project`-Objekt mit `id="_wait_"`. `RankEntry.isWaitEntry()` erkennt es.
+- `addWaitEntryIfUseful(results, gs, playerIndex, opts)` — neue private Methode in `ProbabilityCalc.rankAllProjects`. Findet die beste nicht-erschwingliche Karte, berechnet `turnsToSave = coinsNeeded / currentEvPerRound`, und ROI: `ROI(warten) = ROI(beste_nächste) − turnsToSave × currentEvPerRound`. Nur eingefügt wenn unerschwingliche Karten vorhanden.
+- `Strings.waitLabel()` — "≡ Sparen" / "≡ Save". `Strings.waitEntryNotes(card, turns)` — "Spare auf: [Karte] (~X.X Züge)".
+- **UI**: `fillRankTableModel` überspringt den Sentinel in Erschwinglich/Nicht-erschwinglich-Tab; im "Alle"-Tab erscheint er als "≡ Sparen"-Zeile (unaffordable, kursiv/grau per DimRenderer). Kost-Spalte zeigt `NaN` (leer). Row-click zeigt Name + Notes im Center-Panel.
+- **Assistent**: GP-Rush-Filter ergänzt mit `!e.isWaitEntry()` Guard.
+
+**Tests:** 224 bestanden, 0 fehlgeschlagen.
+
+---
+
 ## M4: Per-Landmark-Gewichte in WinProbabilityCalc
 
 **Problem:** `LANDMARK_WEIGHT = 2.0` war für alle 4 Großprojekte identisch, obwohl ihre EV-Beiträge stark variieren.

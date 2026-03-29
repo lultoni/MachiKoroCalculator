@@ -798,7 +798,65 @@ public class ProbabilityCalc {
         }
 
         results.sort(Comparator.comparingDouble((RankEntry e) -> e.roiOverHorizon).reversed());
+
+        // Synthetic "Wait/Save" entry: insert after all real cards.
+        // ROI(wait) = ROI(best unaffordable card) − 1 turn of missed income.
+        // This shows whether saving for a better card beats the best current buy.
+        addWaitEntryIfUseful(results, gs, playerIndex, opts);
+
         return results;
+    }
+
+    /**
+     * If there are any unaffordable cards in {@code results}, computes a synthetic "Wait/Save"
+     * entry whose ROI represents saving coins for one turn to buy the best card currently
+     * out of reach. The entry is inserted in sorted order if its ROI is competitive with
+     * at least one affordable card, or if no affordable cards exist.
+     */
+    private static void addWaitEntryIfUseful(ArrayList<RankEntry> results,
+                                              GameState gs, int playerIndex,
+                                              RankingOptions opts) {
+        // Find the best unaffordable card by ROI
+        RankEntry bestUnaffordable = null;
+        for (RankEntry e : results) {
+            if (!e.affordable) {
+                if (bestUnaffordable == null || e.roiOverHorizon > bestUnaffordable.roiOverHorizon) {
+                    bestUnaffordable = e;
+                }
+            }
+        }
+        if (bestUnaffordable == null) return; // nothing to save for
+
+        // Current portfolio EV per round (no new purchase)
+        double currentEvPerRound = portfolioEvPerRound(gs, playerIndex);
+        if (currentEvPerRound <= 0) return; // can't estimate turns to save
+
+        // Coins needed and expected turns to accumulate them
+        int coinsNeeded = bestUnaffordable.project.getCost() - gs.getPlayers()[playerIndex].getCoins();
+        if (coinsNeeded <= 0) return; // already affordable (shouldn't happen)
+
+        double turnsToSave = coinsNeeded / currentEvPerRound;
+
+        // ROI(wait) = ROI(best unaffordable) − turnsToSave × currentEvPerRound (opportunity cost)
+        double waitROI = bestUnaffordable.roiOverHorizon - turnsToSave * currentEvPerRound;
+
+        RankEntry waitEntry = new RankEntry();
+        waitEntry.project = RankEntry.WAIT_SENTINEL;
+        waitEntry.evPerRound = currentEvPerRound;
+        waitEntry.roiOverHorizon = waitROI;
+        waitEntry.affordable = false;
+        waitEntry.notes = gui.newui.Strings.waitEntryNotes(
+                bestUnaffordable.project.getLocalizedName(), turnsToSave);
+
+        // Insert in sorted order
+        int insertIdx = results.size();
+        for (int i = 0; i < results.size(); i++) {
+            if (results.get(i).roiOverHorizon < waitROI) {
+                insertIdx = i;
+                break;
+            }
+        }
+        results.add(insertIdx, waitEntry);
     }
     // -------------------------------------------------------------------------
 

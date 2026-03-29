@@ -740,6 +740,17 @@ public class MainWindow extends JFrame {
         // Find the matching RankEntry by card name stored in column 0
         String label = (String) model.getValueAt(modelRow, 0);
         for (RankEntry entry : lastRanking) {
+            if (entry.isWaitEntry()) {
+                if (Strings.waitLabel().equals(label)) {
+                    // Show the wait-entry notes in the center panel header area
+                    clearCenter("");
+                    topCardName.setText(Strings.waitLabel());
+                    if (entry.notes != null) topCardDesc.setText(entry.notes);
+                    topCardRank.setText("");
+                    return;
+                }
+                continue;
+            }
             String entryLabel = entry.project.isIs_grossprojekt()
                     ? entry.project.getLocalizedName() + " " + Strings.gpTag()
                     : entry.project.getLocalizedName();
@@ -1460,7 +1471,7 @@ public class MainWindow extends JFrame {
 
         // GP Rush — cheapest unbuilt GP
         RankEntry bestGP = lastRanking.stream()
-                .filter(e -> e.project.isIs_grossprojekt())
+                .filter(e -> !e.isWaitEntry() && e.project.isIs_grossprojekt())
                 .min(java.util.Comparator.comparingInt(e -> e.project.getCost())).orElse(null);
         String bodyGP = bestGP != null
                 ? Strings.assistantExplainGPRush(bestGP.project.getLocalizedName(), bestGP.project.getCost(), coins)
@@ -1506,15 +1517,20 @@ public class MainWindow extends JFrame {
 
         for (RankEntry e : ranking) {
             if (affordableFilter != null && e.affordable != affordableFilter) continue;
-            String cardLabel = e.project.isIs_grossprojekt()
-                    ? e.project.getLocalizedName() + " " + Strings.gpTag()
-                    : e.project.getLocalizedName();
+            // "Wait" sentinel: shown only in the "All" tab (no affordableFilter means all)
+            if (e.isWaitEntry() && affordableFilter != null) continue;
+            String cardLabel = e.isWaitEntry()
+                    ? Strings.waitLabel()
+                    : (e.project.isIs_grossprojekt()
+                            ? e.project.getLocalizedName() + " " + Strings.gpTag()
+                            : e.project.getLocalizedName());
+            double cost = e.isWaitEntry() ? Double.NaN : (double) e.project.getCost();
             Object[] row = showWinProb
-                    ? new Object[]{cardLabel, (double) e.project.getCost(),
+                    ? new Object[]{cardLabel, cost,
                                    e.evPerRound, e.roiOverHorizon,
                                    e.probNoIncomeOwnTurn, e.variance,
                                    e.winProbDelta}
-                    : new Object[]{cardLabel, (double) e.project.getCost(),
+                    : new Object[]{cardLabel, cost,
                                    e.evPerRound, e.roiOverHorizon,
                                    e.probNoIncomeOwnTurn, e.variance};
             model.addRow(row);

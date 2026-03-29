@@ -87,24 +87,7 @@ Programmatisch als kleine Kreise/Ovale zeichnen; für Rot zusätzlich Hinweis "W
 
 ---
 
-### M5 · "Sparen/Warten" wird nie als Option gerankt (Medium)
-
-**Problem:** `rankPurchasableProjects` und `rankAllProjects` listen nie eine "Nichts kaufen"-Option. Der Spieler sieht nicht, ob Abwarten (Münzen akkumulieren für eine bessere Karte) besser wäre als der beste aktuell erschwingliche Kauf.
-
-**Korrekte Formel für den "Warten"-Eintrag:**
-```
-ROI(warten, k Züge) = ROI(beste_nächste_Karte)
-                     - k × evPerRound_aktuell   [verpasstes Einkommen]
-```
-Der Breakeven-Punkt liegt bei:
-```
-k* = (ROI(C') − ROI(C_jetzt)) / evPerRound_aktuell
-```
-Wenn `k* < 1` → sofort kaufen ist besser. Wenn `k* > 1` → warten lohnt sich.
-
-**Implementierung:** Einen synthetischen `RankEntry` mit `project = null` (oder einem Dummy-Projekt "Warten"), dessen `roiOverHorizon` = ROI der besten nächsten erschwinglichen Karte minus einem Zug verpasstes Einkommen. Würde eine neue Zeile "≡ Warten" im Ranking-Tab ergeben.
-
-Erfordert UI-Anpassung: Die Zeile ist nicht kaufbar, hat keinen Kartendetail-Eintrag, und zeigt stattdessen "Spare auf: [Kartenname]" an.
+### M5 · ~~"Sparen/Warten" wird nie als Option gerankt~~ ✓ (behoben)
 
 ---
 

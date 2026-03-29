@@ -1942,13 +1942,16 @@ public class MainWindow extends JFrame {
                     double d = Double.parseDouble(s);
                     Color bg = scheme.backgroundFor(d);
                     Color fg = scheme.foregroundFor(d);
+                    setOpaque(true);
                     setBackground(bg != null ? bg : table.getBackground());
                     setForeground(fg != null ? fg : table.getForeground());
                 } catch (NumberFormatException ignored) {
+                    setOpaque(true);
                     setBackground(table.getBackground());
                     setForeground(table.getForeground());
                 }
             } else if (isSelected) {
+                setOpaque(true);
                 setBackground(table.getSelectionBackground());
                 setForeground(table.getSelectionForeground());
             }

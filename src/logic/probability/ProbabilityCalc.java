@@ -804,23 +804,133 @@ public class ProbabilityCalc {
                 entry.notes = entry.notes == null ? twoTurnNote : entry.notes + "  |  " + twoTurnNote;
             }
 
-            if (opts.includeWinProbDelta) {
-                if (opts.mcSimulations > 0) {
-                    GameState stateAfter = gs.copy();
-                    stateAfter.getPlayers()[playerIndex].getOwned_projects().add(candidate);
-                    double afterBuy = WinProbabilityCalc.mcWinRate(stateAfter, playerIndex, opts.mcSimulations, opts.mcExplorationTemp);
-                    entry.winProbDelta = afterBuy - mcBaseline;
-                } else {
-                    entry.winProbDelta = WinProbabilityCalc.estimateWinProbDelta(
-                            gs, playerIndex, candidate, 0, opts.turnsElapsed);
-                }
+            // Win-prob delta: analytical path (MC path handled below via adaptiveMCRefinement)
+            if (opts.includeWinProbDelta && opts.mcSimulations == 0) {
+                entry.winProbDelta = WinProbabilityCalc.estimateWinProbDelta(
+                        gs, playerIndex, candidate, 0, opts.turnsElapsed);
             }
 
             results.add(entry);
         }
 
         results.sort(Comparator.comparingDouble((RankEntry e) -> e.roiOverHorizon).reversed());
+
+        // Stufe-3: adaptive MC budget for top-k candidates (only when MC mode is active)
+        if (opts.includeWinProbDelta && opts.mcSimulations > 0) {
+            adaptiveMCRefinement(results, gs, playerIndex, opts, mcBaseline);
+        }
+
         return results;
+    }
+
+    // -------------------------------------------------------------------------
+    // Stufe-3: Adaptive MC budget allocation
+    // -------------------------------------------------------------------------
+
+    /**
+     * Maximum number of top candidates to validate with Monte Carlo (Stufe-3).
+     */
+    private static final int MC_TOP_K = 5;
+
+    /**
+     * Win-probability distance threshold below which all top-k candidates are
+     * considered "close" and receive equal MC budget.
+     */
+    private static final double MC_EQUAL_BUDGET_EPSILON = 0.02;
+
+    /**
+     * Win-probability lead threshold above which the leader is considered dominant
+     * and the remaining budget is focused on chasers.
+     */
+    private static final double MC_DOMINANT_LEAD_THRESHOLD = 0.05;
+
+    /**
+     * Simulations to allocate per candidate in the equal-budget case.
+     */
+    private static final int MC_SIMS_PER_CANDIDATE_EQUAL = 2500;
+
+    /**
+     * Stufe-3: Validates the top-k candidates from the Stufe-1/2 ranking using Monte Carlo
+     * simulation and replaces their {@link RankEntry#winProbDelta} with MC-derived estimates.
+     *
+     * <h3>Budget allocation strategy</h3>
+     * <ol>
+     *   <li>Compute analytical win-prob estimates for all top-k candidates.</li>
+     *   <li>Compute pairwise spread (max − min win-prob across top-k).</li>
+     *   <li>If spread ≤ ε = 0.02 (all close): allocate {@link #MC_SIMS_PER_CANDIDATE_EQUAL}
+     *       sims to each candidate equally.</li>
+     *   <li>If one candidate leads by &gt; 0.05 (dominant): skip the leader (already known best)
+     *       and allocate budget to the remaining chasers (equal split among them).</li>
+     *   <li>Otherwise: equal budget across all top-k.</li>
+     * </ol>
+     *
+     * <p>Results overwrite the {@link RankEntry#winProbDelta} for evaluated candidates.
+     * Candidates outside top-k retain their analytical estimate (or 0 if not computed).
+     * After MC refinement, the list is re-sorted by {@link RankEntry#winProbDelta} descending
+     * for the top-k positions only (overall ROI sort preserved for non-top-k entries).
+     *
+     * @param results     sorted ranking list (modified in-place)
+     * @param gs          current game state
+     * @param playerIndex the buying player
+     * @param opts        ranking options
+     * @param mcBaseline  pre-computed MC baseline win rate for the current state
+     */
+    private static void adaptiveMCRefinement(ArrayList<RankEntry> results, GameState gs,
+                                              int playerIndex, RankingOptions opts,
+                                              double mcBaseline) {
+        int k = Math.min(MC_TOP_K, results.size());
+        if (k == 0) return;
+
+        // Step 1: compute analytical estimates for all top-k to determine budget allocation
+        double[] analyticalWinProbs = new double[k];
+        for (int i = 0; i < k; i++) {
+            analyticalWinProbs[i] = WinProbabilityCalc.estimateWinProbDelta(
+                    gs, playerIndex, results.get(i).project, 0, opts.turnsElapsed);
+        }
+
+        // Step 2: find leader index and spread
+        int leaderIdx = 0;
+        double maxWP = analyticalWinProbs[0];
+        double minWP = analyticalWinProbs[0];
+        for (int i = 1; i < k; i++) {
+            if (analyticalWinProbs[i] > maxWP) { maxWP = analyticalWinProbs[i]; leaderIdx = i; }
+            if (analyticalWinProbs[i] < minWP)   minWP = analyticalWinProbs[i];
+        }
+        double spread = maxWP - minWP;
+
+        // Step 3: determine which candidates to validate with MC
+        boolean[] validate = new boolean[k];
+        int validateCount;
+        if (spread <= MC_EQUAL_BUDGET_EPSILON || analyticalWinProbs[leaderIdx] - minWP <= MC_DOMINANT_LEAD_THRESHOLD) {
+            // All close or leader not dominant enough: validate all top-k
+            java.util.Arrays.fill(validate, true);
+            validateCount = k;
+        } else {
+            // Leader is dominant (>0.05 lead): skip leader, focus on chasers
+            java.util.Arrays.fill(validate, true);
+            validate[leaderIdx] = false;
+            validateCount = k - 1;
+        }
+
+        if (validateCount == 0) return;
+
+        // Step 4: run MC for each validated candidate
+        // MC sims per candidate: allocate total budget equally among validated candidates
+        int simsPerCandidate = MC_SIMS_PER_CANDIDATE_EQUAL;
+
+        for (int i = 0; i < k; i++) {
+            if (!validate[i]) {
+                // For the dominant leader, keep analytical estimate
+                results.get(i).winProbDelta = analyticalWinProbs[leaderIdx];
+                continue;
+            }
+            RankEntry entry = results.get(i);
+            GameState stateAfter = gs.copy();
+            stateAfter.getPlayers()[playerIndex].getOwned_projects().add(entry.project);
+            double afterBuy = WinProbabilityCalc.mcWinRate(stateAfter, playerIndex,
+                    simsPerCandidate, opts.mcExplorationTemp);
+            entry.winProbDelta = afterBuy - mcBaseline;
+        }
     }
 
     /**

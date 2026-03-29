@@ -34,13 +34,12 @@ These are documented deviations from optimal accuracy that have been reviewed an
 
 ### 1. File Split — Priority 1 (complete)
 
-Audit conducted 2026-03-23. All files assessed by line count and responsibility. Files ≥ 200 lines
-with mixed concerns and a clear split boundary:
+Audit conducted 2026-03-23. All P1 splits complete.
 
-| File | Lines | Concern to extract | Status |
-|------|-------|--------------------|--------|
-| `ProbabilityCalc.java` | 870 | Bürohaus helpers (3 methods, ~130 lines) → `BürohausLogic` | `[x]` |
-| `GameSession.java` | 336 | JSON persistence (save + load, ~140 lines) → `GameSessionPersistence` | `[x]` |
+| File | Concern extracted | Status |
+|------|-------------------|--------|
+| `ProbabilityCalc.java` | Bürohaus helpers → `BürohausLogic` | `[x]` |
+| `GameSession.java` | JSON persistence → `GameSessionPersistence` | `[x]` |
 
 ### 2. File Split — Priority 2 (deferred — needs UI test layer first)
 
@@ -50,10 +49,7 @@ with mixed concerns and a clear split boundary:
 
 ### 3. File Split — No action needed
 
-`RuntimeTester.java` (928 lines) is a single self-contained test runner with 47 test methods and 7
-benchmark sections. Despite its size it has no mixed concerns — splitting into per-domain classes
-would add a multi-class test runner harness without meaningful benefit given the current single-file
-compile-and-run workflow.
+`RuntimeTester.java` is a single self-contained test runner. Despite its size it has no mixed concerns — splitting would add a multi-class harness without meaningful benefit given the current workflow.
 
 `CardIncome.java`, `WinProbabilityCalc.java`, `GameSimulator.java` — well-factored, no split warranted.
 

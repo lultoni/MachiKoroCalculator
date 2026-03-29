@@ -4,6 +4,46 @@ All phases of the original implementation plan are complete. This file records w
 
 ---
 
+## UI Polish: BoundedSpinner, Freizeitpark doubles tracking, GP ranking, sortable table, MC controls
+
+**Goal:** Address a batch of correctness and usability issues identified across the UI and game-logic layers. The changes collectively make the tracker faithful to the official rules (doubles bonus turns, correct supply caps for starter cards, Großprojekte in the buy list) and substantially improve the information density of the three panels.
+
+### BoundedSpinner — arrow buttons disable at boundaries
+
+A new `BoundedSpinner` class extends `JSpinner` and disables the increment/decrement buttons when the model is already at its maximum or minimum. Previously the spinner accepted one click past the boundary before the `SpinnerNumberModel` clamped — visually confusing and allowing transient out-of-range values to trigger `refreshAll`. All spinners in `MainWindow` and `SnapshotDialog` now use `BoundedSpinner`.
+
+### Freizeitpark doubles tracking
+
+`TurnRecord` gained an `isDoubles` boolean field (existing 3-arg constructor defaults it to false for backward compatibility). `GameSession` gained two fields: `bonusTurnPending` (runtime flag) and `effectiveTurnCount` (persistent counter). When `applyTurn` records a doubles roll by a player who owns both Bahnhof and Freizeitpark, `bonusTurnPending` is set; the bonus turn itself cannot chain further doubles. `effectiveTurnCount` increments only on non-bonus turns, so `nextPlayerIndex()` uses `effectiveTurnCount % n` instead of `history.size() % n`, which would have counted the bonus turn as advancing the player pointer.
+
+`GameSessionPersistence` serializes `isDoubles` only when true (omits the key otherwise for compactness) and defaults to false on load, keeping save files from older sessions valid.
+
+In `MainWindow`, a "Doubles?" `JCheckBox` appears (and hides) based on whether the active player owns both landmarks. When the game is in a bonus-turn state, the active-player label shows a bonus-turn note and the player index stays fixed until the bonus turn is confirmed.
+
+### Großprojekte in the ranking and buy list
+
+`rankPurchasableProjects` previously only iterated `unbuilt_projects`, which never contains landmarks. The method now builds a combined candidate list: `unbuilt_projects` (regular establishments) plus any `isIs_grossprojekt()` card from `ProjectLoader.getAllProjects()` that the active player does not yet own. EV and ROI for landmarks are computed by the same `roiOverHorizon` path as for other cards — `immediateEV` and `evPerRound` already account for landmark effects (Bahnhof, Einkaufszentrum, etc.) because they check `hasProject` internally. The buy dropdown likewise shows landmarks when affordable.
+
+### Sortable ranking table with color-coded values
+
+The ranking table now uses `TableRowSorter<DefaultTableModel>` with type-aware column classes: numeric columns store `Double` objects, letting the default `Comparable` comparator sort correctly. `NumericCellRenderer` (new inner class in `MainWindow`) colors cells green when the value exceeds 0.5, red below −0.5, and neutral otherwise — giving an at-a-glance heat map of the ranking.
+
+### Deep Analysis: configurable MC count and independent reload
+
+The Deep Analysis and win-probability delta controls are now independent: toggling win-prob display does not trigger a fresh MC simulation. A new `BoundedSpinner` (100–10 000) sets the simulation count; a "⟳" reload button re-runs MC at any time without toggling. The spinner and reload button are enabled/disabled based on the Deep Analysis toggle state. MC computation still runs in a `SwingWorker` so the EDT is never blocked.
+
+### Snapshot editor supply caps for starter cards
+
+`SnapshotDialog` previously capped all multi-copy card spinners at 6. Weizenfeld and Bäckerei are distributed to each player at game start on top of the 6 shared market copies, so each player can legitimately own up to 7. The spinner for these two cards now uses `maxCopies = 7`.
+
+### Panel and label naming
+
+"Current Turn" border → "Current Turn Tracker". "Best Purchase" border → "Card Details". The top coin label is bold-formatted. Panel descriptions and tooltips updated accordingly.
+
+**Tests:** 208 passed, 0 failed. 14 new tests covering: starter-card supply cap (3), GP ranking inclusion (3), Freizeitpark doubles tracking and next-player index (5), and the `effectiveTurnCount` reset on undo (1) plus two additional integration tests.
+
+---
+
 ## Buy dropdown and ranking now use post-roll coins
 
 **Goal:** Correct the turn-order model in the UI. In Machi Koro the sequence is roll → collect income / pay red cards → buy. The buy dropdown and ranking table previously used the player's pre-roll coins, so a player with 2 coins who rolled a 3 (and collected 1 from Bäckerei) would not see cards costing 3 in their buy list even though they could now afford them.

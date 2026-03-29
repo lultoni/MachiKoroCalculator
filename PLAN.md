@@ -70,11 +70,11 @@ Done. "Doubles?" checkbox shown when player owns both. Bonus turn logic in `Game
 #### [x] Coin display — coin icon + post-roll delta
 Done. `coinsLabel` now uses `COIN.png` (scaled 18×18) as icon with the coin count as text. A second `coinsAfterLabel` appears below when the current roll changes the player's coins, showing the delta as "+N" (green) or "−N" (red) next to the amount. Full denomination rendering (bronze/silver/gold) deferred — accepted as-is.
 
-#### [ ] Roll input — slider instead of spinner
-Low priority. Slider would require a separate label to show the current value and is less precise for keyboard input. Deferred unless user explicitly prefers it.
+#### [x] Roll input — dice selector strips instead of spinner
+Done. Spinner replaced by `DiceSelectorPanel` (1 or 2 strips). First strip mandatory, second optional (deselectable) when Bahnhof is owned. `getCurrentRoll()` computes roll sum from strips. `DiceFacePanel` draws real pip faces programmatically; `DICE.png` (empty shell) is no longer used.
 
 #### [x] History panel — show coin deltas (paid/received amounts per player per turn)
-Done. `TurnRecord` now stores `int[] coinDeltas` (computed by `applyTurn`). `refreshHistory` shows a per-player delta line below each roll row, green for gains, red for losses. Backward-compatible: old saves without the field display history without the delta line.
+Done. `TurnRecord` stores `int[] coinDeltas` (computed by `applyTurn`). History redesigned: HTML JLabels replaced by `TurnEntryPanel extends JPanel`, which embeds `DiceFacePanel` pip graphics for the roll value, colored coin-delta lines per player, and purchase info. The spurious "→ saved" line (for turns with no purchase) is removed. Backward-compatible: old saves without `coinDeltas` show history without the delta line.
 
 #### [x] Left panel resize — history should get free space, not labels
 Done. `buildLeftPanel` now uses `BorderLayout`; the controls sub-panel is in `NORTH` (fixed) and the history `JScrollPane` is in `CENTER` (fills all remaining vertical space).
@@ -98,6 +98,12 @@ Done. `rebuildTable` saves `sorter.getSortKeys()` before column rebuild and rest
 
 #### [x] Deep Analysis toggle should NOT auto-show win prob column; MC only computed when win prob is shown
 Done. `onToggleDeepAnalysis` sets `rankOpts.mcSimulations` to the MC count only when **both** deep analysis is enabled **and** win prob is shown; otherwise it stays 0. `onToggleWinProb` sets the correct MC count when showing, and resets it to 0 when hiding. This means: enabling Deep Analysis alone does not run MC; enabling "Show Win Prob Δ" while Deep Analysis is on triggers the first MC run; the ⟳ button re-runs at any time.
+
+#### [x] Card Details activation dice
+Done. `topCardCost` label replaced by `topCardCostRow` (JPanel). `buildActivationDice` appends a `DiceFacePanel` for each activation value after the cost text. Großprojekte show " · Großprojekt" in italic instead.
+
+#### [x] Metric legend visible without hover
+Done. A collapsible legend panel is added below the metrics grid. Toggle button ("▼ Metric legend" / "▶ Metric legend") shows/hides it. Lists EV/round, ROI, P(0), Var, Win Δ with plain-English descriptions. Hover tooltips on each label/value are preserved.
 
 ### Right panel — All Affordable Cards
 

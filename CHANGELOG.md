@@ -4,6 +4,38 @@ All phases of the original implementation plan are complete. This file records w
 
 ---
 
+## Dice UI overhaul: programmatic dice faces, selector strips, redesigned history
+
+**Goal:** Replace all uses of the broken `DICE.png` icon with programmatically-drawn dice faces, introduce a clickable die-strip roll input, redesign the turn history to embed rendered dice, and improve metric discoverability in the Card Details panel.
+
+### DiceFacePanel
+
+New `gui.newui.DiceFacePanel extends JPanel` paints a real die face (value 1–6) with dots using the standard pip layout for each face. Three visual modes: display-only (history, card details), selectable-and-selected (roll input strip), selectable-but-not-selected (dimmed, dashed border). `paintComponent` uses `Graphics2D` antialiasing and a small drop shadow. The `DICE.png` static constant and `loadScaledIcon` call for it are removed from `MainWindow`.
+
+### DiceSelectorPanel
+
+New `gui.newui.DiceSelectorPanel extends JPanel` provides a horizontal strip of 6 `DiceFacePanel`s for selecting a die value. Single-selection. Optional mode (second die strip): clicking the selected die deselects the strip entirely (returns `-1`), allowing the user to enter a 1d6 roll even when Bahnhof is owned. `ChangeListener` API mirrors `JSpinner`.
+
+### Roll input: spinner replaced with die strips
+
+`buildLeftPanel` no longer creates a `BoundedSpinner` + range label. Instead two `DiceSelectorPanel`s are used: the first (mandatory) strip is always shown with a default value of 3; the second (optional) strip is shown only when the active player owns Bahnhof. `updateRollInput` replaces `updateRollSpinner`. `getCurrentRoll()` computes the total roll as `strip1 + strip2` (or just `strip1` if the second strip is deselected/hidden). `onConfirmTurn` and all preview/refresh paths call `getCurrentRoll()` instead of reading from a spinner model.
+
+### Turn history redesigned with TurnEntryPanel
+
+New `gui.newui.TurnEntryPanel extends JPanel` replaces the previous HTML `JLabel` approach for history entries. Each entry shows: player name (colored), "rolled" text, rendered `DiceFacePanel`(s) for the roll value (split into canonical two-die pairs for values 7–12), optional DOUBLES badge, per-player coin deltas (green/red bold), and purchase info. The spurious "→ saved" line when nothing was bought is removed entirely. `refreshHistory()` in `MainWindow` is replaced with a loop that constructs `TurnEntryPanel` instances.
+
+### Card Details activation dice
+
+`populateCenter` no longer appends text like " · Rolls: 2, 3" to the cost label string. `topCardCost` (a JLabel) is replaced by `topCardCostRow` (a JPanel with FlowLayout). The new `buildActivationDice(JPanel, Project)` helper adds a separator " ·" followed by one `DiceFacePanel` per activation value. Großprojekte show " · Großprojekt" in italic text.
+
+### Metric legend
+
+A collapsible legend panel is added below the metrics grid in Card Details. It lists all metric abbreviations (EV/round, ROI, P(0), Var, Win Δ) with one-line plain-English descriptions. A toggle button ("▼ Metric legend" / "▶ Metric legend") shows or hides the panel. The existing hover tooltips on each label/value are preserved.
+
+**Tests:** 228 passed, 0 failed.
+
+---
+
 ## Coin icon display, win-prob interaction fixes, game-over row fix
 
 **Goal:** Fix the remaining Deep Analysis / Win Prob interaction bug, improve the coin display, and clean up two minor correctness issues.

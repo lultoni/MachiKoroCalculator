@@ -38,10 +38,8 @@ public class MainWindow extends JFrame {
             new Color(0x7030A0),  // lila
             new Color(0xFFD700),  // gelb
     };
-    /** Coin icon scaled to 18×18, or null if the resource could not be loaded. */
+    /** Coin icon scaled to 16×16, or null if the resource could not be loaded. */
     private static final ImageIcon COIN_ICON = loadScaledIcon("resources/other_icons/COIN.png", 16);
-    /** Dice icon scaled to 16×16 for the roll-spinner label. */
-    private static final ImageIcon DICE_ICON = loadScaledIcon("resources/other_icons/DICE.png", 16);
 
     // ---- state ----
     private GameSession session;
@@ -51,8 +49,9 @@ public class MainWindow extends JFrame {
 
     // ---- left panel components ----
     private JLabel activePlayerLabel;
-    private JLabel rollRangeLabel;
-    private JSpinner rollSpinner;
+    private DiceSelectorPanel dieStrip1;   // always shown (mandatory, 1d6 or first of 2d6)
+    private DiceSelectorPanel dieStrip2;   // shown when Bahnhof owned (optional second die)
+    private JPanel dieStrip2Wrapper;       // wrapping panel to show/hide dieStrip2
     private JCheckBox doublesCheckBox;
     private JComboBox<String> buyCombo;
     private JButton confirmBtn;
@@ -64,7 +63,7 @@ public class MainWindow extends JFrame {
 
     // ---- center panel components ----
     private JLabel topCardName;
-    private JLabel topCardCost;
+    private JPanel topCardCostRow;  // cost + activation dice faces
     private JLabel topCardColorTag;
     private JLabel topCardDesc;
     private JLabel topCardEV;
@@ -113,8 +112,9 @@ public class MainWindow extends JFrame {
         JPanel center = buildCenterPanel();
         JPanel right  = buildRightPanel();
 
-        // Wire roll spinner change listener now that rollPreviewPanel is initialized.
-        rollSpinner.addChangeListener(e -> refreshAfterRollChange());
+        // Wire die strip change listeners now that rollPreviewPanel is initialized.
+        dieStrip1.addChangeListener(e -> refreshAfterRollChange());
+        dieStrip2.addChangeListener(e -> refreshAfterRollChange());
 
         JSplitPane rightSplit = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, center, right);
         rightSplit.setDividerLocation(320);
@@ -159,16 +159,22 @@ public class MainWindow extends JFrame {
 
         controls.add(Box.createVerticalStrut(8));
 
-        // Roll input — dice icon + range label
-        rollRangeLabel = new JLabel("Dice roll (1–6):", DICE_ICON, SwingConstants.LEFT);
-        rollRangeLabel.setFont(HEADER_FONT);
-        rollRangeLabel.setIconTextGap(4);
-        rollRangeLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
-        controls.add(wrap(rollRangeLabel));
-        rollSpinner = new BoundedSpinner(new SpinnerNumberModel(3, 1, 6, 1));
-        rollSpinner.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
-        rollSpinner.setAlignmentX(Component.LEFT_ALIGNMENT);
-        controls.add(rollSpinner);
+        // Roll input — first die strip (always shown, mandatory selection)
+        controls.add(wrap(bold("Dice roll:")));
+        dieStrip1 = new DiceSelectorPanel(false);
+        dieStrip1.setValue(3);  // default to 3
+        dieStrip1.setAlignmentX(Component.LEFT_ALIGNMENT);
+        controls.add(dieStrip1);
+
+        // Second die strip (shown only when player has Bahnhof; optional/deselectable)
+        dieStrip2 = new DiceSelectorPanel(true);
+        dieStrip2.setAlignmentX(Component.LEFT_ALIGNMENT);
+        dieStrip2Wrapper = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+        dieStrip2Wrapper.setOpaque(false);
+        dieStrip2Wrapper.add(dieStrip2);
+        dieStrip2Wrapper.setAlignmentX(Component.LEFT_ALIGNMENT);
+        dieStrip2Wrapper.setVisible(false);
+        controls.add(dieStrip2Wrapper);
 
         // Doubles (Pasch) checkbox: only shown when player has Bahnhof + Freizeitpark
         doublesCheckBox = new JCheckBox("Doubles (Pasch)!");
@@ -291,10 +297,10 @@ public class MainWindow extends JFrame {
         nameRow.setAlignmentX(Component.LEFT_ALIGNMENT);
         panel.add(nameRow);
 
-        topCardCost = new JLabel("Cost: —");
-        topCardCost.setFont(new Font("Arial", Font.PLAIN, 13));
-        topCardCost.setAlignmentX(Component.LEFT_ALIGNMENT);
-        panel.add(wrap(topCardCost));
+        topCardCostRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 3, 0));
+        topCardCostRow.setOpaque(false);
+        topCardCostRow.setAlignmentX(Component.LEFT_ALIGNMENT);
+        panel.add(topCardCostRow);
 
         // Card description
         topCardDesc = new JLabel("<html><i>—</i></html>");
@@ -323,7 +329,25 @@ public class MainWindow extends JFrame {
         metricsWrapper.setAlignmentX(Component.LEFT_ALIGNMENT);
         panel.add(metricsWrapper);
 
-        panel.add(Box.createVerticalStrut(6));
+        panel.add(Box.createVerticalStrut(4));
+
+        // Metric legend — collapsible; always visible by default
+        JPanel legendPanel = buildMetricLegend();
+        legendPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        JButton legendToggle = new JButton("▼ Metric legend");
+        legendToggle.setFont(new Font("Arial", Font.PLAIN, 11));
+        legendToggle.setFocusPainted(false);
+        legendToggle.setBorderPainted(false);
+        legendToggle.setContentAreaFilled(false);
+        legendToggle.setForeground(new Color(0x555555));
+        legendToggle.setAlignmentX(Component.LEFT_ALIGNMENT);
+        legendToggle.addActionListener(e -> {
+            boolean visible = !legendPanel.isVisible();
+            legendPanel.setVisible(visible);
+            legendToggle.setText((visible ? "▼" : "▶") + " Metric legend");
+        });
+        panel.add(wrap(legendToggle));
+        panel.add(legendPanel);
 
         // Baseline win probability
         baselineWinProbLabel = new JLabel("Current win prob: —");
@@ -349,7 +373,45 @@ public class MainWindow extends JFrame {
     }
 
     /**
-     * Adds a two-cell metric row (label + value) to the grid panel and returns the value label.
+     * Builds a compact legend panel listing all metric abbreviations used in the card details
+     * and ranking table, so users can understand the metrics without hovering over labels.
+     */
+    private static JPanel buildMetricLegend() {
+        JPanel panel = new JPanel();
+        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+        panel.setOpaque(true);
+        panel.setBackground(new Color(0xF8F8F8));
+        panel.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(0xCCCCCC), 1),
+                BorderFactory.createEmptyBorder(4, 6, 4, 6)));
+        panel.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        String[][] entries = {
+            {"EV / round", "Expected coins per full game round (own + opponents' turns)"},
+            {"ROI",         "Return on investment over 10 rounds minus cost. Positive = profitable."},
+            {"P(0)",        "Probability of earning 0 coins on your own turn. Lower = reliable."},
+            {"Var",         "Variance of per-turn income. Higher = boom-or-bust risk."},
+            {"Win Δ",       "Change in estimated win probability from buying this card."},
+        };
+
+        for (String[] entry : entries) {
+            JPanel row = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 1));
+            row.setOpaque(false);
+            JLabel abbr = new JLabel(entry[0] + ":");
+            abbr.setFont(new Font("Arial", Font.BOLD, 10));
+            abbr.setPreferredSize(new Dimension(62, 14));
+            JLabel desc = new JLabel(entry[1]);
+            desc.setFont(new Font("Arial", Font.PLAIN, 10));
+            desc.setForeground(new Color(0x444444));
+            row.add(abbr);
+            row.add(desc);
+            panel.add(row);
+        }
+
+        return panel;
+    }
+
+    /** Adds a two-cell metric row (label + value) to the grid panel and returns the value label.
      * The label gets a tooltip with the explanation text.
      */
     private JLabel addMetricRow(JPanel grid, String labelText, String tooltip) {
@@ -455,7 +517,7 @@ public class MainWindow extends JFrame {
 
     private void onConfirmTurn(ActionEvent e) {
         int pi = session.nextPlayerIndex();
-        int roll = (int) rollSpinner.getValue();
+        int roll = getCurrentRoll();
         boolean isDoubles = doublesCheckBox.isVisible() && doublesCheckBox.isSelected();
 
         Project bought = null;
@@ -611,7 +673,7 @@ public class MainWindow extends JFrame {
         topCardName.setText(winnerName + " wins!");
         topCardColorTag.setText("[GP]");
         topCardColorTag.setBackground(new Color(0xFFF5B0));
-        topCardCost.setText("");
+        topCardCostRow.removeAll();
         topCardDesc.setText("<html><i>All 4 Großprojekte built!</i></html>");
         topCardEV.setText("—");
         topCardROI.setText("—");
@@ -631,12 +693,24 @@ public class MainWindow extends JFrame {
     // =========================================================================
 
     /**
+     * Returns the current roll value from the die strip(s).
+     * Strip 1 is always mandatory (value 1–6).
+     * Strip 2 is optional (Bahnhof only): contributes its value only when a die is selected.
+     */
+    private int getCurrentRoll() {
+        int v1 = dieStrip1.getValue();
+        if (v1 < 1) v1 = 1;  // safety; strip1 is never deselectable
+        int v2 = dieStrip2Wrapper.isVisible() ? dieStrip2.getValue() : -1;
+        return v2 >= 1 ? v1 + v2 : v1;
+    }
+
+    /**
      * Returns a copy of the current game state with coin deltas from the current roll
      * already applied. This is the state the active player actually buys from.
      */
     private GameState postRollState() {
         int pi   = session.nextPlayerIndex();
-        int roll = (int) rollSpinner.getValue();
+        int roll = getCurrentRoll();
         GameState state  = session.getState().copy();
         int[] deltas = ProbabilityCalc.computeAllDeltasForRoll(state, pi, roll);
         Player[] players = state.getPlayers();
@@ -660,7 +734,7 @@ public class MainWindow extends JFrame {
         }
         coinsLabel.setText(activePlayer.getCoins() + " coins");
 
-        updateRollSpinner(activePlayer);
+        updateRollInput(activePlayer);
 
         GameState postRoll = postRollState();
         Player postRollPlayer = postRoll.getPlayers()[pi];
@@ -724,36 +798,36 @@ public class MainWindow extends JFrame {
     }
 
     /**
-     * Updates the roll spinner's range and default value for the given active player.
-     * Also shows the doubles checkbox when the player has both Bahnhof and Freizeitpark.
+     * Updates the roll input strips for the given active player.
+     * Shows the second die strip when the player has Bahnhof (can roll 2d6).
+     * Shows the doubles checkbox when the player has both Bahnhof and Freizeitpark.
      */
-    private void updateRollSpinner(Player activePlayer) {
+    private void updateRollInput(Player activePlayer) {
         boolean hasBahnhof = activePlayer.hasProject("bahnhof");
-        int newMax = hasBahnhof ? 12 : 6;
-        int newDefault = hasBahnhof ? 7 : 3;
-        int current = (int) rollSpinner.getValue();
-        int clamped = Math.min(current, newMax);
-        SpinnerNumberModel model = (SpinnerNumberModel) rollSpinner.getModel();
-        model.setMaximum(newMax);
-        model.setMinimum(1);
-        if (current != clamped) rollSpinner.setValue(clamped);
-        if ((hasBahnhof && current <= 6) || (!hasBahnhof && current > 6)) {
-            rollSpinner.setValue(newDefault);
-        }
-        rollRangeLabel.setText("Dice roll (1–" + newMax + "):");
 
-        // Show doubles checkbox only when player can roll 2 dice (Bahnhof) AND has Freizeitpark
+        // Show/hide second die strip
+        boolean strip2WasVisible = dieStrip2Wrapper.isVisible();
+        dieStrip2Wrapper.setVisible(hasBahnhof);
+        if (hasBahnhof && !strip2WasVisible) {
+            // Just gained Bahnhof: default second die to 4 (so total = d1 + 4 = 3+4 = 7)
+            if (dieStrip2.getValue() < 1) dieStrip2.setValue(4);
+        } else if (!hasBahnhof) {
+            // Lost Bahnhof access: ensure strip1 still has a valid value
+            if (dieStrip1.getValue() < 1) dieStrip1.setValue(3);
+        }
+
+        // Doubles checkbox: only when player can roll 2 dice AND has Freizeitpark
         boolean canGetBonus = hasBahnhof && activePlayer.hasProject("freizeitpark");
         doublesCheckBox.setVisible(canGetBonus);
         if (!canGetBonus) doublesCheckBox.setSelected(false);
     }
 
     /**
-     * Computes and displays per-player coin deltas for the current roll spinner value.
+     * Computes and displays per-player coin deltas for the current roll value.
      */
     private void refreshRollPreview() {
         if (rollPreviewPanel == null) return;
-        int roll = (int) rollSpinner.getValue();
+        int roll = getCurrentRoll();
         int pi = session.nextPlayerIndex();
         GameState state = session.getState();
         int[] deltas = ProbabilityCalc.computeAllDeltasForRoll(state, pi, roll);
@@ -773,7 +847,7 @@ public class MainWindow extends JFrame {
     }
 
     /**
-     * Refreshes all roll-dependent UI elements when the roll spinner value changes.
+     * Refreshes all roll-dependent UI elements when a die strip selection changes.
      */
     private void refreshAfterRollChange() {
         refreshRollPreview();
@@ -887,8 +961,11 @@ public class MainWindow extends JFrame {
         topCardColorTag.setBackground(colorForCard(p.getColor(), false));
         topCardColorTag.setForeground(colorForCard(p.getColor(), true).darker());
 
-        topCardCost.setText("Cost: " + p.getCost() + " coin" + (p.getCost() != 1 ? "s" : "")
-                + activationLabel(p));
+        topCardCostRow.removeAll();
+        JLabel costLabel = new JLabel("Cost: " + p.getCost() + " coin" + (p.getCost() != 1 ? "s" : ""));
+        costLabel.setFont(new Font("Arial", Font.PLAIN, 13));
+        topCardCostRow.add(costLabel);
+        buildActivationDice(topCardCostRow, p);
         String desc = p.getDescription();
         topCardDesc.setText("<html><i>" + (desc != null && !desc.isEmpty() ? desc : "—") + "</i></html>");
 
@@ -907,7 +984,7 @@ public class MainWindow extends JFrame {
         topCardName.setText("—");
         topCardColorTag.setText("");
         topCardColorTag.setBackground(null);
-        topCardCost.setText("");
+        topCardCostRow.removeAll();
         topCardDesc.setText("");
         topCardEV.setText("—");
         topCardROI.setText("—");
@@ -926,50 +1003,10 @@ public class MainWindow extends JFrame {
 
         for (int i = history.size() - 1; i >= 0; i--) {
             TurnRecord t = history.get(i);
-            String pName = names[t.playerIndex];
             Color pColor = playerIndexColor(t.playerIndex);
-            String colorHex = String.format("#%02x%02x%02x",
-                    pColor.getRed(), pColor.getGreen(), pColor.getBlue());
-
-            StringBuilder html = new StringBuilder("<html><body style='padding:1px'>");
-
-            // Line 1: who rolled what (+ doubles badge)
-            html.append("<b style='color:").append(colorHex).append("'>").append(pName).append("</b>");
-            html.append(" rolled <b>").append(t.roll).append("</b>");
-            if (t.isDoubles) html.append(" 🎲 <b style='color:#7030A0'>DOUBLES!</b>");
-
-            // Line 2: coin deltas per player
-            if (t.coinDeltas != null) {
-                html.append("<br><small style='color:#555'>");
-                for (int p = 0; p < Math.min(t.coinDeltas.length, nPlayers); p++) {
-                    if (p > 0) html.append("  ");
-                    int d = t.coinDeltas[p];
-                    String sign = d >= 0 ? "+" : "";
-                    String col = d > 0 ? "#007700" : (d < 0 ? "#AA0000" : "#888888");
-                    html.append("<b style='color:").append(col).append("'>")
-                        .append(names[p]).append(": ").append(sign).append(d).append("¢</b>");
-                }
-                html.append("</small>");
-            }
-
-            // Line 3: purchase (if any)
-            if (t.bought != null) {
-                String gpMark = t.bought.isIs_grossprojekt() ? " [GP]" : "";
-                html.append("<br><small>→ bought <b>")
-                    .append(UIUtils.capitalize(t.bought.getId())).append(gpMark)
-                    .append("</b> (−").append(t.bought.getCost()).append("¢)</small>");
-            } else {
-                html.append("<br><small style='color:#888'>→ saved</small>");
-            }
-
-            html.append("</body></html>");
-
-            JLabel lbl = new JLabel(html.toString());
-            lbl.setFont(new Font("Arial", Font.PLAIN, 11));
-            lbl.setBorder(BorderFactory.createEmptyBorder(3, 4, 3, 4));
-            lbl.setOpaque(true);
-            lbl.setBackground((i % 2 == 0) ? Color.WHITE : new Color(0xF5F5F5));
-            historyPanel.add(lbl);
+            TurnEntryPanel entry = new TurnEntryPanel(t, names, nPlayers, pColor, i % 2 == 0);
+            entry.setAlignmentX(Component.LEFT_ALIGNMENT);
+            historyPanel.add(entry);
         }
 
         historyPanel.revalidate();
@@ -1005,19 +1042,29 @@ public class MainWindow extends JFrame {
         return name.toLowerCase();
     }
 
-    /** Returns a short activation string for a card (e.g. " · Rolls: 2, 3" or " · All turns"). */
-    private static String activationLabel(Project p) {
-        if (p.isIs_grossprojekt()) return " · Großprojekt";
-        int[] dice = p.getDice_activation();
-        if (dice == null || dice.length == 0) return "";
-        StringBuilder sb = new StringBuilder(" · Roll");
-        if (dice.length > 1) sb.append("s");
-        sb.append(": ");
-        for (int i = 0; i < dice.length; i++) {
-            if (i > 0) sb.append(", ");
-            sb.append(dice[i]);
+    /**
+     * Appends activation dice faces (or a text label for landmarks) to {@code row}.
+     * For regular cards: a separator label " · " followed by one DiceFacePanel per activation value.
+     * For Großprojekte: a text label " · Großprojekt".
+     */
+    private static void buildActivationDice(JPanel row, Project p) {
+        if (p.isIs_grossprojekt()) {
+            JLabel lbl = new JLabel(" · Großprojekt");
+            lbl.setFont(new Font("Arial", Font.ITALIC, 12));
+            lbl.setForeground(new Color(0x555555));
+            row.add(lbl);
+            return;
         }
-        return sb.toString();
+        int[] dice = p.getDice_activation();
+        if (dice == null || dice.length == 0) return;
+        JLabel sep = new JLabel(" ·");
+        sep.setFont(new Font("Arial", Font.PLAIN, 12));
+        row.add(sep);
+        for (int v : dice) {
+            row.add(new DiceFacePanel(v, 20));
+        }
+        row.revalidate();
+        row.repaint();
     }
 
     private static Color playerIndexColor(int idx) {

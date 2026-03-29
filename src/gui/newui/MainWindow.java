@@ -988,6 +988,8 @@ public class MainWindow extends JFrame {
 
     /**
      * Refreshes all roll-dependent UI elements when a die strip selection changes.
+     * Always re-ranks using the analytical engine (not MC) so the response is instant.
+     * Preserves the current buy selection if the selected card is still affordable.
      */
     private void refreshAfterRollChange() {
         refreshRollPreview();
@@ -1001,15 +1003,43 @@ public class MainWindow extends JFrame {
         int postCoins = postRollPlayer.getCoins();
         updateCoinsAfterLabel(preCoins, postCoins);
 
+        // Remember currently selected project (if any) before rebuilding combo
+        String previousSelection = (String) buyCombo.getSelectedItem();
+        boolean hadSelection = previousSelection != null && !previousSelection.equals(Strings.nothingOption());
+
         rebuildBuyCombo(pi, postRollPlayer, postRoll);
+
+        // Restore selection if the previously selected card is still in the combo
+        if (hadSelection) {
+            for (int i = 0; i < buyCombo.getItemCount(); i++) {
+                if (previousSelection.equals(buyCombo.getItemAt(i))) {
+                    buyCombo.setSelectedIndex(i);
+                    break;
+                }
+            }
+        }
 
         double baselineWinProb = ProbabilityCalc.computeBaselineWinProb(postRoll, pi);
         baselineWinProbLabel.setText(Strings.baselineWinProbFmt(baselineWinProb * 100));
 
-        if (rankOpts.mcSimulations == 0) {
-            lastRanking = ProbabilityCalc.rankAllProjects(postRoll, pi, rankOpts);
-            rebuildTable();
+        // Always re-rank analytically on roll change (MC results depend on coins too)
+        RankingOptions quickOpts = new RankingOptions();
+        quickOpts.turnsElapsed = rankOpts.turnsElapsed;
+        quickOpts.mcSimulations = 0;
+        lastRanking = ProbabilityCalc.rankAllProjects(postRoll, pi, quickOpts);
+        rebuildTable();
+
+        // If no prior selection was preserved, auto-select first affordable
+        if (!hadSelection || buyCombo.getSelectedIndex() == 0) {
             selectFirstAffordable();
+        } else {
+            // Update center panel to reflect the re-selected card with updated metrics
+            String sel = (String) buyCombo.getSelectedItem();
+            if (sel != null && !sel.equals(Strings.nothingOption())) {
+                String id = projectIdFromLabel(sel);
+                lastRanking.stream().filter(e -> e.project.getId().equals(id)).findFirst()
+                        .ifPresent(this::populateCenter);
+            }
         }
     }
 
@@ -1061,7 +1091,7 @@ public class MainWindow extends JFrame {
             int ownLandmarks,
             int maxOppLandmarks,
             boolean bahnhofSuggested, double bahnhofEvGain,
-            boolean ekzSuggested,
+            boolean ekzSuggested,     double ekzEvGain,
             boolean fpSuggested,
             boolean ftSuggested
     ) {}
@@ -1161,8 +1191,9 @@ public class MainWindow extends JFrame {
             }
         }
 
-        // Einkaufszentrum: worth buying if player has ≥ 2 green or store cards
+        // Einkaufszentrum: worth buying if player has ≥ 2 green or store cards; compute EV gain
         boolean ekzSuggested = false;
+        double ekzEvGain = 0.0;
         if (!hasEkz) {
             int greenOrStore = 0;
             for (Project p : active.getOwned_projects()) {
@@ -1170,7 +1201,13 @@ public class MainWindow extends JFrame {
                     greenOrStore++;
                 }
             }
-            ekzSuggested = greenOrStore >= 2;
+            if (greenOrStore >= 2) {
+                GameState withEkz = session.getState().copy();
+                logic.probability.ProjectLoader.getProject("einkaufszentrum").ifPresent(ep ->
+                        withEkz.getPlayers()[pi].getOwned_projects().add(ep));
+                ekzEvGain = ProbabilityCalc.portfolioEvPerRound(withEkz, pi) - ownEv;
+                ekzSuggested = ekzEvGain > 0.05;
+            }
         }
 
         // Freizeitpark: worth buying if player has Bahnhof + cards activating on 6–8
@@ -1188,7 +1225,7 @@ public class MainWindow extends JFrame {
         boolean ftSuggested = !hasFt && hasFp;
 
         return new GamePhaseContext(phase, earlyStr, midStr, lateStr, ownLm, maxOppLm,
-                bahnhofSuggested, bahnhofEvGain, ekzSuggested, fpSuggested, ftSuggested);
+                bahnhofSuggested, bahnhofEvGain, ekzSuggested, ekzEvGain, fpSuggested, ftSuggested);
     }
 
     /**
@@ -1324,8 +1361,9 @@ public class MainWindow extends JFrame {
         titleLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
         ctxPanel.add(titleLabel);
 
-        // Phase line
-        JLabel phaseLabel = new JLabel(Strings.assistantContextPhase(ctx.phaseLabel(), ctx.maxOppLandmarks()));
+        // Phase line: shows continuous blend if mixed, or single phase if dominant
+        JLabel phaseLabel = new JLabel(Strings.assistantContextPhase(ctx.phaseLabel(), ctx.maxOppLandmarks(),
+                ctx.earlyStrength(), ctx.midStrength(), ctx.lateStrength()));
         phaseLabel.setFont(new Font("Arial", Font.PLAIN, 10));
         phaseLabel.setForeground(new Color(0x555555));
         phaseLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -1342,6 +1380,12 @@ public class MainWindow extends JFrame {
         // Factors
         if (!factors.isEmpty()) {
             ctxPanel.add(Box.createVerticalStrut(3));
+            // Explain that weights come from phase interpolation
+            JLabel weightsBlend = new JLabel("<html><i>" + Strings.assistantContextWeightsBlend() + "</i></html>");
+            weightsBlend.setFont(new Font("Arial", Font.PLAIN, 9));
+            weightsBlend.setForeground(new Color(0x666666));
+            weightsBlend.setAlignmentX(Component.LEFT_ALIGNMENT);
+            ctxPanel.add(weightsBlend);
             StringBuilder sb = new StringBuilder("<html><body style='font-size:10px;color:#444'>");
             for (String f : factors) sb.append(f).append("<br>");
             sb.append("</body></html>");
@@ -1368,7 +1412,7 @@ public class MainWindow extends JFrame {
             }
             if (ctx.ekzSuggested()) {
                 logic.probability.ProjectLoader.getProject("einkaufszentrum").ifPresent(p ->
-                        addHint.accept(p.getLocalizedName(), 0.0));
+                        addHint.accept(p.getLocalizedName(), ctx.ekzEvGain()));
             }
             if (ctx.fpSuggested()) {
                 logic.probability.ProjectLoader.getProject("freizeitpark").ifPresent(p ->
@@ -1612,9 +1656,12 @@ public class MainWindow extends JFrame {
         model.setRowCount(0);
 
         for (RankEntry e : ranking) {
-            if (affordableFilter != null && e.affordable != affordableFilter) continue;
-            // "Wait" sentinel: shown only in the "All" tab (no affordableFilter means all)
-            if (e.isWaitEntry() && affordableFilter != null) continue;
+            // "Wait" sentinel: shown in affordable tab and "All" tab, not in unaffordable tab
+            if (e.isWaitEntry()) {
+                if (Boolean.FALSE.equals(affordableFilter)) continue;
+            } else {
+                if (affordableFilter != null && e.affordable != affordableFilter) continue;
+            }
             String cardLabel = e.isWaitEntry()
                     ? Strings.waitLabel()
                     : (e.project.isIs_grossprojekt()

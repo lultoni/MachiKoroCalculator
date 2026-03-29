@@ -287,19 +287,39 @@ public final class Strings {
     public static String assistantContextTitle() {
         return s("Spiellage-Analyse", "Situation Analysis");
     }
-    public static String assistantContextPhase(String phase, int maxOppLandmarks) {
-        return s("Phase: " + phase + "  ·  Gegner max. " + maxOppLandmarks + " GPs",
-                 "Phase: " + phase + "  ·  Opponents max. " + maxOppLandmarks + " GPs");
+    public static String assistantContextPhase(String phase, int maxOppLandmarks,
+                                                double earlyStr, double midStr, double lateStr) {
+        String blend;
+        if (earlyStr >= 0.01 && midStr >= 0.01 && lateStr >= 0.01) {
+            blend = s(
+                String.format("Früh %.0f%% · Mitte %.0f%% · Spät %.0f%%",
+                        earlyStr*100, midStr*100, lateStr*100),
+                String.format("Early %.0f%% · Mid %.0f%% · Late %.0f%%",
+                        earlyStr*100, midStr*100, lateStr*100));
+        } else {
+            blend = s("Phase: " + phase, "Phase: " + phase);
+        }
+        return blend + s("  ·  Gegner max. " + maxOppLandmarks + " GPs",
+                         "  ·  Opponents max. " + maxOppLandmarks + " GPs");
     }
     public static String assistantContextRecommend(String card) {
         return s("Empfehlung: <b>" + card + "</b>", "Recommendation: <b>" + card + "</b>");
+    }
+    public static String assistantContextWeightsBlend() {
+        return s("Kriterien-Gewichte = interpoliert aus Frühphase/Mittelspiel/Endspiel-Profilen:",
+                 "Criteria weights = interpolated from Early/Mid/Late profiles:");
     }
     public static String assistantContextFactor(String profile, double weight, int rank) {
         return String.format("×%.1f  %s", weight, profile) + s("  — Rang #" + rank, "  — rank #" + rank);
     }
     public static String assistantContextGPHint(String gp, double evGain) {
-        return s("💡 " + gp + " lohnt sich (+" + String.format("%.2f", evGain) + "¢/Runde)",
-                 "💡 " + gp + " worth buying (+" + String.format("%.2f", evGain) + "¢/round)");
+        if (evGain > 0.01) {
+            return s("💡 " + gp + " lohnt sich (+" + String.format("%.2f", evGain) + "¢/Runde)",
+                     "💡 " + gp + " worth buying (+" + String.format("%.2f", evGain) + "¢/round)");
+        } else {
+            return s("💡 " + gp + " lohnt sich (Synergie mit Portfolio)",
+                     "💡 " + gp + " worth buying (synergy with portfolio)");
+        }
     }
     public static String assistantContextNoAffordable() {
         return s("Keine erschwinglichen Karten — sparen.", "No affordable cards — save up.");

@@ -30,6 +30,14 @@ public class GameSession {
     private final String[] playerNames;
     private boolean finished = false;
     private int winnerIndex = -1;
+    /** True when the next turn is a Freizeitpark bonus turn for the same player. */
+    private boolean bonusTurnPending = false;
+    /**
+     * Counts the number of "effective" player advances (i.e. turns that advance to the
+     * next player). Bonus Freizeitpark turns do NOT increment this counter, so
+     * {@link #nextPlayerIndex()} stays correct even when bonus turns are interspersed.
+     */
+    private int effectiveTurnCount = 0;
 
     /**
      * Creates a new session from an initial game state.
@@ -112,6 +120,23 @@ public class GameSession {
         }
 
         history.add(record);
+
+        // Determine if a Freizeitpark bonus turn is pending:
+        // The player gets a bonus turn if:
+        //   1. They just rolled doubles (record.isDoubles = true)
+        //   2. This was NOT itself a bonus turn (no chaining — Freizeitpark rule)
+        //   3. The player owns both Bahnhof (required for 2-dice) and Freizeitpark
+        boolean thisWasBonusTurn = bonusTurnPending;
+        boolean qualifiesForBonus = record.isDoubles && !thisWasBonusTurn
+                && players[pi].hasProject("bahnhof")
+                && players[pi].hasProject("freizeitpark");
+        bonusTurnPending = qualifiesForBonus;
+
+        // Advance effectiveTurnCount only for non-bonus turns.
+        // Bonus turns count as the same player's turn continuation.
+        if (!thisWasBonusTurn) {
+            effectiveTurnCount++;
+        }
     }
 
     /**
@@ -124,9 +149,11 @@ public class GameSession {
         // Rebuild state from the stored initial snapshot, then replay all turns except the last.
         this.state = initialState.copy();
 
-        // Reset win state — will be re-set if the replayed turns include a win
+        // Reset win state and bonus turn state — will be re-set during replay
         finished = false;
         winnerIndex = -1;
+        bonusTurnPending = false;
+        effectiveTurnCount = 0;
 
         ArrayList<TurnRecord> toReplay = new ArrayList<>(history.subList(0, history.size() - 1));
         history.clear();
@@ -185,9 +212,24 @@ public class GameSession {
         return playerNames.clone();
     }
 
-    /** Returns the index of the player whose turn comes next (round-robin). */
+    /**
+     * Returns the index of the player whose turn comes next.
+     *
+     * <p>Normally advances round-robin. However, if the last recorded turn was a doubles
+     * roll ({@link TurnRecord#isDoubles} = true) and the active player owned both
+     * Bahnhof and Freizeitpark at that point, the same player gets a bonus second turn.
+     * The second turn itself cannot chain further doubles (Freizeitpark rule).
+     */
     public int nextPlayerIndex() {
-        return history.size() % state.getPlayers().length;
+        if (bonusTurnPending && !history.isEmpty()) {
+            return history.get(history.size() - 1).playerIndex;
+        }
+        return effectiveTurnCount % state.getPlayers().length;
+    }
+
+    /** Returns true when the next turn is a Freizeitpark bonus turn for the same player. */
+    public boolean isBonusTurnPending() {
+        return bonusTurnPending;
     }
 
     /** Returns true if a player has won the game (all 4 landmarks purchased). */

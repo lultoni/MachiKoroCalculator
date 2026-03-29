@@ -587,7 +587,16 @@ public class ProbabilityCalc {
             mcBaseline = WinProbabilityCalc.mcWinRate(gs, playerIndex, opts.mcSimulations);
         }
 
-        for (Project candidate : gs.getUnbuilt_projects()) {
+        // Unbuilt pool (regular + lila cards already pre-filtered into this list)
+        ArrayList<Project> candidates = new ArrayList<>(gs.getUnbuilt_projects());
+        // Add unowned GPs (landmarks) — they are never in the unbuilt pool but are always purchasable
+        for (Project p : ProjectLoader.getAllProjects()) {
+            if (p.isIs_grossprojekt() && !player.hasProject(p.getId())) {
+                candidates.add(p);
+            }
+        }
+
+        for (Project candidate : candidates) {
             if (candidate.getCost() > coins) continue;
             if (candidate.isIs_grossprojekt() && player.hasProject(candidate.getId())) continue;
             if (candidate.getColor().equals("lila") && player.hasProject(candidate.getId())) continue;

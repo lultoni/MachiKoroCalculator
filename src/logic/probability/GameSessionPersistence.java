@@ -125,6 +125,7 @@ final class GameSessionPersistence {
             } else {
                 turn.add("boughtId", com.google.gson.JsonNull.INSTANCE);
             }
+            if (t.isDoubles) turn.addProperty("isDoubles", true); // omit when false for compactness
             turns.add(turn);
         }
         return turns;
@@ -166,7 +167,9 @@ final class GameSessionPersistence {
                         .orElseThrow(() -> new IllegalArgumentException(
                                 "Unknown project id in save file: " + id));
             }
-            session.applyTurn(new TurnRecord(pi, roll, bought));
+            // isDoubles defaults to false if absent (backward compatible with old saves)
+            boolean isDoubles = t.has("isDoubles") && t.get("isDoubles").getAsBoolean();
+            session.applyTurn(new TurnRecord(pi, roll, bought, isDoubles));
         }
     }
 }

@@ -125,10 +125,15 @@ public class SnapshotDialog extends JDialog {
 
                 String cardLabel = UIUtils.capitalize(p.getId()) + " (" + p.getCost() + ")";
                 if (isMultiCopy) {
-                    // JSpinner(0–6): player may own multiple copies
+                    // Starter cards (weizenfeld, bäckerei) may be owned up to 7 times:
+                    // 1 starting copy + 6 from the shared market supply. All other
+                    // multi-copy cards are capped at 6 (market supply only).
+                    boolean isStarterCard = p.getId().equals("weizenfeld") || p.getId().equals("bäckerei");
+                    int maxCopies = isStarterCard ? 7 : 6;
+                    // JSpinner(0–maxCopies): player may own multiple copies
                     JPanel cell = new JPanel(new FlowLayout(FlowLayout.LEFT, 2, 0));
                     cell.add(new JLabel(cardLabel));
-                    JSpinner countSpinner = new JSpinner(new SpinnerNumberModel(0, 0, 6, 1));
+                    JSpinner countSpinner = new JSpinner(new SpinnerNumberModel(0, 0, maxCopies, 1));
                     countSpinner.setPreferredSize(new Dimension(45, 22));
                     cell.add(countSpinner);
                     cardControls[playerIndex][j] = countSpinner;

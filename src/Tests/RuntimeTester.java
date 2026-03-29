@@ -79,6 +79,23 @@ public class RuntimeTester {
         test_save_and_load_snapshot_rooted_session();
         test_load_invalid_file_throws();
 
+        System.out.println("\n=== Starter-Card Supply Tests ===\n");
+        test_starter_cards_allow_7_copies_in_builder();
+        test_starter_cards_7_copies_exhausts_unbuilt_pool();
+        test_non_starter_cards_capped_at_6_in_builder();
+
+        System.out.println("\n=== GP Ranking Tests ===\n");
+        test_gp_included_in_ranking_when_affordable();
+        test_gp_not_offered_when_already_owned();
+        test_gp_ranking_separate_from_regular_cards();
+
+        System.out.println("\n=== Freizeitpark Doubles Tests ===\n");
+        test_freizeitpark_bonus_turn_granted_on_doubles();
+        test_freizeitpark_bonus_turn_not_granted_without_bahnhof();
+        test_freizeitpark_no_chain_on_second_doubles();
+        test_freizeitpark_bonus_advances_player_after_bonus();
+        test_freizeitpark_undo_restores_correct_state();
+
         System.out.println("\n--- Results: " + passed + " passed, " + failed + " failed ---");
 
         System.out.println("\n=== Runtime Benchmarks ===\n");
@@ -890,6 +907,209 @@ public class RuntimeTester {
             assertTrue("load with unknown card id throws IllegalArgumentException", threw);
         } finally {
             Files.deleteIfExists(tmp);
+        }
+    }
+
+    // =========================================================================
+    // Starter-Card Supply Tests
+    // =========================================================================
+
+    private static void test_starter_cards_allow_7_copies_in_builder() {
+        // Each player starts with 1 weizenfeld/bäckerei as a starter card (outside the market).
+        // The market supplies 6 more copies. So a single player could own 1+6=7 in total.
+        // GameStateBuilder must allow up to 7 copies of weizenfeld and bäckerei.
+        boolean threw = false;
+        try {
+            GameStateBuilder b = new GameStateBuilder(2);
+            b.setPlayerName(0, "P0").setCoins(0, 0);
+            for (int i = 0; i < 7; i++) b.addProject(0, "weizenfeld");
+            b.setPlayerName(1, "P1").setCoins(1, 0);
+        } catch (Exception ex) {
+            threw = true;
+        }
+        assertTrue("GameStateBuilder allows 7 copies of weizenfeld (starter + 6 market)", !threw);
+    }
+
+    private static void test_starter_cards_7_copies_exhausts_unbuilt_pool() {
+        // If one player owns 7 weizenfeld (all 6 market copies + 1 starter),
+        // weizenfeld must NOT appear in the unbuilt pool (market exhausted).
+        GameStateBuilder b = new GameStateBuilder(2);
+        b.setPlayerName(0, "P0").setCoins(0, 0);
+        for (int i = 0; i < 7; i++) b.addProject(0, "weizenfeld");
+        b.setPlayerName(1, "P1").setCoins(1, 0);
+        GameState gs = b.build();
+        boolean weizenInPool = gs.getUnbuilt_projects().stream()
+                .anyMatch(p -> p.getId().equals("weizenfeld"));
+        assertTrue("Weizenfeld removed from unbuilt pool when 7 copies owned (all market copies gone)",
+                !weizenInPool);
+    }
+
+    private static void test_non_starter_cards_capped_at_6_in_builder() {
+        // Non-starter cards like bauernhof are capped at 6 by the supply model
+        // (they don't have a starter copy). Verify 6 is allowed but the pool is then exhausted.
+        GameStateBuilder b = new GameStateBuilder(2);
+        b.setPlayerName(0, "P0").setCoins(0, 0);
+        for (int i = 0; i < 6; i++) b.addProject(0, "bauernhof");
+        b.setPlayerName(1, "P1").setCoins(1, 0);
+        GameState gs = b.build();
+        boolean bauernhofInPool = gs.getUnbuilt_projects().stream()
+                .anyMatch(p -> p.getId().equals("bauernhof"));
+        assertTrue("Bauernhof removed from unbuilt pool when 6 copies owned", !bauernhofInPool);
+    }
+
+    // =========================================================================
+    // GP Ranking Tests
+    // =========================================================================
+
+    private static void test_gp_included_in_ranking_when_affordable() {
+        // When player has enough coins to buy a GP (e.g., bahnhof costs 4), it should appear
+        // in the ranking list from rankPurchasableProjects.
+        GameStateBuilder b = new GameStateBuilder(2);
+        b.setPlayerName(0, "P0").setCoins(0, 10).addProject(0, "weizenfeld");
+        b.setPlayerName(1, "P1").setCoins(1, 3).addProject(1, "weizenfeld");
+        GameState gs = b.build();
+        RankingOptions opts = new RankingOptions();
+        ArrayList<RankEntry> ranking = ProbabilityCalc.rankPurchasableProjects(gs, 0, opts);
+        boolean bahnhofOffered = ranking.stream()
+                .anyMatch(e -> e.project.getId().equals("bahnhof"));
+        assertTrue("bahnhof (GP, cost 4) is offered in ranking when player has 10 coins",
+                bahnhofOffered);
+    }
+
+    private static void test_gp_not_offered_when_already_owned() {
+        // A player who already owns bahnhof must not be offered it again.
+        GameStateBuilder b = new GameStateBuilder(2);
+        b.setPlayerName(0, "P0").setCoins(0, 20)
+                .addProject(0, "weizenfeld").addProject(0, "bahnhof");
+        b.setPlayerName(1, "P1").setCoins(1, 3).addProject(1, "weizenfeld");
+        GameState gs = b.build();
+        RankingOptions opts = new RankingOptions();
+        ArrayList<RankEntry> ranking = ProbabilityCalc.rankPurchasableProjects(gs, 0, opts);
+        boolean bahnhofOffered = ranking.stream()
+                .anyMatch(e -> e.project.getId().equals("bahnhof"));
+        assertTrue("bahnhof is not offered again when player already owns it", !bahnhofOffered);
+    }
+
+    // =========================================================================
+    // Freizeitpark Doubles Tests
+    // =========================================================================
+
+    private static void test_freizeitpark_bonus_turn_granted_on_doubles() {
+        // Player 0 has Bahnhof + Freizeitpark. Rolling doubles should grant a bonus turn.
+        // After the doubles turn, nextPlayerIndex() should still return 0 (same player).
+        GameStateBuilder b = new GameStateBuilder(2);
+        b.setPlayerName(0, "P0").setCoins(0, 25)
+                .addProject(0, "weizenfeld").addProject(0, "bahnhof").addProject(0, "freizeitpark");
+        b.setPlayerName(1, "P1").setCoins(1, 3).addProject(1, "weizenfeld");
+        GameState gs = b.build();
+        GameSession session = new GameSession(gs, new String[]{"P0", "P1"});
+
+        // Roll 6 (3+3 doubles) with isDoubles=true
+        session.applyTurn(new TurnRecord(0, 6, null, true));
+
+        assertTrue("Freizeitpark: bonus turn pending after doubles", session.isBonusTurnPending());
+        assertEq("Freizeitpark: nextPlayerIndex() == 0 (same player gets bonus turn)",
+                0, session.nextPlayerIndex());
+    }
+
+    private static void test_freizeitpark_bonus_turn_not_granted_without_bahnhof() {
+        // Player 0 has Freizeitpark but NOT Bahnhof → only 1d6 rolls possible → no doubles.
+        // Even if isDoubles=true is passed, the bonus should not fire without Bahnhof.
+        GameStateBuilder b = new GameStateBuilder(2);
+        b.setPlayerName(0, "P0").setCoins(0, 20)
+                .addProject(0, "weizenfeld").addProject(0, "freizeitpark");
+        b.setPlayerName(1, "P1").setCoins(1, 3).addProject(1, "weizenfeld");
+        GameState gs = b.build();
+        GameSession session = new GameSession(gs, new String[]{"P0", "P1"});
+
+        // isDoubles=true but no Bahnhof
+        session.applyTurn(new TurnRecord(0, 3, null, true));
+
+        assertTrue("No bonus without Bahnhof: bonusTurnPending is false", !session.isBonusTurnPending());
+        assertEq("No bonus without Bahnhof: nextPlayerIndex() == 1 (advances normally)",
+                1, session.nextPlayerIndex());
+    }
+
+    private static void test_freizeitpark_no_chain_on_second_doubles() {
+        // Freizeitpark rule: if player rolls doubles on the BONUS turn itself, no third turn.
+        // After a bonus turn (regardless of isDoubles on that bonus turn), turn advances normally.
+        GameStateBuilder b = new GameStateBuilder(2);
+        b.setPlayerName(0, "P0").setCoins(0, 25)
+                .addProject(0, "weizenfeld").addProject(0, "bahnhof").addProject(0, "freizeitpark");
+        b.setPlayerName(1, "P1").setCoins(1, 3).addProject(1, "weizenfeld");
+        GameState gs = b.build();
+        GameSession session = new GameSession(gs, new String[]{"P0", "P1"});
+
+        // First turn: doubles → bonus pending
+        session.applyTurn(new TurnRecord(0, 6, null, true));
+        assertTrue("After first doubles: bonus pending", session.isBonusTurnPending());
+        assertEq("After first doubles: still P0's turn", 0, session.nextPlayerIndex());
+
+        // Bonus turn: roll doubles again → should NOT chain
+        session.applyTurn(new TurnRecord(0, 8, null, true));
+        assertTrue("After bonus turn with doubles: no chain (bonus NOT pending)",
+                !session.isBonusTurnPending());
+        assertEq("After bonus turn: advances to P1", 1, session.nextPlayerIndex());
+    }
+
+    private static void test_freizeitpark_bonus_advances_player_after_bonus() {
+        // After the bonus turn completes, the turn should advance to the next player normally.
+        GameStateBuilder b = new GameStateBuilder(3);
+        b.setPlayerName(0, "P0").setCoins(0, 25)
+                .addProject(0, "weizenfeld").addProject(0, "bahnhof").addProject(0, "freizeitpark");
+        b.setPlayerName(1, "P1").setCoins(1, 3).addProject(1, "weizenfeld");
+        b.setPlayerName(2, "P2").setCoins(2, 3).addProject(2, "weizenfeld");
+        GameState gs = b.build();
+        GameSession session = new GameSession(gs, new String[]{"P0", "P1", "P2"});
+
+        // P0 rolls doubles
+        session.applyTurn(new TurnRecord(0, 6, null, true));
+        assertEq("P0 bonus pending", 0, session.nextPlayerIndex());
+
+        // P0 takes bonus turn (no more doubles)
+        session.applyTurn(new TurnRecord(0, 5, null, false));
+        assertEq("After bonus turn: P1's turn (index 1)", 1, session.nextPlayerIndex());
+
+        // P1 takes their turn
+        session.applyTurn(new TurnRecord(1, 3, null, false));
+        assertEq("After P1's turn: P2's turn (index 2)", 2, session.nextPlayerIndex());
+    }
+
+    private static void test_freizeitpark_undo_restores_correct_state() throws Exception {
+        // After undo, the bonus turn state should be correctly reset.
+        GameStateBuilder b = new GameStateBuilder(2);
+        b.setPlayerName(0, "P0").setCoins(0, 25)
+                .addProject(0, "weizenfeld").addProject(0, "bahnhof").addProject(0, "freizeitpark");
+        b.setPlayerName(1, "P1").setCoins(1, 3).addProject(1, "weizenfeld");
+        GameState gs = b.build();
+        GameSession session = new GameSession(gs, new String[]{"P0", "P1"});
+
+        // P0 rolls doubles → bonus pending
+        session.applyTurn(new TurnRecord(0, 6, null, true));
+        assertTrue("Bonus pending before undo", session.isBonusTurnPending());
+
+        // Undo the doubles roll
+        session.undoLastTurn();
+        assertTrue("Bonus NOT pending after undo", !session.isBonusTurnPending());
+        assertEq("After undo: P0's turn again (index 0)", 0, session.nextPlayerIndex());
+    }
+
+    private static void test_gp_ranking_separate_from_regular_cards() {
+        // GPs and regular cards should all appear in one sorted list; cost comparison valid.
+        GameStateBuilder b = new GameStateBuilder(2);
+        b.setPlayerName(0, "P0").setCoins(0, 25).addProject(0, "weizenfeld");
+        b.setPlayerName(1, "P1").setCoins(1, 3).addProject(1, "weizenfeld");
+        GameState gs = b.build();
+        RankingOptions opts = new RankingOptions();
+        ArrayList<RankEntry> ranking = ProbabilityCalc.rankPurchasableProjects(gs, 0, opts);
+        // All 4 GPs should be in the ranking (bahnhof=4, einkaufszentrum=10, freizeitpark=16, funkturm=22)
+        long gpCount = ranking.stream().filter(e -> e.project.isIs_grossprojekt()).count();
+        assertTrue("All 4 GPs appear in ranking when player has 25 coins (found " + gpCount + ")",
+                gpCount == 4);
+        // Verify ranking is still sorted by ROI
+        for (int i = 1; i < ranking.size(); i++) {
+            assertTrue("ranking sorted descending with GPs at index " + i,
+                    ranking.get(i - 1).roiOverHorizon >= ranking.get(i).roiOverHorizon);
         }
     }
 

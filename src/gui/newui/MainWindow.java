@@ -5,8 +5,7 @@ import logic.probability.*;
 import javax.swing.*;
 import javax.swing.border.TitledBorder;
 import javax.swing.filechooser.FileNameExtensionFilter;
-import javax.swing.table.DefaultTableCellRenderer;
-import javax.swing.table.DefaultTableModel;
+import javax.swing.table.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.nio.file.Path;
@@ -18,10 +17,10 @@ import java.util.List;
  *
  * <p>Layout (three columns inside a JSplitPane chain):
  * <pre>
- *  ┌───────────────┬────────────────────┬──────────────────────┐
- *  │  Turn Input   │  Top Recommendation│  Full Ranking Table  │
- *  │  (left ~220)  │  (center ~280)     │  (right, flex)       │
- *  └───────────────┴────────────────────┴──────────────────────┘
+ *  ┌────────────────────┬───────────────────────┬──────────────────────┐
+ *  │ Current Turn       │  Card Details         │  All Cards (Ranking) │
+ *  │ Tracker (~230)     │  (center ~300)        │  (right, flex)       │
+ *  └────────────────────┴───────────────────────┴──────────────────────┘
  * </pre>
  */
 public class MainWindow extends JFrame {
@@ -41,28 +40,33 @@ public class MainWindow extends JFrame {
     private GameSession session;
     private final RankingOptions rankOpts = new RankingOptions();
     private boolean showWinProb = false;
+    private int mcSimCount = 1000;
 
     // ---- left panel components ----
     private JLabel activePlayerLabel;
     private JLabel rollRangeLabel;
     private JSpinner rollSpinner;
+    private JCheckBox doublesCheckBox;
     private JComboBox<String> buyCombo;
     private JButton confirmBtn;
     private JButton undoBtn;
-    private JTextArea historyArea;
     private JLabel coinsLabel;
+    private JPanel historyPanel;
+    private JPanel rollPreviewPanel;
 
     // ---- center panel components ----
     private JLabel topCardName;
     private JLabel topCardCost;
+    private JLabel topCardColorTag;
+    private JLabel topCardDesc;
     private JLabel topCardEV;
     private JLabel topCardROI;
     private JLabel topCardRisk;
+    private JLabel topCardVar;
     private JLabel topCardWinProb;
     private JLabel topCardNote;
     private JPanel topCardColorBar;
     private JLabel baselineWinProbLabel;
-    private JTextArea rollPreviewArea;
 
     // ---- right panel components ----
     private DefaultTableModel tableModel;
@@ -70,6 +74,8 @@ public class MainWindow extends JFrame {
     private JButton toggleWinProbBtn;
     private JToggleButton deepAnalysisBtn;
     private JLabel statusLabel;
+    private JSpinner mcSimSpinner;
+    private JButton mcReloadBtn;
 
     // ---- snapshot / live state for the current-player recommendation ----
     private ArrayList<RankEntry> lastRanking = new ArrayList<>();
@@ -83,7 +89,7 @@ public class MainWindow extends JFrame {
         this.session = session;
         setTitle("Machi Koro Calculator");
         setDefaultCloseOperation(EXIT_ON_CLOSE);
-        setMinimumSize(new Dimension(900, 560));
+        setMinimumSize(new Dimension(980, 600));
         buildUI();
         refreshAll();
         pack();
@@ -99,17 +105,15 @@ public class MainWindow extends JFrame {
         JPanel center = buildCenterPanel();
         JPanel right  = buildRightPanel();
 
-        // Wire roll spinner change listener now that rollPreviewArea is initialized.
-        // When the roll value changes, the post-roll coins change too, so refresh
-        // the preview, the buy dropdown, and the full ranking — all roll-dependent.
+        // Wire roll spinner change listener now that rollPreviewPanel is initialized.
         rollSpinner.addChangeListener(e -> refreshAfterRollChange());
 
         JSplitPane rightSplit = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, center, right);
-        rightSplit.setDividerLocation(300);
+        rightSplit.setDividerLocation(320);
         rightSplit.setResizeWeight(0.35);
 
         JSplitPane mainSplit = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, left, rightSplit);
-        mainSplit.setDividerLocation(230);
+        mainSplit.setDividerLocation(240);
         mainSplit.setResizeWeight(0.0);
 
         setContentPane(mainSplit);
@@ -120,8 +124,8 @@ public class MainWindow extends JFrame {
     private JPanel buildLeftPanel() {
         JPanel panel = new JPanel();
         panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
-        panel.setBorder(titledBorder("Current Turn"));
-        panel.setPreferredSize(new Dimension(230, 0));
+        panel.setBorder(titledBorder("Current Turn Tracker"));
+        panel.setPreferredSize(new Dimension(240, 0));
 
         // Active player
         activePlayerLabel = new JLabel("Player 1's turn");
@@ -131,22 +135,47 @@ public class MainWindow extends JFrame {
 
         // Coins display
         coinsLabel = new JLabel("Coins: 3");
-        coinsLabel.setFont(new Font("Arial", Font.PLAIN, 12));
+        coinsLabel.setFont(new Font("Arial", Font.BOLD, 14));
         coinsLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
         panel.add(wrap(coinsLabel));
 
-        panel.add(Box.createVerticalStrut(10));
+        panel.add(Box.createVerticalStrut(8));
 
         // Roll input
         rollRangeLabel = bold("Dice roll (1–6):");
         rollRangeLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
         panel.add(wrap(rollRangeLabel));
-        rollSpinner = new JSpinner(new SpinnerNumberModel(3, 1, 6, 1));
+        rollSpinner = new BoundedSpinner(new SpinnerNumberModel(3, 1, 6, 1));
         rollSpinner.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
         rollSpinner.setAlignmentX(Component.LEFT_ALIGNMENT);
         panel.add(rollSpinner);
 
-        panel.add(Box.createVerticalStrut(10));
+        // Doubles (Pasch) checkbox: only shown when player has Bahnhof + Freizeitpark
+        doublesCheckBox = new JCheckBox("Doubles (Pasch)!");
+        doublesCheckBox.setFont(new Font("Arial", Font.BOLD, 12));
+        doublesCheckBox.setForeground(new Color(0x7030A0)); // lila / purple for emphasis
+        doublesCheckBox.setAlignmentX(Component.LEFT_ALIGNMENT);
+        doublesCheckBox.setToolTipText(
+                "<html>Check this if you rolled doubles (both dice show same face).<br>" +
+                "Freizeitpark grants you a bonus second turn!</html>");
+        doublesCheckBox.setVisible(false); // shown only when player has Bahnhof + Freizeitpark
+        panel.add(wrap(doublesCheckBox));
+
+        panel.add(Box.createVerticalStrut(8));
+
+        // Roll preview (compact, inline with turn input)
+        panel.add(wrap(bold("Roll outcome:")));
+        rollPreviewPanel = new JPanel();
+        rollPreviewPanel.setLayout(new BoxLayout(rollPreviewPanel, BoxLayout.Y_AXIS));
+        rollPreviewPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        rollPreviewPanel.setBorder(BorderFactory.createEmptyBorder(2, 4, 2, 4));
+        JScrollPane previewScroll = new JScrollPane(rollPreviewPanel);
+        previewScroll.setAlignmentX(Component.LEFT_ALIGNMENT);
+        previewScroll.setMaximumSize(new Dimension(Integer.MAX_VALUE, 70));
+        previewScroll.setBorder(BorderFactory.createLineBorder(new Color(0xCCCCCC)));
+        panel.add(previewScroll);
+
+        panel.add(Box.createVerticalStrut(8));
 
         // Buy dropdown
         panel.add(wrap(bold("Purchase (optional):")));
@@ -155,7 +184,7 @@ public class MainWindow extends JFrame {
         buyCombo.setAlignmentX(Component.LEFT_ALIGNMENT);
         panel.add(buyCombo);
 
-        panel.add(Box.createVerticalStrut(12));
+        panel.add(Box.createVerticalStrut(10));
 
         // Confirm button
         confirmBtn = new JButton("Confirm Turn");
@@ -164,7 +193,7 @@ public class MainWindow extends JFrame {
         confirmBtn.addActionListener(this::onConfirmTurn);
         panel.add(confirmBtn);
 
-        panel.add(Box.createVerticalStrut(6));
+        panel.add(Box.createVerticalStrut(4));
 
         // Undo button
         undoBtn = new JButton("Undo Last Turn");
@@ -173,7 +202,7 @@ public class MainWindow extends JFrame {
         undoBtn.addActionListener(this::onUndo);
         panel.add(undoBtn);
 
-        panel.add(Box.createVerticalStrut(14));
+        panel.add(Box.createVerticalStrut(10));
 
         // Snapshot button
         JButton snapshotBtn = new JButton("Enter Snapshot…");
@@ -182,7 +211,7 @@ public class MainWindow extends JFrame {
         snapshotBtn.addActionListener(this::onOpenSnapshot);
         panel.add(snapshotBtn);
 
-        panel.add(Box.createVerticalStrut(6));
+        panel.add(Box.createVerticalStrut(4));
 
         // Save / Load buttons
         JButton saveBtn = new JButton("Save Game…");
@@ -191,7 +220,7 @@ public class MainWindow extends JFrame {
         saveBtn.addActionListener(this::onSave);
         panel.add(saveBtn);
 
-        panel.add(Box.createVerticalStrut(4));
+        panel.add(Box.createVerticalStrut(2));
 
         JButton loadBtn = new JButton("Load Game…");
         loadBtn.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -199,99 +228,132 @@ public class MainWindow extends JFrame {
         loadBtn.addActionListener(this::onLoad);
         panel.add(loadBtn);
 
-        panel.add(Box.createVerticalStrut(14));
+        panel.add(Box.createVerticalStrut(12));
 
         // History area
         panel.add(wrap(bold("Turn history:")));
-        historyArea = new JTextArea(8, 18);
-        historyArea.setFont(new Font("Monospaced", Font.PLAIN, 11));
-        historyArea.setEditable(false);
-        historyArea.setLineWrap(true);
-        JScrollPane histScroll = new JScrollPane(historyArea);
+        historyPanel = new JPanel();
+        historyPanel.setLayout(new BoxLayout(historyPanel, BoxLayout.Y_AXIS));
+        historyPanel.setBackground(Color.WHITE);
+        JScrollPane histScroll = new JScrollPane(historyPanel);
         histScroll.setAlignmentX(Component.LEFT_ALIGNMENT);
-        histScroll.setMaximumSize(new Dimension(Integer.MAX_VALUE, 160));
+        histScroll.setMaximumSize(new Dimension(Integer.MAX_VALUE, 200));
         panel.add(histScroll);
 
         return panel;
     }
 
-    // ---- Center panel: top recommendation ----
+    // ---- Center panel: card details ----
 
     private JPanel buildCenterPanel() {
         JPanel panel = new JPanel();
         panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
-        panel.setBorder(titledBorder("Best Purchase"));
-        panel.setPreferredSize(new Dimension(300, 0));
+        panel.setBorder(titledBorder("Card Details"));
+        panel.setPreferredSize(new Dimension(320, 0));
 
         topCardColorBar = new JPanel();
-        topCardColorBar.setMaximumSize(new Dimension(Integer.MAX_VALUE, 8));
+        topCardColorBar.setMaximumSize(new Dimension(Integer.MAX_VALUE, 6));
         topCardColorBar.setAlignmentX(Component.LEFT_ALIGNMENT);
         panel.add(topCardColorBar);
 
-        panel.add(Box.createVerticalStrut(8));
+        panel.add(Box.createVerticalStrut(6));
 
+        // Card name + color tag on same row
+        JPanel nameRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
         topCardName = new JLabel("—");
-        topCardName.setFont(new Font("Arial", Font.BOLD, 20));
-        topCardName.setAlignmentX(Component.LEFT_ALIGNMENT);
-        panel.add(wrap(topCardName));
+        topCardName.setFont(new Font("Arial", Font.BOLD, 18));
+        nameRow.add(topCardName);
+        topCardColorTag = new JLabel("");
+        topCardColorTag.setFont(new Font("Arial", Font.BOLD, 11));
+        topCardColorTag.setOpaque(true);
+        topCardColorTag.setBorder(BorderFactory.createEmptyBorder(1, 4, 1, 4));
+        nameRow.add(topCardColorTag);
+        nameRow.setAlignmentX(Component.LEFT_ALIGNMENT);
+        panel.add(nameRow);
 
         topCardCost = new JLabel("Cost: —");
         topCardCost.setFont(new Font("Arial", Font.PLAIN, 13));
         topCardCost.setAlignmentX(Component.LEFT_ALIGNMENT);
         panel.add(wrap(topCardCost));
 
-        panel.add(Box.createVerticalStrut(10));
+        // Card description
+        topCardDesc = new JLabel("<html><i>—</i></html>");
+        topCardDesc.setFont(new Font("Arial", Font.ITALIC, 11));
+        topCardDesc.setForeground(new Color(0x555555));
+        topCardDesc.setAlignmentX(Component.LEFT_ALIGNMENT);
+        panel.add(wrap(topCardDesc));
 
-        topCardEV = metricLabel("EV / round: —");
-        topCardROI = metricLabel("ROI (10 turns): —");
-        topCardRisk = metricLabel("Risk (P=0 income): —");
-        topCardWinProb = metricLabel("Win Δ: —");
+        panel.add(Box.createVerticalStrut(8));
+
+        // Metrics in two-column grid with labels + values
+        JPanel metricsGrid = new JPanel(new GridLayout(0, 2, 4, 3));
+        metricsGrid.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        topCardEV    = addMetricRow(metricsGrid, "EV / round:", "Expected coins earned per full game round (own turn + opponent turns). Higher = better income engine.");
+        topCardROI   = addMetricRow(metricsGrid, "ROI (10 turns):", "Discounted return on investment over 10 rounds minus purchase cost. Positive = profitable buy.");
+        topCardRisk  = addMetricRow(metricsGrid, "P(0 income):", "Probability of earning zero coins on your own turn. Lower = more reliable income.");
+        topCardVar   = addMetricRow(metricsGrid, "Variance:", "Statistical spread of per-turn income. Lower = more predictable; higher = boom-or-bust.");
+        topCardWinProb = addMetricRow(metricsGrid, "Win Prob Δ:", "Change in estimated win probability from buying this card. Requires win-prob analysis.");
         topCardWinProb.setVisible(false);
+        // Also hide its label
+        ((JLabel) metricsGrid.getComponent(metricsGrid.getComponentCount() - 2)).setVisible(false);
 
-        panel.add(wrap(topCardEV));
-        panel.add(wrap(topCardROI));
-        panel.add(wrap(topCardRisk));
-        panel.add(wrap(topCardWinProb));
+        JPanel metricsWrapper = new JPanel(new BorderLayout());
+        metricsWrapper.add(metricsGrid, BorderLayout.NORTH);
+        metricsWrapper.setAlignmentX(Component.LEFT_ALIGNMENT);
+        panel.add(metricsWrapper);
 
         panel.add(Box.createVerticalStrut(6));
 
+        // Baseline win probability
         baselineWinProbLabel = new JLabel("Current win prob: —");
         baselineWinProbLabel.setFont(new Font("Arial", Font.BOLD, 12));
         baselineWinProbLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        JLabel winProbExplain = new JLabel("<html><small>Analytical softmax estimate based on relative EV score vs opponents</small></html>");
+        winProbExplain.setFont(new Font("Arial", Font.PLAIN, 10));
+        winProbExplain.setForeground(new Color(0x666666));
+        winProbExplain.setAlignmentX(Component.LEFT_ALIGNMENT);
         panel.add(wrap(baselineWinProbLabel));
+        panel.add(wrap(winProbExplain));
 
-        panel.add(Box.createVerticalStrut(12));
+        panel.add(Box.createVerticalStrut(6));
 
         topCardNote = new JLabel("<html><i>—</i></html>");
         topCardNote.setFont(new Font("Arial", Font.ITALIC, 12));
         topCardNote.setAlignmentX(Component.LEFT_ALIGNMENT);
         panel.add(wrap(topCardNote));
 
-        panel.add(Box.createVerticalStrut(10));
-
-        panel.add(wrap(bold("Roll outcome:")));
-        rollPreviewArea = new JTextArea(4, 22);
-        rollPreviewArea.setFont(new Font("Monospaced", Font.PLAIN, 11));
-        rollPreviewArea.setEditable(false);
-        rollPreviewArea.setLineWrap(true);
-        rollPreviewArea.setBackground(panel.getBackground());
-        JScrollPane previewScroll = new JScrollPane(rollPreviewArea);
-        previewScroll.setAlignmentX(Component.LEFT_ALIGNMENT);
-        previewScroll.setMaximumSize(new Dimension(Integer.MAX_VALUE, 90));
-        panel.add(previewScroll);
-
         return panel;
+    }
+
+    /**
+     * Adds a two-cell metric row (label + value) to the grid panel and returns the value label.
+     * The label gets a tooltip with the explanation text.
+     */
+    private JLabel addMetricRow(JPanel grid, String labelText, String tooltip) {
+        JLabel lbl = new JLabel(labelText);
+        lbl.setFont(new Font("Arial", Font.BOLD, 12));
+        lbl.setToolTipText(tooltip);
+        JLabel val = new JLabel("—");
+        val.setFont(MONO_FONT);
+        val.setToolTipText(tooltip);
+        grid.add(lbl);
+        grid.add(val);
+        return val;
     }
 
     // ---- Right panel: full ranking table ----
 
     private JPanel buildRightPanel() {
         JPanel panel = new JPanel(new BorderLayout(4, 4));
-        panel.setBorder(titledBorder("All Affordable Cards (sorted by ROI)"));
+        panel.setBorder(titledBorder("All Affordable Cards"));
 
-        String[] cols = {"Card", "Cost", "EV/rnd", "ROI", "Risk", "Var"};
+        String[] cols = {"Card", "Cost", "EV/rnd", "ROI", "P(0)", "Var"};
         tableModel = new DefaultTableModel(cols, 0) {
             @Override public boolean isCellEditable(int r, int c) { return false; }
+            @Override public Class<?> getColumnClass(int c) {
+                return c == 0 ? String.class : Double.class;
+            }
         };
         rankTable = new JTable(tableModel);
         rankTable.setFont(MONO_FONT);
@@ -301,29 +363,66 @@ public class MainWindow extends JFrame {
             if (!e.getValueIsAdjusting()) onTableSelect();
         });
 
-        // Right-align numeric columns and card name color renderer are applied in rebuildTable().
-        // Column widths (fixed initial values; rebuildTable also restores these)
-        rankTable.getColumnModel().getColumn(0).setPreferredWidth(110);
-        for (int c = 1; c <= 5; c++) rankTable.getColumnModel().getColumn(c).setPreferredWidth(55);
+        // Sortable columns
+        TableRowSorter<DefaultTableModel> sorter = new TableRowSorter<>(tableModel);
+        rankTable.setRowSorter(sorter);
+        // Card column (String): alphabetic sort; numeric columns: numeric sort
+        sorter.setComparator(0, java.util.Comparator.naturalOrder());
+        for (int c = 1; c <= 5; c++) {
+            sorter.setComparator(c, java.util.Comparator.comparingDouble(o -> (Double) o));
+        }
+        // Default: sort by ROI (column 3) descending
+        java.util.List<RowSorter.SortKey> sortKeys = new java.util.ArrayList<>();
+        sortKeys.add(new RowSorter.SortKey(3, SortOrder.DESCENDING));
+        sorter.setSortKeys(sortKeys);
 
         panel.add(new JScrollPane(rankTable), BorderLayout.CENTER);
 
         // Button bar at bottom
         JPanel btnBar = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 4));
+
         toggleWinProbBtn = new JButton("Show Win Prob Δ");
         toggleWinProbBtn.addActionListener(this::onToggleWinProb);
         btnBar.add(toggleWinProbBtn);
 
         deepAnalysisBtn = new JToggleButton("Deep Analysis (MC)");
-        deepAnalysisBtn.setToolTipText("Run 1000 Monte Carlo simulations per card for accurate win-probability delta. ~1–2 seconds.");
+        deepAnalysisBtn.setToolTipText("Run Monte Carlo simulations per card for accurate win-probability delta.");
         deepAnalysisBtn.addActionListener(this::onToggleDeepAnalysis);
         btnBar.add(deepAnalysisBtn);
+
+        // MC sim count spinner (only relevant when deep analysis is on)
+        mcSimSpinner = new BoundedSpinner(new SpinnerNumberModel(1000, 100, 10000, 100));
+        mcSimSpinner.setPreferredSize(new Dimension(70, 24));
+        mcSimSpinner.setToolTipText("Number of Monte Carlo simulations (100–10000). More = accurate but slower.");
+        mcSimSpinner.setEnabled(false);
+        mcSimSpinner.addChangeListener(e -> {
+            mcSimCount = (int) mcSimSpinner.getValue();
+            rankOpts.mcSimulations = deepAnalysisBtn.isSelected() ? mcSimCount : 0;
+        });
+        btnBar.add(new JLabel("N:"));
+        btnBar.add(mcSimSpinner);
+
+        // Reload button for MC without double-toggling
+        mcReloadBtn = new JButton("⟳");
+        mcReloadBtn.setToolTipText("Re-run Monte Carlo analysis with the current settings.");
+        mcReloadBtn.setEnabled(false);
+        mcReloadBtn.addActionListener(e -> {
+            if (deepAnalysisBtn.isSelected() && showWinProb) {
+                refreshAll();
+            }
+        });
+        btnBar.add(mcReloadBtn);
 
         statusLabel = new JLabel("");
         statusLabel.setFont(new Font("Arial", Font.ITALIC, 11));
         btnBar.add(statusLabel);
 
         panel.add(btnBar, BorderLayout.SOUTH);
+
+        // Column tooltips explaining headers
+        rankTable.getTableHeader().setToolTipText(
+                "<html>EV/rnd = expected coins/round · ROI = return on investment (10 turns) · " +
+                "P(0) = probability of zero income · Var = variance</html>");
 
         return panel;
     }
@@ -335,6 +434,7 @@ public class MainWindow extends JFrame {
     private void onConfirmTurn(ActionEvent e) {
         int pi = session.nextPlayerIndex();
         int roll = (int) rollSpinner.getValue();
+        boolean isDoubles = doublesCheckBox.isVisible() && doublesCheckBox.isSelected();
 
         Project bought = null;
         String selected = (String) buyCombo.getSelectedItem();
@@ -344,16 +444,26 @@ public class MainWindow extends JFrame {
         }
 
         try {
-            session.applyTurn(new TurnRecord(pi, roll, bought));
+            session.applyTurn(new TurnRecord(pi, roll, bought, isDoubles));
         } catch (IllegalArgumentException ex) {
             JOptionPane.showMessageDialog(this, ex.getMessage(), "Invalid Turn", JOptionPane.ERROR_MESSAGE);
             return;
         }
 
+        // Reset doubles checkbox after confirming
+        doublesCheckBox.setSelected(false);
+
         if (session.isFinished()) {
             String winner = session.getPlayerNames()[session.getWinnerIndex()];
             showGameOver(winner);
             return;
+        }
+
+        // Show bonus turn notification if Freizeitpark triggered
+        if (session.isBonusTurnPending()) {
+            String pName = session.getPlayerNames()[pi];
+            activePlayerLabel.setText("<html><b style='color:#7030A0'>" + pName
+                    + " BONUS TURN!</b></html>");
         }
 
         refreshAll();
@@ -375,14 +485,20 @@ public class MainWindow extends JFrame {
 
     private void onToggleDeepAnalysis(ActionEvent e) {
         boolean enabled = deepAnalysisBtn.isSelected();
-        rankOpts.mcSimulations = enabled ? 1000 : 0;
+        mcSimCount = (int) mcSimSpinner.getValue();
+        rankOpts.mcSimulations = enabled ? mcSimCount : 0;
         deepAnalysisBtn.setText(enabled ? "Deep Analysis ON (MC)" : "Deep Analysis (MC)");
-        // Only show win-prob column when deep analysis is active
+        mcSimSpinner.setEnabled(enabled);
+        // Reload button is only active when both deep analysis is on AND win prob is shown
+        mcReloadBtn.setEnabled(enabled && showWinProb);
+
+        // Auto-show win-prob column when deep analysis is activated
         if (enabled && !showWinProb) {
             showWinProb = true;
             rankOpts.includeWinProbDelta = true;
             toggleWinProbBtn.setText("Hide Win Prob Δ");
-            topCardWinProb.setVisible(true);
+            setWinProbRowVisible(true);
+            mcReloadBtn.setEnabled(true);
         }
         refreshAll();
     }
@@ -391,22 +507,48 @@ public class MainWindow extends JFrame {
         showWinProb = !showWinProb;
         rankOpts.includeWinProbDelta = showWinProb;
         toggleWinProbBtn.setText(showWinProb ? "Hide Win Prob Δ" : "Show Win Prob Δ");
-        topCardWinProb.setVisible(showWinProb);
+        setWinProbRowVisible(showWinProb);
+        // Reload button only enabled when deep analysis is on AND win prob is shown
+        mcReloadBtn.setEnabled(deepAnalysisBtn.isSelected() && showWinProb);
 
-        // Add/remove Win Δ column
         if (showWinProb) {
-            tableModel.addColumn("Win Δ");
+            // Only recompute if analytical (MC was already computed or is off)
+            if (rankOpts.mcSimulations == 0) {
+                refreshAll();
+            } else {
+                // MC is on: add Win Δ column and rebuild table without re-running MC
+                rebuildTable();
+            }
         } else {
-            // Remove last column — DefaultTableModel doesn't have removeColumn; rebuild
+            // Just rebuild table without the column — no need to recompute
             rebuildTable();
         }
-        refreshAll();
+    }
+
+    /**
+     * Shows or hides the Win Prob row in the center panel.
+     * The row occupies two cells in the metrics grid (label + value).
+     */
+    private void setWinProbRowVisible(boolean visible) {
+        // topCardWinProb's label is the component just before it in the grid
+        topCardWinProb.setVisible(visible);
+        // Find and toggle its label sibling
+        Container grid = topCardWinProb.getParent();
+        if (grid != null) {
+            int idx = -1;
+            for (int i = 0; i < grid.getComponentCount(); i++) {
+                if (grid.getComponent(i) == topCardWinProb) { idx = i; break; }
+            }
+            if (idx > 0) grid.getComponent(idx - 1).setVisible(visible);
+        }
     }
 
     private void onTableSelect() {
-        int row = rankTable.getSelectedRow();
-        if (row < 0 || row >= lastRanking.size()) return;
-        RankEntry entry = lastRanking.get(row);
+        int viewRow = rankTable.getSelectedRow();
+        if (viewRow < 0) return;
+        int modelRow = rankTable.convertRowIndexToModel(viewRow);
+        if (modelRow < 0 || modelRow >= lastRanking.size()) return;
+        RankEntry entry = lastRanking.get(modelRow);
         populateCenter(entry);
     }
 
@@ -449,22 +591,24 @@ public class MainWindow extends JFrame {
     }
 
     private void showGameOver(String winnerName) {
-        // Disable further input
         confirmBtn.setEnabled(false);
         undoBtn.setEnabled(true);
 
-        // Replace center panel content with a win message
-        topCardColorBar.setBackground(CARD_COLORS[4]); // gelb — landmark color
+        topCardColorBar.setBackground(CARD_COLORS[4]);
         topCardName.setText(winnerName + " wins!");
+        topCardColorTag.setText("[GP]");
+        topCardColorTag.setBackground(new Color(0xFFF5B0));
         topCardCost.setText("");
-        topCardEV.setText("All 4 landmarks built.");
-        topCardROI.setText("");
-        topCardRisk.setText("");
+        topCardDesc.setText("<html><i>All 4 Großprojekte built!</i></html>");
+        topCardEV.setText("—");
+        topCardROI.setText("—");
+        topCardRisk.setText("—");
+        topCardVar.setText("—");
+        topCardWinProb.setText("—");
         topCardWinProb.setVisible(false);
         baselineWinProbLabel.setText("Current win prob: 100%");
         topCardNote.setText("<html><i>Game over. Use Undo to continue or close the window.</i></html>");
 
-        // Clear the ranking table — no more purchases
         tableModel.setRowCount(0);
         statusLabel.setText("Game over!");
     }
@@ -475,8 +619,7 @@ public class MainWindow extends JFrame {
 
     /**
      * Returns a copy of the current game state with coin deltas from the current roll
-     * already applied. This is the state the active player actually buys from: in Machi Koro
-     * you roll first, collect income / pay red cards, and only then make a purchase.
+     * already applied. This is the state the active player actually buys from.
      */
     private GameState postRollState() {
         int pi   = session.nextPlayerIndex();
@@ -495,39 +638,38 @@ public class MainWindow extends JFrame {
         Player[] players = session.getState().getPlayers();
         Player activePlayer = players[pi];
 
-        // Update active-player label and coins (pre-roll coins shown as context)
         activePlayerLabel.setText(activePlayer.getName() + "'s turn");
+        if (session.isBonusTurnPending()) {
+            activePlayerLabel.setText("<html><b style='color:#7030A0'>" + activePlayer.getName()
+                    + " — BONUS TURN (Freizeitpark)!</b></html>");
+        } else {
+            activePlayerLabel.setText(activePlayer.getName() + "'s turn");
+        }
         coinsLabel.setText("Coins: " + activePlayer.getCoins());
 
-        // Update roll spinner range based on whether the active player owns Bahnhof
         updateRollSpinner(activePlayer);
 
-        // Compute post-roll state: this is what the player can afford to buy
         GameState postRoll = postRollState();
         Player postRollPlayer = postRoll.getPlayers()[pi];
         int postRollCoins = postRollPlayer.getCoins();
         if (postRollCoins != activePlayer.getCoins()) {
-            coinsLabel.setText("Coins: " + activePlayer.getCoins() + " → " + postRollCoins + " (after roll)");
+            coinsLabel.setText(activePlayer.getCoins() + " → " + postRollCoins + " coins (after roll)");
         }
 
-        // Rebuild buy combo using post-roll coins (roll first, then buy)
         rebuildBuyCombo(pi, postRollPlayer, postRoll);
 
-        // History and undo must always update immediately
         refreshHistory();
         undoBtn.setEnabled(!session.getHistory().isEmpty());
 
-        // Show roll outcome preview for the current spinner value
         refreshRollPreview();
 
-        // Baseline win probability uses post-roll state (more accurate for current position)
         double baselineWinProb = ProbabilityCalc.computeBaselineWinProb(postRoll, pi);
-        baselineWinProbLabel.setText(String.format("Current win prob: %.1f%%", baselineWinProb * 100));
+        baselineWinProbLabel.setText(String.format("Win prob: %.1f%%", baselineWinProb * 100));
 
         if (rankOpts.mcSimulations > 0) {
-            // MC path: run ranking on background thread to keep UI responsive
-            statusLabel.setText("Running MC simulations…");
+            statusLabel.setText("Running MC…");
             confirmBtn.setEnabled(false);
+            mcReloadBtn.setEnabled(false);
             final GameState snapState = postRoll;
             final int snapPi = pi;
 
@@ -546,6 +688,7 @@ public class MainWindow extends JFrame {
                     }
                     statusLabel.setText("MC done (" + rankOpts.mcSimulations + " sims)");
                     confirmBtn.setEnabled(true);
+                    mcReloadBtn.setEnabled(deepAnalysisBtn.isSelected() && showWinProb);
                     rebuildTable();
                     if (!lastRanking.isEmpty()) {
                         populateCenter(lastRanking.get(0));
@@ -557,7 +700,6 @@ public class MainWindow extends JFrame {
             };
             worker.execute();
         } else {
-            // Analytical path: fast, run on EDT directly
             statusLabel.setText("");
             lastRanking = ProbabilityCalc.rankPurchasableProjects(postRoll, pi, rankOpts);
             rebuildTable();
@@ -572,8 +714,7 @@ public class MainWindow extends JFrame {
 
     /**
      * Updates the roll spinner's range and default value for the given active player.
-     * Without Bahnhof the valid roll range is 1–6 (1d6); with Bahnhof it is 1–12 (2d6 option).
-     * The default is 3 (mid-1d6) or 7 (mode of 2d6). The current value is clamped to the new range.
+     * Also shows the doubles checkbox when the player has both Bahnhof and Freizeitpark.
      */
     private void updateRollSpinner(Player activePlayer) {
         boolean hasBahnhof = activePlayer.hasProject("bahnhof");
@@ -582,43 +723,46 @@ public class MainWindow extends JFrame {
         int current = (int) rollSpinner.getValue();
         int clamped = Math.min(current, newMax);
         SpinnerNumberModel model = (SpinnerNumberModel) rollSpinner.getModel();
-        // Update max before clamping value to avoid model validation errors
         model.setMaximum(newMax);
         model.setMinimum(1);
         if (current != clamped) rollSpinner.setValue(clamped);
-        // Reset to sensible default when switching dice mode
         if ((hasBahnhof && current <= 6) || (!hasBahnhof && current > 6)) {
             rollSpinner.setValue(newDefault);
         }
         rollRangeLabel.setText("Dice roll (1–" + newMax + "):");
+
+        // Show doubles checkbox only when player can roll 2 dice (Bahnhof) AND has Freizeitpark
+        boolean canGetBonus = hasBahnhof && activePlayer.hasProject("freizeitpark");
+        doublesCheckBox.setVisible(canGetBonus);
+        if (!canGetBonus) doublesCheckBox.setSelected(false);
     }
 
     /**
      * Computes and displays per-player coin deltas for the current roll spinner value.
-     * Called whenever the roll spinner changes so the user can verify outcomes before confirming.
      */
     private void refreshRollPreview() {
-        if (rollPreviewArea == null) return;
+        if (rollPreviewPanel == null) return;
         int roll = (int) rollSpinner.getValue();
         int pi = session.nextPlayerIndex();
         GameState state = session.getState();
         int[] deltas = ProbabilityCalc.computeAllDeltasForRoll(state, pi, roll);
         String[] names = session.getPlayerNames();
-        StringBuilder sb = new StringBuilder("Roll ").append(roll).append(": ");
+
+        rollPreviewPanel.removeAll();
         for (int i = 0; i < deltas.length; i++) {
-            if (i > 0) sb.append(", ");
-            sb.append(names[i]).append(" ");
-            if (deltas[i] >= 0) sb.append("+");
-            sb.append(deltas[i]);
+            String sign = deltas[i] >= 0 ? "+" : "";
+            JLabel lbl = new JLabel(names[i] + ": " + sign + deltas[i] + " coins");
+            lbl.setFont(new Font("Monospaced", Font.PLAIN, 11));
+            if (deltas[i] > 0) lbl.setForeground(new Color(0x007700));
+            else if (deltas[i] < 0) lbl.setForeground(new Color(0xAA0000));
+            rollPreviewPanel.add(lbl);
         }
-        rollPreviewArea.setText(sb.toString());
+        rollPreviewPanel.revalidate();
+        rollPreviewPanel.repaint();
     }
 
     /**
      * Refreshes all roll-dependent UI elements when the roll spinner value changes.
-     * Re-computes the post-roll state and updates the buy dropdown, ranking table,
-     * and roll preview — without touching turn-independent elements (history, spinner range).
-     * Skips MC re-ranking to avoid blocking the EDT on every spinner tick.
      */
     private void refreshAfterRollChange() {
         refreshRollPreview();
@@ -630,7 +774,7 @@ public class MainWindow extends JFrame {
         int preCoins  = preRollPlayer.getCoins();
         int postCoins = postRollPlayer.getCoins();
         if (postCoins != preCoins) {
-            coinsLabel.setText("Coins: " + preCoins + " → " + postCoins + " (after roll)");
+            coinsLabel.setText(preCoins + " → " + postCoins + " coins (after roll)");
         } else {
             coinsLabel.setText("Coins: " + preCoins);
         }
@@ -638,9 +782,8 @@ public class MainWindow extends JFrame {
         rebuildBuyCombo(pi, postRollPlayer, postRoll);
 
         double baselineWinProb = ProbabilityCalc.computeBaselineWinProb(postRoll, pi);
-        baselineWinProbLabel.setText(String.format("Current win prob: %.1f%%", baselineWinProb * 100));
+        baselineWinProbLabel.setText(String.format("Win prob: %.1f%%", baselineWinProb * 100));
 
-        // Analytical ranking only on spinner change (MC is too slow for live updates)
         if (rankOpts.mcSimulations == 0) {
             lastRanking = ProbabilityCalc.rankPurchasableProjects(postRoll, pi, rankOpts);
             rebuildTable();
@@ -658,12 +801,10 @@ public class MainWindow extends JFrame {
         buyCombo.addItem("— nothing —");
         int coins = postRollPlayer.getCoins();
 
-        // Unbuilt pool (normal cards) — affordable with post-roll coins
         for (Project p : postRoll.getUnbuilt_projects()) {
             if (p.getCost() <= coins) buyCombo.addItem(labelForProject(p));
         }
 
-        // Großprojekte: always available if not yet owned by this player
         for (Project p : ProjectLoader.getAllProjects()) {
             if (p.isIs_grossprojekt() && !postRollPlayer.hasProject(p.getId()) && p.getCost() <= coins) {
                 buyCombo.addItem(labelForProject(p) + " [GP]");
@@ -673,67 +814,128 @@ public class MainWindow extends JFrame {
 
     private void rebuildTable() {
         String[] cols = showWinProb
-                ? new String[]{"Card", "Cost", "EV/rnd", "ROI", "Risk", "Var", "Win Δ"}
-                : new String[]{"Card", "Cost", "EV/rnd", "ROI", "Risk", "Var"};
+                ? new String[]{"Card", "Cost", "EV/rnd", "ROI", "P(0)", "Var", "Win Δ"}
+                : new String[]{"Card", "Cost", "EV/rnd", "ROI", "P(0)", "Var"};
 
         tableModel.setColumnIdentifiers(cols);
         tableModel.setRowCount(0);
 
         for (RankEntry e : lastRanking) {
+            String cardLabel = e.project.isIs_grossprojekt()
+                    ? UIUtils.capitalize(e.project.getId()) + " [GP]"
+                    : UIUtils.capitalize(e.project.getId());
             Object[] row = showWinProb
-                    ? new Object[]{e.project.getId(), e.project.getCost(),
-                                   fmt2(e.evPerRound), fmt2(e.roiOverHorizon),
-                                   fmt2(e.probNoIncomeOwnTurn), fmt2(e.variance),
-                                   fmt2(e.winProbDelta)}
-                    : new Object[]{e.project.getId(), e.project.getCost(),
-                                   fmt2(e.evPerRound), fmt2(e.roiOverHorizon),
-                                   fmt2(e.probNoIncomeOwnTurn), fmt2(e.variance)};
+                    ? new Object[]{cardLabel, (double) e.project.getCost(),
+                                   e.evPerRound, e.roiOverHorizon,
+                                   e.probNoIncomeOwnTurn, e.variance,
+                                   e.winProbDelta}
+                    : new Object[]{cardLabel, (double) e.project.getCost(),
+                                   e.evPerRound, e.roiOverHorizon,
+                                   e.probNoIncomeOwnTurn, e.variance};
             tableModel.addRow(row);
         }
 
-        // Re-apply renderers after column rebuild
-        DefaultTableCellRenderer rightAlign = new DefaultTableCellRenderer();
-        rightAlign.setHorizontalAlignment(SwingConstants.RIGHT);
-        for (int c = 1; c < cols.length; c++) rankTable.getColumnModel().getColumn(c).setCellRenderer(rightAlign);
+        // Re-apply renderers and widths
         rankTable.getColumnModel().getColumn(0).setCellRenderer(new CardNameRenderer());
-        rankTable.getColumnModel().getColumn(0).setPreferredWidth(110);
-        for (int c = 1; c < cols.length; c++) rankTable.getColumnModel().getColumn(c).setPreferredWidth(55);
+        rankTable.getColumnModel().getColumn(0).setPreferredWidth(120);
+
+        NumericCellRenderer numRenderer = new NumericCellRenderer();
+        for (int c = 1; c < cols.length; c++) {
+            rankTable.getColumnModel().getColumn(c).setCellRenderer(numRenderer);
+            rankTable.getColumnModel().getColumn(c).setPreferredWidth(52);
+        }
+
+        // Re-attach sorter comparators after column rebuild
+        TableRowSorter<?> sorter = (TableRowSorter<?>) rankTable.getRowSorter();
+        if (sorter != null) {
+            @SuppressWarnings("unchecked")
+            TableRowSorter<DefaultTableModel> trs = (TableRowSorter<DefaultTableModel>) sorter;
+            trs.setComparator(0, java.util.Comparator.naturalOrder());
+            for (int c = 1; c < cols.length; c++) {
+                trs.setComparator(c, java.util.Comparator.comparingDouble(o -> (Double) o));
+            }
+        }
     }
 
     private void populateCenter(RankEntry entry) {
         Project p = entry.project;
         topCardName.setText(UIUtils.capitalize(p.getId()));
-        topCardCost.setText("Cost: " + p.getCost() + " coin" + (p.getCost() != 1 ? "s" : ""));
-        topCardEV.setText("EV / round:    " + fmt2(entry.evPerRound));
-        topCardROI.setText("ROI (10 turns): " + fmt2(entry.roiOverHorizon));
-        topCardRisk.setText("Risk (P=0 income): " + fmt2(entry.probNoIncomeOwnTurn));
-        topCardWinProb.setText("Win Δ:         " + fmt2(entry.winProbDelta));
+
+        String colorStr = colorLabel(p.getColor());
+        topCardColorTag.setText(colorStr);
+        topCardColorTag.setBackground(colorForCard(p.getColor(), false));
+        topCardColorTag.setForeground(colorForCard(p.getColor(), true).darker());
+
+        topCardCost.setText("Cost: " + p.getCost() + " coin" + (p.getCost() != 1 ? "s" : "")
+                + activationLabel(p));
+        String desc = p.getDescription();
+        topCardDesc.setText("<html><i>" + (desc != null && !desc.isEmpty() ? desc : "—") + "</i></html>");
+
+        topCardEV.setText(fmt2(entry.evPerRound));
+        topCardROI.setText(fmt2(entry.roiOverHorizon));
+        topCardRisk.setText(fmt2(entry.probNoIncomeOwnTurn));
+        topCardVar.setText(fmt2(entry.variance));
+        topCardWinProb.setText(fmt2(entry.winProbDelta));
         topCardNote.setText("<html><i>" + buildNote(entry) + "</i></html>");
         topCardColorBar.setBackground(colorForCard(p));
     }
 
     private void clearCenter(String message) {
         topCardName.setText("—");
+        topCardColorTag.setText("");
+        topCardColorTag.setBackground(null);
         topCardCost.setText("");
-        topCardEV.setText("EV / round:    —");
-        topCardROI.setText("ROI (10 turns): —");
-        topCardRisk.setText("Risk (P=0 income): —");
-        topCardWinProb.setText("Win Δ:         —");
+        topCardDesc.setText("");
+        topCardEV.setText("—");
+        topCardROI.setText("—");
+        topCardRisk.setText("—");
+        topCardVar.setText("—");
+        topCardWinProb.setText("—");
         topCardNote.setText("<html><i>" + message + "</i></html>");
         topCardColorBar.setBackground(Color.LIGHT_GRAY);
     }
 
     private void refreshHistory() {
+        historyPanel.removeAll();
         List<TurnRecord> history = session.getHistory();
-        StringBuilder sb = new StringBuilder();
         String[] names = session.getPlayerNames();
+        GameState current = session.getState();
+        String[] playerColors = new String[current.getPlayers().length];
+        for (int i = 0; i < current.getPlayers().length; i++) {
+            // Assign a distinct color per player for history display
+            Color c = playerIndexColor(i);
+            playerColors[i] = String.format("#%02x%02x%02x", c.getRed(), c.getGreen(), c.getBlue());
+        }
+
         for (int i = history.size() - 1; i >= 0; i--) {
             TurnRecord t = history.get(i);
             String pName = names[t.playerIndex];
-            String buy = (t.bought != null) ? " → bought " + t.bought.getId() : " → saved";
-            sb.append(pName).append(" rolled ").append(t.roll).append(buy).append("\n");
+            String colorHex = playerColors[t.playerIndex];
+
+            StringBuilder html = new StringBuilder("<html>");
+            html.append("<b style='color:").append(colorHex).append("'>").append(pName).append("</b>");
+            html.append(" rolled <b>").append(t.roll).append("</b>");
+            if (t.isDoubles) html.append(" 🎲🎲 <b style='color:#7030A0'>DOUBLES!</b>");
+            if (t.bought != null) {
+                String gpMark = t.bought.isIs_grossprojekt() ? " [GP]" : "";
+                html.append(" → bought <b>").append(UIUtils.capitalize(t.bought.getId()))
+                    .append(gpMark).append("</b> (−").append(t.bought.getCost()).append("¢)");
+            } else {
+                html.append(" → saved");
+            }
+            html.append("</html>");
+
+            JLabel lbl = new JLabel(html.toString());
+            lbl.setFont(new Font("Arial", Font.PLAIN, 11));
+            lbl.setBorder(BorderFactory.createEmptyBorder(2, 4, 2, 4));
+            // Alternate row background
+            lbl.setOpaque(true);
+            lbl.setBackground((i % 2 == 0) ? Color.WHITE : new Color(0xF5F5F5));
+            historyPanel.add(lbl);
         }
-        historyArea.setText(sb.toString());
+
+        historyPanel.revalidate();
+        historyPanel.repaint();
     }
 
     // =========================================================================
@@ -759,12 +961,46 @@ public class MainWindow extends JFrame {
 
     /** Extracts the project ID from a combo label like "Weizenfeld (1)" or "Bahnhof (4) [GP]" */
     private static String projectIdFromLabel(String label) {
-        // Remove [GP] suffix if present, then parse from the capitalized label
         String clean = label.replace(" [GP]", "");
-        // Label is "Name (cost)" where Name is capitalize(id), so we lowercase again
         int paren = clean.indexOf(" (");
         String name = paren >= 0 ? clean.substring(0, paren) : clean;
         return name.toLowerCase();
+    }
+
+    /** Returns a short activation string for a card (e.g. " · Rolls: 2, 3" or " · All turns"). */
+    private static String activationLabel(Project p) {
+        if (p.isIs_grossprojekt()) return " · Großprojekt";
+        int[] dice = p.getDice_activation();
+        if (dice == null || dice.length == 0) return "";
+        StringBuilder sb = new StringBuilder(" · Roll");
+        if (dice.length > 1) sb.append("s");
+        sb.append(": ");
+        for (int i = 0; i < dice.length; i++) {
+            if (i > 0) sb.append(", ");
+            sb.append(dice[i]);
+        }
+        return sb.toString();
+    }
+
+    private static Color playerIndexColor(int idx) {
+        return switch (idx) {
+            case 0 -> new Color(0x1565C0); // dark blue
+            case 1 -> new Color(0xAD1457); // dark pink
+            case 2 -> new Color(0x2E7D32); // dark green
+            case 3 -> new Color(0xE65100); // dark orange
+            default -> Color.DARK_GRAY;
+        };
+    }
+
+    private static String colorLabel(String color) {
+        return switch (color) {
+            case "blau"  -> "Blau";
+            case "rot"   -> "Rot";
+            case "grün"  -> "Grün";
+            case "lila"  -> "Lila";
+            case "gelb"  -> "Gelb";
+            default      -> color;
+        };
     }
 
     private static Color colorForCard(Project p) {
@@ -774,7 +1010,7 @@ public class MainWindow extends JFrame {
     /**
      * Returns the display color for a card.
      *
-     * @param colorId card color string (e.g. "blau", "rot")
+     * @param colorId  card color string (e.g. "blau", "rot")
      * @param saturated true = vivid/saturated color (for color bars); false = pastel (for table cell backgrounds)
      */
     private static Color colorForCard(String colorId, boolean saturated) {
@@ -801,7 +1037,6 @@ public class MainWindow extends JFrame {
 
     /**
      * Replaces the current session with a new one (called from {@link SnapshotDialog}).
-     * The window refreshes to reflect the new state.
      */
     void replaceSession(GameSession newSession) {
         this.session = newSession;
@@ -822,12 +1057,6 @@ public class MainWindow extends JFrame {
         return l;
     }
 
-    private static JLabel metricLabel(String text) {
-        JLabel l = new JLabel(text);
-        l.setFont(MONO_FONT);
-        return l;
-    }
-
     private static TitledBorder titledBorder(String title) {
         return BorderFactory.createTitledBorder(
                 BorderFactory.createEtchedBorder(), title, TitledBorder.LEFT, TitledBorder.TOP,
@@ -844,13 +1073,55 @@ public class MainWindow extends JFrame {
                                                         boolean isSelected, boolean hasFocus,
                                                         int row, int column) {
             super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
-            if (!isSelected && value instanceof String) {
-                String id = (String) value;
+            if (!isSelected && value instanceof String label) {
+                // Strip [GP] suffix to look up color
+                String id = label.replace(" [GP]", "").toLowerCase();
                 Project p = ProjectLoader.getProject(id).orElse(null);
                 if (p != null) {
                     setBackground(colorForCard(p.getColor(), false));
                 } else {
                     setBackground(Color.WHITE);
+                }
+            } else if (isSelected) {
+                setBackground(table.getSelectionBackground());
+            }
+            return this;
+        }
+    }
+
+    // =========================================================================
+    // Color-coded numeric cell renderer
+    // =========================================================================
+
+    /**
+     * Renders numeric table cells with 2-decimal formatting and color-coding:
+     * positive values use a green tint, negative values use a red tint.
+     */
+    private static class NumericCellRenderer extends DefaultTableCellRenderer {
+        NumericCellRenderer() {
+            setHorizontalAlignment(SwingConstants.RIGHT);
+        }
+
+        @Override
+        public Component getTableCellRendererComponent(JTable table, Object value,
+                                                        boolean isSelected, boolean hasFocus,
+                                                        int row, int column) {
+            if (value instanceof Double d) {
+                value = String.format("%.2f", d);
+            }
+            super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+            if (!isSelected && value instanceof String s) {
+                try {
+                    double d = Double.parseDouble(s);
+                    if (d > 0.5) {
+                        setBackground(new Color(0xDDFFDD));
+                    } else if (d < -0.5) {
+                        setBackground(new Color(0xFFDDDD));
+                    } else {
+                        setBackground(table.getBackground());
+                    }
+                } catch (NumberFormatException ignored) {
+                    setBackground(table.getBackground());
                 }
             } else if (isSelected) {
                 setBackground(table.getSelectionBackground());

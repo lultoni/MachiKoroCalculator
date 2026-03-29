@@ -4,6 +4,32 @@ All phases of the original implementation plan are complete. This file records w
 
 ---
 
+## UI bug fixes and enriched turn history
+
+**Goal:** Fix three UI correctness bugs uncovered in review, improve the left panel's resize behavior, and make the turn history show meaningful coin-flow information per turn.
+
+### Bug fixes
+
+**Win Prob row always visible regardless of toggle** — `populateCenter` now calls `setWinProbRowVisible(showWinProb)` after setting metric values. Previously the row reappeared on every card selection even when the user had toggled it off.
+
+**Sort order lost on table rebuild** — `rebuildTable` now saves `sorter.getSortKeys()` before calling `tableModel.setColumnIdentifiers()` and restores it after re-attaching comparators. Column indices are clamped to handle the Win Δ column being added or removed. Previously any `rebuildTable()` call (triggered by turn confirm, undo, Deep Analysis toggle, etc.) silently reset the sort to the default ROI-descending order.
+
+**Deep Analysis auto-showed win prob column** — `onToggleDeepAnalysis` no longer forces `showWinProb = true`. The "Show Win Prob Δ" button is now the sole gate. Enabling Deep Analysis enables the MC backend only; the column appears only when the user explicitly requests it.
+
+### Left panel resize behavior
+
+`buildLeftPanel` was rewritten to use `BorderLayout`. The controls sub-panel (player name, coins, roll, buy, buttons) is placed in `NORTH` (fixed height); the turn history `JScrollPane` is placed in `CENTER` and fills all remaining vertical space. Previously the entire panel used `BoxLayout Y_AXIS` with a fixed `setMaximumSize(200)` on the history scroll, which created large empty areas when the window was tall.
+
+### Enriched turn history with per-player coin deltas
+
+`TurnRecord` gained a `int[] coinDeltas` field (5-arg constructor; shorter constructors default to `null` for backward compatibility). `GameSession.applyTurn` computes `computeAllDeltasForRoll` as before and attaches the result to the stored `TurnRecord` rather than discarding it. `GameSessionPersistence` serializes the array as `"coinDeltas": [...]` (omitted when null) and deserializes it back; old save files without the field get `null` deltas and display history without the delta line.
+
+`refreshHistory` now shows a three-line entry per turn: player name + roll (+ doubles badge), a per-player coin-delta line (green for gains, red for losses), and the purchase line. This lets players see at a glance who paid whom and how much from each roll.
+
+**Tests:** 224 passed, 0 failed. 16 new assertions covering: `coinDeltas` null/non-null semantics, correct values for blue and red card activations, preservation across undo-replay, and JSON round-trip.
+
+---
+
 ## UI Polish: BoundedSpinner, Freizeitpark doubles tracking, GP ranking, sortable table, MC controls
 
 **Goal:** Address a batch of correctness and usability issues identified across the UI and game-logic layers. The changes collectively make the tracker faithful to the official rules (doubles bonus turns, correct supply caps for starter cards, Großprojekte in the buy list) and substantially improve the information density of the three panels.

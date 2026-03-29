@@ -39,7 +39,9 @@ public class MainWindow extends JFrame {
             new Color(0xFFD700),  // gelb
     };
     /** Coin icon scaled to 18×18, or null if the resource could not be loaded. */
-    private static final ImageIcon COIN_ICON = loadCoinIcon(18);
+    private static final ImageIcon COIN_ICON = loadScaledIcon("resources/other_icons/COIN.png", 16);
+    /** Dice icon scaled to 16×16 for the roll-spinner label. */
+    private static final ImageIcon DICE_ICON = loadScaledIcon("resources/other_icons/DICE.png", 16);
 
     // ---- state ----
     private GameSession session;
@@ -55,7 +57,7 @@ public class MainWindow extends JFrame {
     private JComboBox<String> buyCombo;
     private JButton confirmBtn;
     private JButton undoBtn;
-    private JLabel coinsLabel;      // shows current coins with coin icon
+    private JLabel coinsLabel;      // shows "N coins" in bold text
     private JLabel coinsAfterLabel; // shows post-roll delta (hidden when no change)
     private JPanel historyPanel;
     private JPanel rollPreviewPanel;
@@ -143,25 +145,24 @@ public class MainWindow extends JFrame {
         activePlayerLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
         controls.add(wrap(activePlayerLabel));
 
-        // Coins display — icon + current coins, with post-roll delta below
-        coinsLabel = new JLabel("3", COIN_ICON, SwingConstants.LEFT);
-        coinsLabel.setFont(new Font("Arial", Font.BOLD, 16));
-        coinsLabel.setIconTextGap(4);
+        // Coins display — bold text with post-roll delta below
+        coinsLabel = new JLabel("3 coins");
+        coinsLabel.setFont(new Font("Arial", Font.BOLD, 14));
         coinsLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
         controls.add(wrap(coinsLabel));
 
         coinsAfterLabel = new JLabel();
         coinsAfterLabel.setFont(new Font("Arial", Font.PLAIN, 11));
-        coinsAfterLabel.setForeground(new Color(0x007700));
-        coinsAfterLabel.setIconTextGap(3);
         coinsAfterLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
         coinsAfterLabel.setVisible(false);
         controls.add(wrap(coinsAfterLabel));
 
         controls.add(Box.createVerticalStrut(8));
 
-        // Roll input
-        rollRangeLabel = bold("Dice roll (1–6):");
+        // Roll input — dice icon + range label
+        rollRangeLabel = new JLabel("Dice roll (1–6):", DICE_ICON, SwingConstants.LEFT);
+        rollRangeLabel.setFont(HEADER_FONT);
+        rollRangeLabel.setIconTextGap(4);
         rollRangeLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
         controls.add(wrap(rollRangeLabel));
         rollSpinner = new BoundedSpinner(new SpinnerNumberModel(3, 1, 6, 1));
@@ -657,8 +658,7 @@ public class MainWindow extends JFrame {
         } else {
             activePlayerLabel.setText(activePlayer.getName() + "'s turn");
         }
-        coinsLabel.setText(String.valueOf(activePlayer.getCoins()));
-        coinsLabel.setIcon(COIN_ICON);
+        coinsLabel.setText(activePlayer.getCoins() + " coins");
 
         updateRollSpinner(activePlayer);
 
@@ -1085,15 +1085,14 @@ public class MainWindow extends JFrame {
 
     /**
      * Updates the post-roll coins label below the main coin display.
-     * Shows the delta as "+N" (green) or "−N" (red) next to a coin icon when the roll changes
-     * the active player's coin count; hides the label when the roll has no effect.
+     * Shows "→ N coins (±delta)" in green/red when the roll changes the player's coin count;
+     * hides the label when the roll has no effect.
      */
     private void updateCoinsAfterLabel(int preCoins, int postCoins) {
         int delta = postCoins - preCoins;
         if (delta != 0) {
             String sign = delta > 0 ? "+" : "";
-            coinsAfterLabel.setText(sign + delta + " after roll  (= " + postCoins + ")");
-            coinsAfterLabel.setIcon(COIN_ICON);
+            coinsAfterLabel.setText("→ " + postCoins + " coins (" + sign + delta + ")");
             coinsAfterLabel.setForeground(delta > 0 ? new Color(0x007700) : new Color(0xAA0000));
             coinsAfterLabel.setVisible(true);
         } else {
@@ -1102,12 +1101,12 @@ public class MainWindow extends JFrame {
     }
 
     /**
-     * Loads and scales COIN.png from classpath resources. Returns null if the resource
-     * is unavailable so callers can degrade gracefully (label shows text only).
+     * Loads and scales an image from classpath resources.
+     * Returns null if the resource is unavailable so callers can degrade gracefully.
      */
-    private static ImageIcon loadCoinIcon(int size) {
+    private static ImageIcon loadScaledIcon(String resourcePath, int size) {
         try (InputStream is = MainWindow.class.getClassLoader()
-                .getResourceAsStream("resources/other_icons/COIN.png")) {
+                .getResourceAsStream(resourcePath)) {
             if (is == null) return null;
             BufferedImage img = ImageIO.read(is);
             Image scaled = img.getScaledInstance(size, size, Image.SCALE_SMOOTH);

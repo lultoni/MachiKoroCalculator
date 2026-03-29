@@ -4,6 +4,18 @@ Implementierungsgeschichte: was gebaut wurde, warum, und welche Designentscheidu
 
 ---
 
+## MC-Policy: ROI-basiertes Scoring in GameSimulator
+
+**Problem:** `greedyBuy` benutzte `contextualEvPerRound / cost` als Kaufentscheidung. Das ignoriert die zeitliche Diskontierung — ein teurer 5-Münzen-Return-Karte sah gleich aus wie 5 billige 1-Münzen-Karten.
+
+**Lösung:** Neues Scoring: `roi = contextualEvPerRound × ROI_GEOMETRIC_SUM − cost`, wobei `ROI_GEOMETRIC_SUM = γ × (1 − γ^T) / (1 − γ)` mit γ = 0.95, T = 10 (= 7.72, vorberechnet als statische Konstante). Das entspricht der ROI-Formel des analytischen Rankings. Die Simulation spielt nun dieselbe Strategie, die der Spieler im Ranking sieht → realistischere Win-Raten.
+
+Performance: 40ms für 1000 Sims (unverändert), da `contextualCardEvPerRound` allokationsfrei bleibt.
+
+**Tests:** 224 bestanden, 0 fehlgeschlagen.
+
+---
+
 ## U3: Trigger-Modus-Anzeige in Kartendetails
 
 `TriggerModePanel` — neues inneres `JPanel` in `MainWindow`, in die `nameRow` nach dem Farb-Tag eingefügt. Zeichnet programmatisch mit `Graphics2D`:

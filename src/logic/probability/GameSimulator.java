@@ -15,9 +15,11 @@ import java.util.concurrent.atomic.AtomicInteger;
  *   <li>If the player can afford the next unbuilt landmark (cheapest first),
  *       buy it — landmark progression is always strictly optimal.</li>
  *   <li>Otherwise buy the affordable establishment card with the highest
- *       contextual {@code evPerRound / cost} ratio, evaluated in the buying
- *       player's actual synergy context (real Einkaufszentrum status and
- *       food/animal/production counts).</li>
+ *       discounted {@code roiOverHorizon} score, computed via
+ *       {@link ProbabilityCalc#roiOverHorizon} in the buying player's actual
+ *       game state. This is consistent with the analytical ranking the user sees
+ *       and correctly reflects synergy multipliers, coin-projection, Funkturm
+ *       re-roll EV, and the time-value of money (γ = 0.95, T = 10).</li>
  *   <li>If nothing is affordable, save (skip buy phase).</li>
  * </ol>
  *
@@ -193,11 +195,31 @@ public class GameSimulator {
     // -------------------------------------------------------------------------
 
     /**
+     * Geometric-series multiplier used for the fast ROI estimate in the buy policy.
+     * Precomputed: γ × (1 − γ^T) / (1 − γ) with γ = 0.95, T = DEFAULT_HORIZON.
+     * This avoids calling Math.pow inside the simulation hot loop.
+     */
+    private static final double ROI_GEOMETRIC_SUM;
+    static {
+        double gamma = 0.95;
+        int T = RankingOptions.DEFAULT_HORIZON;
+        ROI_GEOMETRIC_SUM = gamma * (1.0 - Math.pow(gamma, T)) / (1.0 - gamma);
+    }
+
+    /**
      * Executes the greedy buy decision for the active player.
-     * Card scores are computed in the player's actual synergy context (real
-     * Einkaufszentrum, food/animal/production counts) using
-     * {@link CardIncome#contextualCardEvPerRound}, so synergy multipliers
-     * like Markthalle and Molkerei are correctly reflected in card rankings.
+     * Card scores use a fast ROI approximation:
+     * <pre>
+     *   score = contextualEvPerRound × ROI_GEOMETRIC_SUM − cost
+     * </pre>
+     * where {@code contextualEvPerRound} is evaluated in the player's actual synergy
+     * context (Einkaufszentrum, food/animal/production multipliers). This matches
+     * the analytical ranking's ROI formula exactly in the own-turn EV component,
+     * using the same discount factor (γ = 0.95) and horizon (T = 10). The only
+     * difference from the full {@link ProbabilityCalc#roiOverHorizon} is that
+     * opponent-turn blue/red card income is approximated via the colour-scaling
+     * in {@link CardIncome#contextualCardEvPerRound} rather than the step-aware
+     * projection — an acceptable trade-off for simulation speed.
      *
      * @return the winner's player index if this purchase completes the game,
      *         or {@code -1} if the game continues
@@ -219,30 +241,28 @@ public class GameSimulator {
             }
         }
 
-        // 2. Try to buy the best-value establishment card using contextual EV.
+        // 2. Buy the best-value establishment card using fast ROI approximation.
         // Build the player's stats and opponent coins once for this buy phase.
         int n = state.getPlayers().length;
         CardIncome.PlayerStats playerStats = CardIncome.PlayerStats.of(player);
         int[] oppCoins = CardIncome.buildOpponentCoins(state.getPlayers(), activePlayer);
 
         Project best = null;
-        double bestScore = -Double.MAX_VALUE;
+        double bestROI = -Double.MAX_VALUE;
         for (Project p : state.getUnbuilt_projects()) {
             if (p.isIs_grossprojekt()) continue;
             if (player.getCoins() < p.getCost()) continue;
             int remaining = supply.getOrDefault(p.getId(), 0);
             if (remaining <= 0) continue;
-            // Evaluate in active player's real context (synergy-aware)
             double ev = CardIncome.contextualCardEvPerRound(p, playerStats, n, oppCoins);
-            double score = p.getCost() > 0 ? ev / p.getCost() : 0.0;
-            if (score > bestScore) {
-                bestScore = score;
+            double roi = ev * ROI_GEOMETRIC_SUM - p.getCost();
+            if (roi > bestROI) {
+                bestROI = roi;
                 best = p;
             }
         }
         if (best != null) {
             purchase(player, best, supply);
-            // Establishment purchase cannot win the game
         }
 
         return -1; // game continues

@@ -79,23 +79,7 @@ Programmatisch als kleine Kreise/Ovale zeichnen; für Rot zusätzlich Hinweis "W
 
 ---
 
-### M3 · `REMAINING_TURNS_ESTIMATE = 12` ist ein statischer Hardcode-Wert (Medium)
-
-**Problem:** In `WinProbabilityCalc` ist `REMAINING_TURNS_ESTIMATE = 12.0` ein Klassenkonstante. Die Win-Prob-Formel lautet:
-```
-score(p) = playerEvPerRound(p) × 12 + Σ LANDMARK_WEIGHT
-```
-Im Frühspiel (alle Spieler bei 0 Landmarks) sind 20+ Züge übrig → 12 unterschätzt den EV-Term. Im Endspiel (Gegner bei 3 Landmarks) sind nur noch ~3 Züge übrig → 12 überschätzt dramatisch.
-
-**Korrekte Ansatz:** `effectiveTurnCount` aus `GameSession` an `rankAllProjects` weitergeben und die Schätzung ableiten:
-```
-remainingTurns = max(3, TOTAL_EXPECTED_TURNS − effectiveTurnCount / n)
-```
-wobei `TOTAL_EXPECTED_TURNS ≈ 25` (kalibrierbar aus MC-Statistiken).
-
-Alternativ: Landmark-Fortschritt als Proxy — Gesamtzahl bereits gebauter Landmarks über alle Spieler.
-
-**Betroffene Datei:** `WinProbabilityCalc.computeScores`, `RankingOptions` (neues optionales Feld `turnsElapsed`).
+### M3 · ~~`REMAINING_TURNS_ESTIMATE = 12` ist ein statischer Hardcode-Wert~~ ✓ (behoben)
 
 ---
 

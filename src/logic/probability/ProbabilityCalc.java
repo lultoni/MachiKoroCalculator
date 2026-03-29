@@ -609,7 +609,7 @@ public class ProbabilityCalc {
     public static double estimateWinProbDelta(GameState gs, int playerIndex,
                                                Project candidate,
                                                int searchDepth, int mcSimulations) {
-        return WinProbabilityCalc.estimateWinProbDelta(gs, playerIndex, candidate, mcSimulations);
+        return WinProbabilityCalc.estimateWinProbDelta(gs, playerIndex, candidate, mcSimulations, 0);
     }
 
     /**
@@ -726,7 +726,7 @@ public class ProbabilityCalc {
                     entry.winProbDelta = afterBuy - mcBaseline;
                 } else {
                     entry.winProbDelta = WinProbabilityCalc.estimateWinProbDelta(
-                            gs, playerIndex, candidate, 0);
+                            gs, playerIndex, candidate, 0, opts.turnsElapsed);
                 }
             }
 
@@ -790,7 +790,7 @@ public class ProbabilityCalc {
                     entry.winProbDelta = afterBuy - mcBaseline;
                 } else {
                     entry.winProbDelta = WinProbabilityCalc.estimateWinProbDelta(
-                            gs, playerIndex, candidate, 0);
+                            gs, playerIndex, candidate, 0, opts.turnsElapsed);
                 }
             }
 

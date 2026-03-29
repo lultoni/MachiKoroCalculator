@@ -851,6 +851,7 @@ public class MainWindow extends JFrame {
 
     private void refreshAll() {
         int pi = session.nextPlayerIndex();
+        rankOpts.turnsElapsed = session.getEffectiveTurnCount();
         Player[] players = session.getState().getPlayers();
         Player activePlayer = players[pi];
 
@@ -971,6 +972,7 @@ public class MainWindow extends JFrame {
         refreshRollPreview();
 
         int pi = session.nextPlayerIndex();
+        rankOpts.turnsElapsed = session.getEffectiveTurnCount();
         GameState postRoll = postRollState();
         Player preRollPlayer  = session.getState().getPlayers()[pi];
         Player postRollPlayer = postRoll.getPlayers()[pi];

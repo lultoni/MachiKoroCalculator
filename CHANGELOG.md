@@ -4,6 +4,23 @@ Implementierungsgeschichte: was gebaut wurde, warum, und welche Designentscheidu
 
 ---
 
+## M3: Dynamischer REMAINING_TURNS_ESTIMATE in WinProbabilityCalc
+
+**Problem:** `REMAINING_TURNS_ESTIMATE = 12.0` war eine statische Konstante. Im Frühspiel (viele Züge übrig) wurde der EV-Term unterschätzt, im Endspiel (Gegner hat 3 GPs) dramatisch überschätzt.
+
+**Lösung:**
+- `RankingOptions.turnsElapsed` — neues optionales Feld (Default 0 = Fallback auf statischen Wert).
+- `WinProbabilityCalc.computeScores(GameState, int turnsElapsed)` — dynamische Schätzung:
+  `remainingTurns = max(3, 25 − turnsElapsed / n)`, wobei `TOTAL_EXPECTED_TURNS = 25`.
+- `WinProbabilityCalc.estimateWinProbDelta` — nimmt jetzt `turnsElapsed`-Overload.
+- `ProbabilityCalc.rankAllProjects` / `rankPurchasableProjects` — leiten `opts.turnsElapsed` an `estimateWinProbDelta` weiter.
+- `MainWindow.refreshAll()` und `refreshAfterRollChange()` setzen `rankOpts.turnsElapsed = session.getEffectiveTurnCount()` vor jedem Ranking-Aufruf.
+- Rückwärtskompatibilität: `turnsElapsed = 0` → REMAINING_TURNS_FALLBACK = 12.0 wie zuvor.
+
+**Tests:** 224 bestanden, 0 fehlgeschlagen.
+
+---
+
 ## M2: Funkturm-EV in immediateEV und evPerRound
 
 **Problem:** `hasFunkturm` wurde bisher nur im Freizeitpark-Doppelwurf-Pfad (`bestSecondRollEV`) genutzt. Ein Spieler mit Funkturm aber ohne Freizeitpark bekam null Funkturm-Nutzen im EV-Modell.

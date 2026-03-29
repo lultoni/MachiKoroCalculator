@@ -14,8 +14,15 @@ class WinProbabilityCalc {
     /** Landmark weight in the softmax score function. */
     private static final double LANDMARK_WEIGHT = 2.0;
 
-    /** Remaining-turns estimate used in softmax scoring (typical mid-game turns left). */
-    private static final double REMAINING_TURNS_ESTIMATE = 12.0;
+    /** Remaining-turns estimate used in softmax scoring when no elapsed-turn info is provided. */
+    private static final double REMAINING_TURNS_FALLBACK = 12.0;
+
+    /**
+     * Total expected turns per player over a full game (used for dynamic remaining-turns estimate).
+     * Calibrated from MC statistics: average game length ≈ 25 effective turns across all players
+     * (roughly 6–8 turns per player in a 3–4 player game before someone wins).
+     */
+    private static final double TOTAL_EXPECTED_TURNS = 25.0;
 
     private WinProbabilityCalc() {}
 
@@ -32,7 +39,7 @@ class WinProbabilityCalc {
      * @return estimated win probability in [0, 1]
      */
     static double computeBaselineWinProb(GameState gs, int playerIndex) {
-        return softmaxEntry(computeScores(gs), playerIndex);
+        return softmaxEntry(computeScores(gs, 0), playerIndex);
     }
 
     // -------------------------------------------------------------------------
@@ -43,13 +50,20 @@ class WinProbabilityCalc {
      * Estimates the change in win probability for playerIndex from buying {@code candidate}.
      *
      * <h3>Analytical mode ({@code mcSimulations == 0})</h3>
-     * Softmax score: {@code score(p) = Σ singleCardEvPerRound × REMAINING_TURNS + Σ LANDMARK_WEIGHT}.
+     * Softmax score: {@code score(p) = Σ singleCardEvPerRound × remainingTurns + Σ LANDMARK_WEIGHT}.
      *
      * <h3>Monte Carlo mode ({@code mcSimulations > 0})</h3>
      * Runs parallel full-game simulations for both the baseline and post-buy state.
+     *
+     * @param turnsElapsed effective turns elapsed in the session (0 = use static fallback estimate)
      */
     static double estimateWinProbDelta(GameState gs, int playerIndex,
                                         Project candidate, int mcSimulations) {
+        return estimateWinProbDelta(gs, playerIndex, candidate, mcSimulations, 0);
+    }
+
+    static double estimateWinProbDelta(GameState gs, int playerIndex,
+                                        Project candidate, int mcSimulations, int turnsElapsed) {
         if (mcSimulations > 0) {
             double baseline = mcWinRate(gs, playerIndex, mcSimulations);
             GameState stateAfter = gs.copy();
@@ -59,12 +73,12 @@ class WinProbabilityCalc {
         }
 
         // Analytical path
-        double[] scoresBefore = computeScores(gs);
+        double[] scoresBefore = computeScores(gs, turnsElapsed);
         double pWinBefore = softmaxEntry(scoresBefore, playerIndex);
 
         GameState stateAfter = gs.copy();
         stateAfter.getPlayers()[playerIndex].getOwned_projects().add(candidate);
-        double[] scoresAfter = computeScores(stateAfter);
+        double[] scoresAfter = computeScores(stateAfter, turnsElapsed);
         double pWinAfter = softmaxEntry(scoresAfter, playerIndex);
 
         return pWinAfter - pWinBefore;
@@ -112,20 +126,32 @@ class WinProbabilityCalc {
 
     /**
      * Computes a heuristic score for each player using synergy-aware per-round EV:
-     * {@code score(p) = playerEvPerRound(p) × REMAINING_TURNS + Σ LANDMARK_WEIGHT}.
+     * {@code score(p) = playerEvPerRound(p) × remainingTurns + Σ LANDMARK_WEIGHT}.
      *
      * <p>Unlike the previous isolated {@code singleCardEvPerRound} approach, this accounts
      * for each player's actual card synergies (Einkaufszentrum bonuses, category multipliers
      * for Molkerei/Möbelfabrik/Markthalle, and opponent coin counts for Stadion/Fernsehsender).
+     *
+     * @param turnsElapsed effective turns elapsed across all players (0 = use static fallback).
+     *                     Used to compute a dynamic remaining-turns estimate.
      */
-    static double[] computeScores(GameState gs) {
+    static double[] computeScores(GameState gs, int turnsElapsed) {
         Player[] players = gs.getPlayers();
-        double[] scores = new double[players.length];
+        int n = players.length;
 
-        for (int i = 0; i < players.length; i++) {
+        // Dynamic remaining-turns estimate:
+        // remainingTurns = max(3, TOTAL_EXPECTED_TURNS − turnsElapsed/n)
+        // turnsElapsed/n = average turns per player so far.
+        double remainingTurns = (turnsElapsed > 0)
+                ? Math.max(3.0, TOTAL_EXPECTED_TURNS - (double) turnsElapsed / n)
+                : REMAINING_TURNS_FALLBACK;
+
+        double[] scores = new double[n];
+
+        for (int i = 0; i < n; i++) {
             int[] opponentCoins = CardIncome.buildOpponentCoins(players, i);
-            double score = CardIncome.playerEvPerRound(players[i], players.length, opponentCoins)
-                    * REMAINING_TURNS_ESTIMATE;
+            double score = CardIncome.playerEvPerRound(players[i], n, opponentCoins)
+                    * remainingTurns;
             for (Project p : players[i].getOwned_projects()) {
                 if (p.isIs_grossprojekt()) score += LANDMARK_WEIGHT;
             }

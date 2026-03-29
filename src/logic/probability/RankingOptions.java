@@ -38,4 +38,13 @@ public class RankingOptions {
      * Default: {@code false}.
      */
     public boolean includeWinProbDelta = false;
+
+    /**
+     * Number of effective turns that have elapsed so far in the session (non-bonus turns,
+     * across all players). Used to compute a dynamic remaining-turns estimate for the
+     * softmax win-probability scorer. {@code 0} (default) uses the static fallback estimate.
+     *
+     * <p>Pass {@code session.getEffectiveTurnCount()} here from the UI for improved accuracy.
+     */
+    public int turnsElapsed = 0;
 }

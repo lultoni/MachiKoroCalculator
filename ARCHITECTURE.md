@@ -292,4 +292,34 @@ copy is purchased; `GameStateBuilder.build()` excludes a type when its owned cou
 
 ---
 
+## 5. Ranking Note Annotations
+
+Each `RankEntry.notes` string is assembled from up to three annotation sources, concatenated with `"  |  "`:
+
+### 5.1 Bürohaus Swap Note
+
+When a player buys Bürohaus, `bürohausSwapNote(stateWithBürohaus, pi)` returns a human-readable recommendation like `"Swap your Weizenfeld for P1's Bergwerk"` (or `null` if no beneficial swap exists). This uses `BürohausLogic.swapNote` which compares `singleCardEvPerRound` for all owned and opponent cards.
+
+### 5.2 Synergy Note (`computeSynergyNote`)
+
+For each candidate card A, scans all remaining pool cards B to find the one that maximally increases A's `contextualCardEvPerRound` when also owned. Uses `buildStatsWithCards(player, A, B)` and compares to `buildStatsWithCard(player, A)` baseline. Threshold: gain ≥ 0.05¢/round. Separately checks Einkaufszentrum for green/store cards.
+
+```
+synergyGain(A, B) = contextualCardEvPerRound(A, statsWithAB) − contextualCardEvPerRound(A, statsWithA)
+```
+
+### 5.3 Two-Turn Lookahead Note (`computeTwoTurnNote`)
+
+After buying card A, finds the best card B to buy next. Uses `contextualCardEvPerRound(B, statsAfterA, n, oppCoins)` — `statsAfterA` reflects the portfolio *after* buying A. Converts to ROI using `geometricSum(horizonTurns, discountFactor)`. Only affordable cards are given this annotation (unaffordable cards' follow-up plans are speculative). Threshold: follow-up ROI > 0.5.
+
+```
+roiB_in_postA_portfolio = contextualCardEvPerRound(B, statsAfterA) × geometricSum(T, γ) − B.cost
+```
+
+`geometricSum(T, γ) = γ(1−γ^T)/(1−γ)` with L'Hôpital guard (returns T when γ ≈ 1).
+
+No `GameState.copy()` is performed in either synergy or two-turn lookahead — only `PlayerStats` objects are allocated per candidate pair. Total cost: O(n²) `contextualCardEvPerRound` calls per ranking (n ≤ 19 pool cards → ≤ 361 calls), well within the 5ms budget.
+
+---
+
 *Offene Bugs und geplante Verbesserungen: siehe `PLAN.md`.*

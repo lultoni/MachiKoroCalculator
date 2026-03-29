@@ -322,4 +322,50 @@ No `GameState.copy()` is performed in either synergy or two-turn lookahead — o
 
 ---
 
+---
+
+## 6. Entscheidungsarchitektur-Vision
+
+### 6.1 Grundproblem: Greedy vs. Optimal
+
+Der aktuelle Calculator berechnet einen **1-Step-Greedy-Entscheid**: Welche Karte maximiert `roiOverHorizon` im aktuellen Zustand? Das ist keine optimale Strategie, sondern eine lokale Näherung. Das Ziel ist ein **stochastischer Entscheidungsbaum** (analog zu Schach-Engines mit alpha-beta): Für alle möglichen Würfelwürfe und Kaufaktionen wird der resultierende Zustand rekursiv bewertet; die Empfehlung ist die Aktion mit maximalem erwartetem Sieg-Wert.
+
+### 6.2 Branching-Faktor
+
+| Phase | Würfelergebnisse | Kaufoptionen | Branching/Zug |
+|-------|-----------------|--------------|---------------|
+| Frühspiel | 6–11 | ~20 | ~120–150 |
+| Mittelspiel | 6–11 | ~8 | ~50–80 |
+| Endspiel | 6–11 | ~2–4 | ~15–25 |
+
+Ein vollständiger Baum bis Spielende ist nicht realisierbar (~150^30 Knoten). Die Lösung ist eine begrenzte Tiefe mit analytischer Blatt-Evaluation und Top-k-Pruning.
+
+### 6.3 Zielarchitektur: Dreistufiges Hybrid-System
+
+**Stufe 1 — Rollout-Tree (geplant, `RolloutTree.java`):**
+Enumiert alle `(Würfelwurf × Kaufaktion)`-Pfade bis Tiefe `d` für den aktuellen Spieler. Knoten-Typen: Entscheidungsknoten (Kauf, d Zweige) und Zufallsknoten (Würfel, gewichtet nach `P1`/`P2`). Pruning: Top-k Kaufoptionen per Knoten (k=5), Abbruch wenn Δ-Sieg < ε=0.001.
+
+Geschätzte Kosten bei d=2, k=5: ~275 Blätter × 0.1ms = ~28ms → akzeptabel.
+
+**Stufe 2 — Analytische Blatt-Evaluation (implementiert, `WinProbabilityCalc`):**
+`portfolioEvPerRound × remainingTurns + LANDMARK_WEIGHTS` → Softmax-Win-Prob. Kosten: ~0.1ms/Knoten. Wird als Blatt-Evaluator in Stufe 1 verwendet.
+
+**Stufe 3 — MC-Rollout (implementiert, `GameSimulator` + `mcWinRate`):**
+Parallele Monte Carlo-Spiele ab Blatt-Zustand. Wird nur für die Top-3 Blätter aufgerufen um Rechenzeit zu sparen. Geplante Erweiterung: Boltzmann-Policy (M7) ersetzt deterministisch-greedy Buy-Policy für realistischere Gegenersimulation.
+
+### 6.4 Synergie-Bewertung: per-Karte vs. Portfolio
+
+**Aktuell (per-Karte):** `contextualCardEvPerRound(A, statsWithA)` — bewertet Karte A im Kontext des Portfolios.
+**Besser (Portfolio-Delta):** `playerEvPerRound(portfolio + A) − playerEvPerRound(portfolio)` — misst den echten Marginalwert von A für das Gesamtportfolio. Nutzt alle Synergien korrekt (Multiplikatoren, Würfelverteilung, Gegner-Interaktion). Geplant als `portfolioDeltaEV` in `ProbabilityCalc`.
+
+### 6.5 MC-Policy: Greedy vs. Boltzmann
+
+**Aktuell:** `greedyBuy` wählt immer die Karte mit höchstem Score (deterministisch). Alle simulierten Spieler spielen „perfekt" — überschätzt Spieler-Qualität, verzerrte Win-Raten.
+
+**Geplant (M7):** Boltzmann-Sampling mit Temperatur T:
+```
+P(buy X) ∝ exp(score(X) / T)
+```
+T=0: greedy (aktuell). T=0.7: realistische Spieler. T=∞: uniform random. Toggle in UI.
+
 *Offene Bugs und geplante Verbesserungen: siehe `PLAN.md`.*

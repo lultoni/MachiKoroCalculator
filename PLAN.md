@@ -4,210 +4,290 @@ Open items only. For history see `CHANGELOG.md`, for math see `ARCHITECTURE.md`.
 
 ---
 
-## Code-Qualität
+## Grundvision — Der ideale Calculator
 
-### C4 · File Split Priority 2 (Low, deferred)
+### Ziel
+
+Gegeben ein beliebiger Spielzustand (Münzen, Karten, Spieleranzahl, Würfelwurf) soll der Calculator die **optimale Aktion** empfehlen — nicht die heuristisch beste Karte isoliert, sondern die Entscheidung die den erwarteten Gewinn (Siegwahrscheinlichkeit) maximiert.
+
+Das Ziel ist ein stochastischer Entscheidungsbaum: Für jeden möglichen Würfelwurf und jede mögliche Kaufaktion wird der resultierende Zustand rekursiv bewertet, gewichtet nach Wahrscheinlichkeit. Die Empfehlung ist die Aktion am Wurzel-Knoten mit dem höchsten erwarteten Sieg-Wert.
+
+---
+
+### Das Problem: Branching-Faktor und Suchtiefe
+
+Ein naiver vollständiger Suchbaum ist nicht realisierbar:
+
+| Phase | Würfelergebnisse | Kaufoptionen | Branching/Zug |
+|-------|-----------------|--------------|---------------|
+| Frühspiel (viele ungebaute Karten) | 6–11 | ~20 | **~120–150** |
+| Mittelspiel | 6–11 | ~8 | ~50–80 |
+| Endspiel (wenig Angebot) | 6–11 | ~2–4 | ~15–25 |
+
+Ein Spiel dauert im Schnitt ~30 Züge pro Spieler (120 Gesamtzüge bei 4 Spielern). Vollständige Enumeration bis Spielende: **unmöglich**. Bereits 3 Züge Tiefe = ~150³ ≈ 3,4 Mio Knoten im Frühspiel.
+
+**Trotzdem ist ein guter Näherungsansatz realisierbar** — analog zu Schach-Engines die alpha-beta mit Stellungsbewertung kombinieren, nicht vollständig suchen.
+
+---
+
+### Architektur-Vision: Dreistufiges Hybrid-System
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  Stufe 1: Exakter Rollout-Tree (kurze Tiefe, aktueller  │
+│           Spieler, ~2–3 Züge)                            │
+│  → Enumerate all (roll × buy) pairs for depth d         │
+│  → Leaf evaluation via Stufe 2 or 3                     │
+├─────────────────────────────────────────────────────────┤
+│  Stufe 2: Analytische Leaf-Evaluation                   │
+│  → portfolioEV-based softmax win-probability            │
+│  → LANDMARK_WEIGHTS + dynamic remaining-turns           │
+│  → Cheap: <0.1ms per node                               │
+├─────────────────────────────────────────────────────────┤
+│  Stufe 3: MC-Rollout (tiefere Validierung)              │
+│  → Parallel MC games from leaf states                   │
+│  → Boltzmann-sampled buy policy (nicht greedy)          │
+│  → Teuer: ~1–5ms per node → nur für Top-k Blätter       │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Entscheidungsfluss:**
+
+1. Spieler hat gewürfelt → Münz-Deltas sind bekannt
+2. **Stufe 1** enumiert alle Kaufoptionen (inkl. Sparen) für diesen exakten Post-Roll-Zustand
+3. Für jede Kaufoption: Leaf-Evaluation via **Stufe 2** (analytisch, schnell)
+4. Top-3 Optionen werden zusätzlich mit **Stufe 3** (MC, genau) bewertet
+5. Empfehlung = Aktion mit höchster `E[Siegwahrscheinlichkeit]`
+
+---
+
+### Stufe 1 im Detail: Rollout-Tree
+
+**Eingabe:** Aktueller `GameState` nach Würfelwurf (Münzen schon verteilt)
+
+**Aufgabe:** Für eine Suchtiefe `d` alle Zustandsfolgen enumieren.
+
+**Knoten-Typen:**
+- **Entscheidungsknoten (Kauf):** Spieler wählt Aktion; alle Optionen werden verzweigt
+- **Zufallsknoten (Würfel):** Alle Würfelergebnisse werden probabilistisch gewichtet (`P1` oder `P2`)
+
+**Pruning-Strategien:**
+
+| Strategie | Reduktion | Begründung |
+|-----------|-----------|------------|
+| Top-k Kaufoptionen per Knoten (k=5) | ~75% | Schlechte Karten (<50% des besten ROI) kaum relevant |
+| Symmetrie-Pruning: gleiche Portfolios → zusammenführen | variabel | Wenn Spieler A+B gleiche Karten kauft: nur 1 Ast |
+| Tiefe 1–2 für 4 Spieler, Tiefe 2–3 für 2 Spieler | — | Tiefe 2 bei 4 Spielern ≈ 150² = 22.500 Knoten |
+| Frühzeitiger Abbruch wenn Δ-Sieg < ε = 0.001 | ~30% | Irrelevante Äste nicht weiter expandieren |
+
+**Geschätzte Kosten bei d=2, k=5:**
+- ~5 Kaufoptionen × 6–11 Würfelergebnisse × 5 Optionen = ~275 Blätter
+- Mit Stufe-2-Evaluation (0.1ms): ~28ms → **akzeptabel**
+- Mit Stufe-3-Top-3 (100 sims): ~3 × 50ms = 150ms zusätzlich → im Hintergrund
+
+---
+
+### Stufe 2 im Detail: Analytische Leaf-Evaluation
+
+Bereits implementiert in `WinProbabilityCalc.computeBaselineWinProb`:
+
+```
+score(player p) = playerEvPerRound(p) × remainingTurns + Σ LANDMARK_WEIGHT(p)
+P_win(i) = softmax(scores)[i]
+```
+
+**Qualität:** Gut für relative Rangordnung, aber Schwäche bei Zuständen kurz vor Spielende (letzter Landmark-Kauf). Für mittlere Spieltiefen (3–20 Züge) sehr gut.
+
+**Verbesserungspotenzial:**
+- Portfoliodiversität (Risikoreduktion) noch nicht modelliert
+- Coin-Vorteil nicht direkt kodiert (nur indirekt über EV)
+- Gegner-Interaktion (rote Karten, Bürohaus) nur statistisch
+
+---
+
+### Stufe 3 im Detail: MC-Rollout mit Boltzmann-Policy
+
+**Aktueller Stand:** MC vorhanden, aber mit deterministisch-greedy Buy-Policy → systematischer Bias.
+
+**Geplante Policy:** Boltzmann-Sampling
+
+```
+P(buy X) ∝ exp(score(X) / T)
+
+wobei:
+  score(X) = contextualCardEvPerRound(X) × ROI_GEOMETRIC_SUM − X.cost
+  T = Temperatur (0 = greedy, 0.5–1.0 = leichte Exploration, ∞ = uniform)
+```
+
+**Warum Boltzmann statt greedy?**
+- Greedy überschätzt die Qualität der eigenen Kaufentscheidungen (alle Spieler spielen „perfekt")
+- Boltzmann mit T≈0.7 simuliert realistischere Spieler: können suboptimale Züge machen
+- Gibt realistischere Win-Raten für suboptimale Spielpfade des echten Spielers
+
+**Performance-Budget (gemessen):**
+- ~28.000 parallele Sims/Sekunde
+- 10.000 Sims: ~350ms → realistisches UI-Budget
+- 100.000 Sims: ~3.5s → zu langsam für Real-Time, aber nutzbar als „Deep Analysis"
+
+---
+
+### Was ist aktuell implementiert vs. was fehlt
+
+| Komponente | Status | Qualität |
+|-----------|--------|----------|
+| `get_I` — alle 19 Karten | ✓ vollständig | Exakt |
+| `computeAllDeltasForRoll` — single turn resolution | ✓ vollständig | Exakt (Rot→Blau/Grün→Lila, counter-clockwise) |
+| `evPerRound` — 1-Runden-EV mit step-aware Münzprojektion | ✓ vollständig | Gut (Näherung bei Rot) |
+| `roiOverHorizon` — diskontierter ROI | ✓ vollständig | Gut |
+| `computeBaselineWinProb` — analytische Siegwahrscheinlichkeit | ✓ vollständig | Mittel (softmax-Näherung) |
+| `mcWinRate` — MC-Simulation | ✓ vorhanden | Mittel (greedy-Policy-Bias) |
+| `computeSynergyNote` — Synergie-Hinweis (1 Partner) | ✓ vorhanden | Begrenzt (per-Karte, nicht Portfolio) |
+| `computeTwoTurnNote` — 2-Turn-Lookahead | ✓ vorhanden | Begrenzt (analytisch, nur Bahnhof als Landmark) |
+| **Stufe 1: Rollout-Tree Enumerator** | ❌ fehlt | — |
+| **Stufe 3: Boltzmann-MC-Policy** | ❌ fehlt (M7) | — |
+| **Portfolio-Synergie** (nicht per-Karte) | ❌ fehlt | — |
+| **Gegner-Modellierung** (adaptive Strategie) | ❌ fehlt | — |
+
+---
+
+### Prioritäten für nächste Entwicklungsschritte
+
+#### Schritt 1 — M7: Boltzmann-MC-Policy (Fundament für alle weiteren MC-basierten Berechnungen)
+
+**Warum zuerst:** MC ist das stärkste Werkzeug. Solange die Policy deterministisch greedy ist, sind alle MC-Ergebnisse verzerrt. Das zu reparieren verbessert sofort die Win-Prob-Qualität und alle darauf aufbauenden Empfehlungen.
+
+**Scope:** ~80 Zeilen — `RankingOptions.mcExplorationTemp`, `GameSimulator.boltzmannBuy()`, UI-Toggle.
+
+---
+
+#### Schritt 2 — Portfolio-Synergie: `portfolioDeltaEV`
+
+**Problem heute:** `computeSynergyNote` bewertet die Synergie aus Sicht der Karte A ("macht B meine Karte A besser?"). Die relevantere Frage ist: "Erhöht das Paar (A, B) das **Gesamt-Portfolio-EV** mehr als A alleine?"
+
+**Neue Methode:** `portfolioDeltaEV(gs, pi, cardA)`:
+```
+Δ = playerEvPerRound(portfolio + A) − playerEvPerRound(portfolio)
+```
+Anstatt `contextualCardEvPerRound(A)` als Proxy. Nutzt bereits vorhandene `playerEvPerRound` — nur der Aufruf fehlt.
+
+**Warum besser:** `playerEvPerRound` berechnet das Portfolio korrekt als Ganzes (alle Karten zusammen, alle Würfelverteilungen, alle Spieler). Die Differenz ist exakt der Marginalwert von Karte A.
+
+**Scope:** ~30 Zeilen in `ProbabilityCalc` + Umbau `rankPurchasableProjects`.
+
+---
+
+#### Schritt 3 — Rollout-Tree Enumerator (Kernarchitektur)
+
+**Neue Klasse:** `RolloutTree` in `logic.probability`
+
+```java
+class RolloutTree {
+    // Enumeriert alle (Würfel × Kauf)-Pfade bis Tiefe d
+    // Wertet Blätter via analytischer Win-Prob aus
+    // Gibt pro Kaufoption den erwarteten Sieg-Wert zurück
+
+    static RolloutResult evaluate(GameState gs, int playerIndex,
+                                   int depth, int topK);
+
+    record RolloutResult(Project bestAction, double expectedWinProb,
+                         Map<Project, Double> allActionValues) {}
+}
+```
+
+**Integration in UI:** Ersetzt die aktuelle `rankAllProjects`-Logik als „tiefer" Analysemode.
+
+**Scope:** ~200 Zeilen neue Klasse + Integration.
+
+---
+
+### Akzeptierte Näherungen (kein sofortiger Handlungsbedarf)
+
+| # | Thema | Erklärung |
+|---|-------|-----------|
+| A1 | Bürohaus — step-aware Projektion | Blaues Einkommen wird schrittsweise akkumuliert; integer-Rundungsfehler vernachlässigbar. |
+| A2 | Bahnhof-Würfelwahl im Simulator | `rollDice()` wählt 2d6 wenn Karte ≥ 7 vorhanden — Heuristik statt exakter EV. Akzeptabler Trade-off. |
+| A3 | `contextualCardEvPerRound` — per-Karte-Max statt Portfolio-optimal | Bahnhof-Entscheidung wird per Karte als max(EV_1d6, EV_2d6) berechnet, nicht global. Wird durch Schritt 2 (portfolioDeltaEV) ersetzt. |
+| A4 | Softmax-Win-Prob ist EV-basiert | Berücksichtigt keine Portfoliodiversität, keine Coin-Vorteile direkt. Akzeptabel für Ranking; Schritt 3 ersetzt als Leaf-Evaluator. |
+
+---
+
+## Offene Items (bestehend)
+
+### Code-Qualität
+
+#### C4 · File Split Priority 2 (Low, deferred)
 
 `MainWindow` ist groß. Sinnvolle Aufteilung wenn ein UI-Test-Layer existiert:
-- `UIDataModel` (~50 Zeilen): hält `session`, `rankOpts`, `lastRanking`, `showWinProb`
+- `UIDataModel` (~50 Zeilen): hält `session`, `rankOpts`, `lastRanking`
 - `RankingUIRenderer` (~100 Zeilen): `rebuildTable`, `populateCenter`, `clearCenter`, `buildNote`
 - `GameController` (dünn): Turn-Anwendung, Undo, Snapshot, Save/Load-Dispatch
 
 ---
 
-### C5 · Deep Code Optimization (Medium, unpriorisiert)
+#### C5 · Deep Code Optimization (Medium, unpriorisiert)
 
-Vollständige Optimierungsrunde über alle Schichten:
-
-**Performance:**
-- Hot-Path-Profiling: `rankAllProjects` → `evPerRound` → `computeNetGainForRoll` — sind alle Schleifen wirklich nötig?
-- `computeNetGainForRoll` wird pro `evPerRound`-Aufruf mehrfach für dieselbe `PlayerStats` aufgerufen — memoization oder batch-Berechnung prüfen
-- `GameState.copy()` in `evPerRound` und `immediateEV` für jeden Kandidaten — alternativ: Stats-only-Pfad ohne Copy
-
-**Klassen-Aufteilung:**
-- `ProbabilityCalc.java` (~950 Zeilen) → könnte in `EV.java` (immediateEV/evPerRound) und `Ranking.java` (rank*, addWaitEntry, computeSynergy) aufgeteilt werden
-- `MainWindow.java` → bereits als C4 geplant
-- `CardIncome.java` (~450 Zeilen) → `get_I` könnte in eigene Klasse (`CardPayoutTable`) da es reiner switch-Dispatch ist
-
-**Code-Qualität:**
-- Redundante Bahnhof/Funkturm/Freizeitpark-Prüflogik taucht in `immediateEV`, `evPerRound`, `computeVarianceOwnTurn`, `computeProbNoIncomeOwnTurn` auf — DRY-Kandidat
-- ~~Hilfsmethoden `buildStatsWithCard`, `buildStatsWithCards`, `buildStatsWithEkz`, `applyToStats` duplizieren Logik aus `CardIncome.PlayerStats.of()` — zusammenführen oder delegieren~~ ✓
+Vollständige Optimierungsrunde:
+- Hot-Path-Profiling: `rankAllProjects` → `evPerRound` → `computeNetGainForRoll`
+- `computeNetGainForRoll` wird pro `evPerRound`-Aufruf mehrfach für dieselbe `PlayerStats` aufgerufen — memoization prüfen
+- Redundante Bahnhof/Funkturm/Freizeitpark-Prüflogik in `immediateEV`, `evPerRound`, `computeVarianceOwnTurn`, `computeProbNoIncomeOwnTurn` — DRY-Kandidat
 
 **Voraussetzung:** Bestehende Tests müssen weiterhin bestehen; keine Verhaltensänderung.
 
 ---
 
-## UI-Verbesserungen
+### UI-Verbesserungen
 
-### U1 · ~~Rechtes Panel: umbenennen + Tabs~~ ✓ (behoben)
+#### U2 · Kategorie-Icons im UI (Low)
 
----
-
-### U2 · Kategorie-Icons im UI (Low)
-
-Die 8 Kategorien (`food`, `store`, `animal`, `production`, `market`, `factory`, `cafe`, `office`) mit kleinen Icons darstellen.
-
-**Schritte:**
-a. Icons (16×16) in `src/resources/category_icons/` — entweder Bilddateien oder programmatisch gezeichnet
-b. Kartendetails: Icon neben Farb-Tag
-c. Tabelle: Icon in der Kartenspalte (eigene Spalte oder Composite-Renderer)
-d. `IconTextRenderer`: Custom-Renderer der Kategorienamen durch Icons ersetzt — für Textbeschreibungen im Zugverlauf (`TurnEntryPanel`) und im Game Assistant (→ N1)
-
-*Technisch:* Swing unterstützt keine inline-Images in JLabel-HTML. Entweder Panel mit FlowLayout (Label + Icon + Label) oder `paintComponent`-Renderer.
+Die 8 Kategorien mit kleinen Icons (16×16) in `src/resources/category_icons/` darstellen. Swing unterstützt keine inline-Images in JLabel-HTML — Panel mit FlowLayout oder `paintComponent`-Renderer nötig.
 
 ---
 
-### U3 · ~~Trigger-Modus-Anzeige in Kartendetails~~ ✓ (behoben)
-
----
-
-## Neue Features
-
-### N0 · ~~Bürohaus-Tausch im UI~~ ✓ (behoben)
-
----
-
-### N1 · ~~Game Assistant~~ ✓ (behoben)
-
----
-
-### N2 · ~~Bahnhof-Würfelwahl explizit im UI anzeigen~~ ✓ (behoben)
-
----
-
-### N3 · ~~Assistent-Gewichte: wirtschaftsbasierte Phasenerkennung~~ ✓ (behoben)
-
----
-
-### N4 · Assistent-Kalibrierung via Snapshot-Labeling (Future, aufwändig)
-
-Konzept für datengetriebene Gewichtskalibrierung. Besteht aus drei Teilsystemen:
-
----
-
-#### N4a · ~~`SnapshotCard` — neues Spieler-Snapshot-Widget~~ ✓ (behoben)
-
----
-
-#### N4b · ~~Snapshot-Generator~~ ✓ (behoben)
-
----
-
-#### N4c · ~~Labeling-UI~~ ✓ (behoben)
-
----
+### Neue Features
 
 #### N4d · Fitting → `AssistantConfig`
 
-- `PhaseFitter.fit(List<LabeledSnapshot>)` — lineare Regression über alle Parameter (avgPortfolioEV, ownGPs, maxOppGPs, ownCoins, portfolioSize, ...) gegen die drei Label-Werte
-- Gibt neue `AssistantConfig`-Werte zurück (Schwellwerte + Gewichte)
+- `PhaseFitter.fit(List<LabeledSnapshot>)` — lineare Regression gegen drei Label-Werte
 - Mindest-Labels für sinnvolle Regression: ~50
-- Aufwand: ~3–5 Tage Implementierung
-
-**Voraussetzungen:** N3 (`AssistantConfig`) + N4a (`SnapshotCard`) + N4b müssen zuerst implementiert sein.
+- **Voraussetzungen:** N3 + N4a + N4b (alle implementiert ✓)
 
 ---
 
-## Akzeptierte Näherungen (kein Handlungsbedarf)
+### Math-Items
 
-| # | Thema | Erklärung |
-|---|-------|-----------|
-| A1 | Bürohaus — step-aware Projektion | Blaues Einkommen wird jetzt schrittsweise pro Gegner-Position akkumuliert; Rundungsfehler durch integer-Projektion sind vernachlässigbar. |
-| A2 | Bahnhof-Würfelwahl im Simulator | `GameSimulator.rollDice()` wählt 2d6 wenn der Spieler eine Karte mit Aktivierung ≥ 7 hat — Heuristik statt exakter EV-Berechnung. Akzeptabler Trade-off für Simulationsgeschwindigkeit. |
+#### M7 · MC-Rollout-Policy: Boltzmann-Exploration Toggle (Prio: Hoch)
 
----
+Aktueller greedy Simulator wählt immer die Karte mit höchstem `evPerRound/cost`. Das führt zu systematisch verzerrten Win-Raten.
 
-## Math-Audit (High — Priorität nach N1)
+**Geplante Änderung:**
+- `RankingOptions.mcExplorationTemp` (double, default 0.0 = greedy): Boltzmann-Temperatur T
+- Bei T > 0: `P(buy X) ∝ exp(score(X) / T)`
+- Empfohlener Standard: T = 0.7
+- Toggle in MainWindow: "Exploration" Checkbox neben MC-Slider
 
-### M1 · ~~Tiefenanalyse der Berechnungsarchitektur — Näherungen entfernen~~ ✓ (behoben)
-
----
-
-### M2 · ~~Funkturm-EV fehlt vollständig in `immediateEV` und `evPerRound`~~ ✓ (behoben)
-
----
-
-### M3 · ~~`REMAINING_TURNS_ESTIMATE = 12` ist ein statischer Hardcode-Wert~~ ✓ (behoben)
-
----
-
-### M4 · ~~Alle Landmark-Gewichte sind gleich (`LANDMARK_WEIGHT = 2.0`)~~ ✓ (behoben)
-
----
-
-### M5 · ~~"Sparen/Warten" wird nie als Option gerankt~~ ✓ (behoben)
+**Scope:** ~80 Zeilen.
 
 ---
 
 ## Future Features (nicht priorisiert)
 
-- **Erweiterungskarten** — Hafen/Millionärsreihe. Architektur ist bereit (JSON-getrieben, `get_I` dispatcht per ID).
-- **Gegner-Archetypen** — Simulierte Spieler folgen aktuell einer greedy Policy. Verschiedene Archetypen würden realistischere Gewinnraten liefern. Basis: Strategieprofile aus N1.
+- **Erweiterungskarten** — Hafen/Millionärsreihe. Architektur ist bereit (JSON-getrieben).
+- **Gegner-Archetypen** — Verschiedene Buy-Strategien für realistischere Win-Raten.
+- **Rollout-Tree** — Schritt 3 der Vision oben. Kernarchitektur für exakte Empfehlungen.
+- **Portfolio-Synergie** — Schritt 2: `portfolioDeltaEV` als Basis für alle Ranking-Berechnungen.
 
 ---
 
-## Future Strategy — Konzept
+## Geschichte abgeschlossener Items
 
-### Was wird bereits berücksichtigt?
-- `roiOverHorizon` diskontiert zukünftige Erträge über 10 Runden (γ=0.95) — time-value of money
-- Win-Prob via MC spielt komplette Spiele durch → berücksichtigt indirekt alle Folgekäufe
-- `contextualCardEvPerRound` bewertet Synergien (Markthalle+food, Molkerei+animal) — impliziter 1-Step-Synergy-Lookahead
-- GP-Synergy-Hints im Spiellage-Assistenten zeigen wenn Bahnhof/EKZ/FP/Funkturm sich gerade lohnen würden
-- MC-Simulation korrekt implementiert: `computeAllDeltasForRoll` in `GameSimulator.applyRoll`, Freizeitpark, Bürohaus-Swap, Supply-Tracking — verifiziert ✓
+### Math-Audit ✓
+M1 (Architektur-Audit) · M2 (Funkturm-EV) · M3 (dynamisches remainingTurns) · M4 (Landmark-Gewichte) · M5 (Warten-Option) · M6 (Bahnhof-Synergie im 2-Turn-Lookahead) · M8 (Bahnhof-Gate im Simulator)
 
-### Mögliche Verbesserungen (nicht priorisiert)
+### Features ✓
+N0 (Bürohaus-Tausch) · N1 (Game Assistant) · N2 (Bahnhof-Würfelwahl) · N3 (Phasenerkennung) · N4a–N4c (Snapshot/Labeling-System)
 
-| Verbesserung | Aufwand | Mehrwert |
-|---|---|---|
-| **Synergy-Lookahead** — für jede Karte berechne `evPerRound_after_best_synergy_card` | ~~50 Zeilen~~ | ~~Mittel: "Molkerei wird besser wenn du noch Bauernhöfe kaufst"~~ | ✓ |
-| **2-Turn Lookahead** — beste zwei Käufe in Folge, O(n²) | ~100 Zeilen | Hoch: erkennt Ketten wie "Bahnhof → dann lohnen sich 2d6-Karten" | ✓ |
-| **MC-Policy verbessern** — statt greedy `evPerRound/cost` die `roiOverHorizon`-Rangliste nutzen | ~~30 Zeilen~~ | ~~Mittel: realistischere Win-Raten, da Spieler die tatsächlich beste Strategie spielen~~ | ✓ |
+### UI ✓
+U1 (rechtes Panel) · U3 (Trigger-Modus-Anzeige)
 
----
-
-## Offene Math-Items (Prio mittel)
-
-### M6 · ~~Landmark-Synergien in 2-Turn-Lookahead~~ ✓ (behoben)
-
-`computeTwoTurnNote` überspringt aktuell alle Landmarks (`is_grossprojekt`-Filter). Das bedeutet, dass z.B. die Kette „Bahnhof → Bergwerk wird besser" nie als Note erscheint.
-
-**Fix:** Landmarks als `cardB`-Kandidaten zulassen wenn das Portflio nach Kauf von `cardA` die Schwelle überschreitet:
-- Wenn `cardA == bahnhof`: Alle 2d6-Karten (Aktivierung ≥ 7) als beste B suchen, da `statsAfterA.hasBahnhof = true` die EV korrekt erhöht
-- Wenn `cardB == bahnhof`: nicht sinnvoll (Bahnhof ist kein Einkommen direkt)
-- Einschränkung: Landmark `cardB` darf nur vorgeschlagen werden wenn der Spieler sie noch nicht besitzt
-
-**Scope:** ~20 Zeilen in `computeTwoTurnNote`.
-
----
-
-### M7 · MC-Rollout-Policy: Boltzmann-Exploration Toggle (Medium)
-
-Aktueller greedy Simulator (`GameSimulator.greedyBuy`) wählt immer die Karte mit höchstem `evPerRound/cost`. Das führt zu systematisch verzerrten Win-Raten: Spieler, die eine „zweitbeste" Karte kaufen (wie der User), wirken schlechter als sie sind.
-
-**Geplante Änderung:**
-- `RankingOptions.mcExplorationTemp` (double, default 0.0 = greedy): Boltzmann-Temperatur T
-- Bei T > 0: `P(buy X) ∝ exp(score(X) / T)` — höheres T = mehr Zufall, T → ∞ = uniform random
-- Empfohlener Standardwert: T = 0.5–1.0 (sanfte Streuung um greedy-Optimum)
-- Toggle in MainWindow: "Exploration" Checkbox neben MC-Slider (nur wenn MC aktiv)
-
-**Zusatz:** MC-Limit auf 10.000 Sims/Kandidat erhöhen (Benchmark: ~28k parallel Sims/sec → <2s bei 10k; 100k = ~50s, zu langsam für UI).
-
-**Scope:** ~80 Zeilen: `GameSimulator` (Boltzmann-Sampling), `RankingOptions` (neues Feld), `MainWindow` (Toggle + erhöhtes Default-Limit).
-
----
-
-### M8 · ~~Bahnhof-Gate im Simulator~~ ✓ (behoben)
-
-`GameSimulator.greedyBuy()` kauft Landmarks blindly in Kosten-Reihenfolge. ~~Das führt dazu, dass simulierte Spieler den Bahnhof früh kaufen, auch wenn sie keine Karten mit Aktivierung ≥ 7 besitzen — was den Bahnhof-Kauf faktisch wertlos macht.~~
-
-~~**Fix:** Bahnhof nur kaufen wenn `hasHighRangeCard(player)`:~~
-```java
-private static boolean hasHighRangeCard(Player p) {
-    return p.getOwned_projects().stream()
-        .anyMatch(c -> !c.isIs_grossprojekt()
-                    && c.getDice_activation().stream().anyMatch(r -> r >= 7));
-}
-```
-~~Vor Bahnhof-Kauf: `if (lm.getId().equals("bahnhof") && !hasHighRangeCard(player)) continue;`~~
-
-~~**Scope:** ~10 Zeilen in `GameSimulator.greedyBuy`.~~
+### Future Strategy ✓
+Synergy-Lookahead · 2-Turn Lookahead · MC-Policy (greedy → roiOverHorizon)

@@ -500,12 +500,12 @@ public final class Strings {
     public static String labelingFromFileBtn()   { return s("Aus Datei laden…", "Load from File…"); }
     public static String labelingExportBtn()     { return s("Labels exportieren…", "Export Labels…"); }
     public static String labelingLabelCount(int n) { return s(n + " Label(s) gespeichert", n + " label(s) saved"); }
-    public static String labelingSliderEarlyLeft()  { return s("Frühphase", "Early Game"); }
-    public static String labelingSliderEarlyRight() { return s("Nicht Frühphase", "Not Early Game"); }
-    public static String labelingSliderMidLeft()    { return s("Mittelspiel", "Mid Game"); }
-    public static String labelingSliderMidRight()   { return s("Nicht Mittelspiel", "Not Mid Game"); }
-    public static String labelingSliderLateLeft()   { return s("Endspiel", "Late Game"); }
-    public static String labelingSliderLateRight()  { return s("Nicht Endspiel", "Not Late Game"); }
+    public static String labelingSliderEarlyLeft()  { return s("Nicht Frühphase", "Not Early Game"); }
+    public static String labelingSliderEarlyRight() { return s("Frühphase", "Early Game"); }
+    public static String labelingSliderMidLeft()    { return s("Nicht Mittelspiel", "Not Mid Game"); }
+    public static String labelingSliderMidRight()   { return s("Mittelspiel", "Mid Game"); }
+    public static String labelingSliderLateLeft()   { return s("Nicht Endspiel", "Not Late Game"); }
+    public static String labelingSliderLateRight()  { return s("Endspiel", "Late Game"); }
     public static String labelingNoSnapshot()       { return s("Kein Snapshot geladen.", "No snapshot loaded."); }
     public static String labelingNumPlayers()       { return s("Spieleranzahl:", "Number of players:"); }
     public static String labelingTurnRange()        { return s("Züge (min–max):", "Turns (min–max):"); }

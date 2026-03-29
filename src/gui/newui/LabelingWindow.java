@@ -19,15 +19,17 @@ import java.util.List;
  *
  * <p>Displays 2–4 {@link SnapshotCard}s side by side, with three independent sliders
  * (no tick numbers, only endpoint labels) for Early / Mid / Late phase strength.
- * Labels are collected in memory and exported to {@code phase_labels.json}.
+ * Labels are collected in memory, automatically written to {@code phase_labels.json}
+ * in the working directory after each "Next Snapshot" click, and can also be exported
+ * to a user-chosen location.
  *
  * <h2>Workflow</h2>
  * <ol>
  *   <li>Set the player count and turn range, then click "Generate" — or load a {@code .mkoro}
  *       file via "Load from File".</li>
- *   <li>Rate the snapshot using the three sliders.</li>
- *   <li>Click "Next Snapshot" to save the current label and load the next one.</li>
- *   <li>Click "Export Labels" to write all collected labels to JSON.</li>
+ *   <li>Rate the snapshot using the three sliders (right = strong for that phase).</li>
+ *   <li>Click "Next Snapshot" to save the current label (auto-written to disk) and load the next one.</li>
+ *   <li>Click "Export Labels" to write all collected labels to a user-chosen file.</li>
  * </ol>
  *
  * <h2>Label format (JSON)</h2>
@@ -50,6 +52,9 @@ public class LabelingWindow extends JFrame {
     private static final int SLIDER_MAX   = 100;
     private static final int SLIDER_INIT  = 50;
 
+    /** Auto-save target: phase_labels.json in the working directory. */
+    private static final Path AUTO_SAVE_PATH = Path.of("phase_labels.json");
+
     // ── State ─────────────────────────────────────────────────────────────────
     private GameState currentSnapshot;
     private final List<JsonObject> labels = new ArrayList<>();
@@ -70,10 +75,23 @@ public class LabelingWindow extends JFrame {
     public LabelingWindow() {
         super(Strings.labelingWindowTitle());
         setDefaultCloseOperation(DISPOSE_ON_CLOSE);
+        loadExistingLabels();
         buildUI();
         pack();
         setLocationRelativeTo(null);
         setVisible(true);
+    }
+
+    /** Loads previously saved labels from {@link #AUTO_SAVE_PATH} if it exists. */
+    private void loadExistingLabels() {
+        if (!Files.exists(AUTO_SAVE_PATH)) return;
+        try {
+            String json = Files.readString(AUTO_SAVE_PATH);
+            JsonArray arr = JsonParser.parseString(json).getAsJsonArray();
+            for (JsonElement el : arr) labels.add(el.getAsJsonObject());
+        } catch (Exception ex) {
+            // Silently ignore malformed existing file — start fresh
+        }
     }
 
     // ── UI construction ───────────────────────────────────────────────────────
@@ -198,7 +216,7 @@ public class LabelingWindow extends JFrame {
         buttons.add(exportBtn);
         panel.add(buttons, BorderLayout.WEST);
 
-        statusLabel = new JLabel(Strings.labelingLabelCount(0));
+        statusLabel = new JLabel(Strings.labelingLabelCount(labels.size()));
         statusLabel.setFont(new Font("Arial", Font.ITALIC, 11));
         statusLabel.setForeground(new Color(0x555555));
         panel.add(statusLabel, BorderLayout.EAST);
@@ -275,9 +293,23 @@ public class LabelingWindow extends JFrame {
         if (currentSnapshot != null) {
             labels.add(buildLabelEntry(currentSnapshot));
             statusLabel.setText(Strings.labelingLabelCount(labels.size()));
+            autoSave();
         }
         // Auto-generate next snapshot with same settings
         generateSnapshot();
+    }
+
+    /** Writes all current labels to {@link #AUTO_SAVE_PATH} silently (no dialog). */
+    private void autoSave() {
+        try {
+            Gson gson = new GsonBuilder().setPrettyPrinting().create();
+            JsonArray arr = new JsonArray();
+            labels.forEach(arr::add);
+            Files.writeString(AUTO_SAVE_PATH, gson.toJson(arr));
+        } catch (IOException ex) {
+            // Non-critical: auto-save failure is shown in status but doesn't block flow
+            statusLabel.setText(Strings.labelingExportError(ex.getMessage()));
+        }
     }
 
     private JsonObject buildLabelEntry(GameState gs) {

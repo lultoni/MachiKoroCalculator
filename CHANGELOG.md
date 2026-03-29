@@ -4,6 +4,22 @@ Implementierungsgeschichte: was gebaut wurde, warum, und welche Designentscheidu
 
 ---
 
+## N4d–N4f: Continuous Phase Weights + LabelingWindow UX + PhaseFitter
+
+**N4d — Kontinuierliche Phasen-Gewichte:** `computePhaseContext` berechnet jetzt drei kontinuierliche Stärken `earlyStrength`, `midStrength`, `lateStrength` ∈ [0,1] (Summe = 1). Spät-Stärke: linearer Ramp über GP-Anzahl → `LATE_GP_THRESHOLD`. Früh-Stärke: Mittelwert aus EV-Schwäche (`1 - avgEv/threshold`) und EKZ-Erreichbarkeit (0/1). Mid = Restant. `addContextProfile` interpoliert Gewichte als `w[i] = earlyStr × WEIGHTS_EARLY[i] + midStr × WEIGHTS_MID[i] + lateStr × WEIGHTS_LATE[i]` — kein hartes Snap mehr auf eine Phase. `phaseLabel` wird nur noch für die Anzeige und als Tiebreaker gesetzt (höchste Stärke).
+
+**N4e — LabelingWindow UX:** Einzelner Phase-Slider (0=Früh, 50=Mitte, 100=Spät) ersetzt drei unabhängige Slider. Live-Label "Früh 80% · Mitte 20% · Spät 0%" unter Slider. Auto-Save nach jedem "Nächster Snapshot"-Klick in `phase_labels.json`. Labels werden beim Öffnen des Fensters wiederhergestellt.
+
+**N4e — Detaillierte Label-Exports:** JSON enthält jetzt: `gp_count`, `gps` (Liste der GP-IDs in Kaufreihenfolge), `non_gp_cards`, `cards` (Liste von `{id, count}`), `features` Block (`avg_gps`, `max_gps`, `avg_cards`, `avg_coins`) — direkt für `PhaseFitter` verwendbar ohne Re-Berechnung.
+
+**N4e — SnapshotCard UX:** GP-Leiste mit benannten Slots und Tooltips (GP-Name + Kosten + gebaut/nicht gebaut). Karten-Liste zeigt Projektnamen mit ×N-Multiplikator. Münzen-Zeile mit Text-Label statt Emoji (vermeidet Rendering-Probleme). Karten-Liste erhält `CENTER`-Layout-Slot — füllt restlichen Platz.
+
+**N4f — PhaseFitter:** Neue Klasse `gui.newui.PhaseFitter`. OLS-Regression (Normalengleichungen, Gauß'sche Elimination mit Partial Pivoting) auf `phase_labels.json`. Features: `[1, avg_gps, max_gps, avg_cards, avg_coins]`. Deriviert `LATE_GP_THRESHOLD` aus max_gps-Wert wo Late-Score = 0.5. R²-Bericht im Kalibrier-Dialog. "Kalibrieren…"-Button in `LabelingWindow` triggert Fit + Update via Reflection (Fallback: zeigt Ergebnis ohne Anwendung auf Java 17+).
+
+**Tests:** 224 bestanden, 0 fehlgeschlagen.
+
+---
+
 ## N4a–N4c: SnapshotCard + SnapshotGenerator + LabelingWindow
 
 **N4a — `SnapshotCard.java`:** Neues kompaktes Player-Panel in `gui.newui`. Zeigt: Spielername, Münzen (Clickable / Spinner in edit mode), GP-Fortschrittsleiste (0–4, farbkodiert: grün=führend, gelb=mittel, rot=hinten), farbige Karten-Chips (Blau/Grün/Rot/Lila/Gelb als aggregierte Chips mit ×N-Zähler), EV/Runde via `portfolioEvPerRound`. In Edit-Mode (Doppelklick oder `setEditable(true)`): `BoundedSpinner` für Münzen, pro-Farbe-Spinner/Checkbox für alle Karten — gleiche Validierungslogik wie `SnapshotDialog`. API: `setPlayer(Player)`, `getEditedPlayer() → Player`, `setEditable(boolean)`, `addChangeListener(...)`. `.mkoro`-kompatibel: `getEditedPlayer()` liefert direkt einen `Player` für `GameStateBuilder`.

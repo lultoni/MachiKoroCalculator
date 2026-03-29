@@ -1054,6 +1054,10 @@ public class MainWindow extends JFrame {
     /** Snapshot of strategic context used for the Spiellage-Analyse profile. */
     private record GamePhaseContext(
             String phaseLabel,
+            /** Continuous phase strengths [0,1]; sum to 1.0. Used for weight interpolation. */
+            double earlyStrength,
+            double midStrength,
+            double lateStrength,
             int ownLandmarks,
             int maxOppLandmarks,
             boolean bahnhofSuggested, double bahnhofEvGain,
@@ -1093,17 +1097,43 @@ public class MainWindow extends JFrame {
         for (int i = 0; i < n; i++) avgEv += ProbabilityCalc.portfolioEvPerRound(session.getState(), i);
         avgEv /= n;
 
-        String phase;
-        if (Math.max(ownLm, maxOppLm) >= AssistantConfig.LATE_GP_THRESHOLD) {
-            phase = Strings.assistantPhaseLate();
+        // Compute soft phase strengths in [0,1] that sum to 1.0.
+        // Late strength: based on max-GP ratio clamped [0,1] with threshold at LATE_GP_THRESHOLD-1
+        // Early strength: based on economy weakness (low EV, EKZ unreachable)
+        // Mid strength: remainder
+        int maxGps = Math.max(ownLm, maxOppLm);
+        double lateRaw;
+        if (maxGps >= AssistantConfig.LATE_GP_THRESHOLD) {
+            lateRaw = 1.0;
         } else {
+            // Soft ramp: 0 at 0 GPs → 1 at LATE_GP_THRESHOLD
+            lateRaw = (double) maxGps / AssistantConfig.LATE_GP_THRESHOLD;
+        }
+
+        double earlyRaw;
+        {
             double ownCoins = active.getCoins();
             boolean ekzReachable = (ownCoins + AssistantConfig.EARLY_SAVE_ROUNDS * ownEv)
                                     >= AssistantConfig.EKZ_COST;
-            boolean economyWeak  = avgEv < AssistantConfig.EARLY_AVG_EV_THRESHOLD;
-            phase = (economyWeak && !ekzReachable)
-                    ? Strings.assistantPhaseEarly()
-                    : Strings.assistantPhaseMid();
+            // EV weakness: 1.0 when avgEv==0, 0.0 when avgEv>=threshold
+            double evWeak = Math.max(0.0, 1.0 - avgEv / AssistantConfig.EARLY_AVG_EV_THRESHOLD);
+            double ekzFar  = ekzReachable ? 0.0 : 1.0;
+            earlyRaw = (evWeak + ekzFar) / 2.0;  // average of the two signals, in [0,1]
+        }
+
+        // Normalize so all three sum to 1.0; late takes priority, then early uses remainder
+        double lateStr  = lateRaw;
+        double earlyStr = earlyRaw * (1.0 - lateStr);
+        double midStr   = 1.0 - lateStr - earlyStr;
+
+        // Snap phaseLabel to whichever strength is highest (for display + string-keyed lookups)
+        String phase;
+        if (lateStr >= midStr && lateStr >= earlyStr) {
+            phase = Strings.assistantPhaseLate();
+        } else if (earlyStr > midStr) {
+            phase = Strings.assistantPhaseEarly();
+        } else {
+            phase = Strings.assistantPhaseMid();
         }
 
         boolean hasBahnhof = active.hasProject("bahnhof");
@@ -1157,7 +1187,7 @@ public class MainWindow extends JFrame {
         // Funkturm: worth buying if player has Freizeitpark (doubles already possible)
         boolean ftSuggested = !hasFt && hasFp;
 
-        return new GamePhaseContext(phase, ownLm, maxOppLm,
+        return new GamePhaseContext(phase, earlyStr, midStr, lateStr, ownLm, maxOppLm,
                 bahnhofSuggested, bahnhofEvGain, ekzSuggested, fpSuggested, ftSuggested);
     }
 
@@ -1172,8 +1202,16 @@ public class MainWindow extends JFrame {
             return;
         }
 
-        // Weights from AssistantConfig, then apply opponent-pressure modifier
-        double[] w = AssistantConfig.weightsForPhase(ctx.phaseLabel());
+        // Interpolate weights continuously from all three phase arrays
+        double[] wE = AssistantConfig.WEIGHTS_EARLY;
+        double[] wM = AssistantConfig.WEIGHTS_MID;
+        double[] wL = AssistantConfig.WEIGHTS_LATE;
+        double[] w = new double[8];
+        for (int i = 0; i < 8; i++) {
+            w[i] = ctx.earlyStrength() * wE[i]
+                 + ctx.midStrength()   * wM[i]
+                 + ctx.lateStrength()  * wL[i];
+        }
 
         // Compute turns-to-win for the most threatening opponent
         Player[] players = session.getState().getPlayers();

@@ -7,39 +7,36 @@ import javax.swing.*;
 import javax.swing.event.ChangeListener;
 import javax.swing.filechooser.FileNameExtensionFilter;
 import java.awt.*;
-import java.awt.event.ActionEvent;
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
+import java.util.*;
 import java.util.List;
 
 /**
  * A standalone window for labeling game-state snapshots with phase ratings.
  *
- * <p>Displays 2–4 {@link SnapshotCard}s side by side, with three independent sliders
- * (no tick numbers, only endpoint labels) for Early / Mid / Late phase strength.
- * Labels are collected in memory, automatically written to {@code phase_labels.json}
- * in the working directory after each "Next Snapshot" click, and can also be exported
- * to a user-chosen location.
+ * <p>Displays 2–4 {@link SnapshotCard}s side by side, with a single phase-progression
+ * slider: left = Early (1,0,0), centre = Mid (0,1,0), right = Late (0,0,1), smoothly
+ * interpolated between the three poles.
  *
- * <h2>Workflow</h2>
- * <ol>
- *   <li>Set the player count and turn range, then click "Generate" — or load a {@code .mkoro}
- *       file via "Load from File".</li>
- *   <li>Rate the snapshot using the three sliders (right = strong for that phase).</li>
- *   <li>Click "Next Snapshot" to save the current label (auto-written to disk) and load the next one.</li>
- *   <li>Click "Export Labels" to write all collected labels to a user-chosen file.</li>
- * </ol>
+ * <p>Labels are collected in memory, automatically written to {@code phase_labels.json}
+ * in the working directory after each "Next Snapshot" click, and persist across sessions.
+ * The "Calibrate" button runs {@link PhaseFitter} on all collected labels and updates
+ * the live phase-detection thresholds in {@link AssistantConfig} without restart.
  *
  * <h2>Label format (JSON)</h2>
  * <pre>
  * [
  *   {
- *     "players": [ { "name": "…", "coins": N, "gps": N } ],
- *     "labels": { "early": 0.8, "mid": 0.3, "late": 0.1 }
- *   },
- *   …
+ *     "n_players": 3,
+ *     "players": [
+ *       { "name":"…", "coins":N, "gps":["bahnhof","einkaufszentrum"],
+ *         "cards":[{"id":"weizenfeld","count":2}, …] }
+ *     ],
+ *     "features": { "avg_gps":…, "max_gps":…, "avg_cards":…, "avg_coins":… },
+ *     "labels": { "early":0.8, "mid":0.3, "late":0.1 }
+ *   }, …
  * ]
  * </pre>
  *
@@ -48,30 +45,30 @@ import java.util.List;
 public class LabelingWindow extends JFrame {
 
     // ── Slider constants ──────────────────────────────────────────────────────
-    private static final int SLIDER_MIN   = 0;
-    private static final int SLIDER_MAX   = 100;
-    private static final int SLIDER_INIT  = 50;
+    /** 0 = full Early, 50 = full Mid, 100 = full Late */
+    private static final int SLIDER_MIN  = 0;
+    private static final int SLIDER_MAX  = 100;
+    private static final int SLIDER_INIT = 25; // start in early/mid transition
 
-    /** Auto-save target: phase_labels.json in the working directory. */
-    private static final Path AUTO_SAVE_PATH = Path.of("phase_labels.json");
+    /** GP IDs in purchase order — must match SnapshotCard.GP_IDS */
+    private static final String[] GP_IDS = {"bahnhof", "einkaufszentrum", "freizeitpark", "funkturm"};
+
+    /** Auto-save target in the working directory. */
+    static final Path AUTO_SAVE_PATH = Path.of("phase_labels.json");
 
     // ── State ─────────────────────────────────────────────────────────────────
     private GameState currentSnapshot;
     private final List<JsonObject> labels = new ArrayList<>();
 
     // ── UI ────────────────────────────────────────────────────────────────────
-    private JPanel cardsPanel;
-    private JSlider sliderEarly;
-    private JSlider sliderMid;
-    private JSlider sliderLate;
-    private JLabel statusLabel;
+    private JPanel  cardsPanel;
+    private JSlider phaseSlider;
+    private JLabel  phaseValueLabel;
+    private JLabel  statusLabel;
     private JSpinner numPlayersSpinner;
     private JSpinner minTurnSpinner;
     private JSpinner maxTurnSpinner;
 
-    /**
-     * Opens the LabelingWindow as a non-modal frame (independent of MainWindow).
-     */
     public LabelingWindow() {
         super(Strings.labelingWindowTitle());
         setDefaultCloseOperation(DISPOSE_ON_CLOSE);
@@ -82,16 +79,15 @@ public class LabelingWindow extends JFrame {
         setVisible(true);
     }
 
-    /** Loads previously saved labels from {@link #AUTO_SAVE_PATH} if it exists. */
+    // ── Persist across sessions ───────────────────────────────────────────────
+
     private void loadExistingLabels() {
         if (!Files.exists(AUTO_SAVE_PATH)) return;
         try {
             String json = Files.readString(AUTO_SAVE_PATH);
             JsonArray arr = JsonParser.parseString(json).getAsJsonArray();
             for (JsonElement el : arr) labels.add(el.getAsJsonObject());
-        } catch (Exception ex) {
-            // Silently ignore malformed existing file — start fresh
-        }
+        } catch (Exception ignored) {}
     }
 
     // ── UI construction ───────────────────────────────────────────────────────
@@ -99,21 +95,17 @@ public class LabelingWindow extends JFrame {
     private void buildUI() {
         setLayout(new BorderLayout(8, 8));
         getRootPane().setBorder(BorderFactory.createEmptyBorder(10, 12, 10, 12));
-
         add(buildTopControls(), BorderLayout.NORTH);
         add(buildCenterArea(),  BorderLayout.CENTER);
         add(buildBottomBar(),   BorderLayout.SOUTH);
     }
 
-    /** Top row: player count, turn range, generate button, load-from-file button. */
     private JPanel buildTopControls() {
         JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 4));
-
         panel.add(new JLabel(Strings.labelingNumPlayers()));
         numPlayersSpinner = new JSpinner(new SpinnerNumberModel(3, 2, 4, 1));
         numPlayersSpinner.setPreferredSize(new Dimension(50, 26));
         panel.add(numPlayersSpinner);
-
         panel.add(new JLabel(Strings.labelingTurnRange()));
         minTurnSpinner = new JSpinner(new SpinnerNumberModel(3, 0, 100, 1));
         minTurnSpinner.setPreferredSize(new Dimension(55, 26));
@@ -122,23 +114,17 @@ public class LabelingWindow extends JFrame {
         panel.add(minTurnSpinner);
         panel.add(new JLabel("–"));
         panel.add(maxTurnSpinner);
-
         JButton genBtn = new JButton(Strings.labelingGenerate());
         genBtn.addActionListener(e -> generateSnapshot());
         panel.add(genBtn);
-
         JButton fileBtn = new JButton(Strings.labelingFromFileBtn());
         fileBtn.addActionListener(e -> loadFromFile());
         panel.add(fileBtn);
-
         return panel;
     }
 
-    /** Center: side-by-side SnapshotCards + three phase sliders below. */
     private JPanel buildCenterArea() {
         JPanel panel = new JPanel(new BorderLayout(0, 8));
-
-        // ── Card area ────────────────────────────────────────────────────────
         cardsPanel = new JPanel();
         cardsPanel.setLayout(new BoxLayout(cardsPanel, BoxLayout.X_AXIS));
         cardsPanel.setBorder(BorderFactory.createTitledBorder("Snapshot"));
@@ -149,10 +135,7 @@ public class LabelingWindow extends JFrame {
         cardsPanel.add(placeholder);
         cardsPanel.add(Box.createHorizontalGlue());
         panel.add(cardsPanel, BorderLayout.CENTER);
-
-        // ── Sliders ──────────────────────────────────────────────────────────
         panel.add(buildSliderPanel(), BorderLayout.SOUTH);
-
         return panel;
     }
 
@@ -160,59 +143,86 @@ public class LabelingWindow extends JFrame {
         JPanel panel = new JPanel();
         panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
         panel.setBorder(BorderFactory.createTitledBorder(
-                Strings.isDE() ? "Spielphase-Einschätzung" : "Phase Rating"));
+                Strings.isDE() ? "Spielphase" : "Game Phase"));
 
-        sliderEarly = makeSlider();
-        sliderMid   = makeSlider();
-        sliderLate  = makeSlider();
+        // Single slider: 0=Early, 50=Mid, 100=Late
+        JPanel sliderRow = new JPanel(new BorderLayout(6, 0));
+        JLabel leftLbl  = new JLabel(Strings.isDE() ? "Frühphase" : "Early Game");
+        JLabel rightLbl = new JLabel(Strings.isDE() ? "Endspiel"  : "Late Game");
+        leftLbl.setFont(new Font("Arial", Font.PLAIN, 11));
+        rightLbl.setFont(new Font("Arial", Font.PLAIN, 11));
 
-        panel.add(sliderRow(sliderEarly,
-                Strings.labelingSliderEarlyLeft(), Strings.labelingSliderEarlyRight()));
-        panel.add(Box.createVerticalStrut(6));
-        panel.add(sliderRow(sliderMid,
-                Strings.labelingSliderMidLeft(), Strings.labelingSliderMidRight()));
-        panel.add(Box.createVerticalStrut(6));
-        panel.add(sliderRow(sliderLate,
-                Strings.labelingSliderLateLeft(), Strings.labelingSliderLateRight()));
+        phaseSlider = new JSlider(SLIDER_MIN, SLIDER_MAX, SLIDER_INIT);
+        phaseSlider.setPaintLabels(false);
+        phaseSlider.setPaintTicks(false);
+        phaseSlider.setPaintTrack(true);
 
+        // Live value display: e.g. "Early 80% · Mid 20% · Late 0%"
+        phaseValueLabel = new JLabel(phaseText(SLIDER_INIT), SwingConstants.CENTER);
+        phaseValueLabel.setFont(new Font("Arial", Font.PLAIN, 11));
+        phaseValueLabel.setForeground(new Color(0x444444));
+        phaseSlider.addChangeListener(e -> phaseValueLabel.setText(phaseText(phaseSlider.getValue())));
+
+        sliderRow.add(leftLbl,   BorderLayout.WEST);
+        sliderRow.add(phaseSlider, BorderLayout.CENTER);
+        sliderRow.add(rightLbl,  BorderLayout.EAST);
+        sliderRow.setAlignmentX(LEFT_ALIGNMENT);
+
+        panel.add(sliderRow);
+        panel.add(phaseValueLabel);
         return panel;
     }
 
-    /**
-     * Creates one labelled slider row:
-     * [left label]  [----slider----]  [right label]
-     */
-    private JPanel sliderRow(JSlider slider, String leftLabel, String rightLabel) {
-        JPanel row = new JPanel(new BorderLayout(6, 0));
-        row.setAlignmentX(LEFT_ALIGNMENT);
-        JLabel left  = new JLabel(leftLabel);
-        JLabel right = new JLabel(rightLabel);
-        left.setFont(new Font("Arial", Font.PLAIN, 11));
-        right.setFont(new Font("Arial", Font.PLAIN, 11));
-        row.add(left,   BorderLayout.WEST);
-        row.add(slider, BorderLayout.CENTER);
-        row.add(right,  BorderLayout.EAST);
-        return row;
+    /** Interpolates the slider position into (early, mid, late) values and formats them. */
+    static double[] sliderToPhaseValues(int pos) {
+        // pos in [0..100]:  0=Early peak, 50=Mid peak, 100=Late peak
+        // Piecewise linear triangles:
+        //   early: 1 at 0,  0 at 50,  0 at 100
+        //   mid:   0 at 0,  1 at 50,  0 at 100
+        //   late:  0 at 0,  0 at 50,  1 at 100
+        double t = pos / 100.0;
+        double early, mid, late;
+        if (t <= 0.5) {
+            early = 1.0 - 2 * t;
+            mid   = 2 * t;
+            late  = 0.0;
+        } else {
+            early = 0.0;
+            mid   = 2.0 - 2 * t;
+            late  = 2 * t - 1.0;
+        }
+        return new double[]{early, mid, late};
     }
 
-    private JSlider makeSlider() {
-        JSlider s = new JSlider(SLIDER_MIN, SLIDER_MAX, SLIDER_INIT);
-        s.setPaintLabels(false);
-        s.setPaintTicks(false);
-        s.setPaintTrack(true);
-        return s;
+    private String phaseText(int pos) {
+        double[] v = sliderToPhaseValues(pos);
+        if (Strings.isDE()) {
+            return String.format("Früh %.0f%%  ·  Mitte %.0f%%  ·  Spät %.0f%%",
+                    v[0]*100, v[1]*100, v[2]*100);
+        } else {
+            return String.format("Early %.0f%%  ·  Mid %.0f%%  ·  Late %.0f%%",
+                    v[0]*100, v[1]*100, v[2]*100);
+        }
     }
 
-    /** Bottom: "Next Snapshot", "Export Labels", label count. */
     private JPanel buildBottomBar() {
         JPanel panel = new JPanel(new BorderLayout(8, 0));
-
         JPanel buttons = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
+
         JButton nextBtn = new JButton(Strings.labelingNextBtn());
         nextBtn.addActionListener(e -> saveCurrentAndNext());
+
+        JButton calibrateBtn = new JButton(Strings.isDE() ? "Kalibrieren…" : "Calibrate…");
+        calibrateBtn.setToolTipText(Strings.isDE()
+                ? "Regression über alle Labels → neue Phasenschwellwerte"
+                : "Regression over all labels → updated phase thresholds");
+        calibrateBtn.addActionListener(e -> runCalibration());
+
         JButton exportBtn = new JButton(Strings.labelingExportBtn());
         exportBtn.addActionListener(e -> exportLabels());
+
         buttons.add(nextBtn);
+        buttons.add(calibrateBtn);
         buttons.add(exportBtn);
         panel.add(buttons, BorderLayout.WEST);
 
@@ -220,18 +230,16 @@ public class LabelingWindow extends JFrame {
         statusLabel.setFont(new Font("Arial", Font.ITALIC, 11));
         statusLabel.setForeground(new Color(0x555555));
         panel.add(statusLabel, BorderLayout.EAST);
-
         return panel;
     }
 
     // ── Snapshot management ───────────────────────────────────────────────────
 
     private void generateSnapshot() {
-        int n = (int) numPlayersSpinner.getValue();
+        int n    = (int) numPlayersSpinner.getValue();
         int minT = (int) minTurnSpinner.getValue();
         int maxT = (int) maxTurnSpinner.getValue();
         if (maxT < minT) { maxTurnSpinner.setValue(minT); maxT = minT; }
-
         GameState gs = SnapshotGenerator.generate(n, minT, maxT);
         if (gs == null) {
             JOptionPane.showMessageDialog(this,
@@ -264,7 +272,7 @@ public class LabelingWindow extends JFrame {
 
     private void showSnapshot(GameState gs) {
         currentSnapshot = gs;
-        resetSliders();
+        phaseSlider.setValue(SLIDER_INIT);
         rebuildCards(gs);
         revalidate();
         repaint();
@@ -276,15 +284,8 @@ public class LabelingWindow extends JFrame {
         Player[] players = gs.getPlayers();
         for (int i = 0; i < players.length; i++) {
             if (i > 0) cardsPanel.add(Box.createHorizontalStrut(8));
-            SnapshotCard card = new SnapshotCard(players[i], gs, i);
-            cardsPanel.add(card);
+            cardsPanel.add(new SnapshotCard(players[i], gs, i));
         }
-    }
-
-    private void resetSliders() {
-        sliderEarly.setValue(SLIDER_INIT);
-        sliderMid.setValue(SLIDER_INIT);
-        sliderLate.setValue(SLIDER_INIT);
     }
 
     // ── Label collection ──────────────────────────────────────────────────────
@@ -295,11 +296,9 @@ public class LabelingWindow extends JFrame {
             statusLabel.setText(Strings.labelingLabelCount(labels.size()));
             autoSave();
         }
-        // Auto-generate next snapshot with same settings
         generateSnapshot();
     }
 
-    /** Writes all current labels to {@link #AUTO_SAVE_PATH} silently (no dialog). */
     private void autoSave() {
         try {
             Gson gson = new GsonBuilder().setPrettyPrinting().create();
@@ -307,38 +306,122 @@ public class LabelingWindow extends JFrame {
             labels.forEach(arr::add);
             Files.writeString(AUTO_SAVE_PATH, gson.toJson(arr));
         } catch (IOException ex) {
-            // Non-critical: auto-save failure is shown in status but doesn't block flow
             statusLabel.setText(Strings.labelingExportError(ex.getMessage()));
         }
     }
 
     private JsonObject buildLabelEntry(GameState gs) {
         JsonObject entry = new JsonObject();
+        entry.addProperty("n_players", gs.getPlayers().length);
 
-        // Minimal snapshot summary (players)
-        JsonArray players = new JsonArray();
+        // Per-player detail: exact GPs + card counts by id
+        JsonArray playersArr = new JsonArray();
         for (Player p : gs.getPlayers()) {
             JsonObject pObj = new JsonObject();
-            pObj.addProperty("name", p.getName());
+            pObj.addProperty("name",  p.getName());
             pObj.addProperty("coins", p.getCoins());
-            int gps = 0;
-            for (logic.probability.Project proj : p.getOwned_projects()) {
-                if (proj.isIs_grossprojekt()) gps++;
-            }
-            pObj.addProperty("gps", gps);
-            pObj.addProperty("cards", p.getOwned_projects().size());
-            players.add(pObj);
-        }
-        entry.add("players", players);
 
-        // Phase labels (normalised 0.0–1.0; slider 0=left, 100=right)
+            // Which GPs are built (list of ids in purchase order)
+            JsonArray gpsArr = new JsonArray();
+            for (String gpId : GP_IDS) {
+                if (p.hasProject(gpId)) gpsArr.add(gpId);
+            }
+            pObj.addProperty("gp_count", gpsArr.size());
+            pObj.add("gps", gpsArr);
+
+            // Non-GP cards: aggregate by id with count
+            Map<String, Integer> cardCounts = new LinkedHashMap<>();
+            for (Project proj : p.getOwned_projects()) {
+                if (!proj.isIs_grossprojekt()) {
+                    cardCounts.merge(proj.getId(), 1, Integer::sum);
+                }
+            }
+            pObj.addProperty("non_gp_cards", cardCounts.values().stream().mapToInt(i->i).sum());
+            JsonArray cardsArr = new JsonArray();
+            for (Map.Entry<String, Integer> e : cardCounts.entrySet()) {
+                JsonObject c = new JsonObject();
+                c.addProperty("id",    e.getKey());
+                c.addProperty("count", e.getValue());
+                cardsArr.add(c);
+            }
+            pObj.add("cards", cardsArr);
+
+            playersArr.add(pObj);
+        }
+        entry.add("players", playersArr);
+
+        // Derived features (for PhaseFitter — pre-computed so the fitter is simple)
+        Player[] ps = gs.getPlayers();
+        int n = ps.length;
+        double avgGps   = Arrays.stream(ps).mapToInt(p -> (int) p.getOwned_projects().stream()
+                              .filter(Project::isIs_grossprojekt).count()).average().orElse(0);
+        int    maxGps   = Arrays.stream(ps).mapToInt(p -> (int) p.getOwned_projects().stream()
+                              .filter(Project::isIs_grossprojekt).count()).max().orElse(0);
+        double avgCards = Arrays.stream(ps).mapToLong(p -> p.getOwned_projects().stream()
+                              .filter(proj -> !proj.isIs_grossprojekt()).count()).average().orElse(0);
+        double avgCoins = Arrays.stream(ps).mapToInt(Player::getCoins).average().orElse(0);
+        JsonObject features = new JsonObject();
+        features.addProperty("avg_gps",   avgGps);
+        features.addProperty("max_gps",   maxGps);
+        features.addProperty("avg_cards", avgCards);
+        features.addProperty("avg_coins", avgCoins);
+        entry.add("features", features);
+
+        // Phase labels from single slider
+        double[] v = sliderToPhaseValues(phaseSlider.getValue());
         JsonObject labelObj = new JsonObject();
-        labelObj.addProperty("early", sliderEarly.getValue() / 100.0);
-        labelObj.addProperty("mid",   sliderMid.getValue()   / 100.0);
-        labelObj.addProperty("late",  sliderLate.getValue()  / 100.0);
+        labelObj.addProperty("early", Math.round(v[0] * 100.0) / 100.0);
+        labelObj.addProperty("mid",   Math.round(v[1] * 100.0) / 100.0);
+        labelObj.addProperty("late",  Math.round(v[2] * 100.0) / 100.0);
         entry.add("labels", labelObj);
 
         return entry;
+    }
+
+    // ── Calibration ───────────────────────────────────────────────────────────
+
+    private void runCalibration() {
+        if (labels.size() < 10) {
+            JOptionPane.showMessageDialog(this,
+                    Strings.isDE()
+                        ? "Zu wenige Labels (" + labels.size() + "). Mindestens 10 nötig."
+                        : "Too few labels (" + labels.size() + "). At least 10 needed.",
+                    Strings.isDE() ? "Kalibrierung" : "Calibration",
+                    JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        PhaseFitter.FitResult result = PhaseFitter.fit(labels);
+        // Apply to live AssistantConfig
+        PhaseFitter.applyToConfig(result);
+
+        // Show result dialog
+        String msg = Strings.isDE()
+            ? String.format(
+                "Kalibrierung abgeschlossen (%d Labels)%n%n"
+                + "Neue Schwellwerte (live aktiv):%n"
+                + "  LATE_GP_THRESHOLD:      %.2f → %d%n"
+                + "  EARLY_AVG_EV_THRESHOLD: %.2f (fix, EV-basiert)%n%n"
+                + "R² Early: %.3f   Mid: %.3f   Late: %.3f",
+                labels.size(),
+                result.rawLateGpThreshold(), result.lateGpThreshold(),
+                result.earlyEvThreshold(),
+                result.r2Early(), result.r2Mid(), result.r2Late())
+            : String.format(
+                "Calibration complete (%d labels)%n%n"
+                + "New thresholds (live):%n"
+                + "  LATE_GP_THRESHOLD:      %.2f → %d%n"
+                + "  EARLY_AVG_EV_THRESHOLD: %.2f (fixed, EV-based)%n%n"
+                + "R² Early: %.3f   Mid: %.3f   Late: %.3f",
+                labels.size(),
+                result.rawLateGpThreshold(), result.lateGpThreshold(),
+                result.earlyEvThreshold(),
+                result.r2Early(), result.r2Mid(), result.r2Late());
+        JOptionPane.showMessageDialog(this, msg,
+                Strings.isDE() ? "Kalibrierung" : "Calibration",
+                JOptionPane.INFORMATION_MESSAGE);
+        statusLabel.setText(Strings.isDE()
+                ? "Kalibriert — " + Strings.labelingLabelCount(labels.size())
+                : "Calibrated — " + Strings.labelingLabelCount(labels.size()));
     }
 
     // ── Export ────────────────────────────────────────────────────────────────
@@ -350,12 +433,10 @@ public class LabelingWindow extends JFrame {
                     Strings.isDE() ? "Hinweis" : "Note", JOptionPane.INFORMATION_MESSAGE);
             return;
         }
-
         JFileChooser fc = new JFileChooser();
         fc.setSelectedFile(new File("phase_labels.json"));
         fc.setFileFilter(new FileNameExtensionFilter("JSON (*.json)", "json"));
         if (fc.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) return;
-
         Path path = fc.getSelectedFile().toPath();
         try {
             Gson gson = new GsonBuilder().setPrettyPrinting().create();

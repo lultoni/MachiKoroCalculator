@@ -122,9 +122,19 @@ public class DiceFacePanel extends JPanel {
         }
         g2.drawRoundRect(pad, pad, w, h, arc, arc);
 
-        // Dots
+        // Dots or fallback number for values outside 1–6
         if (value >= 1 && value <= 6) {
             paintDots(g2, pad, pad, w, h, selectable && !selected);
+        } else {
+            // Fallback: draw the number centered inside the die face
+            Color numColor = (selectable && !selected) ? new Color(0xBBBBBB) : new Color(0x222222);
+            g2.setColor(numColor);
+            g2.setFont(new Font("Arial", Font.BOLD, Math.max(8, w / 2)));
+            FontMetrics fm = g2.getFontMetrics();
+            String text = String.valueOf(value);
+            int tx = pad + (w - fm.stringWidth(text)) / 2;
+            int ty = pad + (h - fm.getHeight()) / 2 + fm.getAscent();
+            g2.drawString(text, tx, ty);
         }
 
         g2.dispose();

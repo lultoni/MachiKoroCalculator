@@ -8,27 +8,11 @@ Progress key: `[ ]` open · `[~]` in progress · `[x]` done
 
 ## Bugs
 
-### B1 · Würfelaktivierung > 6 zeigt leeren Würfel (High)
+### B1 · ~~Würfelaktivierung > 6 zeigt leeren Würfel~~ ✓ (behoben)
 
-`buildActivationDice()` übergibt alle Aktivierungswerte an `DiceFacePanel`, das nur 1–6 verarbeitet. Karten wie Apfelplantage (10), Bergwerk (9) und Markthalle (11, 12) rendern daher leer.
+### B2 · ~~Rechtes Panel zu schmal — Reload-Button und Status-Text abgeschnitten~~ ✓ (behoben)
 
-**Fix:** Fallback in `DiceFacePanel` einbauen: bei Werten > 6 die Würfelborder und den Hintergrund normal zeichnen, aber statt Augen eine kleine zentrierte Zahl anzeigen.
-
----
-
-### B2 · Rechtes Panel zu schmal — Reload-Button und Status-Text abgeschnitten (High)
-
-Das rechte Panel hat keine `setMinimumSize`. Bei sehr schmalem Fenster fällt `mcReloadBtn` und `statusLabel` aus der `FlowLayout`-Buttonleiste.
-
-**Fix:** `setMinimumSize` auf dem rechten Panel setzen (ca. 420 px — gemessen aus den Button-Breiten). Globale `setMinimumSize` des Fensters entsprechend anpassen.
-
----
-
-### B3 · "coins" im Würfelergebnis-Preview nicht lokalisiert (Medium)
-
-In `refreshRollPreview()` ist `" coins"` hartkodiert. In der deutschen UI steht "Münzen", aber im Preview bleibt "coins".
-
-**Fix:** `" " + Strings.coinsUnit()` verwenden (gibt je nach Locale "Münzen" / "coins").
+### B3 · ~~"coins" im Würfelergebnis-Preview nicht lokalisiert~~ ✓ (behoben)
 
 ---
 

@@ -96,7 +96,7 @@ public class MainWindow extends JFrame {
         this.session = session;
         setTitle(Strings.mainWindowTitle());
         setDefaultCloseOperation(EXIT_ON_CLOSE);
-        setMinimumSize(new Dimension(980, 600));
+        setMinimumSize(new Dimension(1020, 600));
         buildUI();
         refreshAll();
         pack();
@@ -550,6 +550,9 @@ public class MainWindow extends JFrame {
             }
         });
 
+        // Ensure the button bar is never clipped when the window is resized narrow.
+        // The bar needs ~430 px (win-prob btn + deep analysis btn + N: + spinner + reload + status + gaps).
+        panel.setMinimumSize(new Dimension(430, 0));
         return panel;
     }
 
@@ -876,7 +879,7 @@ public class MainWindow extends JFrame {
         rollPreviewPanel.removeAll();
         for (int i = 0; i < deltas.length; i++) {
             String sign = deltas[i] >= 0 ? "+" : "";
-            JLabel lbl = new JLabel(names[i] + ": " + sign + deltas[i] + " coins");
+            JLabel lbl = new JLabel(names[i] + ": " + sign + deltas[i] + " " + Strings.coinsUnit());
             lbl.setFont(new Font("Monospaced", Font.PLAIN, 11));
             if (deltas[i] > 0) lbl.setForeground(new Color(0x007700));
             else if (deltas[i] < 0) lbl.setForeground(new Color(0xAA0000));

@@ -1,92 +1,93 @@
 # MachiKoroCalculator
 
-A decision-support tool for the base game of Machi Koro. Given the current game state (players, coins, owned projects), it calculates the mathematically optimal project to purchase using expected value and probability analysis.
+Entscheidungshilfe für das Brettspiel Machi Koro (Grundspiel). Berechnet auf Basis des aktuellen Spielstands (Münzen, Karten, Spielerzahl) den mathematisch optimalen Kauf mit Erwartungswert- und Wahrscheinlichkeitsanalyse.
 
 ## Features
 
-- Turn-by-turn game tracking with full undo history
-- Snapshot mode: enter or edit the game state at any point; continue turn-by-turn from a snapshot
-- Expected value calculation per project per game state
-- Considers 1d6 vs. 2d6 choice (Bahnhof), Einkaufszentrum bonuses, Freizeitpark double-roll, Funkturm re-roll, and Bürohaus card-swap EV heuristic
-- Landmarks (Großprojekte) are included as purchasable options alongside regular establishments
-- Freizeitpark doubles tracking: checkbox shown when the active player owns both Bahnhof and Freizeitpark; grants a bonus second turn (no chaining)
-- Ranks all affordable projects by EV/round, ROI over 10 turns (discounted), and risk (P=0 income); sortable columns
-- Optional win-probability delta column: analytical (softmax) or Monte Carlo (toggle button)
-- **Deep Analysis mode**: configurable Monte Carlo game simulations (100–10 000) per candidate; independent toggle from win-probability display; runs off the EDT via SwingWorker
-- Three-column Swing GUI: "Current Turn Tracker" | "Card Details" | ranked table of all affordable cards
+- Turn-by-turn Spielverfolgung mit vollständigem Undo-Verlauf
+- Snapshot-Modus: Spielstand jederzeit eintragen oder bearbeiten, dann turn-by-turn weiterführen
+- Erwartungswertberechnung (EV/round), ROI über 10 Runden, Risikomaß P(0), Varianz
+- Alle Großprojekte (Landmarks) als Kaufoptionen neben regulären Karten
+- Bahnhof: 1W6 vs. 2W6-Auswahl; Einkaufszentrum-Boni; Freizeitpark-Doppelwurf; Funkturm-Neuwerfen; Bürohaus-Tausch-EV
+- "Doubles?"-Checkbox wenn Spieler Bahnhof + Freizeitpark besitzt; Bonuszug-Logik in `GameSession`
+- Kaufliste und Ranking basieren auf Post-Roll-Münzen (korrekte Turnreihenfolge: Würfeln → Einkommen/Zahlen → Kaufen)
+- Optionale Win-Prob-Δ-Spalte: analytisch (Softmax) oder Monte Carlo
+- **Deep Analysis**: konfigurierbares MC (100–10 000 Simulationen), unabhängig vom Win-Prob-Toggle, läuft per `SwingWorker` off-EDT
+- DE/EN lokalisiert: Sprachwechsel in Setup (Radiobuttons) und Hauptfenster (Menüleiste)
 
-## Documentation
+## Dokumentation
 
-| File | Purpose |
-|------|---------|
-| `CLAUDE.md` | Agent/developer guidance: architecture, coding conventions, workflow |
-| `ARCHITECTURE.md` | Mathematical formulas, card rule conventions, design rationales |
-| `CHANGELOG.md` | Implementation history: what was built, why, and what decisions were made |
-| `PLAN.md` | Active backlog: known limitations and planned improvements |
+| Datei | Inhalt |
+|-------|--------|
+| `CLAUDE.md` | Architektur, Coding-Konventionen, Workflow |
+| `ARCHITECTURE.md` | Formeln, Kartenregeln, Designentscheidungen |
+| `CHANGELOG.md` | Implementierungsgeschichte |
+| `PLAN.md` | Offene Bugs, geplante Verbesserungen |
 
-## Requirements
+## Voraussetzungen & Build
 
-- Java 17+
-- `gson-2.11.0.jar` (bundled)
-
-## Build & Run
+Java 17+, `gson-2.11.0.jar` (im Repo enthalten).
 
 ```bash
-# Compile
+# Kompilieren
 javac -cp "src:gson-2.11.0.jar" -d out $(find src -name "*.java")
 
-# Run
+# Starten
 java -cp "out:src:gson-2.11.0.jar" logic.Main
 
 # Tests
 java -cp "out:src:gson-2.11.0.jar" Tests.RuntimeTester
 ```
 
-## Project Structure
+## Projektstruktur
 
 ```
 src/
-  logic/                    # Entry point only (Main.java)
-  logic/probability/        # Probability layer — math engine + data model
-    GameState.java          # Mutable game state (Player[] + unbuilt pool)
-    GameStateBuilder.java   # Fluent builder for constructing GameState from user inputs
-    GameSession.java        # Turn-by-turn tracker with undo, Freizeitpark bonus turns, snapshot
-    GameSessionPersistence.java  # JSON save/load (isolated from GameSession)
-    TurnRecord.java         # Immutable record of one turn (roll, purchase, isDoubles flag)
-    ProbabilityCalc.java    # Pure-static math engine (EV, ROI, variance, rankings, MC)
-    BürohausLogic.java      # Bürohaus swap helpers (extracted from ProbabilityCalc)
-    GameSimulator.java      # Stateless Monte Carlo game simulator (greedy rollout policy)
-    ProjectLoader.java      # JSON loader with static cache
-    RankEntry.java          # Result POJO for ranked recommendations
-    RankingOptions.java     # Options (horizon, discount factor, win-prob flag, MC sims)
-  gui/newui/                # Swing UI
-    SetupWindow.java        # New game setup (player count + names)
-    MainWindow.java         # Main three-column game window
-    SnapshotDialog.java     # Mid-game snapshot editor
-    BoundedSpinner.java     # JSpinner subclass that disables +/- at model boundaries
-  resources/jsons/          # projects.json — all 19 base-game cards
-  Tests/                    # RuntimeTester — 208 unit tests + benchmarks
+  logic/                         Einstiegspunkt (Main.java)
+  logic/probability/             Wahrscheinlichkeits-Engine + Datenmodell
+    GameState.java               Veränderbarer Spielstand (Player[] + Kartenpool)
+    GameStateBuilder.java        Fluent Builder für GameState
+    GameSession.java             Turn-Tracker: Undo, Freizeitpark-Bonuszüge, Snapshot
+    GameSessionPersistence.java  JSON-Speichern/Laden (von GameSession getrennt)
+    TurnRecord.java              Unveränderlicher Zug-Record (Wurf, Kauf, isDoubles)
+    ProbabilityCalc.java         Statische Math-Engine (EV, ROI, Varianz, Ranking, MC)
+    BürohausLogic.java           Bürohaus-Tausch-Helpers (aus ProbabilityCalc extrahiert)
+    GameSimulator.java           Stateless Monte-Carlo-Simulator (greedy Rollout)
+    ProjectLoader.java           JSON-Loader mit statischem Cache
+    RankEntry.java               Ergebnis-POJO für Ranking
+    RankingOptions.java          Optionen (Horizont, Diskontfaktor, MC-Simulations)
+  gui/newui/                     Swing-UI
+    SetupWindow.java             Neues Spiel (Spielerzahl + Namen + Sprache)
+    MainWindow.java              Hauptfenster (3-Spalten-Layout)
+    SnapshotDialog.java          Snapshot-Editor
+    Strings.java                 Zentrale i18n-Registry (DE/EN)
+    BoundedSpinner.java          JSpinner-Subklasse: +/− deaktiviert an Modellgrenzen
+    DiceFacePanel.java           Programmatisch gezeichnetes Würfelgesicht
+    DiceSelectorPanel.java       Klickbarer Würfel-Strip für die Wurfeingabe
+    TurnEntryPanel.java          Panel für einen einzelnen Verlaufseintrag
+  resources/jsons/               projects.json — alle 19 Grundspiel-Karten
+  Tests/                         RuntimeTester — 228 Tests + Benchmarks
 ```
 
-## UI Overview
+## UI-Überblick
 
-**Left panel — Current Turn Tracker**
-Roll spinner with dynamic range (1–6 without Bahnhof, 1–12 with). Arrow buttons disable at the boundary (no over-scroll). A "Doubles?" checkbox appears when the active player owns both Bahnhof and Freizeitpark; checking it grants a bonus turn to the same player after Confirm. The buy dropdown shows only cards the player can afford after the roll (post-roll coins). Full turn history below, color-coded by player with doubles badge and landmark marker.
+**Links — Current Turn Tracker**
+Würfelauswahl (1W6 ohne Bahnhof, 2W6 mit). "Doubles?"-Checkbox bei Bahnhof+Freizeitpark. Kaufdropdown zeigt nur Karten, die nach dem Wurf erschwinglich sind. Verlauf mit Würfelgesichtern, Münzdeltas pro Spieler und Kaufinfos.
 
-**Center panel — Card Details**
-Shows the top-recommended card with its EV/round, ROI, risk metric, optional win-probability delta, and a per-roll outcome preview (which player gains or loses coins). Coin label shows "N → M (after roll)" when the roll changes the active player's balance. Current baseline win probability always visible.
+**Mitte — Card Details**
+Top-empfohlene Karte mit EV/round, ROI, Risikomaß, optionalem Win-Prob-Δ und Würfelergebnis-Preview pro Spieler. Aktuelle Basisgewinnwahrscheinlichkeit immer sichtbar.
 
-**Right panel — All Affordable Cards**
-Full ranked table (sortable by any column). Color-coded values: green = strong positive, red = strong negative. Landmarks (GP) are included alongside regular establishments. Deep Analysis toggle enables configurable MC simulation count.
+**Rechts — Verfügbare Karten**
+Vollständige sortierbare Rankingtabelle. Farbkodierung: grün = stark positiv, rot = stark negativ. Großprojekte enthalten. Deep-Analysis-Toggle für MC.
 
-## Cards (Base Game)
+## Karten (Grundspiel)
 
-All 19 cards from the Machi Koro base game are supported. Project data lives in `src/resources/jsons/projects.json`.
+Alle 19 Karten sind in `src/resources/jsons/projects.json` definiert.
 
-| Color  | Triggers on        | Examples                          |
-|--------|--------------------|-----------------------------------|
-| Blau   | Any player's turn  | Weizenfeld, Bauernhof, Bergwerk   |
-| Grün   | Own turn only      | Bäckerei, Molkerei, Möbelfabrik   |
-| Rot    | Opponents' turns   | Café, Familienrestaurant          |
-| Lila   | Own turn, unique   | Stadion, Fernsehsender, Bürohaus  |
-| Gelb   | Landmarks (GP)     | Bahnhof, Einkaufszentrum, …       |
+| Farbe | Löst aus | Beispiele |
+|-------|---------|-----------|
+| Blau | Immer — alle Spieler | Weizenfeld, Bauernhof, Bergwerk |
+| Grün | Eigener Zug | Bäckerei, Molkerei, Möbelfabrik |
+| Rot | Fremde Züge | Café, Familienrestaurant |
+| Lila | Eigener Zug, einmalig | Stadion, Fernsehsender, Bürohaus |
+| Gelb | Großprojekte (GP) | Bahnhof, Einkaufszentrum, … |

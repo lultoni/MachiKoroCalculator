@@ -280,6 +280,4 @@ copy is purchased; `GameStateBuilder.build()` excludes a type when its owned cou
 
 ---
 
-## 5. Known Limitations & Backlog
-
-See `PLAN.md` (the active backlog) for the full list of known issues and planned improvements.
+*Offene Bugs und geplante Verbesserungen: siehe `PLAN.md`.*

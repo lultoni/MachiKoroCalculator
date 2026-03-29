@@ -1,145 +1,173 @@
 # PLAN.md — MachiKoroCalculator Active Backlog
 
-All 6 original implementation phases are complete. This file tracks **known limitations, bugs, and planned improvements** — open items only.
-
-For historical context (what was built and why), see `CHANGELOG.md`.
-For mathematical foundations and design rationales, see `ARCHITECTURE.md`.
+Open items only. For history see `CHANGELOG.md`, for math see `ARCHITECTURE.md`.
 
 Progress key: `[ ]` open · `[~]` in progress · `[x]` done
 
 ---
 
-## Known Approximations (Accepted)
+## Bugs
 
-These are documented deviations from optimal accuracy that have been reviewed and accepted.
+### B1 · Würfelaktivierung > 6 zeigt leeren Würfel (High)
 
-### 1. Bürohaus — Optimal-Swap Assumption
-**Priority: Low**
+`buildActivationDice()` übergibt alle Aktivierungswerte an `DiceFacePanel`, das nur 1–6 verarbeitet. Karten wie Apfelplantage (10), Bergwerk (9) und Markthalle (11, 12) rendern daher leer.
 
-`bürohausSwapEV` assumes the player always makes the optimal swap on every activation. In reality the swap is optional. Acceptable heuristic. See `ARCHITECTURE.md §2.8`.
-
-### 2. GameSimulator — Static EV/Cost Table Ignores Synergy
-**Priority: Low**
-
-`STATIC_EV_PER_COST` is precomputed from a neutral reference state; synergy-heavy builds (e.g. many food cards with Markthalle) make suboptimal buy decisions during simulation. Acceptable for win-rate estimation. See `ARCHITECTURE.md §4.2`.
-
-### 3. `evPerRound` — Projected Coin Correction is Approximate
-**Priority: Low**
-
-`evPerRound` projects each player's coins forward by `estimateUncappedOwnTurnEV` before evaluating red card clamping. This is a single-step projection (not a full multi-turn model). Accepted approximation. See `ARCHITECTURE.md §2.4b`.
+**Fix:** Fallback in `DiceFacePanel` einbauen: bei Werten > 6 die Würfelborder und den Hintergrund normal zeichnen, aber statt Augen eine kleine zentrierte Zahl anzeigen.
 
 ---
 
-## Code Quality
+### B2 · Rechtes Panel zu schmal — Reload-Button und Status-Text abgeschnitten (High)
 
-### 1. File Split — Priority 1 (complete)
+Das rechte Panel hat keine `setMinimumSize`. Bei sehr schmalem Fenster fällt `mcReloadBtn` und `statusLabel` aus der `FlowLayout`-Buttonleiste.
 
-| File | Concern extracted | Status |
-|------|-------------------|--------|
-| `ProbabilityCalc.java` | Bürohaus helpers → `BürohausLogic` | `[x]` |
-| `GameSession.java` | JSON persistence → `GameSessionPersistence` | `[x]` |
-
-### 2. File Split — Priority 2 (deferred — needs UI test layer first)
-
-- [ ] Extract `UIDataModel` from `MainWindow` (~50 lines): holds `session`, `rankOpts`, `lastRanking`, `showWinProb`.
-- [ ] Extract `RankingUIRenderer` from `MainWindow` (~100 lines): `rebuildTable`, `populateCenter`, `clearCenter`, `buildNote`.
-- [ ] Extract thin `GameController` from `MainWindow`: turn application, undo, snapshot, save/load event dispatch.
-
-### 3. File Split — No action needed
-
-`RuntimeTester.java` is a single self-contained test runner. Despite its size it has no mixed concerns.
-`CardIncome.java`, `WinProbabilityCalc.java`, `GameSimulator.java` — well-factored, no split warranted.
+**Fix:** `setMinimumSize` auf dem rechten Panel setzen (ca. 420 px — gemessen aus den Button-Breiten). Globale `setMinimumSize` des Fensters entsprechend anpassen.
 
 ---
 
-## UI Polish Batch 2 — Open Items
+### B3 · "coins" im Würfelergebnis-Preview nicht lokalisiert (Medium)
 
-Items from the second UI review (2026-03-29). Organized by panel and priority.
+In `refreshRollPreview()` ist `" coins"` hartkodiert. In der deutschen UI steht "Münzen", aber im Preview bleibt "coins".
 
-### Left panel — Current Turn Tracker
-
-#### [x] Rename "Current Turn" → "Current Turn Tracker"
-Done.
-
-#### [x] BoundedSpinner — arrow buttons disable at boundaries
-Done. `BoundedSpinner` wraps `JSpinner` and disables increment/decrement at model bounds.
-
-#### [x] Doubles tracking (Freizeitpark/Bahnhof)
-Done. "Doubles?" checkbox shown when player owns both. Bonus turn logic in `GameSession`.
-
-#### [x] Coin display — coin icon + post-roll delta
-Done. `coinsLabel` now uses `COIN.png` (scaled 18×18) as icon with the coin count as text. A second `coinsAfterLabel` appears below when the current roll changes the player's coins, showing the delta as "+N" (green) or "−N" (red) next to the amount. Full denomination rendering (bronze/silver/gold) deferred — accepted as-is.
-
-#### [x] Roll input — dice selector strips instead of spinner
-Done. Spinner replaced by `DiceSelectorPanel` (1 or 2 strips). First strip mandatory, second optional (deselectable) when Bahnhof is owned. `getCurrentRoll()` computes roll sum from strips. `DiceFacePanel` draws real pip faces programmatically; `DICE.png` (empty shell) is no longer used.
-
-#### [x] History panel — show coin deltas (paid/received amounts per player per turn)
-Done. `TurnRecord` stores `int[] coinDeltas` (computed by `applyTurn`). History redesigned: HTML JLabels replaced by `TurnEntryPanel extends JPanel`, which embeds `DiceFacePanel` pip graphics for the roll value, colored coin-delta lines per player, and purchase info. The spurious "→ saved" line (for turns with no purchase) is removed. Backward-compatible: old saves without `coinDeltas` show history without the delta line.
-
-#### [x] Left panel resize — history should get free space, not labels
-Done. `buildLeftPanel` now uses `BorderLayout`; the controls sub-panel is in `NORTH` (fixed) and the history `JScrollPane` is in `CENTER` (fills all remaining vertical space).
-
-#### [x] History entries overly tall when few turns played
-Done. `TurnEntryPanel.getMaximumSize()` returns `(MAX_WIDTH, preferredHeight)` so `BoxLayout` cannot stretch entries vertically.
-
-#### [x] Coins-after label causes layout shift in the dice strip area
-Done. `coinsAfterLabel` is now always visible. When the roll has no effect it shows "→ N coins (±0)" in grey; when coins change it shows the delta in green/red as before. `updateCoinsAfterLabel` no longer calls `setVisible(false)`.
-
-### Center panel — Card Details
-
-#### [x] Rename "Best Purchase" → "Card Details"
-Done.
-
-#### [x] Metric explanations (tooltips on each metric label)
-Done. Each label has a tooltip explaining EV/rnd, ROI, P(0), Variance, Win Prob Δ.
-
-#### [x] Win Prob Δ row hidden by default; toggle via "Show Win Prob Δ" button
-Done.
-
-#### [x] Win Prob row visibility should follow the global toggle (not always shown)
-Done. `populateCenter` now calls `setWinProbRowVisible(showWinProb)` after setting values, keeping it in sync with the toggle regardless of how the center panel was repopulated.
-
-#### [x] Sort order preserved in ranking table after table rebuild
-Done. `rebuildTable` saves `sorter.getSortKeys()` before column rebuild and restores them after, with column-index clamping for the case where the Win Δ column is added/removed.
-
-#### [x] Deep Analysis toggle should NOT auto-show win prob column; MC only computed when win prob is shown
-Done. `onToggleDeepAnalysis` sets `rankOpts.mcSimulations` to the MC count only when **both** deep analysis is enabled **and** win prob is shown; otherwise it stays 0. `onToggleWinProb` sets the correct MC count when showing, and resets it to 0 when hiding. This means: enabling Deep Analysis alone does not run MC; enabling "Show Win Prob Δ" while Deep Analysis is on triggers the first MC run; the ⟳ button re-runs at any time.
-
-#### [x] Card Details activation dice
-Done. `topCardCost` label replaced by `topCardCostRow` (JPanel). `buildActivationDice` appends a `DiceFacePanel` for each activation value after the cost text. Großprojekte show " · Großprojekt" in italic instead.
-
-#### [x] Metric legend visible without hover
-Done. A collapsible legend panel is added below the metrics grid. Toggle button ("▼ Metric legend" / "▶ Metric legend") shows/hides it. Lists EV/round, ROI, P(0), Var, Win Δ with plain-English descriptions. Hover tooltips on each label/value are preserved.
-
-### Right panel — All Affordable Cards
-
-#### [x] Sortable columns
-Done. `TableRowSorter` with numeric comparators per column.
-
-#### [x] Color-coded cell values
-Done. `NumericCellRenderer` green/red/neutral based on value.
-
-#### [x] Großprojekte (GPs) included in ranking
-Done. `rankPurchasableProjects` now includes unowned GPs.
-
-#### [x] Configurable MC sim count + independent reload button
-Done. `BoundedSpinner` 100–10 000 + "⟳" button; independent of win-prob toggle.
-
-#### [x] Win Prob Δ explanation in table header / column
-Done. Custom `JTableHeader.getToolTipText(MouseEvent)` override provides per-column tooltips for all 7 columns (including "Win Δ"). The previous single blanket tooltip is replaced.
-
-#### [x] Table sort indicator in column header
-`TableRowSorter` renders a sort arrow by default — no additional work needed.
+**Fix:** `" " + Strings.coinsUnit()` verwenden (gibt je nach Locale "Münzen" / "coins").
 
 ---
 
-## Future Features
+## Code-Qualität
 
-### Expansion Support
-- [ ] Add harbour/millionaire's row expansion cards. Architecture is ready: `ProjectLoader` is JSON-driven and `get_I` dispatches by card ID.
+### C1 · Metrik-Färbung: gemeinsame Basisklasse (Medium)
 
-### Opponent Modeling
-- [ ] Simulated players use the same greedy policy. Simulating different archetypes would produce more realistic win rates.
+`NumericCellRenderer` (Tabelle) und die Metrik-Labels in Kartendetails (`topCardEV`, `topCardROI`, etc.) färben Werte unabhängig voneinander — mit inkonsistenten, hartkodiert gestreuten Schwellen (aktuell: > 0.5 grün, < −0.5 rot für alle Spalten, ungeachtet Wertebereich oder Semantik).
 
-### Localisation
-- [x] Add a language switcher (DE/EN) in the setup screen. All displayed strings should be centralised in a `Strings` class with a static locale selection. Low priority.
+**Gewünschtes Verhalten:**
+- Spaltenspezifische Schwellen, kalibriert auf den realen Wertebereich jeder Metrik
+- P(0) und Varianz: Farblogik umkehren (kleiner = besser)
+- Eine einzige `MetricColorScheme`-Klasse (oder enum) hält alle Schwellen; sowohl `NumericCellRenderer` als auch die Label-Färbung in `populateCenter` nutzen dieselbe Quelle — keine Dopplungen
+
+Typische Wertebereiche (via Simulation zu kalibrieren):
+
+| Metrik | Kleiner Wert | Großer Wert | Richtung |
+|--------|-------------|-------------|---------|
+| EV/round | ~0.1 (Weizenfeld solo) | ~1.5 (Bergwerk mit vielen Spielern) | höher = besser |
+| ROI | negativ | ~5.0+ | höher = besser |
+| P(0) | 0.0 | 1.0 | **niedriger = besser** |
+| Varianz | 0.0 | ~5.0 | **niedriger = besser** |
+| Win Prob Δ | −0.1 | +0.3 | höher = besser |
+
+---
+
+### C2 · Language Deep Clean — UX-Lesbarkeit des gesamten UI (Medium)
+
+Alle UI-Strings in `Strings.java` auf Verständlichkeit und Konsistenz prüfen:
+- Sind Labels klar und knapp? (kein "Alle erschwinglichen Karten", kein überlanger Tooltip-Text)
+- Ist die Sprache in DE und EN konsistent im Ton?
+- Redundante oder unnatürlich klingende Formulierungen identifizieren und korrigieren
+
+---
+
+### C3 · Codeduplizierungen und Dead Code entfernen (Low)
+
+Gezielt auf redundante Muster prüfen:
+- Doppelte Logik zwischen `NumericCellRenderer` und `populateCenter` (→ C1)
+- `DICE.png` ist als statisches Feld in `MainWindow` deklariert, aber seit der Würfel-UI-Überarbeitung nie geladen — prüfen ob noch referenziert, sonst entfernen
+- Sonstige ungenutzte Methoden oder Felder im gesamten Projekt durchsuchen und entfernen (oder mit mir absprechen, wenn eine Methode ein potenziell nützliches Feature hat)
+
+---
+
+### C4 · File Split Priority 2 (Low, deferred)
+
+`MainWindow` ist groß. Sinnvolle Aufteilung wenn ein UI-Test-Layer existiert:
+- `UIDataModel` (~50 Zeilen): hält `session`, `rankOpts`, `lastRanking`, `showWinProb`
+- `RankingUIRenderer` (~100 Zeilen): `rebuildTable`, `populateCenter`, `clearCenter`, `buildNote`
+- `GameController` (dünn): Turn-Anwendung, Undo, Snapshot, Save/Load-Dispatch
+
+---
+
+## UI-Verbesserungen
+
+### U1 · Rechtes Panel: umbenennen + Tabs (Medium)
+
+**Aktuell:** "Alle erschwinglichen Karten" → veraltet.
+**Neu:** "Verfügbare Karten" (DE) / "Available Cards" (EN)
+
+**Tab-Struktur:**
+| Tab | Inhalt |
+|-----|--------|
+| Erschwinglich / Affordable | Wie bisher — nur kaufbare Karten, sortiert nach ROI |
+| Nicht erschwinglich / Not Affordable | Karten die der aktive Spieler noch nicht kaufen kann (Planung / Sparvorschau) |
+| Alle / All | Beide Gruppen kombiniert; nicht erschwingliche Karten ausgegraut/kursiv |
+
+Buttons (Win Prob, Deep Analysis, MC Spinner etc.) bleiben unten und gelten für alle Tabs.
+
+---
+
+### U2 · Kategorie-Icons im UI (Low)
+
+Die 8 Kategorien (`food`, `store`, `animal`, `production`, `market`, `factory`, `cafe`, `office`) mit kleinen Icons darstellen.
+
+**Schritte:**
+a. Icons (16×16) in `src/resources/category_icons/` — entweder Bilddateien oder programmatisch gezeichnet
+b. Kartendetails: Icon neben Farb-Tag
+c. Tabelle: Icon in der Kartenspalte (eigene Spalte oder Composite-Renderer)
+d. `IconTextRenderer`: Custom-Renderer der Kategorienamen durch Icons ersetzt — für Textbeschreibungen im Zugverlauf (`TurnEntryPanel`) und im Game Assistant (→ N1)
+
+*Technisch:* Swing unterstützt keine inline-Images in JLabel-HTML. Entweder Panel mit FlowLayout (Label + Icon + Label) oder `paintComponent`-Renderer.
+
+---
+
+### U3 · Trigger-Modus-Anzeige in Kartendetails (Low)
+
+Auf echten Machi-Koro-Karten steht, ob die Karte für alle oder nur den aktiven Spieler gilt:
+
+| Farbe | Symbol | Bedeutung |
+|-------|--------|-----------|
+| Blau | 3 Personen | Triggert immer — alle Spieler |
+| Grün | 1 Person | Nur eigener Zug |
+| Rot | 1 Person + Hinweis | Nur fremde Züge |
+| Lila | 1 Person | Nur eigener Zug, einmalig |
+
+Programmatisch als kleine Kreise/Ovale zeichnen; für Rot zusätzlich Hinweis "Wird in fremden Zügen ausgelöst."
+
+---
+
+## Neue Features
+
+### N1 · Game Assistant (Medium)
+
+Deterministischer, regelbasierter Spielassistent. **Keine generative KI.** Wertet alle Metriken aus und gibt pro Strategie eine Empfehlung mit 2–3 Sätzen Begründung aus.
+
+**Strategieprofile:**
+
+| Profil | Kriterium | Kurzbeschreibung |
+|--------|-----------|-----------------|
+| Bestes Investment | höchster ROI | Standard-Empfehlung — maximiert Gewinn pro eingesetzter Münze über 10 Runden |
+| Maximaler Ertrag | höchstes EV/round | Höchster erwarteter Münzgewinn pro Runde, unabhängig von Kosten |
+| Sicherheitsstrategie | niedrigstes P(0) | Karte die am seltensten leer ausgeht — gut bei knapper Kasse oder starken Gegnern |
+| Niedrige Varianz | niedrigste Varianz | Stabile Auszahlung ohne Ausreißer |
+| Sparsam | günstigste Karte | Schnellster Kauf um sofort ins Spiel zurückzukehren |
+| Gewinnwahrscheinlichkeit | höchstes Win Prob Δ | Verbessert die eigene Siegchance am stärksten (nur wenn Win Prob Δ berechnet) |
+| Aggressiv | max. Gegnerschaden | Bevorzugt Rot/Lila (Stadion, Bürohaus) die Gegner Münzen kosten |
+| GP Rush | nächste GP-Schwelle | Strategie die am schnellsten das nächste Großprojekt finanzierbar macht |
+
+**Ausgabe-Beispiel:**
+> **Bestes Investment:** Kaufe Café (2¢). ROI 1.84 — du bekommst die Investition in ~5.4 Runden zurück. Besonders effektiv, weil du noch kein Café besitzt.
+
+**UI:** Vierter Tab im rechten Panel oder eigener Bereich unter Kartendetails. Dropdown / Buttons zur Strategiewahl; Empfehlung aktualisiert sich automatisch bei jedem `refreshAll()`.
+
+**Langfristig:** Die Strategieprofile können als Entscheidungslogik für simulierte Gegner in `GameSimulator` genutzt werden (→ Future: Opponent Modeling).
+
+---
+
+## Akzeptierte Näherungen (kein Handlungsbedarf)
+
+| # | Thema | Erklärung |
+|---|-------|-----------|
+| A1 | Bürohaus — Optimal-Swap-Annahme | `bürohausSwapEV` nimmt an, der Spieler tauscht immer optimal. Swap ist eigentlich optional. Akzeptable Heuristik. Siehe `ARCHITECTURE.md §2.8`. |
+| A2 | GameSimulator — Statische EV/Cost-Tabelle | `STATIC_EV_PER_COST` ignoriert Synergien (z.B. viele Food-Karten + Markthalle). Akzeptabel für Gewinnraten-Schätzung. Siehe `ARCHITECTURE.md §4.2`. |
+| A3 | `evPerRound` — Einschritt-Münzprojektion | Projektion via `estimateUncappedOwnTurnEV` ist kein vollständiges Mehrrundenmodell. Akzeptierte Näherung. Siehe `ARCHITECTURE.md §2.4b`. |
+
+---
+
+## Future Features (nicht priorisiert)
+
+- **Erweiterungskarten** — Hafen/Millionärsreihe. Architektur ist bereit (JSON-getrieben, `get_I` dispatcht per ID).
+- **Gegner-Archetypen** — Simulierte Spieler folgen aktuell einer greedy Policy. Verschiedene Archetypen würden realistischere Gewinnraten liefern. Basis: Strategieprofile aus N1.

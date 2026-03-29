@@ -44,7 +44,7 @@ public class MainWindow extends JFrame {
     // ---- state ----
     private GameSession session;
     private final RankingOptions rankOpts = new RankingOptions();
-    private boolean showWinProb = false;
+    private boolean showWinProb = true;
     private int mcSimCount = 1000;
 
     // ---- left panel components ----
@@ -60,6 +60,8 @@ public class MainWindow extends JFrame {
     private JLabel coinsAfterLabel; // shows post-roll delta (hidden when no change)
     private JPanel historyPanel;
     private JPanel rollPreviewPanel;
+    private JPanel incomeMatrixPanel;   // collapsible income-by-roll grid
+    private JButton incomeMatrixToggleBtn;
 
     // ---- center panel components ----
     private JLabel topCardName;
@@ -87,7 +89,6 @@ public class MainWindow extends JFrame {
     private JTable rankTableAll;
     private JTabbedPane rankTabs;
     private JPanel assistantPanel;
-    private JButton toggleWinProbBtn;
     private JToggleButton deepAnalysisBtn;
     private JLabel statusLabel;
     private JSpinner mcSimSpinner;
@@ -103,6 +104,9 @@ public class MainWindow extends JFrame {
      */
     public MainWindow(GameSession session) {
         this.session = session;
+        // Win probability and MC analysis are always on
+        rankOpts.includeWinProbDelta = true;
+        rankOpts.mcSimulations = mcSimCount;
         setTitle(Strings.mainWindowTitle());
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setMinimumSize(new Dimension(1020, 600));
@@ -247,6 +251,28 @@ public class MainWindow extends JFrame {
         previewScroll.setBorder(BorderFactory.createLineBorder(new Color(0xCCCCCC)));
         controls.add(previewScroll);
 
+        controls.add(Box.createVerticalStrut(4));
+
+        // Income matrix — collapsible, hidden by default
+        incomeMatrixToggleBtn = new JButton(Strings.incomeMatrixToggleShow());
+        incomeMatrixToggleBtn.setFont(new Font("Arial", Font.PLAIN, 11));
+        incomeMatrixToggleBtn.setAlignmentX(Component.LEFT_ALIGNMENT);
+        incomeMatrixToggleBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 26));
+        incomeMatrixPanel = new JPanel();
+        incomeMatrixPanel.setLayout(new BoxLayout(incomeMatrixPanel, BoxLayout.Y_AXIS));
+        incomeMatrixPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        incomeMatrixPanel.setVisible(false);
+        incomeMatrixToggleBtn.addActionListener(e -> {
+            boolean nowVisible = !incomeMatrixPanel.isVisible();
+            incomeMatrixPanel.setVisible(nowVisible);
+            incomeMatrixToggleBtn.setText(nowVisible
+                    ? Strings.incomeMatrixToggleHide()
+                    : Strings.incomeMatrixToggleShow());
+            if (nowVisible) refreshIncomeMatrix();
+        });
+        controls.add(incomeMatrixToggleBtn);
+        controls.add(incomeMatrixPanel);
+
         controls.add(Box.createVerticalStrut(8));
 
         // Buy dropdown
@@ -368,10 +394,6 @@ public class MainWindow extends JFrame {
         topCardRisk  = addMetricRow(metricsGrid, Strings.p0Label(), Strings.p0Tooltip(),              2);
         topCardVar   = addMetricRow(metricsGrid, Strings.varianceLabel(), Strings.varianceTooltip(),  3);
         topCardWinProb = addMetricRow(metricsGrid, Strings.winProbLabel(), Strings.winProbTooltip(),  4);
-        topCardWinProb.setVisible(false);
-        // Also hide its label and rank label
-        ((JLabel) metricsGrid.getComponent(metricsGrid.getComponentCount() - 3)).setVisible(false);
-        topCardMetricRank[4].setVisible(false);
 
         JPanel metricsWrapper = new JPanel(new BorderLayout());
         metricsWrapper.add(metricsGrid, BorderLayout.NORTH);
@@ -516,20 +538,17 @@ public class MainWindow extends JFrame {
         // Button bar at bottom
         JPanel btnBar = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 4));
 
-        toggleWinProbBtn = new JButton(Strings.showWinProbBtn());
-        toggleWinProbBtn.addActionListener(this::onToggleWinProb);
-        btnBar.add(toggleWinProbBtn);
-
-        deepAnalysisBtn = new JToggleButton(Strings.deepAnalysisBtn());
+        deepAnalysisBtn = new JToggleButton(Strings.deepAnalysisBtnOn());
+        deepAnalysisBtn.setSelected(true);
         deepAnalysisBtn.setToolTipText(Strings.deepAnalysisTooltip());
         deepAnalysisBtn.addActionListener(this::onToggleDeepAnalysis);
         btnBar.add(deepAnalysisBtn);
 
-        // MC sim count spinner (only relevant when deep analysis is on)
+        // MC sim count spinner
         mcSimSpinner = new BoundedSpinner(new SpinnerNumberModel(1000, 100, 10000, 100));
         mcSimSpinner.setPreferredSize(new Dimension(70, 24));
         mcSimSpinner.setToolTipText(Strings.mcSimTooltip());
-        mcSimSpinner.setEnabled(false);
+        mcSimSpinner.setEnabled(true);
         mcSimSpinner.addChangeListener(e -> {
             mcSimCount = (int) mcSimSpinner.getValue();
             rankOpts.mcSimulations = deepAnalysisBtn.isSelected() ? mcSimCount : 0;
@@ -537,12 +556,12 @@ public class MainWindow extends JFrame {
         btnBar.add(new JLabel("N:"));
         btnBar.add(mcSimSpinner);
 
-        // Reload button for MC without double-toggling
-        mcReloadBtn = new JButton("⟳");
+        // Reload button for MC
+        mcReloadBtn = new JButton("Reload MC");
         mcReloadBtn.setToolTipText(Strings.mcReloadTooltip());
-        mcReloadBtn.setEnabled(false);
+        mcReloadBtn.setEnabled(true);
         mcReloadBtn.addActionListener(e -> {
-            if (deepAnalysisBtn.isSelected() && showWinProb) {
+            if (deepAnalysisBtn.isSelected()) {
                 refreshAll();
             }
         });
@@ -695,34 +714,11 @@ public class MainWindow extends JFrame {
     private void onToggleDeepAnalysis(ActionEvent e) {
         boolean enabled = deepAnalysisBtn.isSelected();
         mcSimCount = (int) mcSimSpinner.getValue();
-        // MC sims are only actually used when BOTH deep analysis is on AND win prob is shown.
-        // This prevents computing (and discarding) MC win-prob values that the user can't see.
-        rankOpts.mcSimulations = (enabled && showWinProb) ? mcSimCount : 0;
+        rankOpts.mcSimulations = enabled ? mcSimCount : 0;
         deepAnalysisBtn.setText(enabled ? Strings.deepAnalysisBtnOn() : Strings.deepAnalysisBtn());
         mcSimSpinner.setEnabled(enabled);
-        // Reload button is only active when both deep analysis is on AND win prob is shown
-        mcReloadBtn.setEnabled(enabled && showWinProb);
+        mcReloadBtn.setEnabled(enabled);
         refreshAll();
-    }
-
-    private void onToggleWinProb(ActionEvent e) {
-        showWinProb = !showWinProb;
-        rankOpts.includeWinProbDelta = showWinProb;
-        toggleWinProbBtn.setText(showWinProb ? Strings.hideWinProbBtn() : Strings.showWinProbBtn());
-        setWinProbRowVisible(showWinProb);
-        // Reload button only enabled when deep analysis is on AND win prob is shown
-        mcReloadBtn.setEnabled(deepAnalysisBtn.isSelected() && showWinProb);
-
-        if (!showWinProb) {
-            // Just rebuild table without the column — no recompute needed
-            rankOpts.mcSimulations = 0;
-            rebuildTable();
-        } else {
-            // Now that win prob is shown, apply the correct MC sim count (if deep analysis is on)
-            rankOpts.mcSimulations = deepAnalysisBtn.isSelected() ? mcSimCount : 0;
-            // Always recompute when showing: either analytical or MC, with includeWinProbDelta=true
-            refreshAll();
-        }
     }
 
     /**
@@ -897,6 +893,7 @@ public class MainWindow extends JFrame {
         undoBtn.setEnabled(!session.getHistory().isEmpty());
 
         refreshRollPreview();
+        refreshIncomeMatrix();
 
         double baselineWinProb = ProbabilityCalc.computeBaselineWinProb(postRoll, pi);
         baselineWinProbLabel.setText(Strings.baselineWinProbFmt(baselineWinProb * 100));
@@ -987,12 +984,98 @@ public class MainWindow extends JFrame {
     }
 
     /**
+     * Rebuilds the income matrix: a grid showing coin delta per roll (1–12) per player.
+     * Only called when the panel is visible (lazy update).
+     */
+    private void refreshIncomeMatrix() {
+        if (incomeMatrixPanel == null || !incomeMatrixPanel.isVisible()) return;
+        int pi = session.nextPlayerIndex();
+        GameState state = session.getState();
+        String[] names = session.getPlayerNames();
+        int n = names.length;
+
+        // Determine max roll: 12 if active player has (or can use) 2d6, else 6
+        int maxRoll = hasBahnhof(state, pi) ? 12 : 6;
+
+        // Build as a JTable with columns: Roll | Player1 | Player2 | ...
+        String[] columns = new String[1 + n];
+        columns[0] = Strings.incomeMatrixRollHeader();
+        System.arraycopy(names, 0, columns, 1, n);
+
+        Object[][] data = new Object[maxRoll][1 + n];
+        for (int roll = 1; roll <= maxRoll; roll++) {
+            int[] deltas = ProbabilityCalc.computeAllDeltasForRoll(state, pi, roll);
+            data[roll - 1][0] = roll;
+            for (int p = 0; p < n; p++) {
+                String sign = deltas[p] > 0 ? "+" : "";
+                data[roll - 1][1 + p] = sign + deltas[p];
+            }
+        }
+
+        javax.swing.table.DefaultTableModel model =
+                new javax.swing.table.DefaultTableModel(data, columns) {
+                    @Override public boolean isCellEditable(int r, int c) { return false; }
+                };
+        JTable table = new JTable(model);
+        table.setFont(new Font("Monospaced", Font.PLAIN, 11));
+        table.getTableHeader().setFont(new Font("Arial", Font.BOLD, 11));
+        table.setRowHeight(16);
+        table.setAutoResizeMode(JTable.AUTO_RESIZE_ALL_COLUMNS);
+        // Color cells: positive green, negative red
+        javax.swing.table.DefaultTableCellRenderer cellRenderer =
+                new javax.swing.table.DefaultTableCellRenderer() {
+                    @Override
+                    public java.awt.Component getTableCellRendererComponent(
+                            JTable tbl, Object val, boolean sel, boolean foc, int row, int col) {
+                        super.getTableCellRendererComponent(tbl, val, sel, foc, row, col);
+                        setHorizontalAlignment(col == 0 ? CENTER : RIGHT);
+                        if (col > 0 && val != null) {
+                            String v = val.toString().trim();
+                            if (v.startsWith("+") && !v.equals("+0"))
+                                setForeground(new Color(0x006600));
+                            else if (v.startsWith("-"))
+                                setForeground(new Color(0xAA0000));
+                            else
+                                setForeground(Color.BLACK);
+                        } else {
+                            setForeground(Color.BLACK);
+                        }
+                        return this;
+                    }
+                };
+        for (int c = 0; c < table.getColumnCount(); c++) table.getColumnModel().getColumn(c).setCellRenderer(cellRenderer);
+        // Fix column widths
+        table.getColumnModel().getColumn(0).setMaxWidth(36);
+        int colW = 46;
+        for (int c = 1; c <= n; c++) table.getColumnModel().getColumn(c).setPreferredWidth(colW);
+
+        JScrollPane scroll = new JScrollPane(table);
+        scroll.setAlignmentX(Component.LEFT_ALIGNMENT);
+        int tableH = (maxRoll + 1) * 17 + 4;
+        scroll.setPreferredSize(new Dimension(Integer.MAX_VALUE, tableH));
+        scroll.setMaximumSize(new Dimension(Integer.MAX_VALUE, tableH + 4));
+        scroll.setBorder(BorderFactory.createLineBorder(new Color(0xCCCCCC)));
+
+        incomeMatrixPanel.removeAll();
+        incomeMatrixPanel.add(scroll);
+        incomeMatrixPanel.revalidate();
+        incomeMatrixPanel.repaint();
+    }
+
+    /** Returns true if the player at index pi currently owns Bahnhof. */
+    private static boolean hasBahnhof(GameState state, int pi) {
+        return state.getPlayers()[pi].hasProject("bahnhof");
+    }
+
+
+    /**
      * Refreshes all roll-dependent UI elements when a die strip selection changes.
      * Always re-ranks using the analytical engine (not MC) so the response is instant.
      * Preserves the current buy selection if the selected card is still affordable.
      */
     private void refreshAfterRollChange() {
         refreshRollPreview();
+        refreshIncomeMatrix();
 
         int pi = session.nextPlayerIndex();
         rankOpts.turnsElapsed = session.getEffectiveTurnCount();
@@ -1984,8 +2067,8 @@ public class MainWindow extends JFrame {
         topCardNote.setText("<html><i>" + buildNote(entry) + "</i></html>");
         topCardColorBar.setBackground(colorForCard(p));
 
-        // Always re-apply visibility to keep it in sync with the global toggle
-        setWinProbRowVisible(showWinProb);
+        // Always re-apply visibility (win prob always shown)
+        setWinProbRowVisible(true);
     }
 
     /** Sets the text and background/foreground tint of a metric label using the given scheme. */

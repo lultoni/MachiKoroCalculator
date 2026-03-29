@@ -578,4 +578,13 @@ public final class Strings {
     public static String labelingLoadError(String msg) {
         return s("Fehler beim Laden: " + msg, "Error loading file: " + msg);
     }
+
+    // =========================================================================
+    // Income Matrix (left panel, collapsible)
+    // =========================================================================
+
+    public static String incomeMatrixToggleShow() { return s("Einkommensmatrix anzeigen", "Show Income Matrix"); }
+    public static String incomeMatrixToggleHide() { return s("Einkommensmatrix verbergen", "Hide Income Matrix"); }
+    /** Column header: "Roll" */
+    public static String incomeMatrixRollHeader() { return s("Wurf", "Roll"); }
 }

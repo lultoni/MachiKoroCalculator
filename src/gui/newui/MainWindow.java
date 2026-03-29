@@ -490,7 +490,9 @@ public class MainWindow extends JFrame {
     private void onToggleDeepAnalysis(ActionEvent e) {
         boolean enabled = deepAnalysisBtn.isSelected();
         mcSimCount = (int) mcSimSpinner.getValue();
-        rankOpts.mcSimulations = enabled ? mcSimCount : 0;
+        // MC sims are only actually used when BOTH deep analysis is on AND win prob is shown.
+        // This prevents computing (and discarding) MC win-prob values that the user can't see.
+        rankOpts.mcSimulations = (enabled && showWinProb) ? mcSimCount : 0;
         deepAnalysisBtn.setText(enabled ? "Deep Analysis ON (MC)" : "Deep Analysis (MC)");
         mcSimSpinner.setEnabled(enabled);
         // Reload button is only active when both deep analysis is on AND win prob is shown
@@ -506,17 +508,15 @@ public class MainWindow extends JFrame {
         // Reload button only enabled when deep analysis is on AND win prob is shown
         mcReloadBtn.setEnabled(deepAnalysisBtn.isSelected() && showWinProb);
 
-        if (showWinProb) {
-            // Only recompute if analytical (MC was already computed or is off)
-            if (rankOpts.mcSimulations == 0) {
-                refreshAll();
-            } else {
-                // MC is on: add Win Δ column and rebuild table without re-running MC
-                rebuildTable();
-            }
-        } else {
-            // Just rebuild table without the column — no need to recompute
+        if (!showWinProb) {
+            // Just rebuild table without the column — no recompute needed
+            rankOpts.mcSimulations = 0;
             rebuildTable();
+        } else {
+            // Now that win prob is shown, apply the correct MC sim count (if deep analysis is on)
+            rankOpts.mcSimulations = deepAnalysisBtn.isSelected() ? mcSimCount : 0;
+            // Always recompute when showing: either analytical or MC, with includeWinProbDelta=true
+            refreshAll();
         }
     }
 

@@ -4,6 +4,40 @@ Implementierungsgeschichte: was gebaut wurde, warum, und welche Designentscheidu
 
 ---
 
+## 2-Turn Lookahead in Card Notes
+
+**`computeTwoTurnNote(gs, pi, cardA, candidates, horizon, discount)`** — new package-private static method in `ProbabilityCalc`. For each affordable candidate card A, evaluates all remaining candidates as a potential follow-up purchase B. Uses `CardIncome.contextualCardEvPerRound(B, statsAfterA, n, oppCoins)` — no `GameState.copy()` needed, only `PlayerStats` are constructed. Selects B with the highest estimated `roiOverHorizon` in the post-A portfolio state. Returns a note like "Danach: Bergwerk (ROI +4.2)" when the follow-up ROI exceeds 0.5 (threshold to avoid noise). Landmarks excluded from candidates (their interaction is too complex for this level).
+
+Wired into both `rankPurchasableProjects` and `rankAllProjects` (affordable cards only) alongside the existing synergy note. Notes are concatenated with `"  |  "` separator. `Strings.twoTurnNote(name, roi)` added.
+
+Performance: ranking benchmark still passes at < 5ms avg (O(n²) per ranking call, but n ≤ 19 cards so ≤ 361 `contextualCardEvPerRound` calls with no allocations beyond `PlayerStats`).
+
+**Tests:** 228 PASS, 0 FAIL (MC sum test occasionally flaky by design).
+
+---
+
+## UI-Polishing: Bug-Fixes, Runner-Ups, Win-Prob always-on, Income Matrix
+
+**Bug-Fixes:**
+- Roll-change no longer resets buy selection unless the previously selected card is no longer affordable after the new roll (preserves selection correctly).
+- Roll-change now always re-ranks analytically (was blocked when MC mode was active).
+- Phase label in context profile now shows a continuous blend ("Früh 30% · Mitte 70%") instead of a single label.
+- EKZ GP hint now computes actual EV gain via `portfolioEvPerRound` diff; no longer shows "+0.00¢/Runde".
+- Wait sentinel ("≡ Sparen") now appears in the affordable tab (it's a valid this-turn choice).
+- Removed all emoji from UI strings — replaced with `[GP]`, `[+]`, `[!]`, `[W]`/`[D]` prefixes for cross-platform safety.
+
+**Runner-Ups per assistant profile:** Each profile row in the Game Assistant now shows the 2nd and 3rd place cards in a right-aligned column ("2. Bergwerk  3. Wald"), so the uniqueness of the top recommendation is immediately visible. `runnerUpNames(metric, lowerIsBetter, winnerId, max)` helper; `addAssistantRow` overload with `BorderLayout` right column.
+
+**Win-prob always on / MC on by default:** The win-probability delta toggle button is removed — win prob is always shown in the card detail panel. Deep Analysis (MC) is enabled by default. `showWinProb` field removed; `rankOpts.includeWinProbDelta = true` and `rankOpts.mcSimulations = mcSimCount` set in constructor.
+
+**Extended `GamePhaseContext`:** Eleven new fields added — `catchUpStrength`, `pullAheadStrength`, `evGapVsLeader`, `coinAdvantage`, `portfolioDiversity`, `turnsToOwnWin`, `minTurnsToOppWin`, `ekzEvGain`, plus synergy gap detection (`synergyGapExists`, `synergyGapCard`, `synergyGapGain`). `addContextProfile` uses position modifiers (catch-up boosts GPRush/Aggro/Cheap; pull-ahead boosts ROI/Safe/LowVar), coin advantage, and diversity gap on top of the phase interpolation.
+
+**Income Matrix (collapsible):** New toggle button in the left panel between roll preview and buy dropdown. Shows a grid of coin deltas for all players (rows = roll values 1–12 or 1–6, columns = players), color-coded green/red. Hidden by default; lazily refreshed on show and on every roll change. `refreshIncomeMatrix()` method; `incomeMatrixPanel` + `incomeMatrixToggleBtn` fields.
+
+**Tests:** 224 bestanden, 0 fehlgeschlagen.
+
+---
+
 ## N4d–N4f: Continuous Phase Weights + LabelingWindow UX + PhaseFitter
 
 **N4d — Kontinuierliche Phasen-Gewichte:** `computePhaseContext` berechnet jetzt drei kontinuierliche Stärken `earlyStrength`, `midStrength`, `lateStrength` ∈ [0,1] (Summe = 1). Spät-Stärke: linearer Ramp über GP-Anzahl → `LATE_GP_THRESHOLD`. Früh-Stärke: Mittelwert aus EV-Schwäche (`1 - avgEv/threshold`) und EKZ-Erreichbarkeit (0/1). Mid = Restant. `addContextProfile` interpoliert Gewichte als `w[i] = earlyStr × WEIGHTS_EARLY[i] + midStr × WEIGHTS_MID[i] + lateStr × WEIGHTS_LATE[i]` — kein hartes Snap mehr auf eine Phase. `phaseLabel` wird nur noch für die Anzeige und als Tiebreaker gesetzt (höchste Stärke).

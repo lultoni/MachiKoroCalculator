@@ -444,6 +444,18 @@ public final class Strings {
                  "Pairs with: " + partnerName + " (+" + String.format("%.2f", gainPerRound) + "¢/round)");
     }
 
+    /**
+     * Two-turn lookahead note: shown in card notes when buying card A then card B
+     * gives a significantly better combined ROI than any single purchase.
+     *
+     * @param followUpName  localized name of the recommended follow-up card
+     * @param followUpRoi   the follow-up card's ROI over horizon in post-A state
+     */
+    public static String twoTurnNote(String followUpName, double followUpRoi) {
+        return s("Danach: " + followUpName + " (ROI +" + String.format("%.1f", followUpRoi) + ")",
+                 "Then buy: " + followUpName + " (ROI +" + String.format("%.1f", followUpRoi) + ")");
+    }
+
     public static String bürohausSwapTitle()  { return s("Bürohaus: Karte tauschen?", "Office Building: Swap Card?"); }
     public static String bürohausSwapPrompt(String note, double evGain) {
         return s(note + "\nGeschätzter EV-Gewinn: +" + String.format("%.2f", evGain) + " Münzen/Runde.\nTauschen?",

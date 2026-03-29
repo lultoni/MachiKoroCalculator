@@ -746,6 +746,13 @@ public class ProbabilityCalc {
                 entry.notes = entry.notes == null ? synergyNote : entry.notes + "  |  " + synergyNote;
             }
 
+            // Two-turn lookahead: recommend best follow-up card after buying this one
+            String twoTurnNote = computeTwoTurnNote(gs, playerIndex, candidate, candidates,
+                    opts.horizonTurns, opts.discountFactor);
+            if (twoTurnNote != null) {
+                entry.notes = entry.notes == null ? twoTurnNote : entry.notes + "  |  " + twoTurnNote;
+            }
+
             if (opts.includeWinProbDelta) {
                 if (opts.mcSimulations > 0) {
                     GameState stateAfter = gs.copy();
@@ -815,6 +822,15 @@ public class ProbabilityCalc {
                     gs.getPlayers().length);
             if (synergyNote != null) {
                 entry.notes = entry.notes == null ? synergyNote : entry.notes + "  |  " + synergyNote;
+            }
+
+            // Two-turn lookahead: recommend best follow-up card after buying this one
+            if (canAfford) {
+                String twoTurnNote = computeTwoTurnNote(gs, playerIndex, candidate, candidates,
+                        opts.horizonTurns, opts.discountFactor);
+                if (twoTurnNote != null) {
+                    entry.notes = entry.notes == null ? twoTurnNote : entry.notes + "  |  " + twoTurnNote;
+                }
             }
 
             if (canAfford && opts.includeWinProbDelta) {
@@ -976,7 +992,65 @@ public class ProbabilityCalc {
         return gui.newui.Strings.synergyNote(bestPartner.getLocalizedName(), bestGain);
     }
 
-    /** Creates PlayerStats for {@code player} as if they also own {@code extra}. */
+    /**
+     * Two-turn lookahead: given that the player buys {@code cardA} this turn, finds the
+     * best follow-up card to buy on a subsequent turn (using post-A portfolio EV).
+     *
+     * <p>Uses the same {@link CardIncome#contextualCardEvPerRound} as the synergy note but
+     * evaluates the second card B in the context of the player already owning A.
+     * No {@link GameState#copy()} is performed — only {@link CardIncome.PlayerStats} are built.
+     *
+     * @param gs             current game state (before buying A)
+     * @param playerIndex    the active player
+     * @param cardA          the card being evaluated (first buy)
+     * @param candidates     all candidate cards in the pool
+     * @param horizonTurns   horizon for ROI computation
+     * @param discountFactor discount factor γ
+     * @return a note string like "Danach: Bergwerk (ROI +4.2)", or {@code null} if no useful follow-up
+     */
+    static String computeTwoTurnNote(GameState gs, int playerIndex, Project cardA,
+                                     ArrayList<Project> candidates,
+                                     int horizonTurns, double discountFactor) {
+        Player player = gs.getPlayers()[playerIndex];
+        int n = gs.getPlayers().length;
+        int[] oppCoins = CardIncome.buildOpponentCoins(gs.getPlayers(), playerIndex);
+
+        // Stats after owning cardA (simulates having bought it)
+        CardIncome.PlayerStats statsAfterA = buildStatsWithCard(player, cardA);
+
+        // Geometric sum for ROI formula
+        final double eps = 1e-9;
+        double geometricSum;
+        if (Math.abs(discountFactor - 1.0) < eps) {
+            geometricSum = horizonTurns;
+        } else {
+            geometricSum = discountFactor * (1.0 - Math.pow(discountFactor, horizonTurns))
+                    / (1.0 - discountFactor);
+        }
+
+        Project bestB = null;
+        double bestRoiB = 0.5; // minimum threshold: only suggest if ROI > 0.5
+
+        for (Project cardB : candidates) {
+            if (cardB == cardA) continue;
+            if (cardB.isIs_grossprojekt()) continue; // landmarks interact differently — skip for simplicity
+            if (player.hasProject(cardB.getId())) continue;
+            if (cardB.getColor().equals("lila") && player.hasProject(cardB.getId())) continue;
+
+            double evB = CardIncome.contextualCardEvPerRound(cardB, statsAfterA, n, oppCoins);
+            double roiB = evB * geometricSum - cardB.getCost();
+
+            if (roiB > bestRoiB) {
+                bestRoiB = roiB;
+                bestB = cardB;
+            }
+        }
+
+        if (bestB == null) return null;
+        return gui.newui.Strings.twoTurnNote(bestB.getLocalizedName(), bestRoiB);
+    }
+
+
     private static CardIncome.PlayerStats buildStatsWithCard(Player player, Project extra) {
         CardIncome.PlayerStats s = new CardIncome.PlayerStats();
         for (Project p : player.getOwned_projects()) applyToStats(s, p);

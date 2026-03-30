@@ -248,19 +248,17 @@ wobei:
 
 ### UI-Verbesserungen
 
-#### U2 · Kategorie-Icons im UI (Low)
+#### U2 · ~~Kategorie-Icons im UI~~ ✓ (implementiert)
 
-Die 8 Kategorien mit kleinen Icons (16×16) in `src/resources/category_icons/` darstellen. Swing unterstützt keine inline-Images in JLabel-HTML — Panel mit FlowLayout oder `paintComponent`-Renderer nötig.
+16×16 Icons aus `resources/category_icons/` (ANIMAL, CAFE, FACTORY, FOOD, MARKET, OFFICE, PRODUCTION, STORE). Statische Map `CATEGORY_ICONS` in `MainWindow`, geladen via `loadScaledIcon`. `topCardCategoryIcon` JLabel in der `nameRow` des Card-Details-Panels, zwischen Kartenname und Farb-Tag. Tooltip zeigt den Kategorienamen. Graceful degradation wenn Icon fehlt (null-safe).
 
 ---
 
 ### Neue Features
 
-#### N4d · Fitting → `AssistantConfig`
+#### N4d · ~~Fitting → `AssistantConfig`~~ ✓ (implementiert)
 
-- `PhaseFitter.fit(List<LabeledSnapshot>)` — lineare Regression gegen drei Label-Werte
-- Mindest-Labels für sinnvolle Regression: ~50
-- **Voraussetzungen:** N3 + N4a + N4b (alle implementiert ✓)
+`PhaseFitter.fit(List<JsonObject>)` — OLS via Normalgleichungen (Gauß-Elimination), R² für early/mid/late. `applyToConfig(FitResult)` — Reflection-Update von `AssistantConfig.LATE_GP_THRESHOLD`. "Kalibrieren…"-Button in `LabelingWindow` vorhanden.
 
 ---
 
@@ -290,10 +288,10 @@ M1 (Architektur-Audit) · M2 (Funkturm-EV) · M3 (dynamisches remainingTurns) ·
 C5 (buildRollGainCache + computeOwnTurnEV — DRY-Refactoring hot path)
 
 ### Features ✓
-N0 (Bürohaus-Tausch) · N1 (Game Assistant) · N2 (Bahnhof-Würfelwahl) · N3 (Phasenerkennung) · N4a–N4c (Snapshot/Labeling-System)
+N0 (Bürohaus-Tausch) · N1 (Game Assistant) · N2 (Bahnhof-Würfelwahl) · N3 (Phasenerkennung) · N4a–N4d (Snapshot/Labeling/PhaseFitter-System)
 
 ### UI ✓
-U1 (rechtes Panel) · U3 (Trigger-Modus-Anzeige)
+U1 (rechtes Panel) · U2 (Kategorie-Icons) · U3 (Trigger-Modus-Anzeige)
 
 ### Future Strategy ✓
 Synergy-Lookahead · 2-Turn Lookahead · MC-Policy (greedy → roiOverHorizon) · Stufe-2 (coinAdvantage + endgameProximityBonus + LANDMARK_WEIGHTS) · Stufe-1 RolloutTree · Stufe-3 Adaptives MC-Budget

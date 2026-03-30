@@ -41,6 +41,18 @@ public class MainWindow extends JFrame {
     /** Coin icon scaled to 16×16, or null if the resource could not be loaded. */
     private static final ImageIcon COIN_ICON = loadScaledIcon("resources/other_icons/COIN.png", 16);
 
+    /** Category icons scaled to 16×16, keyed by category string from projects.json. */
+    private static final java.util.Map<String, ImageIcon> CATEGORY_ICONS;
+    static {
+        String[] cats = {"animal", "cafe", "factory", "food", "market", "office", "production", "store"};
+        java.util.Map<String, ImageIcon> m = new java.util.HashMap<>();
+        for (String cat : cats) {
+            ImageIcon icon = loadScaledIcon("resources/category_icons/" + cat.toUpperCase() + ".png", 16);
+            if (icon != null) m.put(cat, icon);
+        }
+        CATEGORY_ICONS = java.util.Collections.unmodifiableMap(m);
+    }
+
     // ---- state ----
     private GameSession session;
     private final RankingOptions rankOpts = new RankingOptions();
@@ -64,6 +76,7 @@ public class MainWindow extends JFrame {
 
     // ---- center panel components ----
     private JLabel topCardName;
+    private JLabel topCardCategoryIcon;
     private JPanel topCardCostRow;  // cost + activation dice faces
     private JLabel topCardColorTag;
     private TriggerModePanel topCardTrigger;
@@ -370,6 +383,9 @@ public class MainWindow extends JFrame {
         topCardName = new JLabel("—");
         topCardName.setFont(new Font("Arial", Font.BOLD, 18));
         nameRow.add(topCardName);
+        topCardCategoryIcon = new JLabel();
+        topCardCategoryIcon.setToolTipText("");
+        nameRow.add(topCardCategoryIcon);
         topCardColorTag = new JLabel("");
         topCardColorTag.setFont(new Font("Arial", Font.BOLD, 11));
         topCardColorTag.setOpaque(true);
@@ -2063,6 +2079,10 @@ public class MainWindow extends JFrame {
         Project p = entry.project;
         topCardName.setText(p.getLocalizedName());
 
+        ImageIcon catIcon = CATEGORY_ICONS.get(p.getCategory());
+        topCardCategoryIcon.setIcon(catIcon);
+        topCardCategoryIcon.setToolTipText(catIcon != null ? p.getCategory() : null);
+
         String colorStr = Strings.colorLabel(p.getColor());
         topCardColorTag.setText(colorStr);
         topCardColorTag.setBackground(colorForCard(p.getColor(), false));
@@ -2208,6 +2228,8 @@ public class MainWindow extends JFrame {
 
     private void clearCenter(String message) {
         topCardName.setText("—");
+        topCardCategoryIcon.setIcon(null);
+        topCardCategoryIcon.setToolTipText(null);
         topCardColorTag.setText("");
         topCardColorTag.setBackground(null);
         topCardTrigger.setCardColor(null);

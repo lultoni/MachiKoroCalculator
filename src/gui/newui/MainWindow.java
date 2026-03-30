@@ -43,14 +43,44 @@ public class MainWindow extends JFrame {
 
     /** Category icons scaled to 16×16, keyed by category string from projects.json. */
     private static final java.util.Map<String, ImageIcon> CATEGORY_ICONS;
+    /** Base64-encoded PNG data URIs for inline HTML icon rendering, keyed by category. */
+    private static final java.util.Map<String, String> CATEGORY_ICON_HTML;
     static {
         String[] cats = {"animal", "cafe", "factory", "food", "market", "office", "production", "store"};
         java.util.Map<String, ImageIcon> m = new java.util.HashMap<>();
+        java.util.Map<String, String> h = new java.util.HashMap<>();
         for (String cat : cats) {
             ImageIcon icon = loadScaledIcon("resources/category_icons/" + cat.toUpperCase() + ".png", 16);
-            if (icon != null) m.put(cat, icon);
+            if (icon != null) {
+                m.put(cat, icon);
+                // Encode to base64 for inline HTML <img src="data:..."> embedding
+                try {
+                    java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+                    java.awt.image.BufferedImage bi = new java.awt.image.BufferedImage(
+                            16, 16, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+                    java.awt.Graphics2D g2 = bi.createGraphics();
+                    icon.paintIcon(null, g2, 0, 0);
+                    g2.dispose();
+                    javax.imageio.ImageIO.write(bi, "PNG", baos);
+                    String b64 = java.util.Base64.getEncoder().encodeToString(baos.toByteArray());
+                    h.put(cat, "<img src='data:image/png;base64," + b64 + "' width='14' height='14' style='vertical-align:middle'/>");
+                } catch (Exception ignored) {
+                    h.put(cat, "[" + cat + "]");
+                }
+            }
         }
         CATEGORY_ICONS = java.util.Collections.unmodifiableMap(m);
+        CATEGORY_ICON_HTML = java.util.Collections.unmodifiableMap(h);
+    }
+
+    /**
+     * Returns an inline HTML snippet: 14×14 category icon + space + the given text.
+     * Falls back to plain text with bracket prefix if the icon is unavailable.
+     */
+    private static String iconHtml(String category, String text) {
+        String imgTag = CATEGORY_ICON_HTML.get(category);
+        if (imgTag != null) return imgTag + "&nbsp;" + text;
+        return "[" + category + "]&nbsp;" + text;
     }
 
     // ---- state ----
@@ -71,6 +101,7 @@ public class MainWindow extends JFrame {
     private JLabel coinsAfterLabel; // shows post-roll delta (hidden when no change)
     private JPanel historyPanel;
     private JPanel rollPreviewPanel;
+    private JPanel deltaGridPanel;          // inline coin-delta grid (shown right below dice)
     private JPanel incomeMatrixPanel;   // collapsible income-by-roll grid
     private JButton incomeMatrixToggleBtn;
 
@@ -90,9 +121,12 @@ public class MainWindow extends JFrame {
     /** Per-metric rank labels in the 3-column metrics grid: [EV, ROI, P0, VAR, WIN, PDELTA]. */
     private JLabel[] topCardMetricRank = new JLabel[6];
     private JLabel topCardNote;
+    private JLabel topCardInsight;  // inline 1-2 sentence summary below metrics grid
     private JLabel topCardRank;  // "#X / Y affordable · #Z / N total"
     private JPanel topCardColorBar;
     private JLabel baselineWinProbLabel;
+    /** Header bar at the top of the window showing active player / turn / coins / win-prob. */
+    private JLabel headerBarLabel;
 
     // ---- right panel components ----
     private DefaultTableModel tableModel;
@@ -159,8 +193,31 @@ public class MainWindow extends JFrame {
         mainSplit.setDividerLocation(240);
         mainSplit.setResizeWeight(0.0);
 
-        setContentPane(mainSplit);
+        JPanel contentWrapper = new JPanel(new BorderLayout());
+        contentWrapper.add(buildHeaderBar(), BorderLayout.NORTH);
+        contentWrapper.add(mainSplit, BorderLayout.CENTER);
+        setContentPane(contentWrapper);
         setJMenuBar(buildMenuBar());
+    }
+
+    /** Builds the slim header bar at the top of the window. */
+    private JPanel buildHeaderBar() {
+        JPanel bar = new JPanel(new BorderLayout());
+        bar.setBackground(new Color(0xF0F0F0));
+        bar.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createMatteBorder(0, 0, 1, 0, new Color(0xCCCCCC)),
+                BorderFactory.createEmptyBorder(3, 10, 3, 10)));
+        headerBarLabel = new JLabel(Strings.mainWindowTitle());
+        headerBarLabel.setFont(new Font("Arial", Font.PLAIN, 12));
+        bar.add(headerBarLabel, BorderLayout.WEST);
+        return bar;
+    }
+
+    /** Updates the header bar with current player, turn count, coins, and win probability. */
+    private void refreshHeaderBar(String playerName, int turn, int coins, double winPct) {
+        if (headerBarLabel != null) {
+            headerBarLabel.setText(Strings.headerBar(playerName, turn, coins, winPct));
+        }
     }
 
     private JMenuBar buildMenuBar() {
@@ -261,7 +318,20 @@ public class MainWindow extends JFrame {
 
         controls.add(Box.createVerticalStrut(8));
 
-        // Roll preview (compact, inline with turn input)
+        // Inline delta grid: shows coin gain/loss per player for the current roll
+        deltaGridPanel = new JPanel();
+        deltaGridPanel.setLayout(new BoxLayout(deltaGridPanel, BoxLayout.Y_AXIS));
+        deltaGridPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        deltaGridPanel.setOpaque(true);
+        deltaGridPanel.setBackground(new Color(0xF8F8F8));
+        deltaGridPanel.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(0xDDDDDD)),
+                BorderFactory.createEmptyBorder(3, 6, 3, 6)));
+        controls.add(deltaGridPanel);
+
+        controls.add(Box.createVerticalStrut(4));
+
+        // Roll preview (compact, collapsible)
         controls.add(wrap(bold(Strings.rollOutcomeLabel())));
         rollPreviewPanel = new JPanel();
         rollPreviewPanel.setLayout(new BoxLayout(rollPreviewPanel, BoxLayout.Y_AXIS));
@@ -302,6 +372,7 @@ public class MainWindow extends JFrame {
         buyCombo = new JComboBox<>();
         buyCombo.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
         buyCombo.setAlignmentX(Component.LEFT_ALIGNMENT);
+        buyCombo.setRenderer(new IconComboRenderer());
         controls.add(buyCombo);
 
         controls.add(Box.createVerticalStrut(10));
@@ -309,7 +380,12 @@ public class MainWindow extends JFrame {
         // Confirm button
         confirmBtn = new JButton(Strings.confirmTurnBtn());
         confirmBtn.setAlignmentX(Component.LEFT_ALIGNMENT);
-        confirmBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 34));
+        confirmBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
+        confirmBtn.setFont(new Font("Arial", Font.BOLD, 14));
+        confirmBtn.setBackground(new Color(0x2E7D32));
+        confirmBtn.setForeground(Color.WHITE);
+        confirmBtn.setOpaque(true);
+        confirmBtn.setBorderPainted(false);
         confirmBtn.addActionListener(this::onConfirmTurn);
         controls.add(confirmBtn);
 
@@ -463,6 +539,17 @@ public class MainWindow extends JFrame {
         topCardNote.setAlignmentX(Component.LEFT_ALIGNMENT);
         panel.add(wrap(topCardNote));
 
+        // Inline insight summary: 1–2 sentence assessment, updated by populateCenter()
+        topCardInsight = new JLabel("");
+        topCardInsight.setFont(new Font("Arial", Font.PLAIN, 11));
+        topCardInsight.setAlignmentX(Component.LEFT_ALIGNMENT);
+        topCardInsight.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(0xDDDDDD)),
+                BorderFactory.createEmptyBorder(3, 6, 3, 6)));
+        topCardInsight.setOpaque(true);
+        topCardInsight.setBackground(new Color(0xF5F5F5));
+        panel.add(topCardInsight);
+
         topCardRank = new JLabel("—");
         topCardRank.setFont(new Font("Arial", Font.ITALIC, 10));
         topCardRank.setForeground(new Color(0x555555));
@@ -578,14 +665,14 @@ public class MainWindow extends JFrame {
 
         deepAnalysisBtn = new JToggleButton(Strings.deepAnalysisBtnOn());
         deepAnalysisBtn.setSelected(true);
-        deepAnalysisBtn.setToolTipText(Strings.deepAnalysisTooltip());
+        deepAnalysisBtn.setToolTipText(Strings.deepAnalysisTooltipRich());
         deepAnalysisBtn.addActionListener(this::onToggleDeepAnalysis);
         btnBar.add(deepAnalysisBtn);
 
         // MC sim count spinner
         mcSimSpinner = new BoundedSpinner(new SpinnerNumberModel(1000, 100, 10000, 100));
         mcSimSpinner.setPreferredSize(new Dimension(70, 24));
-        mcSimSpinner.setToolTipText(Strings.mcSimTooltip());
+        mcSimSpinner.setToolTipText(Strings.mcSimTooltipRich());
         mcSimSpinner.setEnabled(true);
         mcSimSpinner.addChangeListener(e -> {
             mcSimCount = (int) mcSimSpinner.getValue();
@@ -598,7 +685,7 @@ public class MainWindow extends JFrame {
         mcTempSpinner = new BoundedSpinner(new SpinnerNumberModel(0.0, 0.0, 5.0, 0.1));
         ((JSpinner.NumberEditor) mcTempSpinner.getEditor()).getFormat().setMaximumFractionDigits(1);
         mcTempSpinner.setPreferredSize(new Dimension(55, 24));
-        mcTempSpinner.setToolTipText(Strings.mcTempTooltip());
+        mcTempSpinner.setToolTipText(Strings.mcTempTooltipRich());
         mcTempSpinner.addChangeListener(e ->
             rankOpts.mcExplorationTemp = (double) mcTempSpinner.getValue());
         btnBar.add(new JLabel(Strings.mcTempLabel()));
@@ -941,11 +1028,14 @@ public class MainWindow extends JFrame {
         refreshHistory();
         undoBtn.setEnabled(!session.getHistory().isEmpty());
 
+        refreshDeltaGrid();
         refreshRollPreview();
         refreshIncomeMatrix();
 
         double baselineWinProb = ProbabilityCalc.computeBaselineWinProb(postRoll, pi);
         baselineWinProbLabel.setText(Strings.baselineWinProbFmt(baselineWinProb * 100));
+        refreshHeaderBar(activePlayer.getName(), session.getEffectiveTurnCount() + 1,
+                activePlayer.getCoins(), baselineWinProb * 100);
 
         if (rankOpts.mcSimulations > 0) {
             statusLabel.setText(Strings.mcRunning());
@@ -1006,6 +1096,38 @@ public class MainWindow extends JFrame {
         boolean canGetBonus = hasBahnhof && activePlayer.hasProject("freizeitpark");
         doublesCheckBox.setVisible(canGetBonus);
         if (!canGetBonus) doublesCheckBox.setSelected(false);
+    }
+
+    /**
+     * Refreshes the inline delta grid showing per-player coin deltas for the current roll.
+     */
+    private void refreshDeltaGrid() {
+        if (deltaGridPanel == null) return;
+        int roll = getCurrentRoll();
+        int pi = session.nextPlayerIndex();
+        GameState state = session.getState();
+        int[] deltas = ProbabilityCalc.computeAllDeltasForRoll(state, pi, roll);
+        String[] names = session.getPlayerNames();
+
+        deltaGridPanel.removeAll();
+        for (int i = 0; i < deltas.length; i++) {
+            JPanel row = new JPanel(new BorderLayout(4, 0));
+            row.setOpaque(false);
+            JLabel nameLbl = new JLabel(names[i]);
+            nameLbl.setFont(new Font("Arial", Font.PLAIN, 11));
+            nameLbl.setForeground(playerIndexColor(i));
+            String sign = deltas[i] > 0 ? "+" : "";
+            JLabel deltaLbl = new JLabel(sign + deltas[i] + "¢");
+            deltaLbl.setFont(new Font("Arial", Font.BOLD, 11));
+            if (deltas[i] > 0)      deltaLbl.setForeground(new Color(0x2E7D32));
+            else if (deltas[i] < 0) deltaLbl.setForeground(new Color(0xC62828));
+            else                    deltaLbl.setForeground(new Color(0x888888));
+            row.add(nameLbl, BorderLayout.WEST);
+            row.add(deltaLbl, BorderLayout.EAST);
+            deltaGridPanel.add(row);
+        }
+        deltaGridPanel.revalidate();
+        deltaGridPanel.repaint();
     }
 
     /**
@@ -1123,6 +1245,7 @@ public class MainWindow extends JFrame {
      * Preserves the current buy selection if the selected card is still affordable.
      */
     private void refreshAfterRollChange() {
+        refreshDeltaGrid();
         refreshRollPreview();
         refreshIncomeMatrix();
 
@@ -2041,20 +2164,21 @@ public class MainWindow extends JFrame {
             model.addRow(row);
         }
 
-        // Re-apply renderers
+        // Re-apply renderers — use rank-aware coloring for metric columns
         boolean useUnaffordableRenderer = dimUnaffordable;
         table.getColumnModel().getColumn(0).setCellRenderer(
                 useUnaffordableRenderer ? new CardNameRendererWithDim(ranking) : new CardNameRenderer());
-        table.getColumnModel().getColumn(0).setPreferredWidth(120);
+        table.getColumnModel().getColumn(0).setPreferredWidth(130);
+        // Cost column: plain renderer (no ranking on cost)
         table.getColumnModel().getColumn(1).setCellRenderer(new NumericCellRenderer(MetricColorScheme.COST));
-        table.getColumnModel().getColumn(1).setPreferredWidth(52);
+        table.getColumnModel().getColumn(1).setPreferredWidth(46);
         for (int c = 2; c < cols.length; c++) {
             MetricColorScheme scheme = MetricColorScheme.TABLE_ORDER[c - 2];
-            NumericCellRenderer r = useUnaffordableRenderer
-                    ? new NumericCellRendererWithDim(scheme, ranking)
-                    : new NumericCellRenderer(scheme);
+            DefaultTableCellRenderer r = useUnaffordableRenderer
+                    ? new RankAwareNumericCellRendererWithDim(scheme, c, ranking)
+                    : new RankAwareNumericCellRenderer(scheme, c);
             table.getColumnModel().getColumn(c).setCellRenderer(r);
-            table.getColumnModel().getColumn(c).setPreferredWidth(52);
+            table.getColumnModel().getColumn(c).setPreferredWidth(48);
         }
 
         // Re-attach sorter
@@ -2095,7 +2219,8 @@ public class MainWindow extends JFrame {
         topCardCostRow.add(costLabel);
         buildActivationDice(topCardCostRow, p);
         String desc = p.getLocalizedDescription();
-        topCardDesc.setText("<html><i>" + (desc != null && !desc.isEmpty() ? desc : "—") + "</i></html>");
+        String enrichedDesc = enrichDescriptionWithIcons(desc, p.getCategory());
+        topCardDesc.setText("<html><i>" + (enrichedDesc != null && !enrichedDesc.isEmpty() ? enrichedDesc : "—") + "</i></html>");
 
         MetricColorScheme[] schemes = {
             MetricColorScheme.EV, MetricColorScheme.ROI,
@@ -2108,27 +2233,65 @@ public class MainWindow extends JFrame {
             entry.portfolioDeltaEV
         };
         JLabel[] valueLabels = { topCardEV, topCardROI, topCardRisk, topCardVar, topCardWinProb, topCardPortfolioDelta };
+        int totalCards = (int) lastRanking.stream().filter(e -> !e.isWaitEntry()).count();
+        boolean isMC = rankOpts.mcSimulations > 0;
         for (int i = 0; i < schemes.length; i++) {
             double rankPct = computeMetricRankPct(lastRanking, p.getId(), schemes[i]);
             applyRankedMetricColor(valueLabels[i], schemes[i], values[i], rankPct);
-            topCardMetricRank[i].setText(metricRankText(lastRanking, p.getId(), schemes[i]));
+            String rankTxt = metricRankText(lastRanking, p.getId(), schemes[i]);
+            topCardMetricRank[i].setText(rankTxt);
+            // Contextual tooltip: parse rank number from "#X/N" text
+            int rankNum = 1;
+            try { rankNum = Integer.parseInt(rankTxt.substring(1, rankTxt.indexOf('/'))); }
+            catch (Exception ignored) {}
+            String tooltip = switch (i) {
+                case 0 -> Strings.evTooltipContextual(values[i], rankNum, totalCards);
+                case 1 -> Strings.roiTooltipContextual(values[i], rankNum, totalCards);
+                case 2 -> Strings.p0TooltipContextual(values[i], rankNum, totalCards);
+                case 3 -> Strings.varianceTooltipContextual(values[i], rankNum, totalCards);
+                case 4 -> Strings.winProbTooltipContextual(values[i], rankNum, totalCards, isMC);
+                case 5 -> Strings.portfolioDeltaTooltipContextual(values[i], rankNum, totalCards);
+                default -> null;
+            };
+            valueLabels[i].setToolTipText(tooltip);
         }
 
         topCardNote.setText("<html><i>" + buildNote(entry) + "</i></html>");
         topCardColorBar.setBackground(colorForCard(p));
 
         // Rank context: "#X / Y affordable · #Z / N total"
-        int rankAffordable = 0, totalAffordable = 0, rankAll = 0, totalAll = 0;
+        int rankAffordable = 0, totalAffordable = 0, rankAll = 0;
+        int totalAll = totalCards;
         for (RankEntry e : lastRanking) {
             if (e.isWaitEntry()) continue;
-            totalAll++;
             if (e.affordable) totalAffordable++;
             if (e.project.getId().equals(p.getId())) {
-                rankAll = totalAll;
+                rankAll = totalAffordable + (int) lastRanking.stream()
+                        .filter(x -> !x.isWaitEntry() && !x.affordable).count() - (entry.affordable ? 0 : 0);
                 if (e.affordable) rankAffordable = totalAffordable;
             }
         }
-        topCardRank.setText(Strings.rankLabel(rankAffordable, totalAffordable, rankAll, totalAll));
+        // Recompute rankAll correctly
+        int[] rak = {0, 0};
+        for (RankEntry e : lastRanking) {
+            if (e.isWaitEntry()) continue;
+            rak[0]++;
+            if (e.project.getId().equals(p.getId())) rak[1] = rak[0];
+        }
+        topCardRank.setText(Strings.rankLabel(rankAffordable, totalAffordable, rak[1], totalCards));
+
+        // Inline insight summary
+        int roiRankNum = 1;
+        try {
+            String rt = metricRankText(lastRanking, p.getId(), MetricColorScheme.ROI);
+            roiRankNum = Integer.parseInt(rt.substring(1, rt.indexOf('/')));
+        } catch (Exception ignored) {}
+        if (topCardInsight != null) {
+            topCardInsight.setText(Strings.metricInsightSummary(
+                    p.getLocalizedName(), entry.roiOverHorizon, roiRankNum,
+                    entry.winProbDelta, entry.evPerRound, entry.affordable, totalCards));
+            topCardInsight.setVisible(true);
+        }
 
         // Always re-apply visibility (win prob always shown)
         setWinProbRowVisible(true);
@@ -2244,6 +2407,7 @@ public class MainWindow extends JFrame {
         for (JLabel r : topCardMetricRank) if (r != null) r.setText("—");
         topCardNote.setText("<html><i>" + message + "</i></html>");
         topCardRank.setText("—");
+        if (topCardInsight != null) topCardInsight.setText("");
         topCardColorBar.setBackground(Color.LIGHT_GRAY);
     }
 
@@ -2268,6 +2432,28 @@ public class MainWindow extends JFrame {
     // =========================================================================
     // Helpers
     // =========================================================================
+
+    /**
+     * Enriches a card description string with inline category icons where category
+     * keywords appear. Uses the card's own category for the primary icon injection,
+     * and replaces common category-referencing terms in description text.
+     */
+    private static String enrichDescriptionWithIcons(String desc, String cardCategory) {
+        if (desc == null || desc.isEmpty()) return desc;
+        String result = desc;
+        // Replace category keyword mentions with icon + text
+        // German
+        result = result.replace("Tier-Gebäude",      iconHtml("animal",     "Tier-Gebäude"));
+        result = result.replace("Lebensmittelgebäude", iconHtml("food",      "Lebensmittelgebäude"));
+        result = result.replace("Rohstoff-Gebäude",  iconHtml("production", "Rohstoff-Gebäude"));
+        result = result.replace("Café- und Geschäftsgebäude", iconHtml("cafe", "Café") + "-&amp;" + iconHtml("store", "Geschäftsgebäude"));
+        // English
+        result = result.replace("animal establishment", iconHtml("animal",     "animal establishment"));
+        result = result.replace("food establishment",   iconHtml("food",        "food establishment"));
+        result = result.replace("production establishment", iconHtml("production", "production establishment"));
+        result = result.replace("Café and Store establishments", iconHtml("cafe", "Café") + " and " + iconHtml("store", "Store establishments"));
+        return result;
+    }
 
     private String buildNote(RankEntry e) {
         if (e.notes != null && !e.notes.isEmpty()) return e.notes;
@@ -2456,11 +2642,21 @@ public class MainWindow extends JFrame {
                 }
                 if (p != null) {
                     setBackground(colorForCard(p.getColor(), false));
+                    // Show category icon at 14×14
+                    ImageIcon catIcon = CATEGORY_ICONS.get(p.getCategory());
+                    if (catIcon != null) {
+                        Image scaled = catIcon.getImage().getScaledInstance(14, 14, Image.SCALE_SMOOTH);
+                        setIcon(new ImageIcon(scaled));
+                    } else {
+                        setIcon(null);
+                    }
                 } else {
                     setBackground(Color.WHITE);
+                    setIcon(null);
                 }
             } else if (isSelected) {
                 setBackground(table.getSelectionBackground());
+                setIcon(null);
             }
             return this;
         }
@@ -2499,7 +2695,9 @@ public class MainWindow extends JFrame {
     // =========================================================================
 
     /**
-     * Renders numeric table cells with 2-decimal formatting and metric-aware colour coding.
+     * Renders numeric table cells with rank-relative background coloring.
+     * Top quartile = dark green, top half = light green, bottom quartile = orange/yellow.
+     * Uses the full ranking list and metric scheme to compute the rank fraction on each render.
      */
     private static class NumericCellRenderer extends DefaultTableCellRenderer {
         private final MetricColorScheme scheme;
@@ -2540,13 +2738,84 @@ public class MainWindow extends JFrame {
     }
 
     /**
-     * Variant used in the "All" tab — dims unaffordable rows with grey italic rendering.
+     * Rank-aware numeric renderer: uses rank relative to the other rows in this table
+     * to determine cell background color (top quartile = dark green, etc.).
      */
-    private static class NumericCellRendererWithDim extends NumericCellRenderer {
+    private static class RankAwareNumericCellRenderer extends DefaultTableCellRenderer {
+        private final MetricColorScheme scheme;
+        private final int metricColumnIndex; // model column index of this metric (used for ranking)
+
+        RankAwareNumericCellRenderer(MetricColorScheme scheme, int metricColumnIndex) {
+            this.scheme = scheme;
+            this.metricColumnIndex = metricColumnIndex;
+            setHorizontalAlignment(SwingConstants.RIGHT);
+        }
+
+        @Override
+        public Component getTableCellRendererComponent(JTable table, Object value,
+                                                        boolean isSelected, boolean hasFocus,
+                                                        int row, int column) {
+            if (value instanceof Double d) {
+                value = String.format("%.2f", d);
+            }
+            super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+            if (!isSelected && value instanceof String s) {
+                try {
+                    double cellValue = Double.parseDouble(s);
+                    // Collect all non-NaN values in this column to determine rank
+                    java.util.List<Double> colValues = new java.util.ArrayList<>();
+                    javax.swing.table.TableModel model = table.getModel();
+                    for (int r = 0; r < model.getRowCount(); r++) {
+                        Object v = model.getValueAt(r, metricColumnIndex);
+                        if (v instanceof Double d2 && !Double.isNaN(d2)) colValues.add(d2);
+                    }
+                    if (colValues.size() > 1) {
+                        // Rank: 0.0 = best, 1.0 = worst
+                        boolean lowerBetter = (scheme == MetricColorScheme.P0 || scheme == MetricColorScheme.VARIANCE);
+                        java.util.List<Double> sorted = new java.util.ArrayList<>(colValues);
+                        sorted.sort(lowerBetter ? java.util.Comparator.naturalOrder()
+                                                : java.util.Comparator.reverseOrder());
+                        int rankIdx = sorted.indexOf(cellValue);
+                        if (rankIdx < 0) rankIdx = sorted.size() - 1;
+                        double rankPct = (double) rankIdx / (sorted.size() - 1);
+                        Color bg = scheme.rankedBackgroundFor(rankPct);
+                        Color fg = (bg == MetricColorScheme.GREEN_STRONG_REF)
+                                ? new Color(0x1A5C28) : null;
+                        setOpaque(true);
+                        setBackground(bg != null ? bg : table.getBackground());
+                        setForeground(fg != null ? fg : Color.BLACK);
+                    } else {
+                        // Single entry: use absolute coloring
+                        Color bg = scheme.backgroundFor(cellValue);
+                        Color fg = scheme.foregroundFor(cellValue);
+                        setOpaque(true);
+                        setBackground(bg != null ? bg : table.getBackground());
+                        setForeground(fg != null ? fg : table.getForeground());
+                    }
+                } catch (NumberFormatException ignored) {
+                    setOpaque(true);
+                    setBackground(table.getBackground());
+                    setForeground(table.getForeground());
+                }
+            } else if (isSelected) {
+                setOpaque(true);
+                setBackground(table.getSelectionBackground());
+                setForeground(table.getSelectionForeground());
+            }
+            return this;
+        }
+    }
+
+    /**
+     * Variant used in the "All" tab — dims unaffordable rows with grey italic rendering.
+     * Extends RankAwareNumericCellRenderer to keep rank-based coloring for affordable rows.
+     */
+    private static class RankAwareNumericCellRendererWithDim extends RankAwareNumericCellRenderer {
         private final ArrayList<RankEntry> ranking;
 
-        NumericCellRendererWithDim(MetricColorScheme scheme, ArrayList<RankEntry> ranking) {
-            super(scheme);
+        RankAwareNumericCellRendererWithDim(MetricColorScheme scheme, int metricColumnIndex,
+                                             ArrayList<RankEntry> ranking) {
+            super(scheme, metricColumnIndex);
             this.ranking = ranking;
         }
 
@@ -2556,7 +2825,6 @@ public class MainWindow extends JFrame {
                                                         int row, int column) {
             super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
             if (!isSelected) {
-                // Look up the card name from the same row (column 0) to find the entry
                 Object nameCell = table.getModel().getValueAt(
                         table.convertRowIndexToModel(row), 0);
                 if (nameCell instanceof String label) {
@@ -2582,6 +2850,39 @@ public class MainWindow extends JFrame {
             if (e.project.getLocalizedName().equals(localizedName)) return e;
         }
         return null;
+    }
+
+    // =========================================================================
+    // Icon-aware combo box renderer
+    // =========================================================================
+
+    /**
+     * Renders combo box items with a 14×14 category icon followed by the item text.
+     * Falls back to plain text if no icon is available (e.g. "— nichts —" placeholder).
+     */
+    private static class IconComboRenderer extends DefaultListCellRenderer {
+        @Override
+        public Component getListCellRendererComponent(JList<?> list, Object value,
+                                                       int index, boolean isSelected, boolean hasFocus) {
+            super.getListCellRendererComponent(list, value, index, isSelected, hasFocus);
+            if (value instanceof String label) {
+                // Resolve project to get category icon
+                Project p = projectFromLabel(label);
+                if (p != null) {
+                    ImageIcon icon = CATEGORY_ICONS.get(p.getCategory());
+                    if (icon != null) {
+                        // Scale icon to 14×14 for dropdown
+                        Image scaled = icon.getImage().getScaledInstance(14, 14, Image.SCALE_SMOOTH);
+                        setIcon(new ImageIcon(scaled));
+                    } else {
+                        setIcon(null);
+                    }
+                } else {
+                    setIcon(null);
+                }
+            }
+            return this;
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -2685,11 +2986,13 @@ public class MainWindow extends JFrame {
         controls.add(new JLabel(Strings.rolloutDepthLabel()));
         rolloutDepthSpinner = new BoundedSpinner(new SpinnerNumberModel(1, 1, 3, 1));
         rolloutDepthSpinner.setPreferredSize(new Dimension(50, 24));
+        rolloutDepthSpinner.setToolTipText(Strings.rolloutDepthTooltipRich());
         controls.add(rolloutDepthSpinner);
 
         controls.add(new JLabel(Strings.rolloutTopKLabel()));
         rolloutTopKSpinner = new BoundedSpinner(new SpinnerNumberModel(5, 2, 8, 1));
         rolloutTopKSpinner.setPreferredSize(new Dimension(50, 24));
+        rolloutTopKSpinner.setToolTipText(Strings.rolloutTopKTooltipRich());
         controls.add(rolloutTopKSpinner);
 
         JButton runBtn = new JButton(Strings.rolloutRunBtn());
@@ -2785,6 +3088,38 @@ public class MainWindow extends JFrame {
         table.setAutoResizeMode(JTable.AUTO_RESIZE_LAST_COLUMN);
         table.getColumnModel().getColumn(0).setPreferredWidth(200);
         table.getColumnModel().getColumn(1).setPreferredWidth(100);
+
+        // Icon + color renderer for card name column in rollout table
+        table.getColumnModel().getColumn(0).setCellRenderer(new DefaultTableCellRenderer() {
+            @Override
+            public Component getTableCellRendererComponent(JTable t, Object v, boolean sel,
+                                                           boolean foc, int r, int c) {
+                super.getTableCellRendererComponent(t, v, sel, foc, r, c);
+                if (!sel && v instanceof String lbl) {
+                    Project p = null;
+                    for (Project proj : ProjectLoader.getAllProjects()) {
+                        if (proj.getLocalizedName().equals(lbl)) { p = proj; break; }
+                    }
+                    if (p != null) {
+                        setBackground(colorForCard(p.getColor(), false));
+                        ImageIcon catIcon = CATEGORY_ICONS.get(p.getCategory());
+                        if (catIcon != null) {
+                            Image scaled = catIcon.getImage().getScaledInstance(14, 14, Image.SCALE_SMOOTH);
+                            setIcon(new ImageIcon(scaled));
+                        } else {
+                            setIcon(null);
+                        }
+                    } else {
+                        setBackground(t.getBackground());
+                        setIcon(null);
+                    }
+                } else if (sel) {
+                    setBackground(t.getSelectionBackground());
+                    setIcon(null);
+                }
+                return this;
+            }
+        });
 
         // Color the win-prob column
         table.getColumnModel().getColumn(1).setCellRenderer(new DefaultTableCellRenderer() {

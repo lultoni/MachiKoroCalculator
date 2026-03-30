@@ -4,6 +4,38 @@ Implementierungsgeschichte: was gebaut wurde, warum, und welche Designentscheidu
 
 ---
 
+## UI-Redesign: visuelle Hierarchie, Rank-Coloring, Kategorie-Icons, Insight-Zusammenfassung
+
+Vollständiges UI-Redesign von `MainWindow` und `Strings.java` mit Fokus auf schnell extrahierbare Insights für neue und erfahrene Spieler gleichzeitig.
+
+### Rank-relatives Zellen-Coloring in der Rankingtabelle
+
+`RankAwareNumericCellRenderer` ersetzt `NumericCellRenderer` für alle Metrik-Spalten (EV, ROI, P0, Varianz, Win-Prob-Δ, Portfolio-Δ). Ranking-Logik: alle Werte der Spalte zur Renderzeit gesammelt, sortiert, rankPct berechnet, dann `MetricColorScheme.rankedBackgroundFor(rankPct)` — Top-15% dunkelgrün, 15–40% hellgrün, 65–85% gelb, 85–100% orange. `RankAwareNumericCellRendererWithDim` Variante für "Alle"-Tab dimmt unerschwingliche Zeilen zusätzlich grau/kursiv.
+
+### Kategorie-Icons überall
+
+`CATEGORY_ICON_HTML` static Map (neu): encodiert alle 8 Kategorie-Icons (16×16 PNG) als Base64-Data-URIs für HTML-`<img>`-Einbettung in `JLabel`-HTML-Text. `iconHtml(category, text)` Helper gibt `<img>` + `&nbsp;` + Text zurück. Verwendet in:
+- **Karten-Beschreibungen** (`enrichDescriptionWithIcons`): ersetzt „Tier-Gebäude", „Lebensmittelgebäude", „Rohstoff-Gebäude", „Café- und Geschäftsgebäude" (DE + EN) durch Icon + Text.
+- **Kauf-Dropdown** (`IconComboRenderer`): 14×14 Icon vor jedem Eintrag.
+- **Rankingtabelle** (`CardNameRenderer`): Icon + Kartenfarben-Hintergrund pro Zeile.
+- **Rollout-Tabelle**: inline Renderer mit Icon + Kartenfarbe für Kartenname-Spalte.
+
+### Kontextuelle Metrik-Tooltips + Insight-Zusammenfassung
+
+Alle 6 Metrik-Tooltips (`evTooltipContextual`, `roiTooltipContextual`, `p0TooltipContextual`, `varianceTooltipContextual`, `winProbTooltipContextual`, `portfolioDeltaTooltipContextual`) in `Strings.java` zeigen jetzt: konkreten aktuellen Wert, Rang (#X von N), was gut/schlecht bedeutet mit quantifizierten Schwellwerten, und Wirkung unterschiedlicher Zahlen. `metricInsightSummary` erzeugt 1–2-Satz HTML-Zusammenfassung mit ★ für #1-Rang und farbcodierten Win-Prob-Deltas.
+
+Alle Metrik-Buttons im Center-Panel verwenden `applyRankedMetricColor` (rank-relativ) statt absoluter Schwellwerte.
+
+### Header-Bar + CTA-Button + Delta-Grid
+
+**Header-Bar** oben im Fenster: schmale Leiste (F0F0F0, 1px unten Border) zeigt Spielernamen, Zug, Münzen, Win-Prob%. `refreshHeaderBar` via `refreshAll()`. **Confirm-Button** als primäre CTA gestaltet: grüner Hintergrund (#2E7D32), weiß, Bold 14pt, volle Breite, 40px Höhe. **Delta-Grid-Panel** zwischen Würfelstrips und Roll-Preview: zeigt pro Spieler Name (in Spielerfarbe) + Münzdelta (+N¢ grün, -N¢ rot) für den aktuellen Würfelwurf.
+
+### Reiche Tooltips für Analysis-Einstellungen
+
+`deepAnalysisTooltipRich()`, `mcSimTooltipRich()`, `mcTempTooltipRich()`, `rolloutDepthTooltipRich()`, `rolloutTopKTooltipRich()` — erklären N=100–10000 mit ms/Fehler-Schätzungen, T=0/0.7/1.5, Tiefe 1/2/3 mit Kosten, K=2/5/8 mit Pruning-Erklärung.
+
+---
+
 ## Dreistufiges Hybrid-System: Stufe 1 (RolloutTree) + Stufe 2 (verbesserter Leaf-Evaluator) + Stufe 3 (Adaptives MC-Budget)
 
 Vollständige Implementierung des in PLAN.md § "Dreistufiges Hybrid-System" beschriebenen Architektur-Ziels.

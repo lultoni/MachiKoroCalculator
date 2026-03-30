@@ -395,8 +395,8 @@ public final class Strings {
                  "[D] 2d6 optimal — portfolio activates mainly on 7–12");
     }
 
-    public static String deepAnalysisBtn()    { return s("Tiefenanalyse (MC)", "Deep Analysis (MC)"); }
-    public static String deepAnalysisBtnOn()  { return s("Tiefenanalyse AN (MC)", "Deep Analysis ON (MC)"); }
+    public static String deepAnalysisBtn()    { return s("Deep Analysis AUS", "Deep Analysis OFF"); }
+    public static String deepAnalysisBtnOn()  { return s("⚡ Deep Analysis AN", "⚡ Deep Analysis ON"); }
     public static String deepAnalysisTooltip(){ return s("Monte-Carlo-Simulationen pro Karte für genaues Gewinnwahrscheinlichkeits-Delta.",
                                                           "Run Monte Carlo simulations per card for accurate win-probability delta."); }
     public static String mcSimNLabel()        { return "N:"; }
@@ -630,4 +630,322 @@ public final class Strings {
     public static String incomeMatrixToggleHide() { return s("Einkommensmatrix verbergen", "Hide Income Matrix"); }
     /** Column header: "Roll" */
     public static String incomeMatrixRollHeader() { return s("Wurf", "Roll"); }
+
+    // =========================================================================
+    // Header bar
+    // =========================================================================
+
+    /** Compact header showing active player name, turn number, coins, and win probability. */
+    public static String headerBar(String playerName, int turn, int coins, double winPct) {
+        return s(
+            "<html><b>" + playerName + "</b>  ·  Zug " + turn
+                + "  ·  " + coins + " " + coinsUnit()
+                + "  ·  <span style='color:#1A5C28'>Win: "
+                + String.format("%.1f", winPct) + "%</span></html>",
+            "<html><b>" + playerName + "</b>  ·  Turn " + turn
+                + "  ·  " + coins + " " + coinsUnit()
+                + "  ·  <span style='color:#1A5C28'>Win: "
+                + String.format("%.1f", winPct) + "%</span></html>"
+        );
+    }
+
+    // =========================================================================
+    // Contextual metric tooltips (for card details panel)
+    // =========================================================================
+
+    /**
+     * Rich contextual tooltip for EV/round metric.
+     * @param value   the card's EV/round value
+     * @param rankPos 1-based rank among all cards (1 = best)
+     * @param total   total number of cards ranked
+     */
+    public static String evTooltipContextual(double value, int rankPos, int total) {
+        String quality = value >= 0.35 ? s("Sehr gut", "Very good")
+                       : value >= 0.10 ? s("Gut", "Good")
+                       : value >= 0.0  ? s("Neutral", "Neutral")
+                                       : s("Schlecht", "Poor");
+        return s(
+            "<html><b>EV / Runde</b> — Erwartete Münzen pro vollständiger Runde<br>"
+            + "(eigener Zug + alle Gegner-Züge kombiniert)<br><br>"
+            + "• ≥ 0.35¢/Rd = Sehr gut &nbsp; • ≥ 0.10 = Gut &nbsp; • < 0 = Schlecht<br><br>"
+            + "<b>" + String.format("%.2f", value) + "¢/Runde</b> — " + quality
+            + " &nbsp;·&nbsp; Rang #" + rankPos + " von " + total + "</html>",
+            "<html><b>EV / round</b> — Expected coins per full game round<br>"
+            + "(your turn + all opponent turns combined)<br><br>"
+            + "• ≥ 0.35¢/rd = Very good &nbsp; • ≥ 0.10 = Good &nbsp; • < 0 = Poor<br><br>"
+            + "<b>" + String.format("%.2f", value) + "¢/rd</b> — " + quality
+            + " &nbsp;·&nbsp; Rank #" + rankPos + " of " + total + "</html>"
+        );
+    }
+
+    /**
+     * Rich contextual tooltip for ROI metric.
+     */
+    public static String roiTooltipContextual(double value, int rankPos, int total) {
+        String quality = value >= 2.0  ? s("Ausgezeichnet — sofort kaufen", "Excellent — buy now")
+                       : value >= 0.5  ? s("Gut — lohnend", "Good — profitable")
+                       : value >= 0.0  ? s("Schwach — knapp rentabel", "Weak — barely profitable")
+                                       : s("Negativ — nicht rentabel in 10 Zügen", "Negative — not profitable in 10 turns");
+        return s(
+            "<html><b>ROI (10 Runden)</b> — Diskontierter Münzgewinn über 10 Runden minus Kaufpreis<br><br>"
+            + "• ≥ 2.0 = Ausgezeichnet &nbsp; • ≥ 0.5 = Gut &nbsp; • ≥ 0 = Schwach &nbsp; • &lt; 0 = Nicht rentabel<br><br>"
+            + "<b>" + String.format("%.2f", value) + "</b> — " + quality
+            + " &nbsp;·&nbsp; Rang #" + rankPos + " von " + total + "</html>",
+            "<html><b>ROI (10 turns)</b> — Discounted coin gain over 10 turns minus purchase cost<br><br>"
+            + "• ≥ 2.0 = Excellent &nbsp; • ≥ 0.5 = Good &nbsp; • ≥ 0 = Weak &nbsp; • &lt; 0 = Not profitable<br><br>"
+            + "<b>" + String.format("%.2f", value) + "</b> — " + quality
+            + " &nbsp;·&nbsp; Rank #" + rankPos + " of " + total + "</html>"
+        );
+    }
+
+    /**
+     * Rich contextual tooltip for P(0 income) metric.
+     */
+    public static String p0TooltipContextual(double value, int rankPos, int total) {
+        String quality = value <= 0.35 ? s("Zuverlässig — kommt selten leer", "Reliable — rarely earns nothing")
+                       : value <= 0.55 ? s("Gut", "Good")
+                       : value <= 0.80 ? s("Riskant — oft Runden ohne Ertrag", "Risky — often earns nothing")
+                                       : s("Sehr riskant — meistens leer", "Very risky — usually earns nothing");
+        return s(
+            "<html><b>P(0 Einkommen)</b> — Wahrscheinlichkeit, in der ganzen Runde 0 Münzen zu erhalten<br><br>"
+            + "• ≤ 35% = Zuverlässig &nbsp; • ≤ 55% = Gut &nbsp; • ≤ 80% = Riskant &nbsp; • &gt; 80% = Sehr riskant<br>"
+            + "<i>Niedriger ist besser.</i><br><br>"
+            + "<b>" + String.format("%.0f", value * 100) + "%</b> — " + quality
+            + " &nbsp;·&nbsp; Rang #" + rankPos + " von " + total + "</html>",
+            "<html><b>P(0 income)</b> — Probability of earning 0 coins across the whole round<br><br>"
+            + "• ≤ 35% = Reliable &nbsp; • ≤ 55% = Good &nbsp; • ≤ 80% = Risky &nbsp; • &gt; 80% = Very risky<br>"
+            + "<i>Lower is better.</i><br><br>"
+            + "<b>" + String.format("%.0f", value * 100) + "%</b> — " + quality
+            + " &nbsp;·&nbsp; Rank #" + rankPos + " of " + total + "</html>"
+        );
+    }
+
+    /**
+     * Rich contextual tooltip for Variance metric.
+     */
+    public static String varianceTooltipContextual(double value, int rankPos, int total) {
+        String quality = value <= 0.8  ? s("Stabil — vorhersehbares Einkommen", "Stable — predictable income")
+                       : value <= 1.5  ? s("Mäßig", "Moderate")
+                       : value <= 3.0  ? s("Boom-oder-Pleite", "Boom-or-bust")
+                                       : s("Sehr volatil", "Very volatile");
+        return s(
+            "<html><b>Varianz</b> — Statistische Streuung des Einkommens pro Zug<br><br>"
+            + "• ≤ 0.8 = Stabil &nbsp; • ≤ 1.5 = Mäßig &nbsp; • ≤ 3.0 = Boom-oder-Pleite &nbsp; • &gt; 3.0 = Sehr volatil<br>"
+            + "<i>Niedriger = berechenbarer. Höher = gelegentlich viel, oft nichts.</i><br><br>"
+            + "<b>" + String.format("%.2f", value) + "</b> — " + quality
+            + " &nbsp;·&nbsp; Rang #" + rankPos + " von " + total + "</html>",
+            "<html><b>Variance</b> — Statistical spread of per-turn income<br><br>"
+            + "• ≤ 0.8 = Stable &nbsp; • ≤ 1.5 = Moderate &nbsp; • ≤ 3.0 = Boom-or-bust &nbsp; • &gt; 3.0 = Very volatile<br>"
+            + "<i>Lower = more predictable. Higher = occasionally large, often nothing.</i><br><br>"
+            + "<b>" + String.format("%.2f", value) + "</b> — " + quality
+            + " &nbsp;·&nbsp; Rank #" + rankPos + " of " + total + "</html>"
+        );
+    }
+
+    /**
+     * Rich contextual tooltip for Win Probability Delta metric.
+     */
+    public static String winProbTooltipContextual(double value, int rankPos, int total, boolean isMC) {
+        String method = isMC ? s("MC-Simulation", "MC simulation") : s("analytisch", "analytical");
+        String quality = value >= 0.02 ? s("Signifikante Verbesserung — kaufen", "Significant boost — buy it")
+                       : value >= 0.005? s("Kleine Verbesserung", "Small boost")
+                       : value >= 0.0  ? s("Neutral oder minimal", "Neutral or minimal")
+                                       : s("Reduziert Siegchance", "Reduces win probability");
+        return s(
+            "<html><b>Gewinnwahrscheinlichkeit Δ</b> — Änderung der Siegchance durch diesen Kauf<br>"
+            + "Methode: " + method + "<br><br>"
+            + "• ≥ +2% = Sehr gut &nbsp; • ≥ +0.5% = Gut &nbsp; • ≈ 0% = Neutral &nbsp; • &lt; 0% = Nachteilig<br>"
+            + "<i>Softmax-Schätzung basierend auf EV-Verhältnis aller Spieler.</i><br><br>"
+            + "<b>" + String.format("%+.1f", value * 100) + "%</b> — " + quality
+            + " &nbsp;·&nbsp; Rang #" + rankPos + " von " + total + "</html>",
+            "<html><b>Win Probability Δ</b> — Change in win probability from buying this card<br>"
+            + "Method: " + method + "<br><br>"
+            + "• ≥ +2% = Very good &nbsp; • ≥ +0.5% = Good &nbsp; • ≈ 0% = Neutral &nbsp; • &lt; 0% = Harmful<br>"
+            + "<i>Softmax estimate based on relative EV scores of all players.</i><br><br>"
+            + "<b>" + String.format("%+.1f", value * 100) + "%</b> — " + quality
+            + " &nbsp;·&nbsp; Rank #" + rankPos + " of " + total + "</html>"
+        );
+    }
+
+    /**
+     * Rich contextual tooltip for Portfolio ΔEV metric.
+     */
+    public static String portfolioDeltaTooltipContextual(double value, int rankPos, int total) {
+        String quality = value >= 0.3  ? s("Starke Synergie mit deinem Portfolio", "Strong synergy with your portfolio")
+                       : value >= 0.08 ? s("Gute Synergie", "Good synergy")
+                       : value >= 0.0  ? s("Schwache Synergie", "Weak synergy")
+                                       : s("Keine Synergie", "No synergy");
+        return s(
+            "<html><b>Portfolio ΔEV</b> — Marginaler EV-Gewinn pro Runde durch diesen Kauf:<br>"
+            + "playerEvPerRound(Portfolio + Karte) − playerEvPerRound(Portfolio)<br><br>"
+            + "• ≥ 0.30¢/Rd = Starke Synergie &nbsp; • ≥ 0.08 = Gut &nbsp; • ≥ 0 = Schwach<br>"
+            + "<i>Erfasst Kreuz-Synergien, z.B. Bahnhof schaltet 7–12 Karten frei.</i><br><br>"
+            + "<b>+" + String.format("%.2f", value) + "¢/Runde</b> — " + quality
+            + " &nbsp;·&nbsp; Rang #" + rankPos + " von " + total + "</html>",
+            "<html><b>Portfolio ΔEV</b> — Marginal EV gain per round from this purchase:<br>"
+            + "playerEvPerRound(portfolio + card) − playerEvPerRound(portfolio)<br><br>"
+            + "• ≥ 0.30¢/rd = Strong synergy &nbsp; • ≥ 0.08 = Good &nbsp; • ≥ 0 = Weak<br>"
+            + "<i>Captures cross-card synergies, e.g. Train Station unlocks 7–12 cards.</i><br><br>"
+            + "<b>+" + String.format("%.2f", value) + "¢/round</b> — " + quality
+            + " &nbsp;·&nbsp; Rank #" + rankPos + " of " + total + "</html>"
+        );
+    }
+
+    // =========================================================================
+    // Inline insight summary (below metrics grid in Card Details)
+    // =========================================================================
+
+    /**
+     * Builds a 1–2 sentence HTML insight summary from the card's metrics and ranks.
+     * @param cardName    localized card name
+     * @param roi         ROI value
+     * @param roiRank     ROI rank (1 = best)
+     * @param winDelta    win prob delta
+     * @param evPerRound  EV per round
+     * @param affordable  true if the card is currently affordable
+     * @param totalCards  total cards in ranking
+     */
+    public static String metricInsightSummary(
+            String cardName, double roi, int roiRank, double winDelta,
+            double evPerRound, boolean affordable, int totalCards) {
+        StringBuilder sb = new StringBuilder("<html><body style='width:270px;color:#222;font-size:11px'>");
+
+        // Lead: strongest signal
+        if (roiRank == 1 && roi > 0) {
+            sb.append(s("<b>★ Beste Option diese Runde</b> — ROI ", "<b>★ Best option this turn</b> — ROI "));
+            sb.append(String.format("%.2f", roi)).append(s(". ", ". "));
+        } else if (roi >= 2.0) {
+            sb.append(s("<b>Sehr guter ROI</b> (", "<b>Excellent ROI</b> ("));
+            sb.append(String.format("+%.2f", roi)).append(") · #").append(roiRank)
+              .append(s(" von ", " of ")).append(totalCards).append(". ");
+        } else if (roi >= 0.5) {
+            sb.append(s("Solider ROI +", "Solid ROI +"));
+            sb.append(String.format("%.2f", roi)).append(s(" · kaufenswert. ", " · worth buying. "));
+        } else if (roi < 0) {
+            sb.append(s("<b style='color:#AA0000'>Kosten nicht amortisiert</b> in 10 Zügen (ROI ",
+                        "<b style='color:#AA0000'>Cost not recouped</b> in 10 turns (ROI "));
+            sb.append(String.format("%.2f", roi)).append("). ");
+        } else {
+            sb.append(s("Schwacher ROI (", "Weak ROI ("));
+            sb.append(String.format("+%.2f", roi)).append("). ");
+        }
+
+        // Win delta qualifier
+        if (winDelta >= 0.02) {
+            sb.append(s("Win-Δ <b style='color:#1A5C28'>+", "Win Δ <b style='color:#1A5C28'>+"));
+            sb.append(String.format("%.1f", winDelta * 100)).append("%</b> — ");
+            sb.append(s("kaufen.", "buy it."));
+        } else if (winDelta >= 0.005) {
+            sb.append(s("Win-Δ +", "Win Δ +")).append(String.format("%.1f", winDelta * 100)).append("% — ");
+            sb.append(s("leicht positiv.", "slightly positive."));
+        } else if (winDelta < -0.005) {
+            sb.append(s("Win-Δ <b style='color:#AA0000'>", "Win Δ <b style='color:#AA0000'>"));
+            sb.append(String.format("%.1f", winDelta * 100)).append("%</b> — ");
+            sb.append(s("senkt Siegchance.", "lowers win probability."));
+        }
+
+        if (!affordable) {
+            sb.append(s(" <i>(nicht erschwinglich)</i>", " <i>(not affordable)</i>"));
+        }
+
+        sb.append("</body></html>");
+        return sb.toString();
+    }
+
+    // =========================================================================
+    // Deep Analysis / MC explanations (rich tooltips for right panel controls)
+    // =========================================================================
+
+    public static String deepAnalysisTooltipRich() {
+        return s(
+            "<html><b>Deep Analysis (Monte Carlo)</b><br><br>"
+            + "Aktiviert MC-Simulationen für genauere Win-Prob-Deltas.<br>"
+            + "Jede Karte wird durch N vollständige Spiele simuliert.<br><br>"
+            + "<b>OFF:</b> Nur analytische Softmax-Schätzung (schnell, ~0ms)<br>"
+            + "<b>ON:</b> MC ersetzt Stufe-2-Schätzung für Top-5 Karten (langsamer)<br><br>"
+            + "<i>Empfehlung: ON für finale Kaufentscheidung, OFF für schnelles Scrollen.</i></html>",
+            "<html><b>Deep Analysis (Monte Carlo)</b><br><br>"
+            + "Enables MC simulations for more accurate win-prob deltas.<br>"
+            + "Each card is evaluated through N complete game simulations.<br><br>"
+            + "<b>OFF:</b> Analytical softmax estimate only (fast, ~0ms)<br>"
+            + "<b>ON:</b> MC replaces Tier-2 estimate for top-5 cards (slower)<br><br>"
+            + "<i>Recommendation: ON for final decisions, OFF for quick browsing.</i></html>"
+        );
+    }
+
+    public static String mcSimTooltipRich() {
+        return s(
+            "<html><b>N — Anzahl MC-Simulationen</b><br><br>"
+            + "Wie viele vollständige Spiele pro Karte simuliert werden.<br><br>"
+            + "<b>100:</b> Schnell (~10ms), ±3–5% Fehler<br>"
+            + "<b>1000:</b> Empfohlen (~90ms), ±1–2% Fehler<br>"
+            + "<b>5000:</b> Präzise (~450ms), ±0.5% Fehler<br>"
+            + "<b>10000:</b> Sehr präzise (~900ms), ±0.3% Fehler<br><br>"
+            + "<i>Für Endspiel-Entscheidungen: ≥ 2500 empfohlen.</i></html>",
+            "<html><b>N — Number of MC simulations</b><br><br>"
+            + "How many complete games are simulated per card.<br><br>"
+            + "<b>100:</b> Fast (~10ms), ±3–5% error<br>"
+            + "<b>1000:</b> Recommended (~90ms), ±1–2% error<br>"
+            + "<b>5000:</b> Precise (~450ms), ±0.5% error<br>"
+            + "<b>10000:</b> Very precise (~900ms), ±0.3% error<br><br>"
+            + "<i>For endgame decisions: ≥ 2500 recommended.</i></html>"
+        );
+    }
+
+    public static String mcTempTooltipRich() {
+        return s(
+            "<html><b>T — Boltzmann-Temperatur (Gegner-Verhalten)</b><br><br>"
+            + "Steuert wie zufällig Gegner im MC kaufen:<br><br>"
+            + "<b>T = 0:</b> Alle Gegner kaufen immer optimal (greedy)<br>"
+            + "→ überschätzt starke Gegner, unterschätzt schwache<br>"
+            + "<b>T = 0.3–0.5:</b> Leicht explorativ — realistischer<br>"
+            + "<b>T = 0.7:</b> Empfohlen — gelegentlich suboptimale Käufe<br>"
+            + "<b>T = 1.5+:</b> Fast zufällig — unterschätzt alle Gegner<br><br>"
+            + "<i>T = 0.7 ist nicht empirisch kalibriert — konservative Schätzung.</i></html>",
+            "<html><b>T — Boltzmann temperature (opponent behaviour)</b><br><br>"
+            + "Controls how randomly opponents buy in MC:<br><br>"
+            + "<b>T = 0:</b> All opponents always buy optimally (greedy)<br>"
+            + "→ overestimates strong opponents, underestimates weak<br>"
+            + "<b>T = 0.3–0.5:</b> Slightly explorative — more realistic<br>"
+            + "<b>T = 0.7:</b> Recommended — occasional suboptimal buys<br>"
+            + "<b>T = 1.5+:</b> Near-random — underestimates all opponents<br><br>"
+            + "<i>T = 0.7 is not empirically calibrated — a conservative estimate.</i></html>"
+        );
+    }
+
+    public static String rolloutDepthTooltipRich() {
+        return s(
+            "<html><b>Tiefe — Expectimax-Rollout-Tiefe</b><br><br>"
+            + "Wie viele vollständige Runden der Baum expandiert.<br>"
+            + "1 Runde = eigener Zug + N−1 simulierte Gegner-Züge.<br><br>"
+            + "<b>Tiefe 1:</b> Schnell (~20ms), 1 Runde vorausschauend<br>"
+            + "<b>Tiefe 2:</b> Empfohlen (~200ms), 2 Runden — erfasst Folge-Käufe<br>"
+            + "<b>Tiefe 3:</b> Langsam (~2s), 3 Runden — maximale Genauigkeit<br><br>"
+            + "<i>Tiefe 2 balanciert Laufzeit und Qualität für die meisten Situationen.</i></html>",
+            "<html><b>Depth — Expectimax rollout depth</b><br><br>"
+            + "How many full rounds the tree expands.<br>"
+            + "1 round = your turn + N−1 simulated opponent turns.<br><br>"
+            + "<b>Depth 1:</b> Fast (~20ms), 1 round lookahead<br>"
+            + "<b>Depth 2:</b> Recommended (~200ms), 2 rounds — captures follow-up buys<br>"
+            + "<b>Depth 3:</b> Slow (~2s), 3 rounds — maximum accuracy<br><br>"
+            + "<i>Depth 2 balances runtime and quality for most situations.</i></html>"
+        );
+    }
+
+    public static String rolloutTopKTooltipRich() {
+        return s(
+            "<html><b>Top-K — Kandidaten pro Entscheidungsknoten</b><br><br>"
+            + "Wie viele der besten Kaufoptionen an jedem Knoten expandiert werden.<br><br>"
+            + "<b>K = 2:</b> Nur die 2 besten Optionen — sehr schnell, kann Alternativen verpassen<br>"
+            + "<b>K = 5:</b> Empfohlen — gute Balance aus Breite und Geschwindigkeit<br>"
+            + "<b>K = 8:</b> Breite Suche — langsamer, erfasst mehr Alternativen<br><br>"
+            + "<i>Pruning-Kriterium: Karten mit &lt;50% des besten portfolioDeltaEV werden ausgeschlossen.</i></html>",
+            "<html><b>Top-K — Candidates per decision node</b><br><br>"
+            + "How many of the best buy options are expanded at each node.<br><br>"
+            + "<b>K = 2:</b> Only the top 2 options — very fast, may miss alternatives<br>"
+            + "<b>K = 5:</b> Recommended — good balance of breadth and speed<br>"
+            + "<b>K = 8:</b> Broad search — slower, explores more alternatives<br><br>"
+            + "<i>Pruning criterion: cards with &lt;50% of the best portfolioDeltaEV are excluded.</i></html>"
+        );
+    }
 }

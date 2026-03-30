@@ -291,7 +291,7 @@ C5 (buildRollGainCache + computeOwnTurnEV — DRY-Refactoring hot path)
 N0 (Bürohaus-Tausch) · N1 (Game Assistant) · N2 (Bahnhof-Würfelwahl) · N3 (Phasenerkennung) · N4a–N4d (Snapshot/Labeling/PhaseFitter-System)
 
 ### UI ✓
-U1 (rechtes Panel) · U2 (Kategorie-Icons) · U3 (Trigger-Modus-Anzeige)
+U1 (rechtes Panel) · U2 (Kategorie-Icons) · U3 (Trigger-Modus-Anzeige) · U4 (Rank-Coloring, kontextuelle Tooltips, Insight-Zusammenfassung, Kategorie-Icons in Fließtext, Header-Bar, CTA-Confirm-Button, Delta-Grid)
 
 ### Future Strategy ✓
 Synergy-Lookahead · 2-Turn Lookahead · MC-Policy (greedy → roiOverHorizon) · Stufe-2 (coinAdvantage + endgameProximityBonus + LANDMARK_WEIGHTS) · Stufe-1 RolloutTree · Stufe-3 Adaptives MC-Budget

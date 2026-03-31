@@ -136,6 +136,23 @@ public final class MctsTree {
         return iterationsPerformed;
     }
 
+    /**
+     * Runs {@code count} iterations, but forces selection to start from {@code startNode}
+     * instead of the root. Use this to concentrate budget on a specific subtree.
+     *
+     * <p>Backpropagation still walks all the way up to the root, so win rates at all
+     * ancestor nodes (including root) are updated correctly.
+     *
+     * @param startNode the node to start selection from (must be in this tree)
+     * @param count     number of iterations to run
+     */
+    public void runIterationsFromNode(MctsNode startNode, int count) {
+        for (int i = 0; i < count; i++) {
+            runOneIterationFrom(startNode);
+        }
+        iterationsPerformed += count;
+    }
+
     // -------------------------------------------------------------------------
     // Single iteration
     // -------------------------------------------------------------------------
@@ -171,6 +188,32 @@ public final class MctsTree {
         }
 
         // 4. Backpropagation
+        leaf.backpropagate(score);
+    }
+
+    private void runOneIterationFrom(MctsNode startNode) {
+        MctsNode leaf = select(startNode);
+
+        if (!leaf.isTerminal()) {
+            if (!leaf.expanded) {
+                expand(leaf);
+            }
+            MctsNode firstUnvisited = firstUnvisitedChild(leaf);
+            if (firstUnvisited != null) {
+                leaf = firstUnvisited;
+            }
+        }
+
+        double score;
+        if (leaf.isTerminal()) {
+            score = terminalScore(leaf);
+        } else {
+            score = rolloutFn.simulate(
+                    leaf.state, leaf.supply,
+                    getActivePlayerForNode(leaf),
+                    playerPerspective);
+        }
+
         leaf.backpropagate(score);
     }
 

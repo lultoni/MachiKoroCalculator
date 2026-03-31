@@ -83,7 +83,23 @@ public class MctsV1Engine implements SimulationEngine {
         }
 
         long computeTimeMs = System.currentTimeMillis() - startMs;
+        return buildResult(state, playerIndex, tree, iterationsUsed, computeTimeMs);
+    }
 
+    /**
+     * Builds the {@link EngineResult} from a pre-warmed {@link MctsTree}.
+     * Subclasses that control the iteration schedule themselves (e.g. adaptive budget)
+     * can call this after running their own iteration logic.
+     *
+     * @param state          original game state (not mutated)
+     * @param playerIndex    the player being advised
+     * @param tree           fully-run tree (root must be expanded)
+     * @param iterationsUsed total iterations reflected in the tree
+     * @param computeTimeMs  elapsed wall-clock time to report
+     * @return ranked evaluation result
+     */
+    protected EngineResult buildResult(GameState state, int playerIndex, MctsTree tree,
+                                       int iterationsUsed, long computeTimeMs) {
         // ---- Collect options from root children ----
         List<EngineResult.Option> options = buildOptions(state, playerIndex, tree, iterationsUsed);
 

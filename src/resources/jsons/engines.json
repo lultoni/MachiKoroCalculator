@@ -202,5 +202,32 @@
       "iterations": "2000",
       "maxRolloutDepth": "10"
     }
+  },
+  {
+    "id": "mcts-v1-adaptive-fast",
+    "engineClass": "mcts-v1-adaptive",
+    "description": "MCTS Variant E — adaptive budget, fast mode (~500 iterations)",
+    "default": false,
+    "config": {
+      "iterations": "500"
+    }
+  },
+  {
+    "id": "mcts-v1-adaptive-balanced",
+    "engineClass": "mcts-v1-adaptive",
+    "description": "MCTS Variant E — adaptive budget, balanced mode (~5000 iterations)",
+    "default": false,
+    "config": {
+      "iterations": "5000"
+    }
+  },
+  {
+    "id": "mcts-v1-adaptive-deep",
+    "engineClass": "mcts-v1-adaptive",
+    "description": "MCTS Variant E — adaptive budget, deep mode (~50000 iterations)",
+    "default": false,
+    "config": {
+      "iterations": "50000"
+    }
   }
 ]

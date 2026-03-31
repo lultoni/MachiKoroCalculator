@@ -78,7 +78,24 @@ Registry entries: `mcts-v1-depth3`, `mcts-v1-depth7`, `mcts-v1-depth10`.
 
 8 TDD tests green.
 
-### Selective Test Runner
+### 3.E — Variant E: Adaptive Budget Engine
+
+`engine.MctsAdaptiveEngine` — concentrates the iteration budget on close races rather than distributing uniformly across all candidates.
+
+**Algorithm:**
+1. Survey phase: run `iterations / 5` on the full tree.
+2. Identify top-2 root children by win rate.
+3. Compute margin = `wr1 − wr2`, then allocate remaining budget:
+   - margin ≤ `closeMargin` (default 0.03): split evenly — both candidates need more data.
+   - margin > `splitThreshold` (default 0.06): 70% to second place — confirm the leader is genuinely better.
+   - otherwise: 60% to leader, 40% to second place.
+4. Run focused iterations via `MctsTree.runIterationsFromNode(child, count)` (new method). Backpropagation still updates all ancestors, so root win rates remain consistent.
+
+`MctsV1Engine.evaluate()` was refactored to extract `protected buildResult(state, playerIndex, tree, iterationsUsed, computeTimeMs)`, letting subclasses run their own iteration schedule and then delegate result formatting.
+
+Registry entries: `mcts-v1-adaptive-fast` (500 iter), `-balanced` (5000), `-deep` (50000).
+
+8 TDD tests green.
 
 `RuntimeTester` now supports `--section "name"` and `--test name` CLI flags for running a subset of tests. Section matching is case-insensitive substring (`--section "Variant D"` matches `"Variant D: Depth-Limited Rollout Engine Tests"`). Multiple `--section` flags can be combined. When a filter is active, benchmarks are skipped. The results line reports skipped section count.
 

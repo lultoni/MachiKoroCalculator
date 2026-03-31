@@ -107,7 +107,7 @@ After initial survey of `config.iterations / 5` iterations, identify top-2 candi
 | 3.B | Implement Variant B: Boltzmann rollout policy. H2H vs v1 + A. | done |
 | 3.C | Implement Variant C: greedy tree selection. H2H vs all prior. | done |
 | 3.D | Implement Variant D: depth-limited rollout + heuristic eval. H2H vs all prior. | done |
-| 3.E | Implement Variant E: adaptive iteration budget. H2H vs all prior. | pending |
+| 3.E | Implement Variant E: adaptive iteration budget. H2H vs all prior. | done |
 
 ---
 

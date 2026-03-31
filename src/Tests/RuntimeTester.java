@@ -273,6 +273,17 @@ public class RuntimeTester {
             test_depth_limited_registry_entries_exist();
         });
 
+        runSection("Variant E: Adaptive Budget Engine Tests", () -> {
+            EngineConfig fastConfig  = EngineConfig.ofIterations(500);
+            core.GameState mctsGs = core.GameState.initial(2);
+            engine.MctsAdaptiveEngine adaptiveEngine = new engine.MctsAdaptiveEngine();
+            test_adaptive_returns_nonnull_result(adaptiveEngine, mctsGs, fastConfig);
+            test_adaptive_scores_descending(adaptiveEngine, mctsGs, fastConfig);
+            test_adaptive_obvious_landmark_buy(adaptiveEngine);
+            test_adaptive_registry_entries_exist();
+            test_adaptive_total_iterations_match_budget(adaptiveEngine, mctsGs);
+        });
+
         runSection("Calcs Metrics 3.0 Tests", () -> {
             test_sharpe_ratio_nonnegative_for_blue_card();
             test_sortino_ratio_leq_sharpe_when_downside_exists();
@@ -2292,6 +2303,70 @@ public class RuntimeTester {
         iface.EngineRegistryEntry d3 = iface.EngineRegistry.findById("mcts-v1-depth3").orElseThrow();
         assertEq("mcts-v1-depth3 engineClass", "mcts-v1-depth-limited", d3.engineClass());
         assertEq("mcts-v1-depth3 maxRolloutDepth", "3", d3.config().getExtra("maxRolloutDepth", ""));
+    }
+
+    // =========================================================================
+    // Variant E: Adaptive Budget Engine Tests
+    // =========================================================================
+
+    private static void test_adaptive_returns_nonnull_result(
+            engine.MctsAdaptiveEngine eng, core.GameState gs, engine.EngineConfig cfg) {
+        engine.EngineResult result = eng.evaluate(gs, 0, cfg);
+        assertTrue("adaptive: evaluate returns non-null EngineResult", result != null);
+    }
+
+    private static void test_adaptive_scores_descending(
+            engine.MctsAdaptiveEngine eng, core.GameState gs, engine.EngineConfig cfg) {
+        engine.EngineResult result = eng.evaluate(gs, 0, cfg);
+        boolean sorted = true;
+        for (int i = 1; i < result.rankedOptions.size(); i++) {
+            if (result.rankedOptions.get(i).score > result.rankedOptions.get(i - 1).score) {
+                sorted = false; break;
+            }
+        }
+        assertTrue("adaptive: rankedOptions scores are non-increasing", sorted);
+    }
+
+    private static void test_adaptive_obvious_landmark_buy(engine.MctsAdaptiveEngine eng) {
+        core.Project bahnhof   = core.ProjectLoader.getProject("bahnhof").orElseThrow();
+        core.Project einkauf   = core.ProjectLoader.getProject("einkaufszentrum").orElseThrow();
+        core.Project freizeit  = core.ProjectLoader.getProject("freizeitpark").orElseThrow();
+        core.Project funkturm  = core.ProjectLoader.getProject("funkturm").orElseThrow();
+        core.Project weizen    = core.ProjectLoader.getProject("weizenfeld").orElseThrow();
+        core.Project baeckerei = core.ProjectLoader.getProject("bäckerei").orElseThrow();
+        java.util.ArrayList<core.Project> o0 = new java.util.ArrayList<>();
+        o0.add(weizen); o0.add(baeckerei); o0.add(bahnhof); o0.add(einkauf); o0.add(freizeit);
+        java.util.ArrayList<core.Project> o1 = new java.util.ArrayList<>();
+        o1.add(weizen); o1.add(baeckerei);
+        java.util.ArrayList<core.Project> unbuilt = new java.util.ArrayList<>();
+        unbuilt.add(funkturm);
+        core.Player p0 = new core.Player("Alice", funkturm.getCost(), o0);
+        core.Player p1 = new core.Player("Bob",    3, o1);
+        core.GameState nearWinGs = new core.GameState(new core.Player[]{p0, p1}, unbuilt);
+        engine.EngineResult r = eng.evaluate(nearWinGs, 0, engine.EngineConfig.ofIterations(500));
+        String topId = r.rankedOptions.get(0).project.getId();
+        assertTrue("adaptive obvious win: top pick is funkturm, got " + topId,
+                "funkturm".equals(topId));
+    }
+
+    private static void test_adaptive_registry_entries_exist() {
+        assertTrue("engines.json has mcts-v1-adaptive-fast",
+                iface.EngineRegistry.findById("mcts-v1-adaptive-fast").isPresent());
+        assertTrue("engines.json has mcts-v1-adaptive-balanced",
+                iface.EngineRegistry.findById("mcts-v1-adaptive-balanced").isPresent());
+        assertTrue("engines.json has mcts-v1-adaptive-deep",
+                iface.EngineRegistry.findById("mcts-v1-adaptive-deep").isPresent());
+        iface.EngineRegistryEntry fast = iface.EngineRegistry.findById("mcts-v1-adaptive-fast").orElseThrow();
+        assertEq("mcts-v1-adaptive-fast engineClass", "mcts-v1-adaptive", fast.engineClass());
+    }
+
+    private static void test_adaptive_total_iterations_match_budget(
+            engine.MctsAdaptiveEngine eng, core.GameState gs) {
+        engine.EngineConfig cfg = engine.EngineConfig.ofIterations(500);
+        engine.EngineResult result = eng.evaluate(gs, 0, cfg);
+        // The adaptive engine runs exactly totalBudget iterations (survey + focused phases)
+        assertTrue("adaptive: total iterations reported == 500, got " + result.iterationsUsed,
+                result.iterationsUsed == 500);
     }
 
     // =========================================================================

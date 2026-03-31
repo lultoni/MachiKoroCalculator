@@ -28,5 +28,32 @@
       "iterations": "50000",
       "rolloutPolicy": "greedy"
     }
+  },
+  {
+    "id": "mcts-v1-greedy-rollout-fast",
+    "engineClass": "mcts-v1-greedy-rollout",
+    "description": "MCTS Variant A — greedy rollout, fast mode (~500 iterations)",
+    "default": false,
+    "config": {
+      "iterations": "500"
+    }
+  },
+  {
+    "id": "mcts-v1-greedy-rollout-balanced",
+    "engineClass": "mcts-v1-greedy-rollout",
+    "description": "MCTS Variant A — greedy rollout, balanced mode (~5000 iterations)",
+    "default": false,
+    "config": {
+      "iterations": "5000"
+    }
+  },
+  {
+    "id": "mcts-v1-greedy-rollout-deep",
+    "engineClass": "mcts-v1-greedy-rollout",
+    "description": "MCTS Variant A — greedy rollout, deep mode (~50000 iterations)",
+    "default": false,
+    "config": {
+      "iterations": "50000"
+    }
   }
 ]

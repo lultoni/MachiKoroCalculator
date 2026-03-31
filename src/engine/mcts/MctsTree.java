@@ -48,6 +48,9 @@ public final class MctsTree {
     /** Total iterations performed so far. */
     private int iterationsPerformed = 0;
 
+    /** Rollout strategy — defaults to the uniform-random MctsRollout. */
+    private final RolloutFn rolloutFn;
+
     /**
      * @param rootState           game state at the purchase decision point
      * @param rootSupply          supply tracker matching rootState
@@ -58,10 +61,22 @@ public final class MctsTree {
     public MctsTree(GameState rootState, SupplyTracker rootSupply,
                     int activePlayer, int playerPerspective,
                     double explorationConstant) {
+        this(rootState, rootSupply, activePlayer, playerPerspective, explorationConstant,
+                MctsRollout::simulate);
+    }
+
+    /**
+     * Full constructor accepting a custom rollout function.
+     *
+     * @param rolloutFn custom rollout strategy (e.g. greedy, Boltzmann)
+     */
+    public MctsTree(GameState rootState, SupplyTracker rootSupply,
+                    int activePlayer, int playerPerspective,
+                    double explorationConstant, RolloutFn rolloutFn) {
         this.explorationConstant = explorationConstant;
         this.playerPerspective   = playerPerspective;
         this.activePlayer        = activePlayer;
-        // Next player after the active player (used as the nextPlayer for the root BuyDecisionNode)
+        this.rolloutFn           = rolloutFn;
         int nextPlayer = (activePlayer + 1) % rootState.getPlayers().length;
         this.root = new BuyDecisionNode(rootState, rootSupply, null, activePlayer, nextPlayer);
     }
@@ -128,7 +143,7 @@ public final class MctsTree {
             // Someone has already won in this state
             score = terminalScore(leaf);
         } else {
-            score = MctsRollout.simulate(
+            score = rolloutFn.simulate(
                     leaf.state, leaf.supply,
                     getActivePlayerForNode(leaf),
                     playerPerspective);

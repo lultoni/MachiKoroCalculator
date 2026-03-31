@@ -179,6 +179,15 @@ public class RuntimeTester {
         test_mcts_confidence_in_range(mctsEngine, mctsGs, fastConfig);
         test_mcts_visit_count_sums_to_iterations(mctsEngine, mctsGs, fastConfig);
 
+        System.out.println("\n=== Variant A: Greedy Rollout Engine Tests ===\n");
+        engine.MctsGreedyRolloutEngine greedyEngine = new engine.MctsGreedyRolloutEngine();
+        test_greedy_rollout_returns_nonnull_result(greedyEngine, mctsGs, fastConfig);
+        test_greedy_rollout_ranked_options_nonempty(greedyEngine, mctsGs, fastConfig);
+        test_greedy_rollout_includes_save_option(greedyEngine, mctsGs, fastConfig);
+        test_greedy_rollout_scores_descending(greedyEngine, mctsGs, fastConfig);
+        test_greedy_rollout_obvious_landmark_buy(greedyEngine);
+        test_greedy_rollout_registry_entries_exist();
+
         System.out.println("\n=== Calcs Metrics 3.0 Tests ===\n");
         test_sharpe_ratio_nonnegative_for_blue_card();
         test_sortino_ratio_leq_sharpe_when_downside_exists();
@@ -1914,6 +1923,85 @@ public class RuntimeTester {
                 visitSum > 0);
         assertTrue("mcts: sum of child visit counts ≤ 2 × iterationsUsed (sane upper bound)",
                 visitSum <= 2L * result.iterationsUsed);
+    }
+
+    // =========================================================================
+    // Variant A: Greedy Rollout Engine Tests
+    // =========================================================================
+
+    private static void test_greedy_rollout_returns_nonnull_result(
+            engine.MctsGreedyRolloutEngine eng, core.GameState gs, engine.EngineConfig cfg) {
+        engine.EngineResult result = eng.evaluate(gs, 0, cfg);
+        assertTrue("greedy-rollout: evaluate returns non-null EngineResult", result != null);
+    }
+
+    private static void test_greedy_rollout_ranked_options_nonempty(
+            engine.MctsGreedyRolloutEngine eng, core.GameState gs, engine.EngineConfig cfg) {
+        engine.EngineResult result = eng.evaluate(gs, 0, cfg);
+        assertTrue("greedy-rollout: rankedOptions is non-empty",
+                result != null && !result.rankedOptions.isEmpty());
+    }
+
+    private static void test_greedy_rollout_includes_save_option(
+            engine.MctsGreedyRolloutEngine eng, core.GameState gs, engine.EngineConfig cfg) {
+        engine.EngineResult result = eng.evaluate(gs, 0, cfg);
+        boolean hasSave = result.rankedOptions.stream()
+                .anyMatch(o -> "_wait_".equals(o.project.getId()));
+        assertTrue("greedy-rollout: rankedOptions contains save (_wait_) sentinel", hasSave);
+    }
+
+    private static void test_greedy_rollout_scores_descending(
+            engine.MctsGreedyRolloutEngine eng, core.GameState gs, engine.EngineConfig cfg) {
+        engine.EngineResult result = eng.evaluate(gs, 0, cfg);
+        boolean sorted = true;
+        for (int i = 1; i < result.rankedOptions.size(); i++) {
+            if (result.rankedOptions.get(i).score > result.rankedOptions.get(i - 1).score) {
+                sorted = false;
+                break;
+            }
+        }
+        assertTrue("greedy-rollout: rankedOptions scores are non-increasing", sorted);
+    }
+
+    private static void test_greedy_rollout_obvious_landmark_buy(engine.MctsGreedyRolloutEngine eng) {
+        // Same obvious-win test as MCTS v1: player has 3 landmarks + 22 coins, only Funkturm missing
+        core.Project bahnhof   = core.ProjectLoader.getProject("bahnhof").orElseThrow();
+        core.Project einkauf   = core.ProjectLoader.getProject("einkaufszentrum").orElseThrow();
+        core.Project freizeit  = core.ProjectLoader.getProject("freizeitpark").orElseThrow();
+        core.Project funkturm  = core.ProjectLoader.getProject("funkturm").orElseThrow();
+        core.Project weizen    = core.ProjectLoader.getProject("weizenfeld").orElseThrow();
+        core.Project baeckerei = core.ProjectLoader.getProject("bäckerei").orElseThrow();
+
+        java.util.ArrayList<core.Project> owned0 = new java.util.ArrayList<>();
+        owned0.add(weizen); owned0.add(baeckerei);
+        owned0.add(bahnhof); owned0.add(einkauf); owned0.add(freizeit);
+        java.util.ArrayList<core.Project> owned1 = new java.util.ArrayList<>();
+        owned1.add(weizen); owned1.add(baeckerei);
+
+        java.util.ArrayList<core.Project> unbuilt = new java.util.ArrayList<>();
+        unbuilt.add(funkturm);
+
+        core.Player p0 = new core.Player("Alice", 22, owned0);
+        core.Player p1 = new core.Player("Bob",    3, owned1);
+        core.GameState gs = new core.GameState(new core.Player[]{p0, p1}, unbuilt);
+
+        engine.EngineResult result = eng.evaluate(gs, 0, engine.EngineConfig.ofIterations(500));
+        String topId = result.topRecommendation().project.getId();
+        assertEq("greedy-rollout: obvious winning move is Funkturm", "funkturm", topId);
+    }
+
+    private static void test_greedy_rollout_registry_entries_exist() {
+        // All three greedy-rollout registry entries must be present in engines.json
+        assertTrue("engines.json has mcts-v1-greedy-rollout-fast",
+                iface.EngineRegistry.findById("mcts-v1-greedy-rollout-fast").isPresent());
+        assertTrue("engines.json has mcts-v1-greedy-rollout-balanced",
+                iface.EngineRegistry.findById("mcts-v1-greedy-rollout-balanced").isPresent());
+        assertTrue("engines.json has mcts-v1-greedy-rollout-deep",
+                iface.EngineRegistry.findById("mcts-v1-greedy-rollout-deep").isPresent());
+        // All three must use the correct engineClass
+        iface.EngineRegistryEntry fast = iface.EngineRegistry.findById("mcts-v1-greedy-rollout-fast").orElseThrow();
+        assertEq("greedy-rollout-fast engineClass = mcts-v1-greedy-rollout",
+                "mcts-v1-greedy-rollout", fast.engineClass());
     }
 
     // =========================================================================

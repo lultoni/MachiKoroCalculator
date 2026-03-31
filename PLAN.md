@@ -102,8 +102,8 @@ After initial survey of `config.iterations / 5` iterations, identify top-2 candi
 
 | Task | Description | Status |
 |------|-------------|--------|
-| 3.0 | Add 11 advanced Calcs metrics (Sharpe, Sortino, Kelly, VaR/CVaR, HHI, entropy H, IG, ETW, tempo, urgency, roll correlation). | pending |
-| 3.A | Implement Variant A: greedy rollout policy. H2H vs v1. | pending |
+| 3.0 | Add 11 advanced Calcs metrics (Sharpe, Sortino, Kelly, VaR/CVaR, HHI, entropy H, IG, ETW, tempo, urgency, roll correlation). | done |
+| 3.A | Implement Variant A: greedy rollout policy. H2H vs v1. | done |
 | 3.B | Implement Variant B: Boltzmann rollout policy. H2H vs v1 + A. | pending |
 | 3.C | Implement Variant C: greedy tree selection. H2H vs all prior. | pending |
 | 3.D | Implement Variant D: depth-limited rollout + heuristic eval. H2H vs all prior. | pending |

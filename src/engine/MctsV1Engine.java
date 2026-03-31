@@ -37,7 +37,7 @@ import java.util.Map;
  *   <li>{@code extra("explorationConstant")} — UCB1 C value (default "1.4142")</li>
  * </ul>
  */
-public final class MctsV1Engine implements SimulationEngine {
+public class MctsV1Engine implements SimulationEngine {
 
     public static final String ENGINE_ID = "mcts-v1";
 
@@ -66,7 +66,7 @@ public final class MctsV1Engine implements SimulationEngine {
                 config.getExtra("explorationConstant", "1.4142"));
 
         SupplyTracker supply = SupplyTracker.fromGameState(state);
-        MctsTree tree = new MctsTree(state, supply, playerIndex, playerIndex, explorationConstant);
+        MctsTree tree = buildTree(state, supply, playerIndex, playerIndex, explorationConstant);
 
         // Run iterations or time budget
         int iterationsUsed;
@@ -105,6 +105,20 @@ public final class MctsV1Engine implements SimulationEngine {
         String debugInfo = buildDebugInfo(tree, iterationsUsed);
 
         return new EngineResult(options, confidence, iterationsUsed, computeTimeMs, debugInfo);
+    }
+
+    // -------------------------------------------------------------------------
+    // Tree factory — overridable by subclasses to plug in alternative rollout policies
+    // -------------------------------------------------------------------------
+
+    /**
+     * Creates the MCTS tree used in {@link #evaluate}. Subclasses override this to inject
+     * a different {@link engine.mcts.RolloutFn} (e.g. greedy, Boltzmann).
+     */
+    protected MctsTree buildTree(GameState state, SupplyTracker supply,
+                                 int activePlayer, int playerPerspective,
+                                 double explorationConstant) {
+        return new MctsTree(state, supply, activePlayer, playerPerspective, explorationConstant);
     }
 
     // -------------------------------------------------------------------------

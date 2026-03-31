@@ -4,7 +4,53 @@ Implementation history: what was built, why, and which design decisions were mad
 
 ---
 
-## Phase 2: MCTS v1 Engine (commits 8d6e69b–bb9cbeb)
+## Phase 3: Engine Variants + Calcs Extensions (in progress)
+
+### 3.0 — 11 Advanced Calcs Metrics (commit cb3a1d9)
+
+Added closed-form statistical metrics to `calcs.Calcs` for richer risk and tempo analysis:
+
+| Method | Description |
+|---|---|
+| `sharpeRatio(gs, p, card, riskFreeRate)` | (EV−r) / σ — reward per unit income volatility |
+| `sortinoRatio(gs, p, card, target)` | (EV−target) / semiσ — penalises only downside deviation |
+| `kellyFraction(gs, p, card)` | Optimal purchase fraction from discrete Kelly criterion; clamped to [0,1] |
+| `valueAtRisk(gs, p, card, alpha)` | Income at alpha-quantile of the roll distribution (VaR) |
+| `conditionalValueAtRisk(gs, p, card, alpha)` | Expected income in the worst alpha fraction (CVaR ≤ VaR) |
+| `hhiConcentration(gs, p, card)` | Σ(income_share_r)² — feast-or-famine concentration; 1=all on one roll |
+| `incomeEntropy(gs, p, card)` | −Σ P(r)·w(r)·log₂(w(r)) — roll coverage spread in bits |
+| `informationGain(gs, p, card)` | |H_before − H_after| — entropy change from adding card to portfolio |
+| `estimatedTurnsToWin(gs, p, card)` | deficit / evPerRound — estimated rounds to afford remaining landmarks |
+| `tempoAdvantage(gs, p, card)` | ETW_best_opponent − ETW_player — turns ahead/behind nearest opponent |
+| `purchaseUrgency(gs, p, card, supply)` | portfolioDeltaEV × scarcity × opponentDemand |
+| `rollCorrelation(gs, p, card)` | Cov(card, portfolio) / (σ_card × σ_portfolio) — coverage gap vs. redundancy |
+
+ETW and tempo use `ProjectLoader.getAllProjects()` to compute remaining landmark cost (landmarks are not in `getUnbuilt_projects()`; they're tracked in player `owned_projects`).
+
+14 TDD tests added to `RuntimeTester`.
+
+### 3.A — Variant A: Greedy Rollout Engine (in progress)
+
+`engine.MctsGreedyRolloutEngine` — Variant A of the MCTS engine. Tree phase is unchanged (full UCT via `MctsTree`). Only the rollout policy changes.
+
+**Architecture changes:**
+- `MctsTree` now accepts an optional `RolloutFn` parameter (functional interface in `engine.mcts.RolloutFn`). Default is `MctsRollout::simulate`. This makes all future rollout variants trivial to implement.
+- `MctsV1Engine` changed from `final` to open (`class`), exposing a `protected buildTree(...)` factory method for subclass override.
+- `MctsGreedyRolloutEngine extends MctsV1Engine`, overriding only `buildTree` to inject `GreedyRollout::simulate`.
+
+**Greedy rollout policy** (`engine.mcts.GreedyRollout`):
+- Dice count: 2d6 iff Bahnhof owned AND player has at least one 7–12 activation card.
+- Funkturm: keep if current-roll income ≥ expected reroll EV; else reroll.
+- Bürohaus: execute `BürohausLogic.executeSwap()` (greedy best swap).
+- Purchase: landmark priority (cheapest unowned affordable); else argmax over `evPerRound × geometricSum(5, 0.95) − cost`; else save.
+
+Registry entries: `mcts-v1-greedy-rollout-fast` (500 iter), `-balanced` (5000), `-deep` (50000).
+
+6 TDD tests + smoke run verify the greedy engine is functionally equivalent to v1 (same contract: non-null, non-empty, save sentinel, descending scores, obvious-win landmark, registry presence).
+
+---
+
+
 
 **The engine is now live.** `POST /api/evaluate` returns ranked purchase options from a full UCT tree search.
 

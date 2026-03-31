@@ -1,5 +1,6 @@
 package server;
 
+import engine.MctsGreedyRolloutEngine;
 import engine.MctsV1Engine;
 import iface.EngineOrchestrator;
 
@@ -24,11 +25,12 @@ public final class ServerMain {
     public static void main(String[] args) throws Exception {
         EngineOrchestrator orchestrator = new EngineOrchestrator();
         orchestrator.register(new MctsV1Engine());
+        orchestrator.register(new MctsGreedyRolloutEngine());
 
         ApiServer server = new ApiServer(orchestrator);
         server.start();
 
-        System.out.println("[ServerMain] MCTS v1 engine registered. Server running.");
+        System.out.println("[ServerMain] MCTS v1 + Variant A (greedy rollout) engines registered. Server running.");
         System.out.println("[ServerMain] Press Ctrl+C to stop.");
 
         // Keep the main thread alive until interrupted

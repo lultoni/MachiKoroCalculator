@@ -145,5 +145,32 @@
       "iterations": "50000",
       "rolloutTemperature": "2.0"
     }
+  },
+  {
+    "id": "mcts-v1-greedy-tree-fast",
+    "engineClass": "mcts-v1-greedy-tree",
+    "description": "MCTS Variant C — greedy BuyDecisionNode selection, fast mode (~500 iterations)",
+    "default": false,
+    "config": {
+      "iterations": "500"
+    }
+  },
+  {
+    "id": "mcts-v1-greedy-tree-balanced",
+    "engineClass": "mcts-v1-greedy-tree",
+    "description": "MCTS Variant C — greedy BuyDecisionNode selection, balanced mode (~5000 iterations)",
+    "default": false,
+    "config": {
+      "iterations": "5000"
+    }
+  },
+  {
+    "id": "mcts-v1-greedy-tree-deep",
+    "engineClass": "mcts-v1-greedy-tree",
+    "description": "MCTS Variant C — greedy BuyDecisionNode selection, deep mode (~50000 iterations)",
+    "default": false,
+    "config": {
+      "iterations": "50000"
+    }
   }
 ]

@@ -2,6 +2,7 @@ package server;
 
 import engine.MctsBoltzmannRolloutEngine;
 import engine.MctsGreedyRolloutEngine;
+import engine.MctsGreedyTreeEngine;
 import engine.MctsV1Engine;
 import iface.EngineOrchestrator;
 
@@ -28,6 +29,7 @@ public final class ServerMain {
         orchestrator.register(new MctsV1Engine());
         orchestrator.register(new MctsGreedyRolloutEngine());
         orchestrator.register(new MctsBoltzmannRolloutEngine());
+        orchestrator.register(new MctsGreedyTreeEngine());
 
         ApiServer server = new ApiServer(orchestrator);
         server.start();

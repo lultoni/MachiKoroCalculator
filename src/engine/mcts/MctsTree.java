@@ -52,6 +52,12 @@ public final class MctsTree {
     private final RolloutFn rolloutFn;
 
     /**
+     * When true, {@link BuyDecisionNode} child selection uses argmax over win rate
+     * (greedy exploitation) instead of UCT. All other node types still use UCT.
+     */
+    private final boolean greedyBuySelection;
+
+    /**
      * @param rootState           game state at the purchase decision point
      * @param rootSupply          supply tracker matching rootState
      * @param activePlayer        the player making the purchase decision
@@ -73,10 +79,25 @@ public final class MctsTree {
     public MctsTree(GameState rootState, SupplyTracker rootSupply,
                     int activePlayer, int playerPerspective,
                     double explorationConstant, RolloutFn rolloutFn) {
+        this(rootState, rootSupply, activePlayer, playerPerspective, explorationConstant,
+                rolloutFn, false);
+    }
+
+    /**
+     * Full constructor accepting a custom rollout function and optional greedy buy selection.
+     *
+     * @param rolloutFn          custom rollout strategy
+     * @param greedyBuySelection if true, {@link BuyDecisionNode} uses greedy (argmax) selection
+     */
+    public MctsTree(GameState rootState, SupplyTracker rootSupply,
+                    int activePlayer, int playerPerspective,
+                    double explorationConstant, RolloutFn rolloutFn,
+                    boolean greedyBuySelection) {
         this.explorationConstant = explorationConstant;
         this.playerPerspective   = playerPerspective;
         this.activePlayer        = activePlayer;
         this.rolloutFn           = rolloutFn;
+        this.greedyBuySelection  = greedyBuySelection;
         int nextPlayer = (activePlayer + 1) % rootState.getPlayers().length;
         this.root = new BuyDecisionNode(rootState, rootSupply, null, activePlayer, nextPlayer);
     }
@@ -160,20 +181,36 @@ public final class MctsTree {
     /**
      * Walks from {@code node} toward a leaf using UCB1, returning the first unexpanded node
      * or a node with unvisited children.
+     * When {@code greedyBuySelection} is true, {@link BuyDecisionNode} children are selected
+     * by argmax over win rate (greedy exploitation) instead of UCT.
      */
     private MctsNode select(MctsNode node) {
         while (true) {
-            // Unexpanded node: stop here (it will be expanded next)
             if (!node.expanded) return node;
             List<MctsNode> children = node.getChildren();
-            if (children.isEmpty()) return node; // terminal (no children)
-            // Has unvisited child: return this node (caller will pick the unvisited child)
+            if (children.isEmpty()) return node;
             for (MctsNode child : children) {
                 if (child.visitCount == 0) return node;
             }
-            // All children visited → descend to the highest UCB1 child
-            node = node.selectBestChild(explorationConstant);
+            // All children visited: use greedy for BuyDecisionNode if flag is set
+            if (greedyBuySelection && node instanceof BuyDecisionNode) {
+                node = selectGreedyChild(children);
+            } else {
+                node = node.selectBestChild(explorationConstant);
+            }
         }
+    }
+
+    /** Selects the child with the highest win rate (greedy / argmax exploitation). */
+    private static MctsNode selectGreedyChild(List<MctsNode> children) {
+        MctsNode best = children.get(0);
+        double bestRate = best.visitCount > 0 ? best.totalScore / best.visitCount : 0.0;
+        for (int i = 1; i < children.size(); i++) {
+            MctsNode c = children.get(i);
+            double rate = c.visitCount > 0 ? c.totalScore / c.visitCount : 0.0;
+            if (rate > bestRate) { bestRate = rate; best = c; }
+        }
+        return best;
     }
 
     /** Returns the first child of {@code node} with {@code visitCount == 0}, or null if all are visited. */

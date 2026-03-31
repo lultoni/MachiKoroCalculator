@@ -179,6 +179,13 @@ public class RuntimeTester {
         test_mcts_confidence_in_range(mctsEngine, mctsGs, fastConfig);
         test_mcts_visit_count_sums_to_iterations(mctsEngine, mctsGs, fastConfig);
 
+        System.out.println("\n=== Variant C: Greedy Tree Engine Tests ===\n");
+        engine.MctsGreedyTreeEngine greedyTreeEngine = new engine.MctsGreedyTreeEngine();
+        test_greedy_tree_returns_nonnull_result(greedyTreeEngine, mctsGs, fastConfig);
+        test_greedy_tree_scores_descending(greedyTreeEngine, mctsGs, fastConfig);
+        test_greedy_tree_obvious_landmark_buy(greedyTreeEngine);
+        test_greedy_tree_registry_entries_exist();
+
         System.out.println("\n=== Variant B: Boltzmann Rollout Engine Tests ===\n");
         engine.MctsBoltzmannRolloutEngine boltzEngine = new engine.MctsBoltzmannRolloutEngine();
         test_boltzmann_rollout_returns_nonnull_result(boltzEngine, mctsGs, fastConfig);
@@ -1931,6 +1938,60 @@ public class RuntimeTester {
                 visitSum > 0);
         assertTrue("mcts: sum of child visit counts ≤ 2 × iterationsUsed (sane upper bound)",
                 visitSum <= 2L * result.iterationsUsed);
+    }
+
+    // =========================================================================
+    // Variant C: Greedy Tree Engine Tests
+    // =========================================================================
+
+    private static void test_greedy_tree_returns_nonnull_result(
+            engine.MctsGreedyTreeEngine eng, core.GameState gs, engine.EngineConfig cfg) {
+        engine.EngineResult result = eng.evaluate(gs, 0, cfg);
+        assertTrue("greedy-tree: evaluate returns non-null EngineResult", result != null);
+    }
+
+    private static void test_greedy_tree_scores_descending(
+            engine.MctsGreedyTreeEngine eng, core.GameState gs, engine.EngineConfig cfg) {
+        engine.EngineResult result = eng.evaluate(gs, 0, cfg);
+        boolean sorted = true;
+        for (int i = 1; i < result.rankedOptions.size(); i++) {
+            if (result.rankedOptions.get(i).score > result.rankedOptions.get(i - 1).score) {
+                sorted = false; break;
+            }
+        }
+        assertTrue("greedy-tree: rankedOptions scores are non-increasing", sorted);
+    }
+
+    private static void test_greedy_tree_obvious_landmark_buy(engine.MctsGreedyTreeEngine eng) {
+        core.Project bahnhof   = core.ProjectLoader.getProject("bahnhof").orElseThrow();
+        core.Project einkauf   = core.ProjectLoader.getProject("einkaufszentrum").orElseThrow();
+        core.Project freizeit  = core.ProjectLoader.getProject("freizeitpark").orElseThrow();
+        core.Project funkturm  = core.ProjectLoader.getProject("funkturm").orElseThrow();
+        core.Project weizen    = core.ProjectLoader.getProject("weizenfeld").orElseThrow();
+        core.Project baeckerei = core.ProjectLoader.getProject("bäckerei").orElseThrow();
+        java.util.ArrayList<core.Project> o0 = new java.util.ArrayList<>();
+        o0.add(weizen); o0.add(baeckerei); o0.add(bahnhof); o0.add(einkauf); o0.add(freizeit);
+        java.util.ArrayList<core.Project> o1 = new java.util.ArrayList<>();
+        o1.add(weizen); o1.add(baeckerei);
+        java.util.ArrayList<core.Project> unbuilt = new java.util.ArrayList<>();
+        unbuilt.add(funkturm);
+        core.Player p0 = new core.Player("Alice", 22, o0);
+        core.Player p1 = new core.Player("Bob",    3, o1);
+        core.GameState gs = new core.GameState(new core.Player[]{p0, p1}, unbuilt);
+        engine.EngineResult result = eng.evaluate(gs, 0, engine.EngineConfig.ofIterations(500));
+        String topId = result.topRecommendation().project.getId();
+        assertEq("greedy-tree: obvious winning move is Funkturm", "funkturm", topId);
+    }
+
+    private static void test_greedy_tree_registry_entries_exist() {
+        assertTrue("engines.json has mcts-v1-greedy-tree-fast",
+                iface.EngineRegistry.findById("mcts-v1-greedy-tree-fast").isPresent());
+        assertTrue("engines.json has mcts-v1-greedy-tree-balanced",
+                iface.EngineRegistry.findById("mcts-v1-greedy-tree-balanced").isPresent());
+        assertTrue("engines.json has mcts-v1-greedy-tree-deep",
+                iface.EngineRegistry.findById("mcts-v1-greedy-tree-deep").isPresent());
+        iface.EngineRegistryEntry fast = iface.EngineRegistry.findById("mcts-v1-greedy-tree-fast").orElseThrow();
+        assertEq("greedy-tree-fast engineClass", "mcts-v1-greedy-tree", fast.engineClass());
     }
 
     // =========================================================================

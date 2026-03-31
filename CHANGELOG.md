@@ -25,6 +25,23 @@ See `NORTH-STAR.md` for the full specification. See `PLAN.md` for the phased imp
 
 ---
 
+## Phase 1 Tasks 1.5–1.6 + 1.8: Interface Layer + Engine Registry + Test Suite (commit 3ede567)
+
+**`iface/` package** — orchestration layer between UI and engines:
+- `EngineRegistryEntry` — immutable record: `id`, `engineClass`, `description`, `isDefault`, `config` (built from registry JSON)
+- `EngineRegistry` — loads `engines.json` from classpath; singleton cache; `getAll()`, `getDefault()`, `findById()`, `reload()`
+- `EngineOrchestrator` — routes `evaluate()` calls to registered `SimulationEngine` instances; `register()`, `evaluate(state, playerIndex, entry)`, `evaluateDefault()`
+
+**`engines.json`** — flat engine registry with 3 entries: `mcts-v1-fast` (500 iter), `mcts-v1-balanced` (5000 iter, default), `mcts-v1-deep` (50000 iter). `engineClass = "mcts-v1"` matches the future `SimulationEngine.id()` value.
+
+**Test suite adaptation** (`RuntimeTester`):
+- Added 11 Calcs layer tests (P1/P2 sums, get_I, immediateEV, evPerRound, roiOverHorizon, baselineWinProb, winProbDelta, portfolioDeltaEV, geometricSum, optimalDiceCount)
+- Added 4 Engine Registry tests (loads entries, has default, balanced is default, findById)
+- Fixed 2 explicit `logic.probability.GameSession/TurnRecord` references → `core.*`
+- Results: **247 passed, 0 failed** (was 224)
+
+---
+
 ## Phase 1 Tasks 1.1–1.4: Layer Separation Foundation (commit 1cb66d3)
 
 Extracted the 5-layer architecture skeleton from the monolithic `logic.probability` package.

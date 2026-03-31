@@ -18,10 +18,10 @@ Separate the existing codebase into the 5-layer architecture defined in NORTH-ST
 | 1.2 | Extract `CardIncome.get_I`, `P1`/`P2`, `computeAllDeltasForRoll`, `BürohausLogic.executeSwap` into Core. These are game rules, not strategy. | done |
 | 1.3 | Create Standard Calcs layer: extract version-agnostic math utilities (EV computation, ROI formula, probability distributions, `geometricSum`, variance calculations) into `calcs/` package. | done |
 | 1.4 | Define `SimulationEngine` interface + `EngineConfig` + `EngineResult` contracts (see NORTH-STAR.md Section 6.2). | done |
-| 1.5 | Create Interface (orchestration) layer: engine registry loader (JSON), request routing, result formatting. | pending |
-| 1.6 | Create engine registry JSON file with placeholder entries. | pending |
+| 1.5 | Create Interface (orchestration) layer: engine registry loader (JSON), request routing, result formatting. | done |
+| 1.6 | Create engine registry JSON file with placeholder entries. | done |
 | 1.7 | Set up Java HTTP API server (lightweight, e.g. Javalin or built-in HttpServer) to expose game state + engine endpoints. | pending |
-| 1.8 | Adapt existing test suite (`RuntimeTester`) to work with the new layer separation. All 224 tests must pass. | pending |
+| 1.8 | Adapt existing test suite (`RuntimeTester`) to work with the new layer separation. All 224 tests must pass. | done |
 
 ---
 

@@ -1,297 +1,117 @@
-# PLAN.md — MachiKoroCalculator Active Backlog
+# PLAN.md — MachiKoroCalculator Restructure Backlog
 
-Open items only. For history see `CHANGELOG.md`, for math see `ARCHITECTURE.md`.
+The design rationale, architecture, and UI specification live in `NORTH-STAR.md`.
+This file tracks the phased implementation work to realize that vision.
 
----
-
-## Grundvision — Der ideale Calculator
-
-### Ziel
-
-Gegeben ein beliebiger Spielzustand (Münzen, Karten, Spieleranzahl, Würfelwurf) soll der Calculator die **optimale Aktion** empfehlen — nicht die heuristisch beste Karte isoliert, sondern die Entscheidung die den erwarteten Gewinn (Siegwahrscheinlichkeit) maximiert.
-
-Das Ziel ist ein stochastischer Entscheidungsbaum im Expectimax-Stil: Für jeden möglichen Würfelwurf und jede mögliche Kaufaktion wird der resultierende Zustand rekursiv bewertet, gewichtet nach Wahrscheinlichkeit. Die Empfehlung ist die Aktion am Wurzel-Knoten mit dem höchsten erwarteten Sieg-Wert.
+For history of what was built before the restructure, see `CHANGELOG.md`.
+For the purge archive, see `ARCHIVE.md`.
 
 ---
 
-### Das Problem: Branching-Faktor und Suchtiefe
+## Phase 1: Foundation
 
-Ein naiver vollständiger Suchbaum ist nicht realisierbar. Ein Zug besteht aus zwei Knoten-Ebenen:
+Separate the existing codebase into the 5-layer architecture defined in NORTH-STAR.md Section 6.1.
 
-| Phase | Zufallsknoten (Würfel) | Entscheidungsknoten (Kauf) | 2-Ebenen-Größe/Zug |
-|-------|------------------------|---------------------------|----------------------|
-| Frühspiel (viele ungebaute Karten) | 6–11 Outcomes | ~20 Optionen | **~120–220** |
-| Mittelspiel | 6–11 Outcomes | ~8 Optionen | ~50–90 |
-| Endspiel (wenig Angebot) | 6–11 Outcomes | ~2–4 Optionen | ~15–45 |
-
-Ein Spiel dauert im Schnitt ~30 Züge pro Spieler (120 Gesamtzüge bei 4 Spielern). Vollständige Enumeration bis Spielende: **unmöglich**. Bereits 2 eigene Züge tief (= 1 volle Runde bei 4 Spielern) ergibt ~220² ≈ 48.000 Teilbäume.
-
-**Trotzdem ist ein guter Näherungsansatz realisierbar** — analog zu Backgammon-Engines (Expectimax + Stellungsbewertung), nicht vollständig suchend. Der korrekte theoretische Rahmen ist **Expectiminimax** für stochastische N-Spieler-Spiele, nicht alpha-beta (das gilt nur für 2-Spieler-Zero-Sum ohne Zufall).
-
----
-
-### Architektur-Vision: Dreistufiges Hybrid-System
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│  Stufe 1: Expectimax-Rollout-Tree (kurze Tiefe, d Runden)   │
-│  → Eine Runde = eigener Zug + N-1 simulierte Gegner-Züge    │
-│  → Knoten: Chance (Würfel, gewichtet) + Decision (Kauf)     │
-│  → Supply-State wird durch alle Tiefen mitgeführt           │
-│  → Leaf evaluation via Stufe 2                              │
-│  → Top-k Kauf-Kandidaten mit Stufe 3 (MC) validiert         │
-├─────────────────────────────────────────────────────────────┤
-│  Stufe 2: Analytische Leaf-Evaluation                       │
-│  → portfolioEV-based softmax win-probability                │
-│  → LANDMARK_WEIGHTS + dynamic remaining-turns               │
-│  → Coin-Vorteil-Term + Endspiel-Proximity-Bonus             │
-│  → Günstig: <0.1ms per Knoten                               │
-├─────────────────────────────────────────────────────────────┤
-│  Stufe 3: MC-Validierung (Budget-bewusstes Sampling)        │
-│  → MC-Spiele ab Post-Buy-Zustand (Tiefe 0)                  │
-│  → Boltzmann-sampled buy policy (T ≈ 0.7, nicht kalibriert) │
-│  → Budget nach Kandidaten-Nähe aufteilen, nicht fix Top-3   │
-│  → Teuer: ~1–5ms per Kandidat → nur für Top-k Root-Optionen │
-└─────────────────────────────────────────────────────────────┘
-```
-
-**Entscheidungsfluss:**
-
-1. Spieler hat gewürfelt → Münz-Deltas sind bekannt (Post-Roll-State)
-2. **Stufe 1** expandiert alle Kaufoptionen an der Wurzel (inkl. Sparen)
-3. Für jede Kaufoption: Expectimax-Baum der Tiefe `d` vollständig expandieren; Blätter via **Stufe 2** bewerten
-4. Rangliste der Kaufoptionen nach erwartetem Sieg-Wert; Top-k (k ≤ 5) mit **Stufe 3** (MC) validiert
-5. Stufe-3-Ergebnisse **ersetzen** die Stufe-2-Schätzung für die untersuchten Optionen; Ranking wird danach neu sortiert
-6. Empfehlung = Aktion mit höchstem finalem `E[Siegwahrscheinlichkeit]`
+| Task | Description | Status |
+|------|-------------|--------|
+| 1.1 | Extract Core layer: move `Project`, `Player`, `GameState`, `GameStateBuilder`, `TurnRecord`, `GameSession`, `GameSessionPersistence`, `ProjectLoader` into `core/` package. Core = pure game rules, no strategy. | pending |
+| 1.2 | Extract `CardIncome.get_I`, `P1`/`P2`, `computeAllDeltasForRoll`, `BürohausLogic.executeSwap` into Core. These are game rules, not strategy. | pending |
+| 1.3 | Create Standard Calcs layer: extract version-agnostic math utilities (EV computation, ROI formula, probability distributions, `geometricSum`, variance calculations) into `calcs/` package. | pending |
+| 1.4 | Define `SimulationEngine` interface + `EngineConfig` + `EngineResult` contracts (see NORTH-STAR.md Section 6.2). | pending |
+| 1.5 | Create Interface (orchestration) layer: engine registry loader (JSON), request routing, result formatting. | pending |
+| 1.6 | Create engine registry JSON file with placeholder entries. | pending |
+| 1.7 | Set up Java HTTP API server (lightweight, e.g. Javalin or built-in HttpServer) to expose game state + engine endpoints. | pending |
+| 1.8 | Adapt existing test suite (`RuntimeTester`) to work with the new layer separation. All 224 tests must pass. | pending |
 
 ---
 
-### Stufe 1 im Detail: Expectimax-Rollout-Tree
+## Phase 2: First Engine (MCTS v1)
 
-**Eingabe:** Aktueller `GameState` nach Würfelwurf (Münzen schon verteilt); `depth d` in Runden; `topK` Kandidaten je Entscheidungsknoten.
+Implement MCTS with full-game rollouts as the first pluggable engine.
 
-**Tiefe-Definition:** Eine Tiefe = **eine vollständige Runde** = eigener Zug + (N−1) simulierte Gegner-Züge mit Boltzmann-Policy. Ohne Gegner-Züge zwischen den eigenen Kaufentscheidungen wären Blatt-Zustände bei d>1 unmöglich — die Münzstände und Portfolios der Gegner wären eingefroren, alle roten Karten zwischen den eigenen Zügen würden nicht auslösen.
-
-**Knoten-Typen (pro Runde, pro Spieler):**
-- **Zufallsknoten (Würfel):** Alle Würfelergebnisse werden probabilistisch gewichtet (`P1` oder `P2`); bei Freizeitpark-Besitz: Pasch-Outcomes (6 von 36) führen zu einem zusätzlichen Zufallsknoten (Bonus-Zug)
-- **Entscheidungsknoten (Kauf):** Spieler wählt aus Top-k Optionen (eigener Spieler: exakt; Gegner: Boltzmann-Policy); Bürohaus auf Roll=6 wird als separater Tausch-Entscheidungsknoten behandelt
-- **Funkturm-Knoten:** Entscheidungsknoten ob neu gewürfelt wird (wenn erster Roll schlechter als Erwartung); expandiert den aktuellen Chance-Knoten um einen weiteren Zufallsknoten
-
-**Supply-State:** Jeder Tree-Knoten erbt eine Kopie des `unbuilt_projects`-Zustands. Käufe in Tiefe 1 reduzieren die verfügbaren Optionen in Tiefe 2 korrekt. Ohne Supply-Tracking würde der Baum Karten als kaufbar ausweisen, die erschöpft sind.
-
-**Pruning-Strategien:**
-
-| Strategie | Reduktion | Begründung |
-|-----------|-----------|------------|
-| Top-k Kaufoptionen per Entscheidungsknoten (k=5) | ~75% | Heuristisches Forward-Pruning; eliminiert Optionen mit <50% des besten `portfolioDeltaEV`. **Achtung:** Kann global-optimale Züge ausschließen (Horizont-Effekt). Akzeptabler Trade-off. |
-| Endspiel-Tiefenerweiterung | variabel | Wenn beliebiger Spieler ≤ 8 Münzen vom Sieg entfernt: Suchtiefe +1 für diesen Ast (Quiescence-Analogie). Verhindert Endspiel-Blindheit. |
-| Frühzeitiger Abbruch wenn Δ-Sieg < ε = 0.01 | ~20–30% | Irrelevante Äste nicht weiter expandieren; ε=0.01 (1%) da Stufe-2-Rauschen < 1% nicht sinnvoll auflösbar |
-
-**Was entfernt wurde:**
-- ~~Symmetrie-Pruning~~ — Kollisionsrate in kurzen Bäumen mit geteiltem Supply nahe null; praktisch wertlos.
-
-**Geschätzte Kosten bei d=1 (1 Runde), k=5, 4 Spieler:**
-- Eigener Zug: 5 Kaufoptionen × 8.5 Ø-Würfelergebnisse = ~42 Teilbäume
-- Je Kaufoption: N−1 = 3 Gegner-Züge simuliert (Boltzmann-Policy, je ~1ms)
-- Blätter: ~42 × 5 = ~210 Blattknoten
-- Mit Stufe-2-Evaluation (0.1ms): ~21ms → **akzeptabel**
-- Stufe-3 für Top-k=5 Kaufoptionen (500 sims je): ~5 × 18ms = ~90ms → im Hintergrund
+| Task | Description | Status |
+|------|-------------|--------|
+| 2.1 | Implement MCTS tree structure: chance nodes (dice) + decision nodes (buy/save) for all players (NORTH-STAR.md Section 7.1). | pending |
+| 2.2 | Implement UCT selection + expansion + backpropagation (Section 7.3). | pending |
+| 2.3 | Implement full-game rollout policy (simulate until someone wins, Section 7.2). | pending |
+| 2.4 | Wire MCTS engine through the Interface layer: `evaluate(GameState, playerIndex, config) -> EngineResult`. | pending |
+| 2.5 | Implement iteration budget modes: Fast (~500), Balanced (~5,000), Deep (~50,000) as engine configs in the registry. | pending |
+| 2.6 | Validate MCTS results against existing analytical rankings for sanity. | pending |
 
 ---
 
-### Stufe 2 im Detail: Analytische Leaf-Evaluation
+## Phase 3: Web UI
 
-Basis implementiert in `WinProbabilityCalc.computeBaselineWinProb`:
+Replace the Swing UI with a web SPA talking to the Java HTTP API.
 
-```
-score(player p) = portfolioEvPerRound(p) × remainingTurns(leafState)
-                + Σ LANDMARK_WEIGHT(p)
-                + coinAdvantage(p, leafState)        ← neu
-                + endgameProximityBonus(p, leafState) ← neu
-
-P_win(i) = softmax(scores)[i]
-```
-
-**Wichtige Präzisierungen:**
-
-- `remainingTurns` muss aus dem **Blatt-Zustand** geschätzt werden, nicht als globale Konstante. Verwendete Näherung: `max(3, 25 − turnsElapsed / n)`, wobei `turnsElapsed` die tatsächliche Züge-Tiefe des Blattes ist.
-- `coinAdvantage(p)` = `(coins_p − avg_coins_opponents) / 10` als direkt kodierter Münz-Term (aktuell nur indirekt über EV reflektiert).
-- `endgameProximityBonus(p)` = großer positiver Term wenn Spieler p das letzte Großprojekt im nächsten Zug kaufen kann; verhindert Endspiel-Blindheit der Softmax-Näherung.
-- **Unit-Kalibrierung:** `portfolioEvPerRound × remainingTurns` ist in Münzen (~20–80 typisch). `LANDMARK_WEIGHTS` müssen in derselben Größenordnung liegen. Aktuelle Werte (Bahnhof=1.5, EKZ=3.0, FZP=1.5, FT=4.0) sind zu klein — effektive Landmark-Beiträge sollten auf ~5–20 skaliert werden um bedeutsam zu bleiben.
-
-**Bekannte Schwächen (akzeptiert):**
-- Koalitions-Dynamik nicht modelliert: Ein Spieler mit dominantem Portfolio wird in 4-Spieler-Runden kollektiv angegriffen (Fernsehsender, Stadion, Bürohaus). Softmax überschätzt systematisch den führenden Spieler. → Mitigation: MC-Stufe 3 fängt dies implizit auf.
-- Portfoliodiversität (Varianz-Reduktion) nicht explizit modelliert.
-
-**Qualität:** Gut für relative Rangordnung in Spielmitte (3–20 Züge). Schwach ohne die beiden neuen Terme nahe Spielende.
+| Task | Description | Status |
+|------|-------------|--------|
+| 3.1 | Design API contract: endpoints for game state CRUD, engine evaluation, turn tracking, session persistence. | pending |
+| 3.2 | Set up SPA project (framework TBD: React or Svelte). | pending |
+| 3.3 | Implement Turn Indicator component (Section 3.1). | pending |
+| 3.4 | Implement Dice Interface component (Section 3.2). | pending |
+| 3.5 | Implement Coin Flow Display with live preview (Section 3.3): Now/Roll/Buy columns, color-coding, hover-linked project updates. | pending |
+| 3.6 | Implement Purchase Decision Area with dual paths: manual tracking + assistant recommendation (Section 3.4). | pending |
+| 3.7 | Implement opponent turn tracking: minimal quick-entry (roll + buy), passive insights panel (Section 4). | pending |
+| 3.8 | Implement settings screen: engine selection, mode toggle (Fast/Balanced/Deep), language, autosave. | pending |
+| 3.9 | Implement session persistence UI: save/load in submenu, past games list, autosave (Section 9.1). | pending |
+| 3.10 | Localization: wire DE/EN through the web UI. | pending |
 
 ---
 
-### Stufe 3 im Detail: MC-Validierung mit adaptivem Budget
+## Phase 4: Kauf Assistent
 
-**Zweck:** Stufe 2 liefert eine schnelle Vorrangliste. Stufe 3 validiert die Top-k Kaufoptionen an der **Wurzel** (Post-Buy, Tiefe 0) mit MC-Simulationen und **überschreibt** deren Stufe-2-Schätzung.
+Build the purchase assistant with transparent, structured explanations.
 
-**Was Stufe 3 leistet und was nicht:**
-- Stufe 3 läuft **nicht** von Blatt-Zuständen des Rollout-Trees, sondern von Post-Buy-Zuständen an der Wurzel.
-- Das ist kein Widerspruch zu Stufe 1: Der Rollout-Tree (Stufe 1) verfeinert das Kurzzeit-Ranking über 1–2 Runden. Stufe 3 validiert das Langzeit-Endergebnis der Top-Kandidaten aus diesem Ranking unabhängig via Simulation.
-- Stufe 3 ist **kein MCTS** (kein UCB1, kein Backpropagation). Es ist bewusstes Budget-Allocation für Flat-MC. Der Unterschied zu echtem MCTS: Stufe-2-Fehler die einen Kandidaten unter Top-k drücken werden nicht korrigiert. Dieser bekannte Bias wird akzeptiert.
-
-**Budget-Allocation:**
-- Nicht fix "Top-3 je 100 Sims", sondern adaptiv: wenn Top-k Kandidaten innerhalb von ε = 0.02 Win-Prob liegen, Budget gleichmäßig aufteilen; wenn ein Kandidat klar dominiert (>0.05 Vorsprung), Budget auf die restlichen konzentrieren.
-- Gesamtbudget: ~2.500 Sims pro Kandidat (≈ 45ms je Kandidat bei 28k sims/s parallel), Top-5 = ~225ms → akzeptables UI-Budget im Hintergrund.
-
-**MC-Policy (Boltzmann):**
-```
-P(buy X) ∝ exp(score(X) / T)
-
-wobei:
-  score(X) = contextualCardEvPerRound(X) × ROI_GEOMETRIC_SUM − X.cost
-  T = Temperatur (0 = greedy, 0.5–1.0 = leichte Exploration, ∞ = uniform)
-```
-
-**T-Kalibrierung:** T=0.7 ist **nicht empirisch kalibriert** — es ist eine konservative Schätzung für "Spieler machen gelegentlich suboptimale Züge." Es gibt keinen Grund warum menschliches Spielverhalten einer Boltzmann-Verteilung über diesen Score folgt. Mögliche Verbesserung: Mehrere Gegner-Archetypen (Landmark-Rusher, Einkommens-Maximierer, Blockierer) statt einheitlichem T.
-
-**Performance-Budget (gemessen):**
-- ~28.000 parallele Sims/Sekunde
-- 2.500 Sims: ~90ms pro Kandidat → realistisch für Top-5 im Hintergrund
-- 10.000 Sims: ~350ms → realistisches UI-Budget für einzelne Deep-Analysis
-- 100.000 Sims: ~3.5s → nutzbar als „Deep Analysis" on demand
+| Task | Description | Status |
+|------|-------------|--------|
+| 4.1 | Define explanation data model: factor list with weights, expandable detail, summary sentence (Section 5.2). | pending |
+| 4.2 | Implement explanation generation from `EngineResult` data. Factors ordered by impact weight. | pending |
+| 4.3 | Build expandable bullet-point UI component with dropdown details. | pending |
+| 4.4 | Implement full ranked list view with sortable columns for comparison. | pending |
+| 4.5 | Implement passive-turn insights: position analysis, opponent predictions, dashboard (Section 4). | pending |
+| 4.6 | Implement pre-computation: start engine analysis during opponent turns. | pending |
 
 ---
 
-### Was ist aktuell implementiert vs. was fehlt
+## Phase 5: Head-to-Head Testing
 
-| Komponente | Status | Qualität |
-|-----------|--------|----------|
-| `get_I` — alle 19 Karten | ✓ vollständig | Exakt |
-| `computeAllDeltasForRoll` — single turn resolution | ✓ vollständig | Exakt (Rot→Blau/Grün→Lila, counter-clockwise) |
-| `evPerRound` — 1-Runden-EV mit step-aware Münzprojektion | ✓ vollständig | Gut (Näherung bei Rot) |
-| `roiOverHorizon` — diskontierter ROI | ✓ vollständig | Gut |
-| `computeBaselineWinProb` — analytische Siegwahrscheinlichkeit | ✓ vollständig | Gut (softmax mit Coin-Term, Endspiel-Bonus, kalibrierte Landmark-Gewichte) |
-| `mcWinRate` — MC-Simulation | ✓ vorhanden | Mittel (Boltzmann-Policy, aber unkalibriert) |
-| `computeSynergyNote` — Synergie-Hinweis (1 Partner) | ✓ vorhanden | Begrenzt (per-Karte, nicht Portfolio) |
-| `computeTwoTurnNote` — 2-Turn-Lookahead | ✓ vorhanden | Begrenzt (analytisch, nur Bahnhof als Landmark) |
-| **Stufe 1: Expectimax-Rollout-Tree mit Gegner-Zügen** | ✓ implementiert | `RolloutTree.evaluate()` + UI-Tab |
-| **Stufe 2: coinAdvantage + endgameProximityBonus** | ✓ implementiert | `computeScores` |
-| **Stufe 2: LANDMARK_WEIGHTS Neukalibrierung** | ✓ implementiert | Bahnhof=24, EKZ=36, FZP=24, FT=48 |
-| **Stufe 3: Adaptives Budget-Splitting** | ✓ implementiert | `adaptiveMCRefinement` in `rankPurchasableProjects` |
-| **Stufe 3: Boltzmann-MC-Policy** | ✓ M7 | Implementiert |
-| **Portfolio-Synergie** `portfolioDeltaEV` | ✓ implementiert | Implementiert |
-| **Gegner-Modellierung** (adaptive Archetypen) | ❌ fehlt | Future Feature |
+Build the engine comparison and validation framework.
+
+| Task | Description | Status |
+|------|-------------|--------|
+| 5.1 | Implement match runner: N games between two engine registry entries, parallel execution (Section 8.2). | pending |
+| 5.2 | Implement result storage in `h2h-results.json`: match metadata, aggregate stats, per-game logs (Section 8.6). | pending |
+| 5.3 | Build testing UI: high-level overview (win rates, avg game length) + detailed game replay with step-through (Section 8.4). | pending |
+| 5.4 | Establish baseline: MCTS v1 (all modes) vs. itself as reference. | pending |
 
 ---
 
-### Prioritäten für nächste Entwicklungsschritte
+## Phase 6: Iteration & Future Work
 
-#### Schritt 1 — M7: Boltzmann-MC-Policy ✓ (implementiert)
-
-**Scope:** `RankingOptions.mcExplorationTemp`, `GameSimulator.boltzmannBuy()`, UI-Toggle. ✓ Erledigt.
-
----
-
-#### Schritt 2 — Portfolio-Synergie: `portfolioDeltaEV` ✓ (implementiert)
-
-**Implementiert:** `ProbabilityCalc.portfolioDeltaEV(gs, pi, cardA)` + `RankEntry.portfolioDeltaEV` + UI-Spalte + Card-Details-Zeile. ✓ Erledigt.
-
----
-
-#### Schritt 3 — Leaf-Evaluator verbessern ✓ (implementiert)
-
-**Implementiert:** `coinAdvantage`-Term (`COIN_ADVANTAGE_SCALE=5.0`), `endgameProximityBonus` (×2.5 wenn 3 LMs und Coins ≥ letzte LM-Kosten), LANDMARK_WEIGHTS neukalibriert (Bahnhof=24, EKZ=36, FZP=24, FT=48, Default=20). ~30 Zeilen in `WinProbabilityCalc.computeScores`.
+| Task | Description | Status |
+|------|-------------|--------|
+| 6.1 | Build improved engine versions; test head-to-head against baseline. | pending |
+| 6.2 | Implement depth-limited rollout with heuristic evaluation as alternative to full-game rollouts (Section 7.2). Test head-to-head. | pending |
+| 6.3 | Card scraping: automated script to collect all cards (all expansions) from Machi Koro wiki for reference data (Section 6.6). | pending |
+| 6.4 | Refine UI based on real gameplay usage. | pending |
+| 6.5 | Expansion card support (out of scope until core is perfected). | pending |
+| 6.6 | Opponent archetypes for more realistic simulation (Landmark-Rusher, Income-Maximizer, Blocker). | pending |
 
 ---
 
-#### Schritt 4 — Rollout-Tree Enumerator ✓ (implementiert)
+## Completed (Pre-Restructure)
 
-**Implementiert:** `RolloutTree.evaluate(gs, pi, depth, topK)` in `logic.probability`. `RolloutResult` record. Kandidaten-Pruning via `portfolioDeltaEV`, Gegner-Simulation via `GameSimulator.boltzmannBuy(T=0.7)`, Blatt-Evaluation via `computeBaselineWinProb`. Sonderfälle: Bahnhof (1d6 vs 2d6), Freizeitpark (Pasch → Bonus-Zug), Funkturm (Re-Roll wenn schlechter als Baseline). UI: 5. Tab "Rollout" in `MainWindow` mit Tiefe/Top-K-Spinnern und Run-Button (SwingWorker-Hintergrundausführung).
+All items from the old codebase are documented in `CHANGELOG.md`. Key milestones:
 
----
+- All 19 base-game cards implemented in `get_I`
+- Full roll resolution with correct income order (red -> blue/green -> purple)
+- Analytical EV, ROI, variance, softmax win probability
+- Monte Carlo simulation with Boltzmann policy
+- Expectimax rollout tree (Stufe 1/2/3)
+- Swing UI with turn tracking, card details, ranking, assistant, rollout tabs
+- DE/EN localization
+- Game session persistence (.mkoro files)
+- 224 passing tests
 
-#### Schritt 5 — Adaptives MC-Budget (Stufe 3) ✓ (implementiert)
-
-**Implementiert:** `adaptiveMCRefinement` in `ProbabilityCalc.rankPurchasableProjects`. Konstanten: `MC_TOP_K=5`, `MC_EQUAL_BUDGET_EPSILON=0.02`, `MC_DOMINANT_LEAD_THRESHOLD=0.05`, `MC_SIMS_PER_CANDIDATE_EQUAL=2500`. Budget-Logik: wenn Spread ≤ 0.02 oder kein dominanter Anführer → alle Top-k validieren; sonst Anführer überspringen, Verfolger validieren. MC-Ergebnisse überschreiben Stufe-2-Schätzungen.
-
----
-
-### Akzeptierte Näherungen (kein sofortiger Handlungsbedarf)
-
-| # | Thema | Erklärung |
-|---|-------|-----------|
-| A1 | Bürohaus — step-aware Projektion | Blaues Einkommen wird schrittsweise akkumuliert; integer-Rundungsfehler vernachlässigbar. |
-| A2 | Bahnhof-Würfelwahl im Simulator | `rollDice()` wählt 2d6 wenn Karte ≥ 7 vorhanden — Heuristik statt exakter EV. Akzeptabler Trade-off. |
-| A3 | `contextualCardEvPerRound` — per-Karte-Max statt Portfolio-optimal | Bahnhof-Entscheidung per Karte als max(EV_1d6, EV_2d6). Wird durch portfolioDeltaEV gemildert. |
-| A4 | Softmax-Win-Prob ignoriert Koalitions-Dynamik | Führender Spieler wird systematisch überschätzt (kollektive Angriffe nicht modelliert). Mitigation: MC-Stufe 3 fängt dies implizit auf. |
-| A5 | Boltzmann T=0.7 unkalibriert | Keine empirische Basis; konservative Schätzung für "gelegentlich suboptimale Gegner". Akzeptabel solange kein Spiellog-Datensatz verfügbar. |
-| A6 | Stufe 3 kein echtes MCTS | Kein UCB1, kein Backpropagation. Kandidaten die Stufe 2 unterschätzt bekommen keine MC-Korrektur. Bekannter Bias, akzeptiert. |
-| A7 | Top-k Pruning (Horizont-Effekt) | Globale Optima außerhalb Top-k werden niemals untersucht (Blockade-Käufe, Supply-Denial). Dokumentierter Trade-off gegen Laufzeit. |
-
----
-
-## Offene Items (bestehend)
-
-### Code-Qualität
-
-#### C4 · File Split Priority 2 (Low, deferred)
-
-`MainWindow` ist groß. Sinnvolle Aufteilung wenn ein UI-Test-Layer existiert:
-- `UIDataModel` (~50 Zeilen): hält `session`, `rankOpts`, `lastRanking`
-- `RankingUIRenderer` (~100 Zeilen): `rebuildTable`, `populateCenter`, `clearCenter`, `buildNote`
-- `GameController` (dünn): Turn-Anwendung, Undo, Snapshot, Save/Load-Dispatch
-
----
-
-#### C5 · ~~Deep Code Optimization~~ ✓ (behoben)
-
-`buildRollGainCache(state, playerIndex)` → `double[13]` prefill, shared across `computeOwnTurnEV`, `computeVariance*`, `computeProbNoIncome*`, `optimalDiceCount`. `computeOwnTurnEV(state, pi, cache, ...)` extrahiert das duplizierte Bahnhof/FZP/FT-Entscheidungsblock aus `immediateEV` und `evPerRound`. Ergebnis: `computeNetGainForRoll` wird von ~84 auf 12 Aufrufe pro `immediateEV`/`evPerRound`-Aufruf reduziert.
-
----
-
-### UI-Verbesserungen
-
-#### U2 · ~~Kategorie-Icons im UI~~ ✓ (implementiert)
-
-16×16 Icons aus `resources/category_icons/` (ANIMAL, CAFE, FACTORY, FOOD, MARKET, OFFICE, PRODUCTION, STORE). Statische Map `CATEGORY_ICONS` in `MainWindow`, geladen via `loadScaledIcon`. `topCardCategoryIcon` JLabel in der `nameRow` des Card-Details-Panels, zwischen Kartenname und Farb-Tag. Tooltip zeigt den Kategorienamen. Graceful degradation wenn Icon fehlt (null-safe).
-
----
-
-### Neue Features
-
-#### N4d · ~~Fitting → `AssistantConfig`~~ ✓ (implementiert)
-
-`PhaseFitter.fit(List<JsonObject>)` — OLS via Normalgleichungen (Gauß-Elimination), R² für early/mid/late. `applyToConfig(FitResult)` — Reflection-Update von `AssistantConfig.LATE_GP_THRESHOLD`. "Kalibrieren…"-Button in `LabelingWindow` vorhanden.
-
----
-
-### Math-Items
-
-#### M7 · ~~MC-Rollout-Policy: Boltzmann-Exploration Toggle~~ ✓ (behoben)
-
-**Implementiert:** `RankingOptions.mcExplorationTemp`, `GameSimulator.simulate(state, rng, temperature)`, `GameSimulator.boltzmannBuy(...)`. UI: T-Spinner neben N-Spinner in der Button-Bar.
-
----
-
-## Future Features (nicht priorisiert)
-
-- **Erweiterungskarten** — Hafen/Millionärsreihe. Architektur ist bereit (JSON-getrieben).
-- **Gegner-Archetypen** — Verschiedene Buy-Strategien (Landmark-Rusher, Einkommens-Maximierer, Blockierer) für realistischere und differenziertere Win-Raten statt einheitlichem Boltzmann-T.
-- **Echtes MCTS** — UCB1-basierter Baum mit Backpropagation; würde Stufe-2-Bias-Korrekturen ermöglichen die das aktuelle System strukturell nicht leisten kann.
-- **Boltzmann-Kalibrierung** — T aus echten Spiellogs schätzen (Logistic Regression: welches T sagt beobachtete Kaufentscheidungen am besten vorher?).
-
----
-
-## Geschichte abgeschlossener Items
-
-### Math-Audit ✓
-M1 (Architektur-Audit) · M2 (Funkturm-EV) · M3 (dynamisches remainingTurns) · M4 (Landmark-Gewichte) · M5 (Warten-Option) · M6 (Bahnhof-Synergie im 2-Turn-Lookahead) · M7 (Boltzmann-MC-Policy) · M8 (Bahnhof-Gate im Simulator)
-
-### Code-Qualität ✓
-C5 (buildRollGainCache + computeOwnTurnEV — DRY-Refactoring hot path)
-
-### Features ✓
-N0 (Bürohaus-Tausch) · N1 (Game Assistant) · N2 (Bahnhof-Würfelwahl) · N3 (Phasenerkennung) · N4a–N4d (Snapshot/Labeling/PhaseFitter-System)
-
-### UI ✓
-U1 (rechtes Panel) · U2 (Kategorie-Icons) · U3 (Trigger-Modus-Anzeige) · U4 (Rank-Coloring, kontextuelle Tooltips, Insight-Zusammenfassung, Kategorie-Icons in Fließtext, Header-Bar, CTA-Confirm-Button, Delta-Grid)
-
-### Future Strategy ✓
-Synergy-Lookahead · 2-Turn Lookahead · MC-Policy (greedy → roiOverHorizon) · Stufe-2 (coinAdvantage + endgameProximityBonus + LANDMARK_WEIGHTS) · Stufe-1 RolloutTree · Stufe-3 Adaptives MC-Budget
+These components serve as the foundation. Game rules and core data model carry forward; strategy and UI layers are rebuilt.

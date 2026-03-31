@@ -27,3 +27,8 @@ bin/
 
 ### Mac OS ###
 .DS_Store
+
+### MachiKoro ###
+saves/
+web/node_modules/
+web/dist/

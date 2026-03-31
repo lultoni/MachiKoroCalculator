@@ -117,7 +117,7 @@ Replace the Swing UI with a web SPA talking to the Java HTTP API.
 
 | Task | Description | Status |
 |------|-------------|--------|
-| 4.1 | Design API contract: endpoints for game state CRUD, engine evaluation, turn tracking, session persistence. | pending |
+| 4.1 | Design API contract: endpoints for game state CRUD, engine evaluation, turn tracking, session persistence. Session management (create, state, turn, bürohaus, undo, save, load, saves list, from-snapshot, insights), evaluate enhancement (metricRanges, perRollDeltas), static file serving. | done |
 | 4.2 | Set up SPA project (framework TBD: React or Svelte). | pending |
 | 4.3 | Implement Turn Indicator component (Section 3.1). | pending |
 | 4.4 | Implement Dice Interface component (Section 3.2). | pending |
@@ -167,6 +167,8 @@ Build the engine comparison and validation framework. Used both during Phase 3 v
 | 7.3 | Expansion card support (out of scope until core is perfected). | pending |
 | 7.4 | Opponent archetypes for more realistic simulation (Landmark-Rusher, Income-Maximizer, Blocker). | pending |
 | 7.5 | Selective test runner: extend `RuntimeTester` to accept CLI args for running a named test or a named section (e.g. `--section "Variant D"` or `--test test_mcts_obvious_landmark_buy`). | done |
+| 7.6 | Deep performance optimization of slow engine rollout variants. Variant A (Greedy Rollout, ~23s/500 iter) and Variant B (Boltzmann Rollout, ~22s/500 iter) are 30–40× slower than Variant D (~0.2s). Hot paths: `Calcs.evPerRound()` called per-card per-turn in every rollout purchase, `computeExpectedRollIncome()` doing 6–11 `RollResolver.computeAllDeltasForRoll` calls per Funkturm check, `BürohausLogic.findCandidates()` calling `contextualCardEvPerRound()` per card per player. Optimization strategies: (1) cache `PlayerStats` and `evPerRound` per player across rollout turns (only changes on purchase/swap), (2) precompute expected roll income once per rollout state rather than per Funkturm check, (3) use lightweight card-score approximations in rollouts instead of full analytical EV, (4) avoid `state.copy()` at rollout start — use reversible state mutations instead, (5) profile to find the actual dominant cost before optimizing. | pending |
+| 7.7 | Game-over decision review: compare player choices vs. engine recommendations throughout the game, highlighting where deviations helped or hurt. Requires storing engine `rankedOptions` snapshot in each `TurnRecord`. Show in a post-game analysis screen. | pending |
 
 ---
 

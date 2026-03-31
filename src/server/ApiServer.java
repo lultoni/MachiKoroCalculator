@@ -4,6 +4,7 @@ import com.sun.net.httpserver.HttpServer;
 import iface.EngineOrchestrator;
 
 import java.net.InetSocketAddress;
+import java.nio.file.Path;
 import java.util.concurrent.Executors;
 
 /**
@@ -15,17 +16,27 @@ import java.util.concurrent.Executors;
  *
  * <h2>Endpoints</h2>
  * <ul>
- *   <li>{@code GET  /api/health}   — liveness check</li>
- *   <li>{@code GET  /api/projects} — all 19 base-game cards</li>
- *   <li>{@code GET  /api/engines}  — all registered engine configurations</li>
- *   <li>{@code POST /api/roll}     — apply a dice roll, return coin deltas + updated state</li>
- *   <li>{@code POST /api/evaluate} — run engine evaluation, return ranked purchase options</li>
+ *   <li>{@code GET  /api/health}              — liveness check</li>
+ *   <li>{@code GET  /api/projects}            — all 19 base-game cards</li>
+ *   <li>{@code GET  /api/engines}             — all registered engine configurations</li>
+ *   <li>{@code POST /api/roll}                — apply a dice roll, return coin deltas + updated state</li>
+ *   <li>{@code POST /api/evaluate}            — run engine evaluation, return ranked purchase options</li>
+ *   <li>{@code POST /api/session/create}      — create a new game session</li>
+ *   <li>{@code GET  /api/session/state}       — get full session state</li>
+ *   <li>{@code POST /api/session/turn}        — apply a completed turn</li>
+ *   <li>{@code POST /api/session/bürohaus}    — execute or decline Bürohaus swap</li>
+ *   <li>{@code POST /api/session/undo}        — undo last turn</li>
+ *   <li>{@code POST /api/session/save}        — save to file</li>
+ *   <li>{@code POST /api/session/load}        — load from file</li>
+ *   <li>{@code GET  /api/session/saves}       — list saved .mkoro files</li>
+ *   <li>{@code POST /api/session/from-snapshot} — create session from mid-game state</li>
+ *   <li>{@code GET  /api/session/insights}    — position insights for the assistant panel</li>
+ *   <li>{@code GET  /}                        — serve static files from web/dist/</li>
  * </ul>
  *
  * <h2>Usage</h2>
  * <pre>
  *   EngineOrchestrator orchestrator = new EngineOrchestrator();
- *   // orchestrator.register(new MctsV1Engine()); // added in Phase 2
  *   ApiServer server = new ApiServer(8080, orchestrator);
  *   server.start();
  * </pre>
@@ -37,6 +48,7 @@ public final class ApiServer {
 
     private final int port;
     private final EngineOrchestrator orchestrator;
+    private final SessionManager sessionManager;
     private HttpServer httpServer;
 
     /**
@@ -46,8 +58,9 @@ public final class ApiServer {
      * @param orchestrator the engine orchestrator to use for {@code /api/evaluate}
      */
     public ApiServer(int port, EngineOrchestrator orchestrator) {
-        this.port         = port;
-        this.orchestrator = orchestrator;
+        this.port           = port;
+        this.orchestrator   = orchestrator;
+        this.sessionManager = new SessionManager(Path.of("saves"));
     }
 
     /** Convenience constructor using {@link #DEFAULT_PORT}. */
@@ -67,17 +80,33 @@ public final class ApiServer {
     public void start() throws java.io.IOException {
         httpServer = HttpServer.create(new InetSocketAddress("localhost", port), 0);
 
+        // Original endpoints
         httpServer.createContext("/api/health",   new HealthHandler());
         httpServer.createContext("/api/projects", new ProjectsHandler());
         httpServer.createContext("/api/engines",  new EnginesHandler());
         httpServer.createContext("/api/roll",     new RollHandler());
         httpServer.createContext("/api/evaluate", new EvaluateHandler(orchestrator));
 
-        // Use a small thread pool for concurrent requests
-        httpServer.setExecutor(Executors.newFixedThreadPool(4));
+        // Session management endpoints
+        httpServer.createContext("/api/session/create",        new SessionCreateHandler(sessionManager));
+        httpServer.createContext("/api/session/state",         new SessionStateHandler(sessionManager));
+        httpServer.createContext("/api/session/turn",          new SessionTurnHandler(sessionManager));
+        httpServer.createContext("/api/session/burohaus",      new SessionBürohausHandler(sessionManager));
+        httpServer.createContext("/api/session/undo",          new SessionUndoHandler(sessionManager));
+        httpServer.createContext("/api/session/save",          new SessionSaveHandler(sessionManager));
+        httpServer.createContext("/api/session/load",          new SessionLoadHandler(sessionManager));
+        httpServer.createContext("/api/session/saves",         new SessionSavesListHandler(sessionManager));
+        httpServer.createContext("/api/session/from-snapshot", new SessionFromSnapshotHandler(sessionManager));
+        httpServer.createContext("/api/session/insights",      new SessionInsightsHandler(sessionManager));
+
+        // Static file serving (SPA fallback)
+        httpServer.createContext("/", new StaticFileHandler(Path.of("web", "dist")));
+
+        // Thread pool: increased for concurrent session + evaluate requests
+        httpServer.setExecutor(Executors.newFixedThreadPool(8));
         httpServer.start();
 
-        System.out.println("[ApiServer] Listening on http://localhost:" + port + "/api/");
+        System.out.println("[ApiServer] Listening on http://localhost:" + port + "/");
     }
 
     /**
@@ -95,5 +124,10 @@ public final class ApiServer {
     /** Returns the port this server is configured to listen on. */
     public int getPort() {
         return port;
+    }
+
+    /** Returns the session manager used by this server. */
+    public SessionManager getSessionManager() {
+        return sessionManager;
     }
 }

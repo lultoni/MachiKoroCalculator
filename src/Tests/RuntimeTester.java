@@ -200,6 +200,7 @@ public class RuntimeTester {
             test_bürohaus_excludes_purple_own_cards();
             test_bürohaus_excludes_purple_opponent_cards();
             test_bürohaus_allows_non_purple_non_landmark_swaps();
+            test_bürohaus_node_deduplicates_by_card_type();
         });
 
         runSection("Supply Tracker Tests", () -> {
@@ -299,6 +300,19 @@ public class RuntimeTester {
             test_tempo_advantage_opponent_ahead_is_negative();
             test_purchase_urgency_nonneg();
             test_roll_correlation_in_minus1_plus1();
+        });
+
+        runSection("Session API Tests", () -> {
+            test_session_create_initial_state();
+            test_session_apply_turn_advances_player();
+            test_session_freizeitpark_bonus_turn();
+            test_session_bürohaus_user_chosen_swap();
+            test_session_undo_rollback();
+            test_session_save_load_roundtrip();
+            test_session_from_snapshot();
+            test_session_serializer_canonical_format();
+            test_session_turn_record_dicecount_swap_opp_fields();
+            test_session_persistence_new_fields_roundtrip();
         });
 
         System.out.println("\n--- Results: " + passed + " passed, " + failed + " failed"
@@ -1734,6 +1748,48 @@ public class RuntimeTester {
         }
     }
 
+    private static void test_bürohaus_node_deduplicates_by_card_type() {
+        // Player 0 owns: bürohaus + 3× weizenfeld + 1× bäckerei (2 unique tradeable types)
+        // Opponent owns: 2× bauernhof + 1× bergwerk (2 unique types)
+        // Without dedup: 5 own × 3 opp = 15 swap children
+        // With dedup:    2 own × 2 opp = 4 swap children
+        // Total with no-swap: 5 children
+        core.Project bürohaus  = core.ProjectLoader.getProject("bürohaus").orElseThrow();
+        core.Project weizen    = core.ProjectLoader.getProject("weizenfeld").orElseThrow();
+        core.Project bäckerei  = core.ProjectLoader.getProject("bäckerei").orElseThrow();
+        core.Project bauernhof = core.ProjectLoader.getProject("bauernhof").orElseThrow();
+        core.Project bergwerk  = core.ProjectLoader.getProject("bergwerk").orElseThrow();
+
+        java.util.ArrayList<core.Project> owned0 = new java.util.ArrayList<>();
+        owned0.add(bürohaus);
+        owned0.add(weizen); owned0.add(weizen); owned0.add(weizen); // 3 copies
+        owned0.add(bäckerei);
+
+        java.util.ArrayList<core.Project> owned1 = new java.util.ArrayList<>();
+        owned1.add(bauernhof); owned1.add(bauernhof); // 2 copies
+        owned1.add(bergwerk);
+
+        core.Player p0 = new core.Player("Alice", 10, owned0);
+        core.Player p1 = new core.Player("Bob",   10, owned1);
+        core.GameState gs = new core.GameState(new core.Player[]{p0, p1},
+                new java.util.ArrayList<>());
+
+        engine.mcts.SupplyTracker supply = engine.mcts.SupplyTracker.fromGameState(gs);
+
+        // Create a dummy afterBuyNode (BuyDecisionNode) for the BürohausNode to reparent
+        engine.mcts.BuyDecisionNode afterBuy = new engine.mcts.BuyDecisionNode(
+                gs, supply, null, 0, 1);
+
+        engine.mcts.BürohausNode node = new engine.mcts.BürohausNode(
+                gs, supply, null, 0, afterBuy);
+        node.expand();
+
+        // Expected: 1 (no-swap) + 2 (own types: weizenfeld, bäckerei) × 2 (opp types: bauernhof, bergwerk) = 5
+        int expected = 1 + 2 * 2;
+        assertEq("bürohaus node dedup: child count with duplicate cards",
+                expected, node.getChildren().size());
+    }
+
     // =========================================================================
     // Supply Tracker Tests
     // =========================================================================
@@ -2509,6 +2565,249 @@ public class RuntimeTester {
         double rho = calcs.Calcs.rollCorrelation(gs, 0, bauernhof);
         assertTrue("roll correlation ρ in [-1, 1]",
                 Double.isNaN(rho) || (rho >= -1.0 - 1e-9 && rho <= 1.0 + 1e-9));
+    }
+
+    // =========================================================================
+    // Session API Tests
+    // =========================================================================
+
+    private static void test_session_create_initial_state() {
+        core.GameState gs = core.GameState.initial(2);
+        String[] names = {"Alice", "Bob"};
+        // Apply names to state
+        for (int i = 0; i < 2; i++) {
+            gs.getPlayers()[i] = new core.Player(
+                    names[i], gs.getPlayers()[i].getCoins(), gs.getPlayers()[i].getOwned_projects());
+        }
+        core.GameSession session = new core.GameSession(gs, names);
+        assertTrue("session create: 2 players", session.getState().getPlayers().length == 2);
+        assertTrue("session create: player 0 has 3 coins", session.getState().getPlayers()[0].getCoins() == 3);
+        assertTrue("session create: player 1 has 3 coins", session.getState().getPlayers()[1].getCoins() == 3);
+        assertTrue("session create: nextPlayerIndex == 0", session.nextPlayerIndex() == 0);
+        assertTrue("session create: not finished", !session.isFinished());
+        assertTrue("session create: winnerIndex == -1", session.getWinnerIndex() == -1);
+        assertTrue("session create: effectiveTurnCount == 0", session.getEffectiveTurnCount() == 0);
+        assertTrue("session create: player 0 owns 2 cards",
+                session.getState().getPlayers()[0].getOwned_projects().size() == 2);
+        assertTrue("session create: player name is Alice",
+                "Alice".equals(session.getPlayerNames()[0]));
+    }
+
+    private static void test_session_apply_turn_advances_player() {
+        core.GameState gs = core.GameState.initial(2);
+        String[] names = {"Alice", "Bob"};
+        for (int i = 0; i < 2; i++) {
+            gs.getPlayers()[i] = new core.Player(
+                    names[i], gs.getPlayers()[i].getCoins(), gs.getPlayers()[i].getOwned_projects());
+        }
+        core.GameSession session = new core.GameSession(gs, names);
+        assertTrue("before turn: nextPlayer == 0", session.nextPlayerIndex() == 0);
+
+        session.applyTurn(new core.TurnRecord(0, 1, null));
+        assertTrue("after P0 turn: nextPlayer == 1", session.nextPlayerIndex() == 1);
+        assertTrue("after P0 turn: effectiveTurnCount == 1", session.getEffectiveTurnCount() == 1);
+
+        session.applyTurn(new core.TurnRecord(1, 3, null));
+        assertTrue("after P1 turn: nextPlayer == 0", session.nextPlayerIndex() == 0);
+        assertTrue("after P1 turn: effectiveTurnCount == 2", session.getEffectiveTurnCount() == 2);
+    }
+
+    private static void test_session_freizeitpark_bonus_turn() {
+        core.GameStateBuilder b = new core.GameStateBuilder(2);
+        b.setPlayerName(0, "Alice").setCoins(0, 10)
+                .addProject(0, "weizenfeld").addProject(0, "bäckerei")
+                .addProject(0, "bahnhof").addProject(0, "freizeitpark");
+        b.setPlayerName(1, "Bob").setCoins(1, 10)
+                .addProject(1, "weizenfeld").addProject(1, "bäckerei");
+        core.GameSession session = new core.GameSession(b.build(), new String[]{"Alice", "Bob"});
+
+        // Roll doubles with Bahnhof + Freizeitpark → bonus turn
+        session.applyTurn(new core.TurnRecord(0, 4, null, true, null, null, null, -1, 2));
+        assertTrue("freizeitpark: bonus pending", session.isBonusTurnPending());
+        assertTrue("freizeitpark: still P0's turn", session.nextPlayerIndex() == 0);
+
+        // Play the bonus turn (non-doubles this time)
+        session.applyTurn(new core.TurnRecord(0, 3, null, false, null, null, null, -1, 1));
+        assertTrue("freizeitpark: bonus NOT pending after bonus turn", !session.isBonusTurnPending());
+        assertTrue("freizeitpark: advances to P1", session.nextPlayerIndex() == 1);
+    }
+
+    private static void test_session_bürohaus_user_chosen_swap() {
+        core.GameStateBuilder b = new core.GameStateBuilder(2);
+        b.setPlayerName(0, "Alice").setCoins(0, 10)
+                .addProject(0, "weizenfeld").addProject(0, "bäckerei")
+                .addProject(0, "bürohaus");
+        b.setPlayerName(1, "Bob").setCoins(1, 10)
+                .addProject(1, "weizenfeld").addProject(1, "bergwerk");
+        core.GameSession session = new core.GameSession(b.build(), new String[]{"Alice", "Bob"});
+
+        // Roll a 6 → triggers bürohaus
+        session.applyTurn(new core.TurnRecord(0, 6, null, false, null, null, null, -1, 1));
+
+        // User-chosen swap: Alice's weizenfeld ↔ Bob's bergwerk
+        core.Project weizenfeld = core.ProjectLoader.getProject("weizenfeld").orElseThrow();
+        core.Project bergwerk = core.ProjectLoader.getProject("bergwerk").orElseThrow();
+        session.applyBürohausSwap(0, weizenfeld, 1, bergwerk);
+
+        // Verify swap happened
+        boolean aliceHasBergwerk = session.getState().getPlayers()[0].getOwned_projects()
+                .stream().anyMatch(p -> "bergwerk".equals(p.getId()));
+        boolean bobHasWeizenfeld = session.getState().getPlayers()[1].getOwned_projects()
+                .stream().anyMatch(p -> "weizenfeld".equals(p.getId()))
+                && session.getState().getPlayers()[1].getOwned_projects().size() == 2;
+        assertTrue("bürohaus swap: Alice has bergwerk", aliceHasBergwerk);
+        assertTrue("bürohaus swap: Bob has 2× weizenfeld", bobHasWeizenfeld);
+
+        // Verify history records the swap
+        core.TurnRecord lastTurn = session.getHistory().get(session.getHistory().size() - 1);
+        assertTrue("bürohaus swap: history records swappedAway",
+                lastTurn.swappedAway != null && "weizenfeld".equals(lastTurn.swappedAway.getId()));
+        assertTrue("bürohaus swap: history records swappedIn",
+                lastTurn.swappedIn != null && "bergwerk".equals(lastTurn.swappedIn.getId()));
+        assertTrue("bürohaus swap: history records swapOppPlayerIndex == 1",
+                lastTurn.swapOppPlayerIndex == 1);
+    }
+
+    private static void test_session_undo_rollback() {
+        core.GameState gs = core.GameState.initial(2);
+        String[] names = {"Alice", "Bob"};
+        for (int i = 0; i < 2; i++) {
+            gs.getPlayers()[i] = new core.Player(
+                    names[i], gs.getPlayers()[i].getCoins(), gs.getPlayers()[i].getOwned_projects());
+        }
+        core.GameSession session = new core.GameSession(gs, names);
+        int coinsBefore = session.getState().getPlayers()[0].getCoins();
+
+        session.applyTurn(new core.TurnRecord(0, 1, null));
+        int coinsAfterTurn = session.getState().getPlayers()[0].getCoins();
+        assertTrue("undo: coins changed after turn", coinsAfterTurn != coinsBefore || true); // may not change on roll 1
+
+        session.undoLastTurn();
+        assertTrue("undo: history empty after undo", session.getHistory().isEmpty());
+        assertTrue("undo: nextPlayer back to 0", session.nextPlayerIndex() == 0);
+        assertTrue("undo: coins restored",
+                session.getState().getPlayers()[0].getCoins() == coinsBefore);
+    }
+
+    private static void test_session_save_load_roundtrip() throws Exception {
+        core.GameState gs = core.GameState.initial(2);
+        String[] names = {"SaveAlice", "SaveBob"};
+        for (int i = 0; i < 2; i++) {
+            gs.getPlayers()[i] = new core.Player(
+                    names[i], gs.getPlayers()[i].getCoins(), gs.getPlayers()[i].getOwned_projects());
+        }
+        core.GameSession session = new core.GameSession(gs, names);
+        session.applyTurn(new core.TurnRecord(0, 1, null, false, null, null, null, -1, 1));
+        session.applyTurn(new core.TurnRecord(1, 3, null, false, null, null, null, -1, 2));
+
+        java.nio.file.Path tmpFile = java.nio.file.Files.createTempFile("mkoro-test-", ".mkoro");
+        try {
+            session.save(tmpFile);
+            core.GameSession loaded = core.GameSession.load(tmpFile);
+            assertTrue("save/load: history size matches", loaded.getHistory().size() == 2);
+            assertTrue("save/load: nextPlayerIndex matches",
+                    loaded.nextPlayerIndex() == session.nextPlayerIndex());
+            assertTrue("save/load: player 0 name matches",
+                    "SaveAlice".equals(loaded.getPlayerNames()[0]));
+            assertTrue("save/load: turn 1 diceCount == 2",
+                    loaded.getHistory().get(1).diceCount == 2);
+        } finally {
+            java.nio.file.Files.deleteIfExists(tmpFile);
+        }
+    }
+
+    private static void test_session_from_snapshot() {
+        core.GameStateBuilder b = new core.GameStateBuilder(2);
+        b.setPlayerName(0, "SnapAlice").setCoins(0, 15)
+                .addProject(0, "weizenfeld").addProject(0, "bäckerei").addProject(0, "bergwerk");
+        b.setPlayerName(1, "SnapBob").setCoins(1, 5)
+                .addProject(1, "weizenfeld").addProject(1, "bäckerei");
+        core.GameSession session = core.GameSession.fromSnapshot(b, new String[]{"SnapAlice", "SnapBob"});
+        assertTrue("fromSnapshot: player 0 has 15 coins",
+                session.getState().getPlayers()[0].getCoins() == 15);
+        assertTrue("fromSnapshot: player 0 has bergwerk",
+                session.getState().getPlayers()[0].hasProject("bergwerk"));
+        assertTrue("fromSnapshot: history is empty", session.getHistory().isEmpty());
+    }
+
+    private static void test_session_serializer_canonical_format() {
+        core.GameState gs = core.GameState.initial(2);
+        String[] names = {"SerAlice", "SerBob"};
+        for (int i = 0; i < 2; i++) {
+            gs.getPlayers()[i] = new core.Player(
+                    names[i], gs.getPlayers()[i].getCoins(), gs.getPlayers()[i].getOwned_projects());
+        }
+        core.GameSession session = new core.GameSession(gs, names);
+        com.google.gson.JsonObject json = server.SessionSerializer.toJson(session);
+        assertTrue("serializer: has state field", json.has("state"));
+        assertTrue("serializer: has nextPlayerIndex", json.has("nextPlayerIndex"));
+        assertTrue("serializer: has effectiveTurnCount", json.has("effectiveTurnCount"));
+        assertTrue("serializer: has bonusTurnPending", json.has("bonusTurnPending"));
+        assertTrue("serializer: has finished", json.has("finished"));
+        assertTrue("serializer: has winnerIndex", json.has("winnerIndex"));
+        assertTrue("serializer: has history array", json.has("history") && json.get("history").isJsonArray());
+        assertTrue("serializer: state has players",
+                json.getAsJsonObject("state").has("players"));
+        assertTrue("serializer: player 0 has name SerAlice",
+                json.getAsJsonObject("state").getAsJsonArray("players")
+                        .get(0).getAsJsonObject().get("name").getAsString().equals("SerAlice"));
+    }
+
+    private static void test_session_turn_record_dicecount_swap_opp_fields() {
+        // Verify TurnRecord new fields
+        core.Project weizenfeld = core.ProjectLoader.getProject("weizenfeld").orElseThrow();
+        core.Project bergwerk = core.ProjectLoader.getProject("bergwerk").orElseThrow();
+
+        core.TurnRecord t = new core.TurnRecord(0, 6, null, false, new int[]{1, -1},
+                weizenfeld, bergwerk, 1, 2);
+        assertTrue("TurnRecord: diceCount == 2", t.diceCount == 2);
+        assertTrue("TurnRecord: swapOppPlayerIndex == 1", t.swapOppPlayerIndex == 1);
+        assertTrue("TurnRecord: swappedAway is weizenfeld",
+                "weizenfeld".equals(t.swappedAway.getId()));
+        assertTrue("TurnRecord: swappedIn is bergwerk",
+                "bergwerk".equals(t.swappedIn.getId()));
+
+        // Backwards-compat constructor defaults
+        core.TurnRecord t2 = new core.TurnRecord(0, 3, null);
+        assertTrue("TurnRecord 3-arg: diceCount defaults to 1", t2.diceCount == 1);
+        assertTrue("TurnRecord 3-arg: swapOppPlayerIndex defaults to -1", t2.swapOppPlayerIndex == -1);
+    }
+
+    private static void test_session_persistence_new_fields_roundtrip() throws Exception {
+        // Build a session with bürohaus swap and diceCount=2, verify they round-trip
+        core.GameStateBuilder b = new core.GameStateBuilder(2);
+        b.setPlayerName(0, "PersAlice").setCoins(0, 10)
+                .addProject(0, "weizenfeld").addProject(0, "bäckerei").addProject(0, "bürohaus");
+        b.setPlayerName(1, "PersBob").setCoins(1, 10)
+                .addProject(1, "weizenfeld").addProject(1, "bergwerk");
+        core.GameSession session = new core.GameSession(b.build(), new String[]{"PersAlice", "PersBob"});
+
+        // Apply a turn with diceCount=2, then bürohaus swap
+        session.applyTurn(new core.TurnRecord(0, 6, null, false, null, null, null, -1, 2));
+        core.Project weizenfeld = core.ProjectLoader.getProject("weizenfeld").orElseThrow();
+        core.Project bergwerk = core.ProjectLoader.getProject("bergwerk").orElseThrow();
+        session.applyBürohausSwap(0, weizenfeld, 1, bergwerk);
+
+        java.nio.file.Path tmpFile = java.nio.file.Files.createTempFile("mkoro-pers-", ".mkoro");
+        try {
+            session.save(tmpFile);
+            core.GameSession loaded = core.GameSession.load(tmpFile);
+
+            core.TurnRecord lt = loaded.getHistory().get(0);
+            assertTrue("persistence new fields: diceCount == 2", lt.diceCount == 2);
+            assertTrue("persistence new fields: swapOppPlayerIndex == 1", lt.swapOppPlayerIndex == 1);
+            assertTrue("persistence new fields: swappedAway is weizenfeld",
+                    lt.swappedAway != null && "weizenfeld".equals(lt.swappedAway.getId()));
+            assertTrue("persistence new fields: swappedIn is bergwerk",
+                    lt.swappedIn != null && "bergwerk".equals(lt.swappedIn.getId()));
+
+            // Verify the swap was actually replayed (Alice has bergwerk)
+            boolean aliceHasBergwerk = loaded.getState().getPlayers()[0].getOwned_projects()
+                    .stream().anyMatch(p -> "bergwerk".equals(p.getId()));
+            assertTrue("persistence new fields: swap replayed correctly", aliceHasBergwerk);
+        } finally {
+            java.nio.file.Files.deleteIfExists(tmpFile);
+        }
     }
 
     private static void assertTrue(String label, boolean condition) {

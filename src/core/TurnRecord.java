@@ -66,24 +66,35 @@ public class TurnRecord {
     public final Project swappedIn;
 
     /**
+     * Index of the opponent involved in a bürohaus swap, or -1 if no swap.
+     */
+    public final int swapOppPlayerIndex;
+
+    /**
+     * Number of dice rolled (1 or 2). 2 only when the player owns Bahnhof and chose 2d6.
+     * Defaults to 1 for backwards-compatible constructors.
+     */
+    public final int diceCount;
+
+    /**
      * Constructs a turn record without doubles information (backwards-compatible).
      */
     public TurnRecord(int playerIndex, int roll, Project bought) {
-        this(playerIndex, roll, bought, false, null, null, null);
+        this(playerIndex, roll, bought, false, null, null, null, -1, 1);
     }
 
     /**
      * Constructs a turn record with explicit doubles flag.
      */
     public TurnRecord(int playerIndex, int roll, Project bought, boolean isDoubles) {
-        this(playerIndex, roll, bought, isDoubles, null, null, null);
+        this(playerIndex, roll, bought, isDoubles, null, null, null, -1, 1);
     }
 
     /**
      * Constructs a full turn record with doubles flag and per-player coin deltas.
      */
     public TurnRecord(int playerIndex, int roll, Project bought, boolean isDoubles, int[] coinDeltas) {
-        this(playerIndex, roll, bought, isDoubles, coinDeltas, null, null);
+        this(playerIndex, roll, bought, isDoubles, coinDeltas, null, null, -1, 1);
     }
 
     /**
@@ -91,6 +102,15 @@ public class TurnRecord {
      */
     public TurnRecord(int playerIndex, int roll, Project bought, boolean isDoubles,
                       int[] coinDeltas, Project swappedAway, Project swappedIn) {
+        this(playerIndex, roll, bought, isDoubles, coinDeltas, swappedAway, swappedIn, -1, 1);
+    }
+
+    /**
+     * Constructs a fully specified turn record with all fields.
+     */
+    public TurnRecord(int playerIndex, int roll, Project bought, boolean isDoubles,
+                      int[] coinDeltas, Project swappedAway, Project swappedIn,
+                      int swapOppPlayerIndex, int diceCount) {
         if (playerIndex < 0) throw new IllegalArgumentException("playerIndex must be >= 0");
         if (roll < 1 || roll > 12) throw new IllegalArgumentException("roll must be 1–12, got: " + roll);
         this.playerIndex = playerIndex;
@@ -100,6 +120,8 @@ public class TurnRecord {
         this.coinDeltas = coinDeltas != null ? coinDeltas.clone() : null;
         this.swappedAway = swappedAway;
         this.swappedIn = swappedIn;
+        this.swapOppPlayerIndex = swapOppPlayerIndex;
+        this.diceCount = diceCount;
     }
 
     @Override
@@ -107,7 +129,10 @@ public class TurnRecord {
         String buyStr = (bought != null) ? "bought=" + bought.getId() : "no purchase";
         String doublesStr = isDoubles ? ", DOUBLES" : "";
         String deltaStr = coinDeltas != null ? ", deltas=" + Arrays.toString(coinDeltas) : "";
-        String swapStr = (swappedAway != null) ? ", swap=" + swappedAway.getId() + "→" + swappedIn.getId() : "";
-        return "Turn{player=" + playerIndex + ", roll=" + roll + ", " + buyStr + doublesStr + deltaStr + swapStr + "}";
+        String swapStr = (swappedAway != null)
+                ? ", swap=" + swappedAway.getId() + "→" + swappedIn.getId() + "(opp=" + swapOppPlayerIndex + ")"
+                : "";
+        String diceStr = diceCount == 2 ? ", 2d6" : "";
+        return "Turn{player=" + playerIndex + ", roll=" + roll + ", " + buyStr + doublesStr + deltaStr + swapStr + diceStr + "}";
     }
 }

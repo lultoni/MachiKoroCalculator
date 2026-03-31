@@ -5,7 +5,11 @@ import core.Player;
 import core.Project;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * Decision node for the Bürohaus card-swap choice (triggers on roll 6).
@@ -66,24 +70,26 @@ public final class BürohausNode extends MctsNode {
         Player[] players = state.getPlayers();
         Player active = players[activePlayer];
 
-        // Collect eligible own cards: non-landmark, non-purple, not bürohaus itself
-        List<Project> ownEligible = new ArrayList<>();
+        // Collect unique eligible own card types: non-landmark, non-purple.
+        // Deduplicate by ID — multiple copies of the same card produce identical swap states.
+        Map<String, Project> ownById = new LinkedHashMap<>();
         for (Project p : active.getOwned_projects()) {
             if (!p.isIs_grossprojekt() && !"lila".equals(p.getColor())) {
-                ownEligible.add(p);
+                ownById.putIfAbsent(p.getId(), p);
             }
         }
 
-        // Collect eligible opponent cards per opponent: non-landmark, non-purple
-        List<int[]> swapPairs = new ArrayList<>();   // [ownIdx, oppPlayerIdx, oppCardIdx]
+        // Collect unique eligible opponent card types per opponent, deduplicated by ID.
+        // Each entry: (oppPlayerIndex, oppCardId) → representative Project
+        record OppCard(int oppIdx, String cardId) {}
+        Map<OppCard, Project> oppCards = new LinkedHashMap<>();
         for (int oppIdx = 0; oppIdx < players.length; oppIdx++) {
             if (oppIdx == activePlayer) continue;
-            Player opp = players[oppIdx];
-            for (int ci = 0; ci < opp.getOwned_projects().size(); ci++) {
-                Project oppCard = opp.getOwned_projects().get(ci);
-                if (!oppCard.isIs_grossprojekt() && !"lila".equals(oppCard.getColor())) {
-                    for (int oi = 0; oi < ownEligible.size(); oi++) {
-                        swapPairs.add(new int[]{oi, oppIdx, ci});
+            Set<String> seen = new LinkedHashSet<>();
+            for (Project p : players[oppIdx].getOwned_projects()) {
+                if (!p.isIs_grossprojekt() && !"lila".equals(p.getColor())) {
+                    if (seen.add(p.getId())) {
+                        oppCards.put(new OppCard(oppIdx, p.getId()), p);
                     }
                 }
             }
@@ -92,19 +98,19 @@ public final class BürohausNode extends MctsNode {
         // Child 0: no-swap — attach a re-parented copy of afterBuyNode
         children.add(reparentAfterBuy(state, supply, this));
 
-        // Children 1..N: each valid swap pair
-        for (int[] pair : swapPairs) {
-            Project ownCard = ownEligible.get(pair[0]);
-            int oppPlayerIdx = pair[1];
-            Project oppCard = players[oppPlayerIdx].getOwned_projects().get(pair[2]);
+        // Children 1..N: one per unique (ownCardType × oppCardType) pair
+        for (Map.Entry<OppCard, Project> oppEntry : oppCards.entrySet()) {
+            int oppPlayerIdx = oppEntry.getKey().oppIdx;
+            Project oppCard = oppEntry.getValue();
+            for (Project ownCard : ownById.values()) {
+                GameState swapped = state.copy();
+                swapped.getPlayers()[activePlayer].getOwned_projects().remove(ownCard);
+                swapped.getPlayers()[oppPlayerIdx].getOwned_projects().remove(oppCard);
+                swapped.getPlayers()[activePlayer].getOwned_projects().add(oppCard);
+                swapped.getPlayers()[oppPlayerIdx].getOwned_projects().add(ownCard);
 
-            GameState swapped = state.copy();
-            swapped.getPlayers()[activePlayer].getOwned_projects().remove(ownCard);
-            swapped.getPlayers()[oppPlayerIdx].getOwned_projects().remove(oppCard);
-            swapped.getPlayers()[activePlayer].getOwned_projects().add(oppCard);
-            swapped.getPlayers()[oppPlayerIdx].getOwned_projects().add(ownCard);
-
-            children.add(reparentAfterBuy(swapped, supply, this));
+                children.add(reparentAfterBuy(swapped, supply, this));
+            }
         }
 
         expanded = true;

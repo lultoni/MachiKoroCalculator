@@ -115,6 +115,8 @@ final class GameSessionPersistence {
             }
             if (t.swappedAway != null) turn.addProperty("swappedAway", t.swappedAway.getId());
             if (t.swappedIn   != null) turn.addProperty("swappedIn",   t.swappedIn.getId());
+            if (t.swapOppPlayerIndex >= 0) turn.addProperty("swapOppPlayerIndex", t.swapOppPlayerIndex);
+            if (t.diceCount != 1) turn.addProperty("diceCount", t.diceCount);
             turns.add(turn);
         }
         return turns;
@@ -170,9 +172,19 @@ final class GameSessionPersistence {
             if (t.has("swappedIn") && !t.get("swappedIn").isJsonNull()) {
                 swappedIn = ProjectLoader.getProject(t.get("swappedIn").getAsString()).orElse(null);
             }
-            session.applyTurn(new TurnRecord(pi, roll, bought, isDoubles, coinDeltas, swappedAway, swappedIn));
-            if (swappedAway != null) {
-                BürohausLogic.executeSwap(session.getState(), pi);
+            int swapOppPlayerIndex = t.has("swapOppPlayerIndex") ? t.get("swapOppPlayerIndex").getAsInt() : -1;
+            int diceCount = t.has("diceCount") ? t.get("diceCount").getAsInt() : 1;
+            // Apply turn without swap data first (swap is a separate action on the state)
+            session.applyTurn(new TurnRecord(pi, roll, bought, isDoubles, coinDeltas,
+                    null, null, -1, diceCount));
+            // Then replay the exact saved swap (not re-computing via greedy heuristic)
+            if (swappedAway != null && swappedIn != null) {
+                if (swapOppPlayerIndex >= 0) {
+                    session.applyBürohausSwap(pi, swappedAway, swapOppPlayerIndex, swappedIn);
+                } else {
+                    // Legacy: no opponent index recorded, fall back to greedy
+                    session.applyBürohausSwap(pi);
+                }
             }
         }
     }

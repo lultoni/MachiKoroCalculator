@@ -129,6 +129,38 @@ public final class BürohausLogic {
         opponent.getOwned_projects().add(c.worstOwn());
     }
 
+    /**
+     * Executes a user-chosen bürohaus card swap in-place on {@code state}.
+     * The active player gives away {@code ownCard} and receives {@code oppCard}
+     * from the opponent at index {@code oppPlayerIndex}.
+     *
+     * @param state          game state to mutate
+     * @param playerIndex    the active player
+     * @param ownCard        card the active player gives away
+     * @param oppPlayerIndex the opponent providing the card
+     * @param oppCard        card received from the opponent
+     * @throws IllegalArgumentException if either card is a landmark or purple,
+     *         or if the respective player does not own the card
+     */
+    public static void executeSwap(GameState state, int playerIndex,
+                                    Project ownCard, int oppPlayerIndex, Project oppCard) {
+        if (ownCard.isIs_grossprojekt() || "lila".equals(ownCard.getColor()))
+            throw new IllegalArgumentException("Cannot swap landmark or purple card: " + ownCard.getId());
+        if (oppCard.isIs_grossprojekt() || "lila".equals(oppCard.getColor()))
+            throw new IllegalArgumentException("Cannot swap landmark or purple card: " + oppCard.getId());
+
+        Player active   = state.getPlayers()[playerIndex];
+        Player opponent = state.getPlayers()[oppPlayerIndex];
+
+        if (!active.getOwned_projects().remove(ownCard))
+            throw new IllegalArgumentException("Active player does not own: " + ownCard.getId());
+        if (!opponent.getOwned_projects().remove(oppCard))
+            throw new IllegalArgumentException("Opponent does not own: " + oppCard.getId());
+
+        active.getOwned_projects().add(oppCard);
+        opponent.getOwned_projects().add(ownCard);
+    }
+
     // -------------------------------------------------------------------------
     // Utility
     // -------------------------------------------------------------------------

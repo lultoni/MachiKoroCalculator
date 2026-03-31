@@ -116,7 +116,8 @@ public class GameSession {
 
         // Store an augmented copy of the record that includes the computed coin deltas.
         TurnRecord stored = (record.coinDeltas != null) ? record
-                : new TurnRecord(record.playerIndex, record.roll, record.bought, record.isDoubles, deltas);
+                : new TurnRecord(record.playerIndex, record.roll, record.bought, record.isDoubles, deltas,
+                        record.swappedAway, record.swappedIn, record.swapOppPlayerIndex, record.diceCount);
         history.add(stored);
 
         // Determine if a Freizeitpark bonus turn is pending:
@@ -156,7 +157,26 @@ public class GameSession {
         history.set(history.size() - 1,
                 new TurnRecord(last.playerIndex, last.roll, last.bought,
                         last.isDoubles, last.coinDeltas,
-                        c.worstOwn(), c.bestOpp()));
+                        c.worstOwn(), c.bestOpp(), c.bestOppPlayer(), last.diceCount));
+    }
+
+    /**
+     * Executes a user-chosen bürohaus card swap and amends the last TurnRecord.
+     *
+     * @param playerIndex    the active player
+     * @param ownCard        card the player gives away
+     * @param oppPlayerIndex the opponent providing the card
+     * @param oppCard        card received from the opponent
+     */
+    public void applyBürohausSwap(int playerIndex, Project ownCard,
+                                   int oppPlayerIndex, Project oppCard) {
+        BürohausLogic.executeSwap(state, playerIndex, ownCard, oppPlayerIndex, oppCard);
+
+        TurnRecord last = history.get(history.size() - 1);
+        history.set(history.size() - 1,
+                new TurnRecord(last.playerIndex, last.roll, last.bought,
+                        last.isDoubles, last.coinDeltas,
+                        ownCard, oppCard, oppPlayerIndex, last.diceCount));
     }
 
     /**
@@ -180,12 +200,19 @@ public class GameSession {
             applyTurn(r);
             // Re-apply any bürohaus swap that was recorded with this turn
             if (r.swappedAway != null) {
-                BürohausLogic.executeSwap(state, r.playerIndex);
+                if (r.swapOppPlayerIndex >= 0) {
+                    // User-chosen swap: replay with exact cards and opponent
+                    BürohausLogic.executeSwap(state, r.playerIndex,
+                            r.swappedAway, r.swapOppPlayerIndex, r.swappedIn);
+                } else {
+                    // Legacy greedy swap
+                    BürohausLogic.executeSwap(state, r.playerIndex);
+                }
                 TurnRecord last = history.get(history.size() - 1);
                 history.set(history.size() - 1,
                         new TurnRecord(last.playerIndex, last.roll, last.bought,
                                 last.isDoubles, last.coinDeltas,
-                                r.swappedAway, r.swappedIn));
+                                r.swappedAway, r.swappedIn, r.swapOppPlayerIndex, r.diceCount));
             }
         }
     }

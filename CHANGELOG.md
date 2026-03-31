@@ -25,6 +25,25 @@ See `NORTH-STAR.md` for the full specification. See `PLAN.md` for the phased imp
 
 ---
 
+## Phase 1 Task 1.7: HTTP API Server (commit TBD)
+
+**`server/` package** — local HTTP API using the built-in JDK `com.sun.net.httpserver.HttpServer`, zero new dependencies.
+
+Endpoints:
+- `GET  /api/health`   — liveness check (`{"status":"ok"}`)
+- `GET  /api/projects` — all 19 base-game cards as JSON array
+- `GET  /api/engines`  — all registered engine configurations from `engines.json`
+- `POST /api/roll`     — apply a dice roll to a game state; returns `coinDeltas` + `stateAfter`
+- `POST /api/evaluate` — run engine evaluation; returns ranked purchase options (returns HTTP 503 with descriptive message until MCTS is implemented in Phase 2)
+
+Supporting infrastructure:
+- `ApiUtils` — shared JSON/HTTP helpers: `sendJson()`, `sendError()`, `handleCors()`, `parseBody()`; sets `Access-Control-Allow-Origin: *` on all responses
+- `GameStateSerializer` — `toJson(GameState)` / `fromJson(JsonObject)` using `GameStateBuilder`; validates all project IDs
+
+Test suite extended to 261 passing tests (was 247); 5 new server integration tests start a live server on port 18080 and hit each endpoint.
+
+---
+
 ## Phase 1 Tasks 1.5–1.6 + 1.8: Interface Layer + Engine Registry + Test Suite (commit 3ede567)
 
 **`iface/` package** — orchestration layer between UI and engines:

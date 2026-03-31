@@ -4,7 +4,13 @@ import logic.probability.*;
 import calcs.Calcs;
 import iface.EngineRegistry;
 import iface.EngineRegistryEntry;
+import iface.EngineOrchestrator;
+import server.ApiServer;
 
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -125,6 +131,19 @@ public class RuntimeTester {
         test_engine_registry_has_default();
         test_engine_registry_default_is_balanced();
         test_engine_registry_find_by_id();
+
+        System.out.println("\n=== HTTP API Server Tests ===\n");
+        ApiServer apiServer = new ApiServer(18080, new EngineOrchestrator());
+        apiServer.start();
+        try {
+            test_api_health(18080);
+            test_api_projects(18080);
+            test_api_engines(18080);
+            test_api_roll(18080);
+            test_api_evaluate_503_when_no_engine(18080);
+        } finally {
+            apiServer.stop(0);
+        }
 
         System.out.println("\n--- Results: " + passed + " passed, " + failed + " failed ---");
 
@@ -1361,8 +1380,92 @@ public class RuntimeTester {
     }
 
     // =========================================================================
-    // Assertion helpers
+    // HTTP API Server Tests
     // =========================================================================
+
+    private static void test_api_health(int port) throws Exception {
+        HttpURLConnection conn = openGet("http://localhost:" + port + "/api/health");
+        assertEq("GET /api/health → 200", 200, conn.getResponseCode());
+        String body = new String(conn.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        assertTrue("health body contains \"ok\"", body.contains("\"ok\""));
+    }
+
+    private static void test_api_projects(int port) throws Exception {
+        HttpURLConnection conn = openGet("http://localhost:" + port + "/api/projects");
+        assertEq("GET /api/projects → 200", 200, conn.getResponseCode());
+        String body = new String(conn.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        assertTrue("projects body is a JSON array", body.startsWith("["));
+        assertTrue("projects body contains weizenfeld", body.contains("weizenfeld"));
+        assertTrue("projects body contains bahnhof", body.contains("bahnhof"));
+    }
+
+    private static void test_api_engines(int port) throws Exception {
+        HttpURLConnection conn = openGet("http://localhost:" + port + "/api/engines");
+        assertEq("GET /api/engines → 200", 200, conn.getResponseCode());
+        String body = new String(conn.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        assertTrue("engines body is a JSON array", body.startsWith("["));
+        assertTrue("engines body contains mcts-v1-balanced", body.contains("mcts-v1-balanced"));
+    }
+
+    private static void test_api_roll(int port) throws Exception {
+        // Build a minimal GameState JSON for a 2-player game; both players have only starting cards
+        String requestJson = """
+                {
+                  "state": {
+                    "players": [
+                      {"name":"Alice","coins":3,"ownedIds":["weizenfeld","b\\u00e4ckerei"]},
+                      {"name":"Bob",  "coins":3,"ownedIds":["weizenfeld","b\\u00e4ckerei"]}
+                    ]
+                  },
+                  "playerIndex": 0,
+                  "roll": 1
+                }
+                """;
+        HttpURLConnection conn = openPost("http://localhost:" + port + "/api/roll", requestJson);
+        assertEq("POST /api/roll → 200", 200, conn.getResponseCode());
+        String body = new String(conn.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        assertTrue("roll response contains coinDeltas", body.contains("coinDeltas"));
+        assertTrue("roll response contains stateAfter", body.contains("stateAfter"));
+    }
+
+    private static void test_api_evaluate_503_when_no_engine(int port) throws Exception {
+        String requestJson = """
+                {
+                  "state": {
+                    "players": [
+                      {"name":"Alice","coins":3,"ownedIds":["weizenfeld","b\\u00e4ckerei"]},
+                      {"name":"Bob",  "coins":3,"ownedIds":["weizenfeld","b\\u00e4ckerei"]}
+                    ]
+                  },
+                  "playerIndex": 0
+                }
+                """;
+        HttpURLConnection conn = openPost("http://localhost:" + port + "/api/evaluate", requestJson);
+        assertEq("POST /api/evaluate → 503 when no engine registered", 503, conn.getResponseCode());
+        String body = new String(conn.getErrorStream().readAllBytes(), StandardCharsets.UTF_8);
+        assertTrue("evaluate 503 body contains error key", body.contains("\"error\""));
+    }
+
+    private static HttpURLConnection openGet(String urlStr) throws Exception {
+        HttpURLConnection conn = (HttpURLConnection) new URL(urlStr).openConnection();
+        conn.setRequestMethod("GET");
+        conn.setConnectTimeout(3000);
+        conn.setReadTimeout(3000);
+        return conn;
+    }
+
+    private static HttpURLConnection openPost(String urlStr, String json) throws Exception {
+        HttpURLConnection conn = (HttpURLConnection) new URL(urlStr).openConnection();
+        conn.setRequestMethod("POST");
+        conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+        conn.setDoOutput(true);
+        conn.setConnectTimeout(3000);
+        conn.setReadTimeout(3000);
+        byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
+        conn.setFixedLengthStreamingMode(bytes.length);
+        try (OutputStream os = conn.getOutputStream()) { os.write(bytes); }
+        return conn;
+    }
 
     private static void assertTrue(String label, boolean condition) {
         if (condition) {

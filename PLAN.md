@@ -20,7 +20,7 @@ Separate the existing codebase into the 5-layer architecture defined in NORTH-ST
 | 1.4 | Define `SimulationEngine` interface + `EngineConfig` + `EngineResult` contracts (see NORTH-STAR.md Section 6.2). | done |
 | 1.5 | Create Interface (orchestration) layer: engine registry loader (JSON), request routing, result formatting. | done |
 | 1.6 | Create engine registry JSON file with placeholder entries. | done |
-| 1.7 | Set up Java HTTP API server (lightweight, e.g. Javalin or built-in HttpServer) to expose game state + engine endpoints. | pending |
+| 1.7 | Set up Java HTTP API server (lightweight, e.g. Javalin or built-in HttpServer) to expose game state + engine endpoints. | done |
 | 1.8 | Adapt existing test suite (`RuntimeTester`) to work with the new layer separation. All 224 tests must pass. | done |
 
 ---

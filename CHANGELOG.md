@@ -1,6 +1,33 @@
 # CHANGELOG.md — MachiKoroCalculator
 
-Implementierungsgeschichte: was gebaut wurde, warum, und welche Designentscheidungen getroffen wurden.
+Implementation history: what was built, why, and which design decisions were made.
+
+---
+
+## Complete Restructure: NORTH-STAR.md + 5-Layer Architecture
+
+After reaching feature-completeness on the original monolithic design (Stufe 1/2/3 hybrid system, Swing UI with 5 ranking tabs, assistant, rollout), the project underwent a fundamental re-evaluation of its goals and architecture.
+
+**The problem:** The codebase had accumulated complexity — multiple overlapping analysis approaches (analytical EV, Monte Carlo, Expectimax rollout), a cluttered Swing UI with too many competing features, and no clean separation between game rules and strategy. The core question ("What should I buy right now, and why?") was being lost in the noise.
+
+**The decision:** Complete restructure around a clear North Star vision document (`NORTH-STAR.md`) that defines:
+- **5-layer architecture**: Core (game rules) / Standard Calcs (shared math) / Simulation Engines (pluggable strategy) / Interface (orchestration) / UI (web SPA)
+- **MCTS as the primary strategy engine** with proper tree search (chance nodes + decision nodes for all players), replacing the previous hybrid of analytical ranking + Expectimax + adaptive MC
+- **Web SPA frontend** replacing Swing, with exactly 4 core UI components (Turn Indicator, Dice, Coin Flow, Purchase Decision)
+- **Pluggable engine interface** with a JSON registry, enabling head-to-head testing of different strategy versions
+- **Transparent Kauf Assistent** with structured explanations (summary + weighted factor bullets with expandable details)
+
+**What survives the purge:** Core data model (`Project`, `Player`, `GameState`, etc.), game rules (`get_I`, `computeAllDeltasForRoll`, income order), `ProjectLoader`, `GameSession` + persistence, `Strings` localization, `projects.json`.
+
+**What gets replaced:** All strategy/ranking code (`RolloutTree`, `WinProbabilityCalc`, `adaptiveMCRefinement`, `rankPurchasableProjects`, `GameSimulator`), all Swing UI code (`gui.newui/*`), assistant config and phase calibration systems.
+
+See `NORTH-STAR.md` for the full specification. See `PLAN.md` for the phased implementation backlog. See `ARCHIVE.md` for an index of purged concepts with commit references.
+
+---
+
+## Pre-Restructure History
+
+Everything below documents the original implementation that led to the restructure decision.
 
 ---
 

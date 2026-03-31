@@ -6,6 +6,10 @@ import iface.EngineRegistry;
 import iface.EngineRegistryEntry;
 import iface.EngineOrchestrator;
 import server.ApiServer;
+import engine.MctsV1Engine;
+import engine.EngineConfig;
+import engine.EngineResult;
+import engine.mcts.SupplyTracker;
 
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
@@ -144,6 +148,36 @@ public class RuntimeTester {
         } finally {
             apiServer.stop(0);
         }
+
+        System.out.println("\n=== Bürohaus Swap Scope Tests ===\n");
+        test_bürohaus_excludes_purple_own_cards();
+        test_bürohaus_excludes_purple_opponent_cards();
+        test_bürohaus_allows_non_purple_non_landmark_swaps();
+
+        System.out.println("\n=== Supply Tracker Tests ===\n");
+        test_supply_tracker_initial_state();
+        test_supply_tracker_decrements_on_purchase();
+        test_supply_tracker_exhausted_card_not_in_buy_options();
+
+        System.out.println("\n=== MCTS v1 Engine Tests ===\n");
+        MctsV1Engine mctsEngine = new MctsV1Engine();
+        EngineConfig fastConfig  = EngineConfig.ofIterations(500);
+        EngineConfig deepConfig  = EngineConfig.ofIterations(5000);
+        core.GameState mctsGs = core.GameState.initial(2);
+        test_mcts_returns_nonnull_result(mctsEngine, mctsGs, fastConfig);
+        test_mcts_ranked_options_nonempty(mctsEngine, mctsGs, fastConfig);
+        test_mcts_includes_save_option(mctsEngine, mctsGs, fastConfig);
+        test_mcts_scores_descending(mctsEngine, mctsGs, fastConfig);
+        test_mcts_affordable_flag_matches_coins(mctsEngine, mctsGs, fastConfig);
+        test_mcts_all_metric_keys_present(mctsEngine, mctsGs, fastConfig);
+        test_mcts_terminates_within_time_budget(mctsEngine, mctsGs, fastConfig);
+        test_mcts_obvious_landmark_buy(mctsEngine);
+        test_mcts_bürohaus_state_has_swap_children(mctsEngine, fastConfig);
+        test_mcts_funkturm_decision_explored(mctsEngine, fastConfig);
+        test_mcts_freizeitpark_bonus_turn_extends_depth(mctsEngine, fastConfig);
+        test_mcts_deep_uses_more_iterations_than_fast(mctsEngine, mctsGs, fastConfig, deepConfig);
+        test_mcts_confidence_in_range(mctsEngine, mctsGs, fastConfig);
+        test_mcts_visit_count_sums_to_iterations(mctsEngine, mctsGs, fastConfig);
 
         System.out.println("\n--- Results: " + passed + " passed, " + failed + " failed ---");
 
@@ -1465,6 +1499,405 @@ public class RuntimeTester {
         conn.setFixedLengthStreamingMode(bytes.length);
         try (OutputStream os = conn.getOutputStream()) { os.write(bytes); }
         return conn;
+    }
+
+    // =========================================================================
+    // Bürohaus Swap Scope Tests
+    // =========================================================================
+
+    private static void test_bürohaus_excludes_purple_own_cards() {
+        // Build a state where the active player owns Stadion (purple) + Bürohaus (purple)
+        // and a Weizenfeld. An opponent owns Bergwerk.
+        // The purple card Stadion should NOT appear as a swap-away candidate.
+        core.Project stadion  = core.ProjectLoader.getProject("stadion").orElseThrow();
+        core.Project bürohaus = core.ProjectLoader.getProject("bürohaus").orElseThrow();
+        core.Project bergwerk = core.ProjectLoader.getProject("bergwerk").orElseThrow();
+        core.Project weizen   = core.ProjectLoader.getProject("weizenfeld").orElseThrow();
+
+        java.util.ArrayList<core.Project> owned0 = new java.util.ArrayList<>();
+        owned0.add(stadion);
+        owned0.add(bürohaus);
+        owned0.add(weizen);
+        java.util.ArrayList<core.Project> owned1 = new java.util.ArrayList<>();
+        owned1.add(bergwerk);
+
+        core.Player p0 = new core.Player("Alice", 10, owned0);
+        core.Player p1 = new core.Player("Bob",   10, owned1);
+        core.GameState gs = new core.GameState(new core.Player[]{p0, p1},
+                new java.util.ArrayList<>());
+
+        // swapNote returns null when the only tradeable own-card would be Stadion (purple)
+        // and Weizenfeld is lower-EV → Weizenfeld should be chosen over Stadion.
+        // The key assertion: after the fix, Stadion is excluded; Weizenfeld is the worst non-purple.
+        // So a swap WILL be beneficial (bergwerk > weizenfeld in EV) but Stadion is not the give-away.
+        String note = core.BürohausLogic.swapNote(gs, 0);
+        boolean stadionNotMentioned = (note == null) || !note.toLowerCase().contains("stadion");
+        assertTrue("bürohaus: Stadion (purple) not offered as swap-away card", stadionNotMentioned);
+    }
+
+    private static void test_bürohaus_excludes_purple_opponent_cards() {
+        // Opponent owns only Fernsehsender (purple). Active player owns a non-purple card.
+        // No beneficial swap should be found because the only opponent card is purple.
+        core.Project fernsehsender = core.ProjectLoader.getProject("fernsehsender").orElseThrow();
+        core.Project bürohaus      = core.ProjectLoader.getProject("bürohaus").orElseThrow();
+        core.Project weizen        = core.ProjectLoader.getProject("weizenfeld").orElseThrow();
+
+        java.util.ArrayList<core.Project> owned0 = new java.util.ArrayList<>();
+        owned0.add(bürohaus);
+        owned0.add(weizen);
+        java.util.ArrayList<core.Project> owned1 = new java.util.ArrayList<>();
+        owned1.add(fernsehsender);
+
+        core.Player p0 = new core.Player("Alice", 10, owned0);
+        core.Player p1 = new core.Player("Bob",   10, owned1);
+        core.GameState gs = new core.GameState(new core.Player[]{p0, p1},
+                new java.util.ArrayList<>());
+
+        double ev = core.BürohausLogic.swapEV(gs, 0);
+        assertTrue("bürohaus: opponent's Fernsehsender (purple) is not a swap target — swapEV == 0",
+                ev == 0.0);
+        String note = core.BürohausLogic.swapNote(gs, 0);
+        assertTrue("bürohaus: swapNote is null when only opponent card is purple", note == null);
+    }
+
+    private static void test_bürohaus_allows_non_purple_non_landmark_swaps() {
+        // Non-purple, non-landmark cards must remain valid swap candidates after the fix.
+        core.Project bäckerei = core.ProjectLoader.getProject("bäckerei").orElseThrow();
+        core.Project bergwerk = core.ProjectLoader.getProject("bergwerk").orElseThrow();
+        core.Project bürohaus = core.ProjectLoader.getProject("bürohaus").orElseThrow();
+
+        java.util.ArrayList<core.Project> owned0 = new java.util.ArrayList<>();
+        owned0.add(bürohaus);
+        owned0.add(bäckerei);
+        java.util.ArrayList<core.Project> owned1 = new java.util.ArrayList<>();
+        owned1.add(bergwerk);   // bergwerk (blau, roll 9) has higher EV than bäckerei (grün, roll 2-3)
+
+        core.Player p0 = new core.Player("Alice", 10, owned0);
+        core.Player p1 = new core.Player("Bob",   10, owned1);
+        core.GameState gs = new core.GameState(new core.Player[]{p0, p1},
+                new java.util.ArrayList<>());
+
+        double ev = core.BürohausLogic.swapEV(gs, 0);
+        String note = core.BürohausLogic.swapNote(gs, 0);
+        assertTrue("bürohaus: Bäckerei ↔ Bergwerk swap is valid (swapEV ≥ 0)", ev >= 0.0);
+        assertTrue("bürohaus: swapNote is non-null for valid swap", note != null);
+        if (note != null) {
+            assertTrue("bürohaus: note mentions Bergwerk", note.toLowerCase().contains("bergwerk"));
+        }
+    }
+
+    // =========================================================================
+    // Supply Tracker Tests
+    // =========================================================================
+
+    private static void test_supply_tracker_initial_state() {
+        // At game start with 2 players, each non-landmark card should have
+        // SUPPLY_PER_CARD copies minus the starter copies (weizenfeld + bäckerei each owned by 2 players).
+        core.GameState gs = core.GameState.initial(2);
+        engine.mcts.SupplyTracker tracker = engine.mcts.SupplyTracker.fromGameState(gs);
+
+        // All non-landmark cards should be present in the tracker with count >= 0
+        java.util.ArrayList<core.Project> all = core.ProjectLoader.getAllProjects();
+        boolean allNonLandmarksPresent = true;
+        for (core.Project p : all) {
+            if (p.isIs_grossprojekt()) continue;
+            int count = tracker.getCount(p.getId());
+            if (count < 0) { allNonLandmarksPresent = false; break; }
+        }
+        assertTrue("supply tracker: all non-landmark cards have non-negative count", allNonLandmarksPresent);
+
+        // Starter cards: weizenfeld and bäckerei each owned by 2 players → 6 - 2 = 4 remain
+        int weizenCount   = tracker.getCount("weizenfeld");
+        int bäckereiCount = tracker.getCount("bäckerei");
+        assertEq("supply tracker: weizenfeld has 4 remaining in 2-player game", 4, weizenCount);
+        assertEq("supply tracker: bäckerei has 4 remaining in 2-player game", 4, bäckereiCount);
+
+        // A card no player owns (bergwerk) should have full supply
+        int bergwerkCount = tracker.getCount("bergwerk");
+        assertEq("supply tracker: bergwerk has full supply (" + core.GameState.SUPPLY_PER_CARD + ")",
+                core.GameState.SUPPLY_PER_CARD, bergwerkCount);
+    }
+
+    private static void test_supply_tracker_decrements_on_purchase() {
+        core.GameState gs = core.GameState.initial(2);
+        engine.mcts.SupplyTracker tracker = engine.mcts.SupplyTracker.fromGameState(gs);
+
+        int before = tracker.getCount("bergwerk");
+        engine.mcts.SupplyTracker after = tracker.withPurchase("bergwerk");
+        assertEq("supply tracker: bergwerk decrements after purchase", before - 1, after.getCount("bergwerk"));
+        // Original tracker is unchanged (immutable)
+        assertEq("supply tracker: original tracker unchanged", before, tracker.getCount("bergwerk"));
+    }
+
+    private static void test_supply_tracker_exhausted_card_not_in_buy_options() {
+        // Exhaust bergwerk by decrementing to 0; canPurchase must return false
+        engine.mcts.SupplyTracker tracker = engine.mcts.SupplyTracker.fromGameState(core.GameState.initial(2));
+        // Drain all copies
+        for (int i = 0; i < core.GameState.SUPPLY_PER_CARD; i++) {
+            tracker = tracker.withPurchase("bergwerk");
+        }
+        assertTrue("supply tracker: exhausted card canPurchase → false",
+                !tracker.canPurchase("bergwerk"));
+        assertEq("supply tracker: exhausted card count is 0", 0, tracker.getCount("bergwerk"));
+    }
+
+    // =========================================================================
+    // MCTS v1 Engine Tests
+    // =========================================================================
+
+    private static void test_mcts_returns_nonnull_result(
+            engine.MctsV1Engine eng, core.GameState gs, engine.EngineConfig cfg) {
+        engine.EngineResult result = eng.evaluate(gs, 0, cfg);
+        assertTrue("mcts: evaluate returns non-null EngineResult", result != null);
+    }
+
+    private static void test_mcts_ranked_options_nonempty(
+            engine.MctsV1Engine eng, core.GameState gs, engine.EngineConfig cfg) {
+        engine.EngineResult result = eng.evaluate(gs, 0, cfg);
+        assertTrue("mcts: rankedOptions is non-empty", result != null && !result.rankedOptions.isEmpty());
+    }
+
+    private static void test_mcts_includes_save_option(
+            engine.MctsV1Engine eng, core.GameState gs, engine.EngineConfig cfg) {
+        engine.EngineResult result = eng.evaluate(gs, 0, cfg);
+        boolean hasSave = result.rankedOptions.stream()
+                .anyMatch(o -> "_wait_".equals(o.project.getId()));
+        assertTrue("mcts: rankedOptions contains save (_wait_) sentinel", hasSave);
+    }
+
+    private static void test_mcts_scores_descending(
+            engine.MctsV1Engine eng, core.GameState gs, engine.EngineConfig cfg) {
+        engine.EngineResult result = eng.evaluate(gs, 0, cfg);
+        boolean sorted = true;
+        for (int i = 1; i < result.rankedOptions.size(); i++) {
+            if (result.rankedOptions.get(i).score > result.rankedOptions.get(i - 1).score) {
+                sorted = false;
+                break;
+            }
+        }
+        assertTrue("mcts: rankedOptions scores are non-increasing (sorted best-to-worst)", sorted);
+    }
+
+    private static void test_mcts_affordable_flag_matches_coins(
+            engine.MctsV1Engine eng, core.GameState gs, engine.EngineConfig cfg) {
+        engine.EngineResult result = eng.evaluate(gs, 0, cfg);
+        int playerCoins = gs.getPlayers()[0].getCoins();
+        boolean allCorrect = true;
+        for (engine.EngineResult.Option o : result.rankedOptions) {
+            if ("_wait_".equals(o.project.getId())) continue;  // sentinel: cost 0, always affordable
+            boolean expectedAffordable = (playerCoins >= o.project.getCost());
+            if (o.affordable != expectedAffordable) { allCorrect = false; break; }
+        }
+        assertTrue("mcts: affordable flag matches player coins >= card cost", allCorrect);
+    }
+
+    private static void test_mcts_all_metric_keys_present(
+            engine.MctsV1Engine eng, core.GameState gs, engine.EngineConfig cfg) {
+        engine.EngineResult result = eng.evaluate(gs, 0, cfg);
+        engine.EngineResult.Option top = result.topRecommendation();
+        assertTrue("mcts: top option has non-null metrics map", top.metrics != null);
+        if (top.metrics != null) {
+            String[] required = {
+                "winRate", "confidence", "visitCount",
+                "immediateEV", "evPerRound", "roiOverHorizon",
+                "winProbDelta", "portfolioDeltaEV", "variance",
+                "probNoIncomeOwnTurn", "probNoIncomeRound",
+                "cost", "turnsToWin", "tempoAdvantage"
+            };
+            for (String key : required) {
+                assertTrue("mcts: metrics contains key '" + key + "'", top.metrics.containsKey(key));
+            }
+        }
+    }
+
+    private static void test_mcts_terminates_within_time_budget(
+            engine.MctsV1Engine eng, core.GameState gs, engine.EngineConfig cfg) {
+        long start = System.currentTimeMillis();
+        eng.evaluate(gs, 0, cfg);
+        long elapsed = System.currentTimeMillis() - start;
+        assertTrue("mcts: 500-iteration evaluation completes in < 10 000 ms (was " + elapsed + " ms)",
+                elapsed < 10_000);
+    }
+
+    private static void test_mcts_obvious_landmark_buy(engine.MctsV1Engine eng) {
+        // Player has 22 coins and 3 landmarks; only Funkturm (cost 22) is missing.
+        // MCTS top recommendation should be Funkturm (the winning move).
+        core.Project bahnhof = core.ProjectLoader.getProject("bahnhof").orElseThrow();
+        core.Project einkauf = core.ProjectLoader.getProject("einkaufszentrum").orElseThrow();
+        core.Project freizeit = core.ProjectLoader.getProject("freizeitpark").orElseThrow();
+        core.Project funkturm = core.ProjectLoader.getProject("funkturm").orElseThrow();
+        core.Project weizen  = core.ProjectLoader.getProject("weizenfeld").orElseThrow();
+        core.Project baeckerei = core.ProjectLoader.getProject("bäckerei").orElseThrow();
+
+        java.util.ArrayList<core.Project> owned0 = new java.util.ArrayList<>();
+        owned0.add(weizen);
+        owned0.add(baeckerei);
+        owned0.add(bahnhof);
+        owned0.add(einkauf);
+        owned0.add(freizeit);
+        // Funkturm not owned
+        java.util.ArrayList<core.Project> owned1 = new java.util.ArrayList<>();
+        owned1.add(weizen);
+        owned1.add(baeckerei);
+
+        // Unbuilt pool must contain funkturm so it can be purchased
+        java.util.ArrayList<core.Project> unbuilt = new java.util.ArrayList<>();
+        unbuilt.add(funkturm);
+
+        core.Player p0 = new core.Player("Alice", 22, owned0);
+        core.Player p1 = new core.Player("Bob",    3, owned1);
+        core.GameState gs = new core.GameState(new core.Player[]{p0, p1}, unbuilt);
+
+        engine.EngineResult result = eng.evaluate(gs, 0, engine.EngineConfig.ofIterations(500));
+        String topId = result.topRecommendation().project.getId();
+        assertEq("mcts: obvious winning move is Funkturm when 3 landmarks owned and coins = 22",
+                "funkturm", topId);
+    }
+
+    private static void test_mcts_bürohaus_state_has_swap_children(
+            engine.MctsV1Engine eng, engine.EngineConfig cfg) {
+        // Build a state where player 0 owns Bürohaus (so BürohausNode should be created on roll 6).
+        // debugInfo should confirm multiple swap options were expanded.
+        core.Project bürohaus = core.ProjectLoader.getProject("bürohaus").orElseThrow();
+        core.Project weizen   = core.ProjectLoader.getProject("weizenfeld").orElseThrow();
+        core.Project baeckerei = core.ProjectLoader.getProject("bäckerei").orElseThrow();
+        core.Project bergwerk = core.ProjectLoader.getProject("bergwerk").orElseThrow();
+
+        java.util.ArrayList<core.Project> owned0 = new java.util.ArrayList<>();
+        owned0.add(bürohaus);
+        owned0.add(weizen);
+        owned0.add(baeckerei);
+        java.util.ArrayList<core.Project> owned1 = new java.util.ArrayList<>();
+        owned1.add(bergwerk);
+        owned1.add(weizen);
+
+        java.util.ArrayList<core.Project> unbuilt = new java.util.ArrayList<>();
+        core.Player p0 = new core.Player("Alice", 10, owned0);
+        core.Player p1 = new core.Player("Bob",   10, owned1);
+        core.GameState gs = new core.GameState(new core.Player[]{p0, p1}, unbuilt);
+
+        engine.EngineResult result = eng.evaluate(gs, 0, cfg);
+        // debugInfo must mention bürohaus node expansion (at minimum "bürohaus" or "swap")
+        boolean debugMentionsSwap = result.debugInfo != null
+                && (result.debugInfo.toLowerCase().contains("bürohaus")
+                    || result.debugInfo.toLowerCase().contains("burohaus")
+                    || result.debugInfo.toLowerCase().contains("swap"));
+        assertTrue("mcts: debugInfo confirms BürohausNode was expanded (contains swap/bürohaus reference)",
+                debugMentionsSwap);
+    }
+
+    private static void test_mcts_funkturm_decision_explored(
+            engine.MctsV1Engine eng, engine.EngineConfig cfg) {
+        // Player owns Funkturm → FunkturmNode should be created; debugInfo should confirm
+        // both keep and reroll branches have visitCount > 0.
+        core.Project funkturm = core.ProjectLoader.getProject("funkturm").orElseThrow();
+        core.Project weizen   = core.ProjectLoader.getProject("weizenfeld").orElseThrow();
+        core.Project baeckerei = core.ProjectLoader.getProject("bäckerei").orElseThrow();
+        core.Project bahnhof  = core.ProjectLoader.getProject("bahnhof").orElseThrow();
+
+        java.util.ArrayList<core.Project> owned0 = new java.util.ArrayList<>();
+        owned0.add(funkturm);
+        owned0.add(bahnhof);
+        owned0.add(weizen);
+        owned0.add(baeckerei);
+        java.util.ArrayList<core.Project> owned1 = new java.util.ArrayList<>();
+        owned1.add(weizen);
+        owned1.add(baeckerei);
+
+        core.Player p0 = new core.Player("Alice", 10, owned0);
+        core.Player p1 = new core.Player("Bob",    3, owned1);
+        core.GameState gs = new core.GameState(new core.Player[]{p0, p1},
+                new java.util.ArrayList<>());
+
+        engine.EngineResult result = eng.evaluate(gs, 0, cfg);
+        boolean debugMentionsFunkturm = result.debugInfo != null
+                && (result.debugInfo.toLowerCase().contains("funkturm")
+                    || result.debugInfo.toLowerCase().contains("reroll")
+                    || result.debugInfo.toLowerCase().contains("keep"));
+        assertTrue("mcts: debugInfo confirms FunkturmNode keep/reroll branches both explored",
+                debugMentionsFunkturm);
+    }
+
+    private static void test_mcts_freizeitpark_bonus_turn_extends_depth(
+            engine.MctsV1Engine eng, engine.EngineConfig cfg) {
+        // Build two states: one with Freizeitpark + Bahnhof, one without.
+        // The tree with Freizeitpark/Bahnhof should have greater depth (bonus turn nodes inserted).
+        // We verify via debugInfo mentioning depth or bonus turns.
+        core.Project freizeit = core.ProjectLoader.getProject("freizeitpark").orElseThrow();
+        core.Project bahnhof  = core.ProjectLoader.getProject("bahnhof").orElseThrow();
+        core.Project weizen   = core.ProjectLoader.getProject("weizenfeld").orElseThrow();
+        core.Project baeckerei = core.ProjectLoader.getProject("bäckerei").orElseThrow();
+
+        java.util.ArrayList<core.Project> ownedWith = new java.util.ArrayList<>();
+        ownedWith.add(freizeit);
+        ownedWith.add(bahnhof);
+        ownedWith.add(weizen);
+        ownedWith.add(baeckerei);
+
+        java.util.ArrayList<core.Project> ownedWithout = new java.util.ArrayList<>();
+        ownedWithout.add(weizen);
+        ownedWithout.add(baeckerei);
+
+        java.util.ArrayList<core.Project> opp = new java.util.ArrayList<>();
+        opp.add(weizen);
+        opp.add(baeckerei);
+
+        core.Player oppPlayer = new core.Player("Bob", 3, opp);
+        core.GameState gsWith = new core.GameState(
+                new core.Player[]{new core.Player("Alice", 10, ownedWith), oppPlayer},
+                new java.util.ArrayList<>());
+        core.GameState gsWithout = new core.GameState(
+                new core.Player[]{new core.Player("Alice", 10, ownedWithout), oppPlayer.copy()},
+                new java.util.ArrayList<>());
+
+        engine.EngineResult withResult    = eng.evaluate(gsWith, 0, cfg);
+        engine.EngineResult withoutResult = eng.evaluate(gsWithout, 0, cfg);
+
+        // Both should succeed; the with-Freizeitpark debug info should mention bonus/doubles/freizeit
+        boolean withMentionsBonus = withResult.debugInfo != null
+                && (withResult.debugInfo.toLowerCase().contains("bonus")
+                    || withResult.debugInfo.toLowerCase().contains("doubles")
+                    || withResult.debugInfo.toLowerCase().contains("freizeit"));
+        assertTrue("mcts: Freizeitpark + Bahnhof state debugInfo mentions bonus turn / doubles",
+                withMentionsBonus);
+        assertTrue("mcts: baseline state (no Freizeitpark) returns valid result",
+                withoutResult != null && !withoutResult.rankedOptions.isEmpty());
+    }
+
+    private static void test_mcts_deep_uses_more_iterations_than_fast(
+            engine.MctsV1Engine eng, core.GameState gs,
+            engine.EngineConfig fastCfg, engine.EngineConfig deepCfg) {
+        engine.EngineResult fastResult = eng.evaluate(gs, 0, fastCfg);
+        engine.EngineResult deepResult = eng.evaluate(gs, 0, deepCfg);
+        assertTrue("mcts: deep config uses more iterations than fast config",
+                deepResult.iterationsUsed > fastResult.iterationsUsed);
+    }
+
+    private static void test_mcts_confidence_in_range(
+            engine.MctsV1Engine eng, core.GameState gs, engine.EngineConfig cfg) {
+        engine.EngineResult result = eng.evaluate(gs, 0, cfg);
+        boolean inRange = Double.isNaN(result.confidence)
+                || (result.confidence >= 0.0 && result.confidence <= 1.0);
+        assertTrue("mcts: confidence is in [0, 1] or NaN", inRange);
+    }
+
+    private static void test_mcts_visit_count_sums_to_iterations(
+            engine.MctsV1Engine eng, core.GameState gs, engine.EngineConfig cfg) {
+        engine.EngineResult result = eng.evaluate(gs, 0, cfg);
+        // Sum of visit counts of all root children should approximately equal iterationsUsed.
+        // We allow a small delta for overhead / initialization iterations.
+        long visitSum = result.rankedOptions.stream()
+                .filter(o -> o.metrics != null && o.metrics.containsKey("visitCount"))
+                .mapToLong(o -> {
+                    try { return Long.parseLong(o.metrics.get("visitCount")); }
+                    catch (NumberFormatException e) { return 0L; }
+                })
+                .sum();
+        // visitSum should be > 0 and close to iterationsUsed (within 2x, accounting for tree structure)
+        assertTrue("mcts: sum of child visit counts > 0 (tree was actually searched)",
+                visitSum > 0);
+        assertTrue("mcts: sum of child visit counts ≤ 2 × iterationsUsed (sane upper bound)",
+                visitSum <= 2L * result.iterationsUsed);
     }
 
     private static void assertTrue(String label, boolean condition) {

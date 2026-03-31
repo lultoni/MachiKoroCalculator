@@ -25,7 +25,7 @@ See `NORTH-STAR.md` for the full specification. See `PLAN.md` for the phased imp
 
 ---
 
-## Phase 1 Task 1.7: HTTP API Server (commit TBD)
+## Phase 1 Task 1.7: HTTP API Server (commit 283d798)
 
 **`server/` package** — local HTTP API using the built-in JDK `com.sun.net.httpserver.HttpServer`, zero new dependencies.
 

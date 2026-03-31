@@ -1,6 +1,9 @@
 package Tests;
 
 import logic.probability.*;
+import calcs.Calcs;
+import iface.EngineRegistry;
+import iface.EngineRegistryEntry;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -103,6 +106,25 @@ public class RuntimeTester {
         test_coin_deltas_correct_values_red_card();
         test_coin_deltas_preserved_after_undo_replay();
         test_coin_deltas_roundtrip_save_load();
+
+        System.out.println("\n=== Calcs Layer Tests ===\n");
+        test_calcs_get_P1_sums_to_1();
+        test_calcs_get_P2_sums_to_1();
+        test_calcs_get_I_delegates_correctly();
+        test_calcs_immediate_ev_nonnegative();
+        test_calcs_ev_per_round_blue_scales_with_players();
+        test_calcs_roi_over_horizon_positive_for_cheap_card();
+        test_calcs_baseline_win_prob_sums_to_one();
+        test_calcs_win_prob_delta_in_range();
+        test_calcs_portfolio_delta_ev_nonnegative_for_blue();
+        test_calcs_geometric_sum_identity_at_gamma1();
+        test_calcs_optimal_dice_no_bahnhof_returns_1();
+
+        System.out.println("\n=== Engine Registry Tests ===\n");
+        test_engine_registry_loads_entries();
+        test_engine_registry_has_default();
+        test_engine_registry_default_is_balanced();
+        test_engine_registry_find_by_id();
 
         System.out.println("\n--- Results: " + passed + " passed, " + failed + " failed ---");
 
@@ -730,8 +752,8 @@ public class RuntimeTester {
         // Use computeNetGainForRollPublic (package-private bridge) via evPerRound isolation:
         // We compute the net gain for roll=3 on P0's turn by using a neutral candidate.
         // Simpler: use GameSession.applyTurn and observe P0's coins after the turn.
-        logic.probability.GameSession session = new logic.probability.GameSession(gs, new String[]{"P0", "P1"});
-        logic.probability.TurnRecord turn = new logic.probability.TurnRecord(0, 3, null);
+        GameSession session = new GameSession(gs, new String[]{"P0", "P1"});
+        TurnRecord turn = new TurnRecord(0, 3, null);
         session.applyTurn(turn);
 
         int p0Coins = session.getState().getPlayers()[0].getCoins();
@@ -760,13 +782,13 @@ public class RuntimeTester {
         b.setPlayerName(3, "P3").setCoins(3, 5).addProject(3, "café");
         GameState gs = b.build();
 
-        logic.probability.GameSession session = new logic.probability.GameSession(gs, new String[]{"P0","P1","P2","P3"});
-        logic.probability.TurnRecord turn = new logic.probability.TurnRecord(2, 3, null);
-        session.applyTurn(turn);
+        GameSession session4p = new GameSession(gs, new String[]{"P0","P1","P2","P3"});
+        TurnRecord turn4p = new TurnRecord(2, 3, null);
+        session4p.applyTurn(turn4p);
 
-        int p0After = session.getState().getPlayers()[0].getCoins();
-        int p1After = session.getState().getPlayers()[1].getCoins();
-        int p2After = session.getState().getPlayers()[2].getCoins();
+        int p0After = session4p.getState().getPlayers()[0].getCoins();
+        int p1After = session4p.getState().getPlayers()[1].getCoins();
+        int p2After = session4p.getState().getPlayers()[2].getCoins();
 
         // Counter-clockwise from P2: P1 is first → P1 collects the 1 coin. P0 gets nothing.
         assertTrue("Counter-clockwise: P1 (first CCW neighbour of P2) collects the 1 coin (was " + p1After + ")",
@@ -1206,6 +1228,141 @@ public class RuntimeTester {
                     ranking.get(i - 1).roiOverHorizon >= ranking.get(i).roiOverHorizon);
         }
     }
+
+    // =========================================================================
+    // Calcs Layer Tests
+    // =========================================================================
+
+    private static void test_calcs_get_P1_sums_to_1() {
+        double sum = 0.0;
+        for (int r = 1; r <= 6; r++) sum += Calcs.get_P1(r);
+        assertDoubleEq("Calcs.get_P1 sums to 1.0", 1.0, sum, 1e-12);
+    }
+
+    private static void test_calcs_get_P2_sums_to_1() {
+        double sum = 0.0;
+        for (int r = 2; r <= 12; r++) sum += Calcs.get_P2(r);
+        assertDoubleEq("Calcs.get_P2 sums to 1.0", 1.0, sum, 1e-12);
+    }
+
+    private static void test_calcs_get_I_delegates_correctly() {
+        // Weizenfeld roll=1 → 1 coin
+        assertEq("Calcs.get_I weizenfeld roll=1",
+                1, Calcs.get_I(1, "weizenfeld", false, false, 0, 0, 0, 5, new int[]{5}));
+        // Bäckerei roll=2 oop=true → 1 coin
+        assertEq("Calcs.get_I bäckerei roll=2 oop=true",
+                1, Calcs.get_I(2, "bäckerei", true, false, 0, 0, 0, 5, new int[]{}));
+    }
+
+    private static void test_calcs_immediate_ev_nonnegative() {
+        // Starting player with only starting cards: immediateEV ≥ 0
+        core.GameState gs = core.GameState.initial(2);
+        core.Project weizenfeld = core.ProjectLoader.getProject("weizenfeld").orElseThrow();
+        double ev = Calcs.immediateEV(gs, 0, weizenfeld, false);
+        assertTrue("Calcs.immediateEV ≥ 0 for weizenfeld (was " + ev + ")", ev >= 0.0);
+    }
+
+    private static void test_calcs_ev_per_round_blue_scales_with_players() {
+        // Weizenfeld (blue, roll 1) in 2-player: fires on both turns → ≈ 2*(1/6) = 0.333
+        core.GameState gs = core.GameState.initial(2);
+        gs.getPlayers()[0].getOwned_projects().clear();
+        core.Project weizenfeld = core.ProjectLoader.getProject("weizenfeld").orElseThrow();
+        double ev = Calcs.evPerRound(gs, 0, weizenfeld);
+        assertDoubleEq("Calcs.evPerRound weizenfeld 2-player ≈ 0.333", 2.0 / 6.0, ev, 0.005);
+    }
+
+    private static void test_calcs_roi_over_horizon_positive_for_cheap_card() {
+        core.GameState gs = core.GameState.initial(4);
+        gs.getPlayers()[0].setCoins(10);
+        core.Project weizenfeld = core.ProjectLoader.getProject("weizenfeld").orElseThrow();
+        calcs.RankEntry entry = Calcs.roiOverHorizon(gs, 0, weizenfeld, 10, 0.95);
+        assertTrue("Calcs.roiOverHorizon > 0 for weizenfeld over 10 turns", entry.roiOverHorizon > 0);
+        assertTrue("Calcs.roiOverHorizon.evPerRound > 0", entry.evPerRound > 0);
+    }
+
+    private static void test_calcs_baseline_win_prob_sums_to_one() {
+        core.GameState gs = core.GameState.initial(4);
+        double sum = 0.0;
+        for (int i = 0; i < 4; i++) sum += Calcs.computeBaselineWinProb(gs, i);
+        assertDoubleEq("Calcs.computeBaselineWinProb sums to 1.0 over 4 players", 1.0, sum, 1e-9);
+    }
+
+    private static void test_calcs_win_prob_delta_in_range() {
+        core.GameState gs = core.GameState.initial(4);
+        gs.getPlayers()[0].setCoins(10);
+        core.Project weizenfeld = core.ProjectLoader.getProject("weizenfeld").orElseThrow();
+        double delta = Calcs.estimateWinProbDelta(gs, 0, weizenfeld);
+        assertTrue("Calcs.estimateWinProbDelta in (-1, 1) (was " + delta + ")",
+                delta > -1.0 && delta < 1.0);
+    }
+
+    private static void test_calcs_portfolio_delta_ev_nonnegative_for_blue() {
+        // Adding any blue card to an empty portfolio can only help (delta ≥ 0)
+        core.GameState gs = core.GameState.initial(2);
+        gs.getPlayers()[0].getOwned_projects().clear();
+        core.Project weizenfeld = core.ProjectLoader.getProject("weizenfeld").orElseThrow();
+        double delta = Calcs.portfolioDeltaEV(gs, 0, weizenfeld);
+        assertTrue("Calcs.portfolioDeltaEV weizenfeld ≥ 0 (was " + delta + ")", delta >= 0.0);
+    }
+
+    private static void test_calcs_geometric_sum_identity_at_gamma1() {
+        // γ=1 → sum = T
+        assertDoubleEq("Calcs.geometricSum(10, 1.0) == 10.0", 10.0,
+                Calcs.geometricSum(10, 1.0), 1e-9);
+        // γ=0.95, T=1 → sum = 0.95
+        assertDoubleEq("Calcs.geometricSum(1, 0.95) == 0.95", 0.95,
+                Calcs.geometricSum(1, 0.95), 1e-9);
+    }
+
+    private static void test_calcs_optimal_dice_no_bahnhof_returns_1() {
+        // Without Bahnhof, always use 1d6 (optimalDiceCount = 1)
+        core.GameState gs = core.GameState.initial(2);
+        assertEq("Calcs.optimalDiceCount without Bahnhof = 1",
+                1, Calcs.optimalDiceCount(gs, 0));
+    }
+
+    // =========================================================================
+    // Engine Registry Tests
+    // =========================================================================
+
+    private static void test_engine_registry_loads_entries() {
+        // EngineRegistry must load at least one entry from engines.json
+        java.util.List<EngineRegistryEntry> entries = EngineRegistry.getAll();
+        assertTrue("EngineRegistry loads at least 1 entry (found " + entries.size() + ")",
+                !entries.isEmpty());
+    }
+
+    private static void test_engine_registry_has_default() {
+        // getDefault() must return a non-null entry
+        EngineRegistryEntry def = EngineRegistry.getDefault();
+        assertTrue("EngineRegistry.getDefault() is non-null", def != null);
+        assertTrue("EngineRegistry.getDefault().id() is non-empty",
+                def.id() != null && !def.id().isEmpty());
+    }
+
+    private static void test_engine_registry_default_is_balanced() {
+        // The balanced entry should be the default (per engines.json)
+        EngineRegistryEntry def = EngineRegistry.getDefault();
+        assertTrue("Default engine is mcts-v1-balanced (was " + def.id() + ")",
+                "mcts-v1-balanced".equals(def.id()));
+        assertTrue("Default entry isDefault flag is true", def.isDefault());
+    }
+
+    private static void test_engine_registry_find_by_id() {
+        // findById for existing id returns non-empty; for unknown returns empty
+        assertTrue("findById mcts-v1-fast returns present",
+                EngineRegistry.findById("mcts-v1-fast").isPresent());
+        assertTrue("findById unknown-id returns empty",
+                EngineRegistry.findById("no-such-engine").isEmpty());
+        // Config of fast entry has correct iterations
+        EngineRegistryEntry fast = EngineRegistry.findById("mcts-v1-fast").orElseThrow();
+        assertEq("mcts-v1-fast iterations = 500", 500, fast.config().iterations);
+        assertEq("mcts-v1-fast engineClass = mcts-v1", "mcts-v1", fast.engineClass());
+    }
+
+    // =========================================================================
+    // Assertion helpers
+    // =========================================================================
 
     private static void assertTrue(String label, boolean condition) {
         if (condition) {

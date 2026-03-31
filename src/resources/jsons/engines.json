@@ -1,0 +1,32 @@
+[
+  {
+    "id": "mcts-v1-fast",
+    "engineClass": "mcts-v1",
+    "description": "MCTS v1 — fast mode (~500 iterations)",
+    "default": false,
+    "config": {
+      "iterations": "500",
+      "rolloutPolicy": "greedy"
+    }
+  },
+  {
+    "id": "mcts-v1-balanced",
+    "engineClass": "mcts-v1",
+    "description": "MCTS v1 — balanced mode (~5000 iterations)",
+    "default": true,
+    "config": {
+      "iterations": "5000",
+      "rolloutPolicy": "greedy"
+    }
+  },
+  {
+    "id": "mcts-v1-deep",
+    "engineClass": "mcts-v1",
+    "description": "MCTS v1 — deep mode (~50000 iterations)",
+    "default": false,
+    "config": {
+      "iterations": "50000",
+      "rolloutPolicy": "greedy"
+    }
+  }
+]

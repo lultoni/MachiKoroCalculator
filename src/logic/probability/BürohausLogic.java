@@ -45,7 +45,7 @@ final class BürohausLogic {
         Project worstOwn = null;
         double worstOwnEV = Double.MAX_VALUE;
         for (Project p : active.getOwned_projects()) {
-            if (p.isIs_grossprojekt() || p.getId().equals("bürohaus")) continue;
+            if (p.isIs_grossprojekt() || "lila".equals(p.getColor())) continue;
             double ev = CardIncome.contextualCardEvPerRound(p, activeStats, n, oppCoins);
             if (ev < worstOwnEV) { worstOwnEV = ev; worstOwn = p; }
         }
@@ -56,7 +56,7 @@ final class BürohausLogic {
         for (int i = 0; i < n; i++) {
             if (i == playerIndex) continue;
             for (Project p : state.getPlayers()[i].getOwned_projects()) {
-                if (p.isIs_grossprojekt()) continue;
+                if (p.isIs_grossprojekt() || "lila".equals(p.getColor())) continue;
                 // Evaluate the opponent's card in the active player's context:
                 // what would this card be worth if the active player owned it?
                 double ev = CardIncome.contextualCardEvPerRound(p, activeStats, n, oppCoins);

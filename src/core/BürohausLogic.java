@@ -7,9 +7,14 @@ package core;
  * with any non-landmark establishment owned by another player. The swap is optional.
  *
  * <p>These methods implement a greedy heuristic: always trade the lowest-EV
- * card the active player owns for the highest-EV card any opponent owns,
- * provided the swap is beneficial (i.e. the opponent's card has higher EV
- * in the active player's context than the player's worst card).
+ * non-landmark, non-purple card the active player owns for the highest-EV
+ * non-landmark, non-purple card any opponent owns, provided the swap is
+ * beneficial (i.e. the opponent's card has higher EV in the active player's
+ * context than the player's worst card).
+ *
+ * <p>Purple (lila) cards are excluded because they are unique per player —
+ * swapping one would give the recipient a second copy of a unique card,
+ * which is illegal under the official rules.
  *
  * <p>Card EV is evaluated in the active player's real context (actual
  * Einkaufszentrum status, food/animal/production counts) so that synergy
@@ -37,7 +42,7 @@ public final class BürohausLogic {
         Project worstOwn = null;
         double worstOwnEV = Double.MAX_VALUE;
         for (Project p : active.getOwned_projects()) {
-            if (p.isIs_grossprojekt() || p.getId().equals("bürohaus")) continue;
+            if (p.isIs_grossprojekt() || "lila".equals(p.getColor())) continue;
             double ev = CardIncome.contextualCardEvPerRound(p, activeStats, n, oppCoins);
             if (ev < worstOwnEV) { worstOwnEV = ev; worstOwn = p; }
         }
@@ -48,7 +53,7 @@ public final class BürohausLogic {
         for (int i = 0; i < n; i++) {
             if (i == playerIndex) continue;
             for (Project p : state.getPlayers()[i].getOwned_projects()) {
-                if (p.isIs_grossprojekt()) continue;
+                if (p.isIs_grossprojekt() || "lila".equals(p.getColor())) continue;
                 double ev = CardIncome.contextualCardEvPerRound(p, activeStats, n, oppCoins);
                 if (ev > bestOppEV) { bestOppEV = ev; bestOpp = p; bestOppPlayer = i; }
             }

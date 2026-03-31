@@ -179,6 +179,14 @@ public class RuntimeTester {
         test_mcts_confidence_in_range(mctsEngine, mctsGs, fastConfig);
         test_mcts_visit_count_sums_to_iterations(mctsEngine, mctsGs, fastConfig);
 
+        System.out.println("\n=== Variant B: Boltzmann Rollout Engine Tests ===\n");
+        engine.MctsBoltzmannRolloutEngine boltzEngine = new engine.MctsBoltzmannRolloutEngine();
+        test_boltzmann_rollout_returns_nonnull_result(boltzEngine, mctsGs, fastConfig);
+        test_boltzmann_rollout_includes_save_option(boltzEngine, mctsGs, fastConfig);
+        test_boltzmann_rollout_scores_descending(boltzEngine, mctsGs, fastConfig);
+        test_boltzmann_rollout_obvious_landmark_buy(boltzEngine);
+        test_boltzmann_rollout_registry_entries_exist();
+
         System.out.println("\n=== Variant A: Greedy Rollout Engine Tests ===\n");
         engine.MctsGreedyRolloutEngine greedyEngine = new engine.MctsGreedyRolloutEngine();
         test_greedy_rollout_returns_nonnull_result(greedyEngine, mctsGs, fastConfig);
@@ -1923,6 +1931,72 @@ public class RuntimeTester {
                 visitSum > 0);
         assertTrue("mcts: sum of child visit counts ≤ 2 × iterationsUsed (sane upper bound)",
                 visitSum <= 2L * result.iterationsUsed);
+    }
+
+    // =========================================================================
+    // Variant B: Boltzmann Rollout Engine Tests
+    // =========================================================================
+
+    private static void test_boltzmann_rollout_returns_nonnull_result(
+            engine.MctsBoltzmannRolloutEngine eng, core.GameState gs, engine.EngineConfig cfg) {
+        engine.EngineResult result = eng.evaluate(gs, 0, cfg);
+        assertTrue("boltzmann-rollout: evaluate returns non-null EngineResult", result != null);
+    }
+
+    private static void test_boltzmann_rollout_includes_save_option(
+            engine.MctsBoltzmannRolloutEngine eng, core.GameState gs, engine.EngineConfig cfg) {
+        engine.EngineResult result = eng.evaluate(gs, 0, cfg);
+        boolean hasSave = result.rankedOptions.stream()
+                .anyMatch(o -> "_wait_".equals(o.project.getId()));
+        assertTrue("boltzmann-rollout: rankedOptions contains save sentinel", hasSave);
+    }
+
+    private static void test_boltzmann_rollout_scores_descending(
+            engine.MctsBoltzmannRolloutEngine eng, core.GameState gs, engine.EngineConfig cfg) {
+        engine.EngineResult result = eng.evaluate(gs, 0, cfg);
+        boolean sorted = true;
+        for (int i = 1; i < result.rankedOptions.size(); i++) {
+            if (result.rankedOptions.get(i).score > result.rankedOptions.get(i - 1).score) {
+                sorted = false; break;
+            }
+        }
+        assertTrue("boltzmann-rollout: rankedOptions scores are non-increasing", sorted);
+    }
+
+    private static void test_boltzmann_rollout_obvious_landmark_buy(
+            engine.MctsBoltzmannRolloutEngine eng) {
+        core.Project bahnhof   = core.ProjectLoader.getProject("bahnhof").orElseThrow();
+        core.Project einkauf   = core.ProjectLoader.getProject("einkaufszentrum").orElseThrow();
+        core.Project freizeit  = core.ProjectLoader.getProject("freizeitpark").orElseThrow();
+        core.Project funkturm  = core.ProjectLoader.getProject("funkturm").orElseThrow();
+        core.Project weizen    = core.ProjectLoader.getProject("weizenfeld").orElseThrow();
+        core.Project baeckerei = core.ProjectLoader.getProject("bäckerei").orElseThrow();
+        java.util.ArrayList<core.Project> o0 = new java.util.ArrayList<>();
+        o0.add(weizen); o0.add(baeckerei); o0.add(bahnhof); o0.add(einkauf); o0.add(freizeit);
+        java.util.ArrayList<core.Project> o1 = new java.util.ArrayList<>();
+        o1.add(weizen); o1.add(baeckerei);
+        java.util.ArrayList<core.Project> unbuilt = new java.util.ArrayList<>();
+        unbuilt.add(funkturm);
+        core.Player p0 = new core.Player("Alice", 22, o0);
+        core.Player p1 = new core.Player("Bob",    3, o1);
+        core.GameState gs = new core.GameState(new core.Player[]{p0, p1}, unbuilt);
+        engine.EngineResult result = eng.evaluate(gs, 0, engine.EngineConfig.ofIterations(500));
+        String topId = result.topRecommendation().project.getId();
+        assertEq("boltzmann-rollout: obvious winning move is Funkturm", "funkturm", topId);
+    }
+
+    private static void test_boltzmann_rollout_registry_entries_exist() {
+        // 3 temperatures × 3 modes = 9 entries
+        String[] ids = {
+            "mcts-v1-boltzmann-t03-fast", "mcts-v1-boltzmann-t03-balanced", "mcts-v1-boltzmann-t03-deep",
+            "mcts-v1-boltzmann-t07-fast", "mcts-v1-boltzmann-t07-balanced", "mcts-v1-boltzmann-t07-deep",
+            "mcts-v1-boltzmann-t20-fast", "mcts-v1-boltzmann-t20-balanced", "mcts-v1-boltzmann-t20-deep"
+        };
+        for (String id : ids) {
+            assertTrue("engines.json has " + id, iface.EngineRegistry.findById(id).isPresent());
+        }
+        iface.EngineRegistryEntry t07bal = iface.EngineRegistry.findById("mcts-v1-boltzmann-t07-balanced").orElseThrow();
+        assertEq("boltzmann-t07-balanced engineClass", "mcts-v1-boltzmann-rollout", t07bal.engineClass());
     }
 
     // =========================================================================

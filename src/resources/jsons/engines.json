@@ -55,5 +55,95 @@
     "config": {
       "iterations": "50000"
     }
+  },
+  {
+    "id": "mcts-v1-boltzmann-t03-fast",
+    "engineClass": "mcts-v1-boltzmann-rollout",
+    "description": "MCTS Variant B — Boltzmann rollout T=0.3, fast mode (~500 iterations)",
+    "default": false,
+    "config": {
+      "iterations": "500",
+      "rolloutTemperature": "0.3"
+    }
+  },
+  {
+    "id": "mcts-v1-boltzmann-t03-balanced",
+    "engineClass": "mcts-v1-boltzmann-rollout",
+    "description": "MCTS Variant B — Boltzmann rollout T=0.3, balanced mode (~5000 iterations)",
+    "default": false,
+    "config": {
+      "iterations": "5000",
+      "rolloutTemperature": "0.3"
+    }
+  },
+  {
+    "id": "mcts-v1-boltzmann-t03-deep",
+    "engineClass": "mcts-v1-boltzmann-rollout",
+    "description": "MCTS Variant B — Boltzmann rollout T=0.3, deep mode (~50000 iterations)",
+    "default": false,
+    "config": {
+      "iterations": "50000",
+      "rolloutTemperature": "0.3"
+    }
+  },
+  {
+    "id": "mcts-v1-boltzmann-t07-fast",
+    "engineClass": "mcts-v1-boltzmann-rollout",
+    "description": "MCTS Variant B — Boltzmann rollout T=0.7, fast mode (~500 iterations)",
+    "default": false,
+    "config": {
+      "iterations": "500",
+      "rolloutTemperature": "0.7"
+    }
+  },
+  {
+    "id": "mcts-v1-boltzmann-t07-balanced",
+    "engineClass": "mcts-v1-boltzmann-rollout",
+    "description": "MCTS Variant B — Boltzmann rollout T=0.7, balanced mode (~5000 iterations)",
+    "default": false,
+    "config": {
+      "iterations": "5000",
+      "rolloutTemperature": "0.7"
+    }
+  },
+  {
+    "id": "mcts-v1-boltzmann-t07-deep",
+    "engineClass": "mcts-v1-boltzmann-rollout",
+    "description": "MCTS Variant B — Boltzmann rollout T=0.7, deep mode (~50000 iterations)",
+    "default": false,
+    "config": {
+      "iterations": "50000",
+      "rolloutTemperature": "0.7"
+    }
+  },
+  {
+    "id": "mcts-v1-boltzmann-t20-fast",
+    "engineClass": "mcts-v1-boltzmann-rollout",
+    "description": "MCTS Variant B — Boltzmann rollout T=2.0, fast mode (~500 iterations)",
+    "default": false,
+    "config": {
+      "iterations": "500",
+      "rolloutTemperature": "2.0"
+    }
+  },
+  {
+    "id": "mcts-v1-boltzmann-t20-balanced",
+    "engineClass": "mcts-v1-boltzmann-rollout",
+    "description": "MCTS Variant B — Boltzmann rollout T=2.0, balanced mode (~5000 iterations)",
+    "default": false,
+    "config": {
+      "iterations": "5000",
+      "rolloutTemperature": "2.0"
+    }
+  },
+  {
+    "id": "mcts-v1-boltzmann-t20-deep",
+    "engineClass": "mcts-v1-boltzmann-rollout",
+    "description": "MCTS Variant B — Boltzmann rollout T=2.0, deep mode (~50000 iterations)",
+    "default": false,
+    "config": {
+      "iterations": "50000",
+      "rolloutTemperature": "2.0"
+    }
   }
 ]

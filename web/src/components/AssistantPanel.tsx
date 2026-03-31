@@ -1,0 +1,129 @@
+/** Assistant panel — shows top recommendation + expandable explanation. */
+
+import { useState } from 'react';
+import { useLocale } from '../i18n/useLocale';
+import type { RankedOption, MetricRange, ProjectDef } from '../api/types';
+import { RankedList } from './RankedList';
+
+interface Props {
+  options: RankedOption[];
+  metricRanges: Record<string, MetricRange> | undefined;
+  loading: boolean;
+  projects: { byId: (id: string) => ProjectDef | undefined };
+  language: 'de' | 'en';
+  onHover: (card: { projectId: string; cost: number } | null) => void;
+  onBuy: (projectId: string | null) => void;
+}
+
+export function AssistantPanel({ options, metricRanges, loading, projects, language, onHover, onBuy }: Props) {
+  const { t } = useLocale();
+  const [showAll, setShowAll] = useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  if (loading) {
+    return (
+      <div className="bg-machi-surface rounded-xl border border-machi-border p-6 text-center">
+        <p className="text-machi-text-dim animate-pulse">{t('insights.analyzing')}</p>
+      </div>
+    );
+  }
+
+  if (options.length === 0) {
+    return (
+      <div className="bg-machi-surface rounded-xl border border-machi-border p-4 text-center text-machi-text-dim text-sm">
+        {t('purchase.recommendation')}: —
+      </div>
+    );
+  }
+
+  const top = options[0];
+  const topProj = projects.byId(top.projectId);
+  const topName = topProj?.[`name_${language}` as 'name_de' | 'name_en'] ?? top.projectId;
+  const winPct = (top.score * 100).toFixed(1);
+
+  return (
+    <div className="space-y-3">
+      {/* Top recommendation */}
+      <div className="bg-machi-surface rounded-xl border border-machi-border p-4 space-y-3">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="text-xs text-machi-text-dim uppercase tracking-wider mb-1">
+              {t('purchase.recommendation')}
+            </div>
+            <div className={`text-lg font-bold ${cardTextClass(topProj?.color)}`}>
+              {topName}
+            </div>
+            {top.explanationFactors.length > 0 && (
+              <p className="text-sm text-machi-text-dim mt-1">{top.explanationFactors[0]}</p>
+            )}
+          </div>
+          <div className="text-right shrink-0">
+            <div className="text-2xl font-bold text-machi-green">{winPct}%</div>
+            <div className="text-xs text-machi-text-dim">{t('purchase.winRate')}</div>
+          </div>
+        </div>
+
+        {/* Explanation factors */}
+        {top.explanationFactors.length > 1 && (
+          <ul className="text-xs text-machi-text-dim space-y-0.5 pl-3 list-disc">
+            {top.explanationFactors.slice(1).map((f, i) => (
+              <li key={i}>{f}</li>
+            ))}
+          </ul>
+        )}
+
+        {/* Action buttons */}
+        <div className="flex gap-2">
+          <button
+            className="flex-1 py-2 rounded-lg font-semibold bg-machi-accent text-machi-bg hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-50"
+            onClick={() => onBuy(top.projectId)}
+            disabled={!top.affordable}
+          >
+            {t('coins.buy')} {topName}
+            {topProj && <span className="ml-1 text-sm opacity-75">({topProj.cost}c)</span>}
+          </button>
+          <button
+            className="px-3 py-2 rounded-lg text-sm text-machi-text-dim hover:text-machi-text border border-machi-border hover:border-machi-text-dim transition-all"
+            onClick={() => onBuy(null)}
+          >
+            {t('btn.skip')}
+          </button>
+        </div>
+      </div>
+
+      {/* See all options toggle */}
+      <button
+        className="w-full text-sm text-machi-text-dim hover:text-machi-accent transition-colors py-1"
+        onClick={() => setShowAll(!showAll)}
+      >
+        {t('purchase.seeAll')} {showAll ? '▾' : '▸'}
+      </button>
+
+      {/* Full ranked list */}
+      {showAll && (
+        <div className="bg-machi-surface rounded-xl border border-machi-border p-3">
+          <RankedList
+            options={options}
+            metricRanges={metricRanges}
+            projects={projects}
+            language={language}
+            onHover={onHover}
+            onSelect={setSelectedId}
+            selectedId={selectedId}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function cardTextClass(color?: string): string {
+  switch (color) {
+    case 'blau': return 'text-machi-blue';
+    case 'rot': return 'text-machi-red';
+    case 'grün': return 'text-machi-green';
+    case 'lila': return 'text-machi-purple';
+    case 'gelb': return 'text-machi-yellow';
+    default: return 'text-machi-text';
+  }
+}

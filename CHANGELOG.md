@@ -4,6 +4,54 @@ Implementation history: what was built, why, and which design decisions were mad
 
 ---
 
+## Phase 4: Web UI
+
+### 4.1 — Backend Session API + Evaluate Enhancement
+
+13 new server handlers for full session lifecycle management:
+- `SessionManager` — singleton holder for active `GameSession`
+- `SessionCreateHandler`, `SessionStateHandler`, `SessionTurnHandler`, `SessionBürohausHandler`, `SessionUndoHandler` — core game flow
+- `SessionSaveHandler`, `SessionLoadHandler`, `SessionSavesListHandler` — persistence
+- `SessionFromSnapshotHandler` — mid-game state import
+- `SessionInsightsHandler` — position analysis (ETW, tempo, portfolio EV, supply warnings)
+- `StaticFileHandler` — serves `web/dist/` static files
+- `SessionSerializer` — canonical JSON format for session state
+
+`EvaluateHandler` enhanced with `metricRanges` (min/max per metric for color gradients) and `perRollDeltas` (coin deltas per possible roll total for instant dice switching).
+
+BürohausNode dedup bugfix: deduplicate own/opponent card types before building swap branches (shared by all 6 engines).
+
+54 new tests in RuntimeTester "Session API Tests" section.
+
+### 4.2–4.10 — React Web SPA
+
+**Tech stack:** React 18 + TypeScript + Vite + Tailwind CSS v4.
+
+**27 source files** organized into:
+- `api/` — typed fetch wrappers + TypeScript interfaces matching Java JSON contracts
+- `hooks/` — `useSession`, `useEngine`, `useRollPreview`, `useSettings`, `useProjects`, `useHover`
+- `utils/` — `metricColor` (red→yellow→green gradient), `columns` (adjustable ranked list column config)
+- `i18n/` — DE/EN locale strings via React Context + localStorage
+- `components/` — 11 components:
+  - `SetupScreen` — new game + saved games list + from-snapshot
+  - `GameScreen` — 3-column dashboard with dice/coins/purchase center
+  - `TurnIndicator` — active player badge + turn count + bonus turn
+  - `DiceInterface` — clickable die faces with instant roll selection
+  - `CoinFlowDisplay` — Now/Roll/Buy columns with live color-coded preview
+  - `PurchaseArea` + `AssistantPanel` + `RankedList` — engine recommendation + manual buy + sortable metrics table
+  - `OpponentTurnEntry` — simplified dice + purchase tracking for opponents
+  - `BürohausModal` — card swap UI with engine-ranked recommendations
+  - `SettingsScreen` — engine, language, autosave, user player
+  - `SaveLoadMenu` — save/load game files
+
+**Key design decisions:**
+- Engine-adaptive UI: RankedList shows only columns whose metric keys exist in the engine response
+- Color-coded metrics: each value mapped to red→yellow→green gradient using metricRanges min/max
+- Instant dice switching: evaluate called once, perRollDeltas cached, frontend indexes by roll total
+- Bürohaus triggers on roll total = 6 (any dice combination)
+
+---
+
 ## Phase 3: Engine Variants + Calcs Extensions (in progress)
 
 ### 3.0 — 11 Advanced Calcs Metrics (commit cb3a1d9)

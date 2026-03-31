@@ -118,15 +118,15 @@ Replace the Swing UI with a web SPA talking to the Java HTTP API.
 | Task | Description | Status |
 |------|-------------|--------|
 | 4.1 | Design API contract: endpoints for game state CRUD, engine evaluation, turn tracking, session persistence. Session management (create, state, turn, bürohaus, undo, save, load, saves list, from-snapshot, insights), evaluate enhancement (metricRanges, perRollDeltas), static file serving. | done |
-| 4.2 | Set up SPA project (framework TBD: React or Svelte). | pending |
-| 4.3 | Implement Turn Indicator component (Section 3.1). | pending |
-| 4.4 | Implement Dice Interface component (Section 3.2). | pending |
-| 4.5 | Implement Coin Flow Display with live preview (Section 3.3): Now/Roll/Buy columns, color-coding, hover-linked project updates. | pending |
-| 4.6 | Implement Purchase Decision Area with dual paths: manual tracking + assistant recommendation (Section 3.4). | pending |
-| 4.7 | Implement opponent turn tracking: minimal quick-entry (roll + buy), passive insights panel (Section 4). | pending |
-| 4.8 | Implement settings screen: engine selection, mode toggle (Fast/Balanced/Deep), language, autosave. | pending |
-| 4.9 | Implement session persistence UI: save/load in submenu, past games list, autosave (Section 9.1). | pending |
-| 4.10 | Localization: wire DE/EN through the web UI. | pending |
+| 4.2 | Set up SPA project (React 18 + TypeScript + Vite + Tailwind CSS v4). Types, API client, hooks, utils, i18n. | done |
+| 4.3 | Implement Turn Indicator component (Section 3.1). | done |
+| 4.4 | Implement Dice Interface component (Section 3.2). | done |
+| 4.5 | Implement Coin Flow Display with live preview (Section 3.3): Now/Roll/Buy columns, color-coding, hover-linked project updates. | done |
+| 4.6 | Implement Purchase Decision Area with dual paths: manual tracking + assistant recommendation (Section 3.4). Includes RankedList with engine-adaptive columns and color-coded metric gradients. | done |
+| 4.7 | Implement opponent turn tracking: minimal quick-entry (roll + buy), Bürohaus modal with engine-ranked swap options. | done |
+| 4.8 | Implement settings screen: engine selection, mode toggle, language, autosave, user player. | done |
+| 4.9 | Implement session persistence UI: save/load modal, saves list. | done |
+| 4.10 | Localization: DE/EN through the web UI via React Context + localStorage. | done |
 
 ---
 

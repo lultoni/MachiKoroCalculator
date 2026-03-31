@@ -29,7 +29,7 @@ ETW and tempo use `ProjectLoader.getAllProjects()` to compute remaining landmark
 
 14 TDD tests added to `RuntimeTester`.
 
-### 3.A — Variant A: Greedy Rollout Engine (in progress)
+### 3.A — Variant A: Greedy Rollout Engine
 
 `engine.MctsGreedyRolloutEngine` — Variant A of the MCTS engine. Tree phase is unchanged (full UCT via `MctsTree`). Only the rollout policy changes.
 
@@ -47,6 +47,42 @@ ETW and tempo use `ProjectLoader.getAllProjects()` to compute remaining landmark
 Registry entries: `mcts-v1-greedy-rollout-fast` (500 iter), `-balanced` (5000), `-deep` (50000).
 
 6 TDD tests + smoke run verify the greedy engine is functionally equivalent to v1 (same contract: non-null, non-empty, save sentinel, descending scores, obvious-win landmark, registry presence).
+
+### 3.B — Variant B: Boltzmann Rollout Engine
+
+`engine.MctsBoltzmannRolloutEngine` — Boltzmann (softmax) purchase sampling in the rollout phase. Temperature `T` read from `config.getExtra("rolloutTemperature", "0.7")`. Passed to `buildTree()` via `ThreadLocal<Double>`.
+
+**Rollout policy** (`engine.mcts.BoltzmannRollout`): `P_i ∝ exp(roi_i / T)`. Landmark purchase is deterministic (cheapest affordable first). Non-landmark cards are sampled proportionally to ROI. Dice/Funkturm/Bürohaus decisions same as Variant A (greedy).
+
+Registry entries: 9 total — 3 temperatures (T=0.3, T=0.7, T=2.0) × 3 modes (fast 500, balanced 5000, deep 50000).
+
+5 TDD tests green.
+
+### 3.C — Variant C: Greedy Tree Engine
+
+`engine.MctsGreedyTreeEngine` — UCT everywhere except `BuyDecisionNode` uses argmax (highest win rate) instead of UCB1. All other nodes (DiceChoiceNode, ChanceNode, FunkturmNode, BürohausNode) keep UCT. Rollout = uniform random (same as v1).
+
+Implemented via `greedyBuySelection` boolean flag in `MctsTree`. When true, `select()` dispatches to `selectGreedyChild()` instead of `selectBestChild()` for `BuyDecisionNode` instances.
+
+Registry entries: `mcts-v1-greedy-tree-fast/balanced/deep`.
+
+4 TDD tests green.
+
+### 3.D — Variant D: Depth-Limited Rollout Engine
+
+`engine.MctsDepthLimitedEngine` — rollouts stop after `extra.maxRolloutDepth` turns (default 10) and evaluate the resulting state using `WinProbability.computeBaselineWinProb` instead of simulating to game completion. Tree phase unchanged (full UCT).
+
+`engine.mcts.DepthLimitedRollout.withMaxDepth(n)` returns a `RolloutFn`. Shared uniform-random helpers in `MctsRollout` were made package-visible (`applyBürohausRandomPackage`, `applyPurchaseRandomPackage`, `playBonusTurnPackage`) so `DepthLimitedRollout` can reuse them without duplication.
+
+Registry entries: `mcts-v1-depth3`, `mcts-v1-depth7`, `mcts-v1-depth10`.
+
+8 TDD tests green.
+
+### Selective Test Runner
+
+`RuntimeTester` now supports `--section "name"` and `--test name` CLI flags for running a subset of tests. Section matching is case-insensitive substring (`--section "Variant D"` matches `"Variant D: Depth-Limited Rollout Engine Tests"`). Multiple `--section` flags can be combined. When a filter is active, benchmarks are skipped. The results line reports skipped section count.
+
+Example: `java -cp "out:src:gson-2.11.0.jar" Tests.RuntimeTester --section "Variant D"` runs only the 8 Variant D tests in ~2 seconds instead of waiting ~4 minutes for the full suite.
 
 ---
 

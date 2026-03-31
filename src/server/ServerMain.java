@@ -1,6 +1,7 @@
 package server;
 
 import engine.MctsBoltzmannRolloutEngine;
+import engine.MctsDepthLimitedEngine;
 import engine.MctsGreedyRolloutEngine;
 import engine.MctsGreedyTreeEngine;
 import engine.MctsV1Engine;
@@ -30,11 +31,12 @@ public final class ServerMain {
         orchestrator.register(new MctsGreedyRolloutEngine());
         orchestrator.register(new MctsBoltzmannRolloutEngine());
         orchestrator.register(new MctsGreedyTreeEngine());
+        orchestrator.register(new MctsDepthLimitedEngine());
 
         ApiServer server = new ApiServer(orchestrator);
         server.start();
 
-        System.out.println("[ServerMain] MCTS v1 + Variant A (greedy) + Variant B (Boltzmann) engines registered. Server running.");
+        System.out.println("[ServerMain] MCTS v1 + Variant A (greedy) + Variant B (Boltzmann) + Variant C (greedy tree) + Variant D (depth-limited) engines registered. Server running.");
         System.out.println("[ServerMain] Press Ctrl+C to stop.");
 
         // Keep the main thread alive until interrupted

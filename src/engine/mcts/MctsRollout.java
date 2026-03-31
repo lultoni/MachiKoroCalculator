@@ -116,11 +116,11 @@ public final class MctsRollout {
 
             // ---- Bürohaus: on roll 6, pick uniformly from all valid swaps + no-swap ----
             if (state.getPlayers()[activePlayer].hasProject("bürohaus") && roll == 6) {
-                supply = applyBürohausRandom(state, supply, activePlayer, rng);
+                supply = applyBürohausRandomPackage(state, supply, activePlayer, rng);
             }
 
             // ---- Purchase ----
-            supply = applyPurchaseRandom(state, supply, activePlayer, rng);
+            supply = applyPurchaseRandomPackage(state, supply, activePlayer, rng);
 
             // ---- Win check ----
             if (GameState.hasWon(state.getPlayers()[activePlayer])) {
@@ -131,7 +131,7 @@ public final class MctsRollout {
             boolean hasFreizeit = state.getPlayers()[activePlayer].hasProject("freizeitpark");
             if (hasFreizeit && doubles) {
                 // Bonus turn: same player acts again (no further chaining if bonus doubles)
-                supply = playBonusTurn(state, supply, activePlayer, playerPerspective, rng);
+                supply = playBonusTurnPackage(state, supply, activePlayer, playerPerspective, rng);
                 // Win check after bonus turn
                 if (GameState.hasWon(state.getPlayers()[activePlayer])) {
                     return activePlayer == playerPerspective ? 1.0 : 0.0;
@@ -156,7 +156,7 @@ public final class MctsRollout {
      * Uses the same uniform-random policy as the main loop, but with {@code isBonusTurn=true}
      * so no further Freizeitpark chaining occurs even on doubles.
      */
-    private static SupplyTracker playBonusTurn(GameState state, SupplyTracker supply,
+    static SupplyTracker playBonusTurnPackage(GameState state, SupplyTracker supply,
                                                 int activePlayer, int playerPerspective,
                                                 ThreadLocalRandom rng) {
         boolean hasBahnhof = state.getPlayers()[activePlayer].hasProject("bahnhof");
@@ -180,10 +180,10 @@ public final class MctsRollout {
         }
 
         if (state.getPlayers()[activePlayer].hasProject("bürohaus") && roll == 6) {
-            supply = applyBürohausRandom(state, supply, activePlayer, rng);
+            supply = applyBürohausRandomPackage(state, supply, activePlayer, rng);
         }
 
-        supply = applyPurchaseRandom(state, supply, activePlayer, rng);
+        supply = applyPurchaseRandomPackage(state, supply, activePlayer, rng);
         return supply;
     }
 
@@ -193,7 +193,7 @@ public final class MctsRollout {
      *
      * @return updated supply (unchanged, since swaps don't affect supply counts)
      */
-    private static SupplyTracker applyBürohausRandom(GameState state, SupplyTracker supply,
+    static SupplyTracker applyBürohausRandomPackage(GameState state, SupplyTracker supply,
                                                       int activePlayer,
                                                       ThreadLocalRandom rng) {
         Player active = state.getPlayers()[activePlayer];
@@ -244,7 +244,7 @@ public final class MctsRollout {
      *
      * @return updated supply tracker (decremented for non-landmark purchases)
      */
-    private static SupplyTracker applyPurchaseRandom(GameState state, SupplyTracker supply,
+    static SupplyTracker applyPurchaseRandomPackage(GameState state, SupplyTracker supply,
                                                       int activePlayer,
                                                       ThreadLocalRandom rng) {
         Player active = state.getPlayers()[activePlayer];

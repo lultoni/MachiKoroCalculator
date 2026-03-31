@@ -106,7 +106,7 @@ After initial survey of `config.iterations / 5` iterations, identify top-2 candi
 | 3.A | Implement Variant A: greedy rollout policy. H2H vs v1. | done |
 | 3.B | Implement Variant B: Boltzmann rollout policy. H2H vs v1 + A. | done |
 | 3.C | Implement Variant C: greedy tree selection. H2H vs all prior. | done |
-| 3.D | Implement Variant D: depth-limited rollout + heuristic eval. H2H vs all prior. | pending |
+| 3.D | Implement Variant D: depth-limited rollout + heuristic eval. H2H vs all prior. | done |
 | 3.E | Implement Variant E: adaptive iteration budget. H2H vs all prior. | pending |
 
 ---
@@ -166,6 +166,7 @@ Build the engine comparison and validation framework. Used both during Phase 3 v
 | 7.2 | Refine UI based on real gameplay usage. | pending |
 | 7.3 | Expansion card support (out of scope until core is perfected). | pending |
 | 7.4 | Opponent archetypes for more realistic simulation (Landmark-Rusher, Income-Maximizer, Blocker). | pending |
+| 7.5 | Selective test runner: extend `RuntimeTester` to accept CLI args for running a named test or a named section (e.g. `--section "Variant D"` or `--test test_mcts_obvious_landmark_buy`). | done |
 
 ---
 

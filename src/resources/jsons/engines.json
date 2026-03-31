@@ -172,5 +172,35 @@
     "config": {
       "iterations": "50000"
     }
+  },
+  {
+    "id": "mcts-v1-depth3",
+    "engineClass": "mcts-v1-depth-limited",
+    "description": "MCTS Variant D — depth-limited rollout (depth=3) with heuristic eval",
+    "default": false,
+    "config": {
+      "iterations": "2000",
+      "maxRolloutDepth": "3"
+    }
+  },
+  {
+    "id": "mcts-v1-depth7",
+    "engineClass": "mcts-v1-depth-limited",
+    "description": "MCTS Variant D — depth-limited rollout (depth=7) with heuristic eval",
+    "default": false,
+    "config": {
+      "iterations": "2000",
+      "maxRolloutDepth": "7"
+    }
+  },
+  {
+    "id": "mcts-v1-depth10",
+    "engineClass": "mcts-v1-depth-limited",
+    "description": "MCTS Variant D — depth-limited rollout (depth=10) with heuristic eval",
+    "default": false,
+    "config": {
+      "iterations": "2000",
+      "maxRolloutDepth": "10"
+    }
   }
 ]

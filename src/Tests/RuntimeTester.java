@@ -18,208 +18,285 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Optional;
+import java.util.Set;
 
 public class RuntimeTester {
 
+    @FunctionalInterface
+    private interface ThrowingRunnable {
+        void run() throws Exception;
+    }
+
     private static int passed = 0;
     private static int failed = 0;
+    private static int skippedSections = 0;
+
+    /** Null = run everything. Set via --section or --test flags. */
+    private static Set<String> activeSections = null;
+    private static Set<String> activeTests    = null;
 
     public static void main(String[] args) throws Exception {
-        System.out.println("\n=== Phase 1 Model Tests ===\n");
-        test_project_loader_count();
-        test_project_loader_known_project();
-        test_project_loader_unknown_project();
-        test_project_loader_cache_is_fast();
-        test_player_copy();
-        test_game_state_initial();
-        test_game_state_copy_is_independent();
-
-        System.out.println("\n=== Phase 2 Math Engine Tests ===\n");
-        test_probability_tables_sum_to_1();
-        test_get_I_weizenfeld();
-        test_get_I_baeckerei_green();
-        test_get_I_bauernhof_blue();
-        test_get_I_cafe_red_inability_to_pay();
-        test_get_I_familienrestaurant_red();
-        test_get_I_stadion_all_opponents();
-        test_get_I_fernsehsender_richest_only();
-        test_get_I_molkerei_synergy();
-        test_get_I_markthalle_synergy();
-        test_get_I_moebelfabrik_synergy();
-        test_immediate_ev_weizenfeld_only();
-        test_evPerRound_blue_scales_with_players();
-        test_evPerRound_green_only_own_turn();
-        test_evPerRound_red_income_on_opponent_turns();
-        test_roi_positive_for_good_card();
-        test_variance_nonnegative();
-        test_probNoIncome_between_0_and_1();
-        test_rank_nonempty_for_starting_state();
-        test_rank_sorted_descending();
-        test_rank_excludes_unaffordable();
-        test_win_prob_delta_buying_improves_score();
-        test_baseline_win_prob_sums_to_one();
-
-        System.out.println("\n=== Phase 6 Bürohaus Tests ===\n");
-        test_buerohaus_ev_positive_when_opponents_have_good_cards();
-        test_buerohaus_ev_zero_when_no_opponents_own_cards();
-        test_buerohaus_swap_note_set_in_ranking();
-        test_buerohaus_swap_executed_in_simulator();
-
-        System.out.println("\n=== Phase 5 Monte Carlo Tests ===\n");
-        test_simulator_returns_valid_winner();
-        test_simulator_deterministic_with_seed();
-        test_mc_win_rates_sum_to_one();
-        test_mc_win_prob_delta_in_range();
-
-        System.out.println("\n=== Supply & Ownership Rules Tests ===\n");
-        test_builder_throws_on_duplicate_purple_same_player();
-        test_builder_allows_same_purple_for_different_players();
-        test_rank_excludes_owned_purple_cards();
-        test_rank_excludes_owned_landmarks();
-
-        System.out.println("\n=== Rules Correctness Tests ===\n");
-        test_red_fires_before_green_income();
-        test_red_payment_counter_clockwise_order();
-
-        System.out.println("\n=== Game-Over Detection Tests ===\n");
-        test_game_over_on_fourth_landmark();
-        test_no_game_over_before_fourth_landmark();
-
-        System.out.println("\n=== Session Persistence Tests ===\n");
-        test_save_and_load_roundtrip();
-        test_load_restores_player_names_and_history_size();
-        test_save_and_load_snapshot_rooted_session();
-        test_load_invalid_file_throws();
-
-        System.out.println("\n=== Starter-Card Supply Tests ===\n");
-        test_starter_cards_allow_7_copies_in_builder();
-        test_starter_cards_7_copies_exhausts_unbuilt_pool();
-        test_non_starter_cards_capped_at_6_in_builder();
-
-        System.out.println("\n=== GP Ranking Tests ===\n");
-        test_gp_included_in_ranking_when_affordable();
-        test_gp_not_offered_when_already_owned();
-        test_gp_ranking_separate_from_regular_cards();
-
-        System.out.println("\n=== Freizeitpark Doubles Tests ===\n");
-        test_freizeitpark_bonus_turn_granted_on_doubles();
-        test_freizeitpark_bonus_turn_not_granted_without_bahnhof();
-        test_freizeitpark_no_chain_on_second_doubles();
-        test_freizeitpark_bonus_advances_player_after_bonus();
-        test_freizeitpark_undo_restores_correct_state();
-
-        System.out.println("\n=== TurnRecord CoinDeltas Tests ===\n");
-        test_coin_deltas_stored_in_turn_record();
-        test_coin_deltas_null_for_externally_constructed_record();
-        test_coin_deltas_correct_values_blue_card();
-        test_coin_deltas_correct_values_red_card();
-        test_coin_deltas_preserved_after_undo_replay();
-        test_coin_deltas_roundtrip_save_load();
-
-        System.out.println("\n=== Calcs Layer Tests ===\n");
-        test_calcs_get_P1_sums_to_1();
-        test_calcs_get_P2_sums_to_1();
-        test_calcs_get_I_delegates_correctly();
-        test_calcs_immediate_ev_nonnegative();
-        test_calcs_ev_per_round_blue_scales_with_players();
-        test_calcs_roi_over_horizon_positive_for_cheap_card();
-        test_calcs_baseline_win_prob_sums_to_one();
-        test_calcs_win_prob_delta_in_range();
-        test_calcs_portfolio_delta_ev_nonnegative_for_blue();
-        test_calcs_geometric_sum_identity_at_gamma1();
-        test_calcs_optimal_dice_no_bahnhof_returns_1();
-
-        System.out.println("\n=== Engine Registry Tests ===\n");
-        test_engine_registry_loads_entries();
-        test_engine_registry_has_default();
-        test_engine_registry_default_is_balanced();
-        test_engine_registry_find_by_id();
-
-        System.out.println("\n=== HTTP API Server Tests ===\n");
-        ApiServer apiServer = new ApiServer(18080, new EngineOrchestrator());
-        apiServer.start();
-        try {
-            test_api_health(18080);
-            test_api_projects(18080);
-            test_api_engines(18080);
-            test_api_roll(18080);
-            test_api_evaluate_503_when_no_engine(18080);
-        } finally {
-            apiServer.stop(0);
+        // ---- Parse CLI filters ----
+        // --section "Phase 1 Model Tests"   (can repeat; substring match on section header)
+        // --test test_mcts_obvious_landmark_buy  (can repeat; exact match on test name)
+        for (int i = 0; i < args.length; i++) {
+            if ("--section".equals(args[i]) && i + 1 < args.length) {
+                if (activeSections == null) activeSections = new HashSet<>();
+                activeSections.add(args[++i]);
+            } else if ("--test".equals(args[i]) && i + 1 < args.length) {
+                if (activeTests == null) activeTests = new HashSet<>();
+                activeTests.add(args[++i]);
+            }
+        }
+        if (activeSections != null || activeTests != null) {
+            System.out.println("[Filter] Running "
+                    + (activeSections != null ? "sections: " + activeSections : "")
+                    + (activeTests != null ? " tests: " + activeTests : ""));
         }
 
-        System.out.println("\n=== Bürohaus Swap Scope Tests ===\n");
-        test_bürohaus_excludes_purple_own_cards();
-        test_bürohaus_excludes_purple_opponent_cards();
-        test_bürohaus_allows_non_purple_non_landmark_swaps();
+        // ---- Test sections ----
+        runSection("Phase 1 Model Tests", () -> {
+            test_project_loader_count();
+            test_project_loader_known_project();
+            test_project_loader_unknown_project();
+            test_project_loader_cache_is_fast();
+            test_player_copy();
+            test_game_state_initial();
+            test_game_state_copy_is_independent();
+        });
 
-        System.out.println("\n=== Supply Tracker Tests ===\n");
-        test_supply_tracker_initial_state();
-        test_supply_tracker_decrements_on_purchase();
-        test_supply_tracker_exhausted_card_not_in_buy_options();
+        runSection("Phase 2 Math Engine Tests", () -> {
+            test_probability_tables_sum_to_1();
+            test_get_I_weizenfeld();
+            test_get_I_baeckerei_green();
+            test_get_I_bauernhof_blue();
+            test_get_I_cafe_red_inability_to_pay();
+            test_get_I_familienrestaurant_red();
+            test_get_I_stadion_all_opponents();
+            test_get_I_fernsehsender_richest_only();
+            test_get_I_molkerei_synergy();
+            test_get_I_markthalle_synergy();
+            test_get_I_moebelfabrik_synergy();
+            test_immediate_ev_weizenfeld_only();
+            test_evPerRound_blue_scales_with_players();
+            test_evPerRound_green_only_own_turn();
+            test_evPerRound_red_income_on_opponent_turns();
+            test_roi_positive_for_good_card();
+            test_variance_nonnegative();
+            test_probNoIncome_between_0_and_1();
+            test_rank_nonempty_for_starting_state();
+            test_rank_sorted_descending();
+            test_rank_excludes_unaffordable();
+            test_win_prob_delta_buying_improves_score();
+            test_baseline_win_prob_sums_to_one();
+        });
 
-        System.out.println("\n=== MCTS v1 Engine Tests ===\n");
-        MctsV1Engine mctsEngine = new MctsV1Engine();
-        EngineConfig fastConfig  = EngineConfig.ofIterations(500);
-        EngineConfig deepConfig  = EngineConfig.ofIterations(5000);
-        core.GameState mctsGs = core.GameState.initial(2);
-        test_mcts_returns_nonnull_result(mctsEngine, mctsGs, fastConfig);
-        test_mcts_ranked_options_nonempty(mctsEngine, mctsGs, fastConfig);
-        test_mcts_includes_save_option(mctsEngine, mctsGs, fastConfig);
-        test_mcts_scores_descending(mctsEngine, mctsGs, fastConfig);
-        test_mcts_affordable_flag_matches_coins(mctsEngine, mctsGs, fastConfig);
-        test_mcts_all_metric_keys_present(mctsEngine, mctsGs, fastConfig);
-        test_mcts_terminates_within_time_budget(mctsEngine, mctsGs, fastConfig);
-        test_mcts_obvious_landmark_buy(mctsEngine);
-        test_mcts_bürohaus_state_has_swap_children(mctsEngine, fastConfig);
-        test_mcts_funkturm_decision_explored(mctsEngine, fastConfig);
-        test_mcts_freizeitpark_bonus_turn_extends_depth(mctsEngine, fastConfig);
-        test_mcts_deep_uses_more_iterations_than_fast(mctsEngine, mctsGs, fastConfig, deepConfig);
-        test_mcts_confidence_in_range(mctsEngine, mctsGs, fastConfig);
-        test_mcts_visit_count_sums_to_iterations(mctsEngine, mctsGs, fastConfig);
+        runSection("Phase 6 Bürohaus Tests", () -> {
+            test_buerohaus_ev_positive_when_opponents_have_good_cards();
+            test_buerohaus_ev_zero_when_no_opponents_own_cards();
+            test_buerohaus_swap_note_set_in_ranking();
+            test_buerohaus_swap_executed_in_simulator();
+        });
 
-        System.out.println("\n=== Variant C: Greedy Tree Engine Tests ===\n");
-        engine.MctsGreedyTreeEngine greedyTreeEngine = new engine.MctsGreedyTreeEngine();
-        test_greedy_tree_returns_nonnull_result(greedyTreeEngine, mctsGs, fastConfig);
-        test_greedy_tree_scores_descending(greedyTreeEngine, mctsGs, fastConfig);
-        test_greedy_tree_obvious_landmark_buy(greedyTreeEngine);
-        test_greedy_tree_registry_entries_exist();
+        runSection("Phase 5 Monte Carlo Tests", () -> {
+            test_simulator_returns_valid_winner();
+            test_simulator_deterministic_with_seed();
+            test_mc_win_rates_sum_to_one();
+            test_mc_win_prob_delta_in_range();
+        });
 
-        System.out.println("\n=== Variant B: Boltzmann Rollout Engine Tests ===\n");
-        engine.MctsBoltzmannRolloutEngine boltzEngine = new engine.MctsBoltzmannRolloutEngine();
-        test_boltzmann_rollout_returns_nonnull_result(boltzEngine, mctsGs, fastConfig);
-        test_boltzmann_rollout_includes_save_option(boltzEngine, mctsGs, fastConfig);
-        test_boltzmann_rollout_scores_descending(boltzEngine, mctsGs, fastConfig);
-        test_boltzmann_rollout_obvious_landmark_buy(boltzEngine);
-        test_boltzmann_rollout_registry_entries_exist();
+        runSection("Supply & Ownership Rules Tests", () -> {
+            test_builder_throws_on_duplicate_purple_same_player();
+            test_builder_allows_same_purple_for_different_players();
+            test_rank_excludes_owned_purple_cards();
+            test_rank_excludes_owned_landmarks();
+        });
 
-        System.out.println("\n=== Variant A: Greedy Rollout Engine Tests ===\n");
-        engine.MctsGreedyRolloutEngine greedyEngine = new engine.MctsGreedyRolloutEngine();
-        test_greedy_rollout_returns_nonnull_result(greedyEngine, mctsGs, fastConfig);
-        test_greedy_rollout_ranked_options_nonempty(greedyEngine, mctsGs, fastConfig);
-        test_greedy_rollout_includes_save_option(greedyEngine, mctsGs, fastConfig);
-        test_greedy_rollout_scores_descending(greedyEngine, mctsGs, fastConfig);
-        test_greedy_rollout_obvious_landmark_buy(greedyEngine);
-        test_greedy_rollout_registry_entries_exist();
+        runSection("Rules Correctness Tests", () -> {
+            test_red_fires_before_green_income();
+            test_red_payment_counter_clockwise_order();
+        });
 
-        System.out.println("\n=== Calcs Metrics 3.0 Tests ===\n");
-        test_sharpe_ratio_nonnegative_for_blue_card();
-        test_sortino_ratio_leq_sharpe_when_downside_exists();
-        test_kelly_fraction_in_unit_interval();
-        test_var_leq_cvar();
-        test_cvar_at_100pct_equals_worst_case();
-        test_hhi_between_0_and_1();
-        test_hhi_max_when_single_roll_card();
-        test_income_entropy_nonneg();
-        test_information_gain_nonneg();
-        test_etw_positive_when_coins_below_cost();
-        test_etw_zero_when_coins_cover_cost();
-        test_tempo_advantage_opponent_ahead_is_negative();
-        test_purchase_urgency_nonneg();
-        test_roll_correlation_in_minus1_plus1();
+        runSection("Game-Over Detection Tests", () -> {
+            test_game_over_on_fourth_landmark();
+            test_no_game_over_before_fourth_landmark();
+        });
 
-        System.out.println("\n--- Results: " + passed + " passed, " + failed + " failed ---");
+        runSection("Session Persistence Tests", () -> {
+            test_save_and_load_roundtrip();
+            test_load_restores_player_names_and_history_size();
+            test_save_and_load_snapshot_rooted_session();
+            test_load_invalid_file_throws();
+        });
+
+        runSection("Starter-Card Supply Tests", () -> {
+            test_starter_cards_allow_7_copies_in_builder();
+            test_starter_cards_7_copies_exhausts_unbuilt_pool();
+            test_non_starter_cards_capped_at_6_in_builder();
+        });
+
+        runSection("GP Ranking Tests", () -> {
+            test_gp_included_in_ranking_when_affordable();
+            test_gp_not_offered_when_already_owned();
+            test_gp_ranking_separate_from_regular_cards();
+        });
+
+        runSection("Freizeitpark Doubles Tests", () -> {
+            test_freizeitpark_bonus_turn_granted_on_doubles();
+            test_freizeitpark_bonus_turn_not_granted_without_bahnhof();
+            test_freizeitpark_no_chain_on_second_doubles();
+            test_freizeitpark_bonus_advances_player_after_bonus();
+            test_freizeitpark_undo_restores_correct_state();
+        });
+
+        runSection("TurnRecord CoinDeltas Tests", () -> {
+            test_coin_deltas_stored_in_turn_record();
+            test_coin_deltas_null_for_externally_constructed_record();
+            test_coin_deltas_correct_values_blue_card();
+            test_coin_deltas_correct_values_red_card();
+            test_coin_deltas_preserved_after_undo_replay();
+            test_coin_deltas_roundtrip_save_load();
+        });
+
+        runSection("Calcs Layer Tests", () -> {
+            test_calcs_get_P1_sums_to_1();
+            test_calcs_get_P2_sums_to_1();
+            test_calcs_get_I_delegates_correctly();
+            test_calcs_immediate_ev_nonnegative();
+            test_calcs_ev_per_round_blue_scales_with_players();
+            test_calcs_roi_over_horizon_positive_for_cheap_card();
+            test_calcs_baseline_win_prob_sums_to_one();
+            test_calcs_win_prob_delta_in_range();
+            test_calcs_portfolio_delta_ev_nonnegative_for_blue();
+            test_calcs_geometric_sum_identity_at_gamma1();
+            test_calcs_optimal_dice_no_bahnhof_returns_1();
+        });
+
+        runSection("Engine Registry Tests", () -> {
+            test_engine_registry_loads_entries();
+            test_engine_registry_has_default();
+            test_engine_registry_default_is_balanced();
+            test_engine_registry_find_by_id();
+        });
+
+        runSection("HTTP API Server Tests", () -> {
+            ApiServer apiServer = new ApiServer(18080, new EngineOrchestrator());
+            apiServer.start();
+            try {
+                test_api_health(18080);
+                test_api_projects(18080);
+                test_api_engines(18080);
+                test_api_roll(18080);
+                test_api_evaluate_503_when_no_engine(18080);
+            } finally {
+                apiServer.stop(0);
+            }
+        });
+
+        runSection("Bürohaus Swap Scope Tests", () -> {
+            test_bürohaus_excludes_purple_own_cards();
+            test_bürohaus_excludes_purple_opponent_cards();
+            test_bürohaus_allows_non_purple_non_landmark_swaps();
+        });
+
+        runSection("Supply Tracker Tests", () -> {
+            test_supply_tracker_initial_state();
+            test_supply_tracker_decrements_on_purchase();
+            test_supply_tracker_exhausted_card_not_in_buy_options();
+        });
+
+        runSection("MCTS v1 Engine Tests", () -> {
+            MctsV1Engine mctsEngine = new MctsV1Engine();
+            EngineConfig fastConfig  = EngineConfig.ofIterations(500);
+            EngineConfig deepConfig  = EngineConfig.ofIterations(5000);
+            core.GameState mctsGs = core.GameState.initial(2);
+            test_mcts_returns_nonnull_result(mctsEngine, mctsGs, fastConfig);
+            test_mcts_ranked_options_nonempty(mctsEngine, mctsGs, fastConfig);
+            test_mcts_includes_save_option(mctsEngine, mctsGs, fastConfig);
+            test_mcts_scores_descending(mctsEngine, mctsGs, fastConfig);
+            test_mcts_affordable_flag_matches_coins(mctsEngine, mctsGs, fastConfig);
+            test_mcts_all_metric_keys_present(mctsEngine, mctsGs, fastConfig);
+            test_mcts_terminates_within_time_budget(mctsEngine, mctsGs, fastConfig);
+            test_mcts_obvious_landmark_buy(mctsEngine);
+            test_mcts_bürohaus_state_has_swap_children(mctsEngine, fastConfig);
+            test_mcts_funkturm_decision_explored(mctsEngine, fastConfig);
+            test_mcts_freizeitpark_bonus_turn_extends_depth(mctsEngine, fastConfig);
+            test_mcts_deep_uses_more_iterations_than_fast(mctsEngine, mctsGs, fastConfig, deepConfig);
+            test_mcts_confidence_in_range(mctsEngine, mctsGs, fastConfig);
+            test_mcts_visit_count_sums_to_iterations(mctsEngine, mctsGs, fastConfig);
+        });
+
+        runSection("Variant C: Greedy Tree Engine Tests", () -> {
+            MctsV1Engine mctsEngine = new MctsV1Engine();
+            EngineConfig fastConfig  = EngineConfig.ofIterations(500);
+            core.GameState mctsGs = core.GameState.initial(2);
+            engine.MctsGreedyTreeEngine greedyTreeEngine = new engine.MctsGreedyTreeEngine();
+            test_greedy_tree_returns_nonnull_result(greedyTreeEngine, mctsGs, fastConfig);
+            test_greedy_tree_scores_descending(greedyTreeEngine, mctsGs, fastConfig);
+            test_greedy_tree_obvious_landmark_buy(greedyTreeEngine);
+            test_greedy_tree_registry_entries_exist();
+        });
+
+        runSection("Variant B: Boltzmann Rollout Engine Tests", () -> {
+            EngineConfig fastConfig  = EngineConfig.ofIterations(500);
+            core.GameState mctsGs = core.GameState.initial(2);
+            engine.MctsBoltzmannRolloutEngine boltzEngine = new engine.MctsBoltzmannRolloutEngine();
+            test_boltzmann_rollout_returns_nonnull_result(boltzEngine, mctsGs, fastConfig);
+            test_boltzmann_rollout_includes_save_option(boltzEngine, mctsGs, fastConfig);
+            test_boltzmann_rollout_scores_descending(boltzEngine, mctsGs, fastConfig);
+            test_boltzmann_rollout_obvious_landmark_buy(boltzEngine);
+            test_boltzmann_rollout_registry_entries_exist();
+        });
+
+        runSection("Variant A: Greedy Rollout Engine Tests", () -> {
+            EngineConfig fastConfig  = EngineConfig.ofIterations(500);
+            core.GameState mctsGs = core.GameState.initial(2);
+            engine.MctsGreedyRolloutEngine greedyEngine = new engine.MctsGreedyRolloutEngine();
+            test_greedy_rollout_returns_nonnull_result(greedyEngine, mctsGs, fastConfig);
+            test_greedy_rollout_ranked_options_nonempty(greedyEngine, mctsGs, fastConfig);
+            test_greedy_rollout_includes_save_option(greedyEngine, mctsGs, fastConfig);
+            test_greedy_rollout_scores_descending(greedyEngine, mctsGs, fastConfig);
+            test_greedy_rollout_obvious_landmark_buy(greedyEngine);
+            test_greedy_rollout_registry_entries_exist();
+        });
+
+        runSection("Variant D: Depth-Limited Rollout Engine Tests", () -> {
+            EngineConfig fastConfig  = EngineConfig.ofIterations(500);
+            core.GameState mctsGs = core.GameState.initial(2);
+            engine.MctsDepthLimitedEngine depthEngine = new engine.MctsDepthLimitedEngine();
+            test_depth_limited_returns_nonnull_result(depthEngine, mctsGs, fastConfig);
+            test_depth_limited_scores_descending(depthEngine, mctsGs, fastConfig);
+            test_depth_limited_obvious_landmark_buy(depthEngine);
+            test_depth_limited_registry_entries_exist();
+        });
+
+        runSection("Calcs Metrics 3.0 Tests", () -> {
+            test_sharpe_ratio_nonnegative_for_blue_card();
+            test_sortino_ratio_leq_sharpe_when_downside_exists();
+            test_kelly_fraction_in_unit_interval();
+            test_var_leq_cvar();
+            test_cvar_at_100pct_equals_worst_case();
+            test_hhi_between_0_and_1();
+            test_hhi_max_when_single_roll_card();
+            test_income_entropy_nonneg();
+            test_information_gain_nonneg();
+            test_etw_positive_when_coins_below_cost();
+            test_etw_zero_when_coins_cover_cost();
+            test_tempo_advantage_opponent_ahead_is_negative();
+            test_purchase_urgency_nonneg();
+            test_roll_correlation_in_minus1_plus1();
+        });
+
+        System.out.println("\n--- Results: " + passed + " passed, " + failed + " failed"
+                + (skippedSections > 0 ? ", " + skippedSections + " section(s) skipped" : "") + " ---");
+
+        if (activeSections != null || activeTests != null) {
+            // Skip benchmarks when filtering
+            return;
+        }
 
         System.out.println("\n=== Runtime Benchmarks ===\n");
 
@@ -274,6 +351,26 @@ public class RuntimeTester {
         System.out.println(" - 10 000 getAllProjects() calls: " + allProjElapsed + " ms");
         assertTrue("getAllProjects() 10 000 calls < 200 ms (was " + allProjElapsed + " ms)",
                 allProjElapsed < 200);
+    }
+
+    /**
+     * Runs a named test section. If {@link #activeSections} or {@link #activeTests} filters
+     * are set and this section's name doesn't match any active section, the body is skipped.
+     *
+     * <p>Section name matching is case-insensitive substring: {@code "Variant D"} matches
+     * {@code "Variant D: Depth-Limited Rollout Engine Tests"}.
+     */
+    private static void runSection(String name, ThrowingRunnable body) throws Exception {
+        if (activeSections != null) {
+            boolean match = activeSections.stream()
+                    .anyMatch(f -> name.toLowerCase().contains(f.toLowerCase()));
+            if (!match) {
+                skippedSections++;
+                return;
+            }
+        }
+        System.out.println("\n=== " + name + " ===\n");
+        body.run();
     }
 
     // =========================================================================
@@ -2137,6 +2234,64 @@ public class RuntimeTester {
         iface.EngineRegistryEntry fast = iface.EngineRegistry.findById("mcts-v1-greedy-rollout-fast").orElseThrow();
         assertEq("greedy-rollout-fast engineClass = mcts-v1-greedy-rollout",
                 "mcts-v1-greedy-rollout", fast.engineClass());
+    }
+
+    // =========================================================================
+    // Variant D: Depth-Limited Rollout Engine Tests
+    // =========================================================================
+
+    private static void test_depth_limited_returns_nonnull_result(
+            engine.MctsDepthLimitedEngine eng, core.GameState gs, engine.EngineConfig cfg) {
+        engine.EngineResult result = eng.evaluate(gs, 0, cfg);
+        assertTrue("depth-limited: evaluate returns non-null EngineResult", result != null);
+    }
+
+    private static void test_depth_limited_scores_descending(
+            engine.MctsDepthLimitedEngine eng, core.GameState gs, engine.EngineConfig cfg) {
+        engine.EngineResult result = eng.evaluate(gs, 0, cfg);
+        boolean sorted = true;
+        for (int i = 1; i < result.rankedOptions.size(); i++) {
+            if (result.rankedOptions.get(i).score > result.rankedOptions.get(i - 1).score) {
+                sorted = false; break;
+            }
+        }
+        assertTrue("depth-limited: rankedOptions scores are non-increasing", sorted);
+    }
+
+    private static void test_depth_limited_obvious_landmark_buy(engine.MctsDepthLimitedEngine eng) {
+        core.Project bahnhof   = core.ProjectLoader.getProject("bahnhof").orElseThrow();
+        core.Project einkauf   = core.ProjectLoader.getProject("einkaufszentrum").orElseThrow();
+        core.Project freizeit  = core.ProjectLoader.getProject("freizeitpark").orElseThrow();
+        core.Project funkturm  = core.ProjectLoader.getProject("funkturm").orElseThrow();
+        core.Project weizen    = core.ProjectLoader.getProject("weizenfeld").orElseThrow();
+        core.Project baeckerei = core.ProjectLoader.getProject("bäckerei").orElseThrow();
+        java.util.ArrayList<core.Project> o0 = new java.util.ArrayList<>();
+        o0.add(weizen); o0.add(baeckerei);
+        o0.add(bahnhof); o0.add(einkauf); o0.add(freizeit);
+        java.util.ArrayList<core.Project> o1 = new java.util.ArrayList<>();
+        o1.add(weizen); o1.add(baeckerei);
+        java.util.ArrayList<core.Project> unbuilt = new java.util.ArrayList<>();
+        unbuilt.add(funkturm);
+        core.Player p0 = new core.Player("Alice", funkturm.getCost(), o0);
+        core.Player p1 = new core.Player("Bob",    3, o1);
+        core.GameState nearWinGs = new core.GameState(new core.Player[]{p0, p1}, unbuilt);
+        engine.EngineConfig depthCfg = engine.EngineConfig.ofIterations(2000);
+        engine.EngineResult r = eng.evaluate(nearWinGs, 0, depthCfg);
+        String topId = r.rankedOptions.get(0).project.getId();
+        assertTrue("depth-limited obvious win: top pick is funkturm, got " + topId,
+                "funkturm".equals(topId));
+    }
+
+    private static void test_depth_limited_registry_entries_exist() {
+        assertTrue("engines.json has mcts-v1-depth3",
+                iface.EngineRegistry.findById("mcts-v1-depth3").isPresent());
+        assertTrue("engines.json has mcts-v1-depth7",
+                iface.EngineRegistry.findById("mcts-v1-depth7").isPresent());
+        assertTrue("engines.json has mcts-v1-depth10",
+                iface.EngineRegistry.findById("mcts-v1-depth10").isPresent());
+        iface.EngineRegistryEntry d3 = iface.EngineRegistry.findById("mcts-v1-depth3").orElseThrow();
+        assertEq("mcts-v1-depth3 engineClass", "mcts-v1-depth-limited", d3.engineClass());
+        assertEq("mcts-v1-depth3 maxRolloutDepth", "3", d3.config().getExtra("maxRolloutDepth", ""));
     }
 
     // =========================================================================

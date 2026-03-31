@@ -25,6 +25,33 @@ See `NORTH-STAR.md` for the full specification. See `PLAN.md` for the phased imp
 
 ---
 
+## Phase 1 Tasks 1.1–1.4: Layer Separation Foundation (commit 1cb66d3)
+
+Extracted the 5-layer architecture skeleton from the monolithic `logic.probability` package.
+
+**`util/Strings`** — cross-cutting locale registry (DE/EN), stripped of all Swing-specific code from the original `gui.newui.Strings`.
+
+**`core/` package** — pure game rules, no strategy:
+- `Project`, `Player`, `GameState` (adds `SUPPLY_PER_CARD` constant + `hasWon()` static method, previously buried in `GameSimulator`)
+- `GameStateBuilder`, `TurnRecord`, `ProjectLoader`, `GameSession`, `GameSessionPersistence`
+- `CardIncome` — all 19 cards, P1/P2 dice probabilities, income calculation. Made public so `calcs/` can access it directly.
+- `RollResolver` — new class; extracts `computeAllDeltasForRoll` from `ProbabilityCalc` into its own authoritative Core class (Red → Blue/Green → Purple, counter-clockwise)
+- `BürohausLogic` — made public for cross-layer access
+
+**`calcs/` package** — version-agnostic math, callable by any engine:
+- `Calcs` — public API: `get_I`, `computeAllDeltasForRoll`, `get_P1/P2`, `geometricSum`, `immediateEV`, `evPerRound`, `roiOverHorizon`, `portfolioEvPerRound`, `portfolioDeltaEV`, `optimalDiceCount`, `computeBaselineWinProb`, `estimateWinProbDelta`, `values_per_r_per_p`
+- `RankEntry` — result POJO for `roiOverHorizon` (replaces `logic.probability.RankEntry`)
+- `WinProbability` — analytical softmax scorer (ports analytical-only parts from `WinProbabilityCalc`; `mcWinRate` intentionally excluded — superseded by MCTS engine)
+
+**`engine/` package** — engine contract:
+- `SimulationEngine` interface — `id()`, `description()`, `evaluate(GameState, playerIndex, EngineConfig) -> EngineResult`
+- `EngineConfig` — generic config container (iterations, timeBudgetMs, riskToleranceWeight, extra key-value map)
+- `EngineResult` — ranked options list with score + explanation factors + metrics + confidence + timing metadata
+
+All 224 existing tests pass. The old `logic.probability` code continues to compile unchanged.
+
+---
+
 ## Pre-Restructure History
 
 Everything below documents the original implementation that led to the restructure decision.

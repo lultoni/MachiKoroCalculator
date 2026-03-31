@@ -14,10 +14,10 @@ Separate the existing codebase into the 5-layer architecture defined in NORTH-ST
 
 | Task | Description | Status |
 |------|-------------|--------|
-| 1.1 | Extract Core layer: move `Project`, `Player`, `GameState`, `GameStateBuilder`, `TurnRecord`, `GameSession`, `GameSessionPersistence`, `ProjectLoader` into `core/` package. Core = pure game rules, no strategy. | pending |
-| 1.2 | Extract `CardIncome.get_I`, `P1`/`P2`, `computeAllDeltasForRoll`, `BürohausLogic.executeSwap` into Core. These are game rules, not strategy. | pending |
-| 1.3 | Create Standard Calcs layer: extract version-agnostic math utilities (EV computation, ROI formula, probability distributions, `geometricSum`, variance calculations) into `calcs/` package. | pending |
-| 1.4 | Define `SimulationEngine` interface + `EngineConfig` + `EngineResult` contracts (see NORTH-STAR.md Section 6.2). | pending |
+| 1.1 | Extract Core layer: move `Project`, `Player`, `GameState`, `GameStateBuilder`, `TurnRecord`, `GameSession`, `GameSessionPersistence`, `ProjectLoader` into `core/` package. Core = pure game rules, no strategy. | done |
+| 1.2 | Extract `CardIncome.get_I`, `P1`/`P2`, `computeAllDeltasForRoll`, `BürohausLogic.executeSwap` into Core. These are game rules, not strategy. | done |
+| 1.3 | Create Standard Calcs layer: extract version-agnostic math utilities (EV computation, ROI formula, probability distributions, `geometricSum`, variance calculations) into `calcs/` package. | done |
+| 1.4 | Define `SimulationEngine` interface + `EngineConfig` + `EngineResult` contracts (see NORTH-STAR.md Section 6.2). | done |
 | 1.5 | Create Interface (orchestration) layer: engine registry loader (JSON), request routing, result formatting. | pending |
 | 1.6 | Create engine registry JSON file with placeholder entries. | pending |
 | 1.7 | Set up Java HTTP API server (lightweight, e.g. Javalin or built-in HttpServer) to expose game state + engine endpoints. | pending |

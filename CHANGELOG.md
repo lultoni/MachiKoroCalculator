@@ -4,7 +4,59 @@ Implementation history: what was built, why, and which design decisions were mad
 
 ---
 
-## Complete Restructure: NORTH-STAR.md + 5-Layer Architecture
+## Phase 2: MCTS v1 Engine (commits 8d6e69b–bb9cbeb)
+
+**The engine is now live.** `POST /api/evaluate` returns ranked purchase options from a full UCT tree search.
+
+### Core bug fix: Bürohaus purple-card swap scope
+
+`core.BürohausLogic.findCandidates()` was allowing purple (lila) cards to be swapped. The official rule says "any non-landmark establishment," but purple cards are unique per player — swapping one would give a second copy of a unique card, violating the uniqueness constraint. Both `core/BürohausLogic` and the legacy `logic.probability/BürohausLogic` now exclude purple cards from both the own-card and opponent-card candidate lists.
+
+### SupplyTracker
+
+`engine.mcts.SupplyTracker` — immutable value object tracking how many market copies of each non-landmark card remain. Built from a `GameState` at evaluation start by counting owned copies across all players and subtracting from `GameState.SUPPLY_PER_CARD`. Exposes `getCount(id)`, `canPurchase(id)`, and `withPurchase(id)` (returns a new instance — the original is unchanged). Travels alongside each `GameState.copy()` through the MCTS tree.
+
+### MCTS Tree Node Types (6 classes in `engine.mcts/`)
+
+All 6 node types extend the abstract `MctsNode` base (UCB1 scoring, backpropagation, terminal detection):
+
+- **`DiceChoiceNode`** — Bahnhof 1d6/2d6 decision. Present at start of active player's turn iff they own Bahnhof on that branch. Two children: ChanceNode(1d6) and ChanceNode(2d6).
+- **`ChanceNode`** — dice outcome branching. 1d6: 6 children (rolls 1–6). 2d6: 11 children (rolls 2–12). Each child has roll income applied. Detects doubles (even 2d6 sums) for Freizeitpark bonus turn insertion. Hooks up Funkturm, Bürohaus, and bonus-turn nodes per branch based on what the active player owns on that specific path.
+- **`FunkturmNode`** — keep or reroll decision (UCT). Keep branch → pre-built afterKeepNode (re-parented). Reroll branch → new ChanceNode from pre-roll state. Both explored via UCT, not greedy.
+- **`BürohausNode`** — all valid (ownCard × oppCard) swap pairs + no-swap, all via UCT. Valid pairs: non-landmark, non-purple on both sides. On roll 6 only.
+- **`BuyDecisionNode`** — all affordable non-landmark cards (supply > 0, coins ≥ cost) + affordable landmarks + save sentinel, all via UCT. After purchase, transitions to next player's DiceChoiceNode or ChanceNode. Handles win-condition detection (terminal node if purchase wins the game).
+
+**Landmark tracking per branch:** which special nodes appear depends on the `GameState` stored in that node (reflecting purchases along that specific path), not the root state.
+
+### MctsRollout
+
+`engine.mcts.MctsRollout` — uniform-random full-game simulation from a leaf node. All decisions are fully random: 50/50 dice count (Bahnhof), uniform roll, 50/50 Funkturm keep/reroll, uniform selection over all valid Bürohaus swap pairs + no-swap, uniform purchase over affordable cards + save. Freizeitpark doubles trigger one bonus turn per main turn (no chaining). Falls back to `WinProbability.computeBaselineWinProb` after 200 turns.
+
+### MctsTree
+
+`engine.mcts.MctsTree` — UCT iteration loop: select (walk via UCB1 to a node with unvisited children or unexpanded leaf) → expand → pick first unvisited child → rollout → backpropagate. Score perspective is always the root `playerIndex` throughout the tree (1.0 win, 0.0 loss, fractional softmax on timeout).
+
+### MctsV1Engine
+
+`engine.MctsV1Engine` — full `SimulationEngine` implementation:
+- Builds `SupplyTracker`, constructs `MctsTree`, runs iterations or time budget
+- Infers which card was purchased per root child by state diff (owned list comparison)
+- Sorts options by win rate descending; tie-breaking: non-save options above save on equal score (buying the winning card is preferred over saving when both are equivalent)
+- Populates all 14 required metric keys: `winRate`, `confidence`, `visitCount`, `immediateEV`, `evPerRound`, `roiOverHorizon`, `winProbDelta`, `portfolioDeltaEV`, `variance`, `probNoIncomeOwnTurn`, `probNoIncomeRound`, `cost`, `turnsToWin`, `tempoAdvantage`
+- Explanation factors ordered by impact: win rate, immediate EV, EV/round, ROI, win-prob delta, portfolio delta, variance, risk probabilities, cost, color, activation rolls, landmark annotations, Einkaufszentrum synergy, Bürohaus swap note, ETW, tempo
+
+### ServerMain
+
+`server.ServerMain` — entry point: registers `MctsV1Engine` with `EngineOrchestrator`, starts `ApiServer` on port 8080. `POST /api/evaluate` endpoint is now live.
+
+### Tests
+
+20 new TDD tests added to `RuntimeTester` (written before implementation):
+- 3 Bürohaus swap scope tests (purple exclusion for own cards, opponent cards, valid non-purple swaps)
+- 3 SupplyTracker tests (initial state, decrement, exhaustion)
+- 14 MctsV1Engine contract tests (non-null result, non-empty options, save sentinel, score ordering, affordable flags, all metric keys, time budget, obvious-win landmark recommendation, Bürohaus/Funkturm/Freizeitpark branch expansion, deep > fast iterations, confidence range, visit count sum)
+
+
 
 After reaching feature-completeness on the original monolithic design (Stufe 1/2/3 hybrid system, Swing UI with 5 ranking tabs, assistant, rollout), the project underwent a fundamental re-evaluation of its goals and architecture.
 

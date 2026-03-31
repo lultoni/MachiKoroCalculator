@@ -1,381 +1,243 @@
 # ARCHITECTURE.md — MachiKoroCalculator Technical Reference
 
-This document contains the mathematical foundations, card rule conventions, and design rationales
-for the probability engine. It is intended as a reference for anyone reading or modifying
-`ProbabilityCalc.java`, `GameSimulator.java`, or the data model.
+This document contains the mathematical foundations, card rule conventions, and design rationales for the game rules engine and shared calculations. For the high-level architecture and vision, see `NORTH-STAR.md`.
 
 ---
 
-## 1. Mathematical Formulas
+## 1. System Architecture
 
-### 1.1 Dice Probabilities
+### 1.1 Layer Overview
+
+```
+UI (Web SPA) → Interface → Simulation Engines → Standard Calcs → Core
+```
+
+See NORTH-STAR.md Section 6.1 for the full specification. This document covers the **Core** and **Standard Calcs** layers in technical detail.
+
+### 1.2 Core Layer Responsibilities
+
+The Core layer owns everything determined by game rules or card effects:
+
+- Game state representation (`GameState`, `Player`, `Project`, `TurnRecord`)
+- Dice mechanics (1d6/2d6 sum, doubles detection)
+- Income resolution for all card types in correct order (Red → Blue & Green → Purple)
+- Income clamping (can't pay more than you have)
+- Counter-clockwise resolution for multiple red claims
+- Card supply tracking (6 copies per non-landmark; 1 purple per player)
+- Starting cards: each player begins with 1 Weizenfeld + 1 Bäckerei (not deducted from the 6-copy supply)
+- Card purchase validation (enough coins, card available, purple uniqueness)
+- Mechanical landmark effects: Freizeitpark doubles → bonus turn, Einkaufszentrum +1 coin per green/red store card
+- Turn order progression
+- Win condition (4 landmarks built)
+- Bürohaus swap execution (the mechanics, not the choice)
+
+**Strategic choices are engine territory** (see NORTH-STAR.md Section 6.5):
+- Bahnhof: 1d6 or 2d6?
+- What to buy (or save)?
+- Bürohaus: which cards to swap (or skip)?
+- Funkturm: re-roll or keep?
+
+### 1.3 Standard Calcs Layer Responsibilities
+
+Reusable, version-agnostic math that any engine can call:
+
+- Dice probability distributions (`P1`, `P2`)
+- Per-card income calculation (`get_I`)
+- Expected value computation (weighted roll EV, per-round EV)
+- ROI formulas (geometric-series discounted)
+- Variance and risk metrics
+- Probability of no income
+- Synergy scoring helpers
+
+---
+
+## 2. Mathematical Formulas
+
+### 2.1 Dice Probabilities
 
 **1d6 (without Bahnhof):**
 ```
-P(roll = k | 1d6) = 1/6   for k ∈ {1..6}, else 0
+P(roll = k | 1d6) = 1/6   for k in {1..6}, else 0
 ```
 
 **2d6 (with Bahnhof):**
 ```
-P(roll = k | 2d6) = (6 − |k − 7|) / 36   for k ∈ {2..12}, else 0
+P(roll = k | 2d6) = (6 - |k - 7|) / 36   for k in {2..12}, else 0
 ```
 
-Both tables are precomputed as `double[] P1` and `double[] P2` constants at class load in
-`ProbabilityCalc.java`, indexed 0–12 (entries 0 and 1 of P2 are 0).
+Precomputed as `double[] P1` and `double[] P2` constants indexed 0–12 (entries 0 and 1 of P2 are 0).
 
-### 1.2 Blue Card EV per Round (N players)
+### 2.2 Blue Card EV per Round (N players)
 
-Blue cards activate on *every* player's turn, so the owner receives income N times per round:
+Blue cards activate on every player's turn:
 ```
-EV_round(blue card) = payout(roll) × P(activation_roll) × N
-```
-
-For a multi-activation card (e.g. weizenfeld activates on roll 1 only with 1d6):
-```
-EV_round(weizenfeld, N players, 1d6) = 1 × (1/6) × N
+EV_round(blue card) = payout(roll) x P(activation_roll) x N
 ```
 
-Implemented in `evPerRound()` by summing own-turn income + N−1 opponent-turn income.
+### 2.3 Discounted ROI over T Turns
 
-### 1.3 Discounted ROI over T Turns
-
-The discounted return on investment uses a geometric series:
 ```
-ROI = EV_round × γ × (1 − γ^T) / (1 − γ) − cost
+ROI = EV_round x gamma x (1 - gamma^T) / (1 - gamma) - cost
 
 where:
-  γ          = discountFactor (default 0.95)
-  T          = horizonTurns   (default 10)
-  EV_round   = expected coins per full round
-  cost       = card purchase price
+  gamma    = discountFactor (default 0.95)
+  T        = horizonTurns   (default 10)
+  EV_round = expected coins per full round
+  cost     = card purchase price
 ```
 
-This is the **primary sort key** used by `rankPurchasableProjects`.
+### 2.4 Variance of Per-Turn Net Gain
 
-### 1.4 Win Probability — Analytical Softmax
-
-Used in `estimateWinProbDelta` when `mcSimulations == 0`:
 ```
-score(player p) = playerEvPerRound(p) × remainingTurns
-                + Σ_{built landmark} LANDMARK_WEIGHT(landmark)
-                + coinAdvantage(p)
-                [× endgameProximityBonus if applicable]
-
-coinAdvantage(p)         = (coins_p − avgCoins) / COIN_ADVANTAGE_SCALE (5.0)
-endgameProximityBonus(p) = score × 2.5 if landmarkCount == 3 and coins_p ≥ cheapestMissingLandmarkCost
-remainingTurns           = max(3, TOTAL_EXPECTED_TURNS(25) − turnsElapsed/n)
-                           or REMAINING_TURNS_FALLBACK(12) when turnsElapsed == 0
-
-P_win(player i) = exp(score_i) / Σ_j exp(score_j)
-
-winProbDelta(candidate) = P_win(state_after_buy, i) − P_win(state_before_buy, i)
+Var = Sum_r P(r) x gain(r)^2 - EV^2
 ```
 
-`playerEvPerRound` uses the player's actual `PlayerStats` (Einkaufszentrum, food/animal/production counts) and real opponent coin counts, so category multipliers (Molkerei, Möbelfabrik, Markthalle) and purple card values (Stadion, Fernsehsender) are scored correctly.
+High variance = "swingy" card (Stadion, Bergwerk). Low variance = consistent income (Cafe, Bäckerei).
 
-LANDMARK_WEIGHTS (coin-equivalent units, Bahnhof ≈ +2 EV/round × 12 turns = 24):
-- Bahnhof: 24
-- Einkaufszentrum: 36
-- Freizeitpark: 24
-- Funkturm: 48
-- Default (any other landmark): 20
+### 2.5 Geometric Sum Helper
 
-The softmax is computed with max-subtraction for numerical stability (see `softmaxEntry()`).
-
-### 1.5 Variance of Per-Turn Net Gain
-
-Used as the risk metric in `RankEntry.variance`:
 ```
-Var = Σ_r P(r) × gain(r)² − EV²
+geometricSum(T, gamma) = gamma x (1 - gamma^T) / (1 - gamma)
 ```
 
-High variance = "swingy" card (stadion, bergwerk). Low variance = consistent income (café, bäckerei).
+With L'Hopital guard (returns T when gamma is approximately 1).
 
 ---
 
-## 2. Card Game Rules & `get_I` Conventions
+## 3. Card Game Rules & `get_I` Conventions
 
-### 2.1 `get_I` Perspective Convention
+### 3.1 `get_I` Perspective Convention
 
-`get_I(r, p_id, oop, eb, f_c, a_c, p_c, c, co)` always returns the coin **delta for the
-queried player**. The `oop` (own-turn perspective) flag disambiguates card colours:
+`get_I(r, p_id, oop, eb, f_c, a_c, p_c, c, co)` returns the coin delta for the queried player. The `oop` (own-turn perspective) flag disambiguates card colours:
 
 | Colour | `oop = true` (own turn) | `oop = false` (opponent's turn) |
 |--------|------------------------|---------------------------------|
-| blau   | receives income        | receives income (same — fires both turns) |
-| grün   | receives income        | 0 (green only fires on own turn) |
+| blau   | receives income        | receives income (fires both turns) |
+| gruen  | receives income        | 0 (green only fires on own turn) |
 | lila   | receives income        | 0 (purple only fires on own turn) |
 | rot    | 0 (owner doesn't pay self) | **negative** (queried player is the roller, pays the owner) |
 
-### 2.2 Income Processing Order
+### 3.2 Income Processing Order
 
-The official rules specify: **Rot → Blau & Grün → Violett**.
+Official rules: **Rot -> Blau & Gruen -> Violett**.
 
-`computeNetGainForRoll` implements this order:
-1. **Red** — opponents' red card payments are deducted from the roller's coins *before any income is received*. Roller's coins at the start of red resolution = `activeCoins` (pre-roll).
-2. **Blue** — active player receives bank income from their own blue cards.
-3. **Green** — active player receives bank income from their own green cards.
-4. **Purple** — active player's purple effects fire last (Stadion, Fernsehsender steal; Bürohaus handled separately in `immediateEV`).
+`computeNetGainForRoll` implements this:
+1. **Red** — opponents' red card payments deducted from roller's coins before any income
+2. **Blue** — active player receives bank income from blue cards
+3. **Green** — active player receives bank income from green cards
+4. **Purple** — active player's purple effects fire last (Stadion, Fernsehsender steal; Bürohaus handled separately)
 
-This ordering matters for the **inability-to-pay** rule: a roller with 0 coins pays nothing to red card owners, even if they would receive blue or green income on the same roll.
+This ordering matters for the inability-to-pay rule: a roller with 0 coins pays nothing to red card owners, even if they would receive blue/green income on the same roll.
 
-### 2.3 Counter-Clockwise Red Card Payment Order
+### 3.3 Counter-Clockwise Red Card Payment Order
 
-When multiple red card owners trigger on the same roll, they are paid in **counter-clockwise order** from the active player. Earlier claimants are paid in full; later claimants receive whatever remains.
+When multiple red card owners trigger on the same roll, they are paid counter-clockwise from the active player:
 
-`computeNetGainForRoll` iterates opponents as:
 ```
 for step in 1..(n-1):
     opponentIdx = (playerIndex - step + n) % n
 ```
 
-This is enforced consistently in:
-- `computeNetGainForRoll` (EV model)
-- `computeAllDeltasForRoll` (live game / simulation)
+Earlier claimants are paid in full; later claimants receive whatever remains.
 
-### 2.4 `computeAllDeltasForRoll` — Single Source of Truth for Roll Resolution
+### 3.4 `computeAllDeltasForRoll` — Single Source of Truth
 
-`computeAllDeltasForRoll(state, activePlayer, roll)` returns an `int[]` of per-player coin deltas for a single roll, applying the correct order and counter-clockwise priority. Both `GameSession.applyTurn` and `GameSimulator.applyRoll` use this method.
+`computeAllDeltasForRoll(state, activePlayer, roll)` returns an `int[]` of per-player coin deltas for a single roll, applying correct order and counter-clockwise priority. Used by `GameSession.applyTurn` and any simulation code.
 
-The two older bridge methods (`computeNetGainForRollPublic`, `computeOpponentTurnGainForRollPublic`) are retained as `@Deprecated` for backward compatibility but are no longer used in the live game path.
+### 3.5 Red Card Payment (Cafe, Familienrestaurant)
 
-### 2.4b `evPerRound` — Step-Aware Coin Projection
+`get_I` from the roller's perspective for red cards:
+- Returns a **negative** integer (amount the roller loses)
+- Clamped to `-min(base_cost, current_coins)` for inability-to-pay
+- Einkaufszentrum (`eb = true`) adds +1 to the amount the owner collects
 
-`computeNetGainForRoll` uses the players' current coin counts for red card clamping. This creates a **static-snapshot bias**: a player with 0 coins appears unable to pay red cards in the EV model, even though they will accumulate blue income on prior opponent turns before the triggering roll fires.
+### 3.6 Stadion (Lila, Roll 6)
 
-`evPerRound` corrects for this in two stages:
-
-**Stage 1 — base projection (all players):**
+Takes **2 coins from each opponent** (not just the richest). Total uncapped.
 ```
-projectedCoins(player) = currentCoins + round(estimateUncappedOwnTurnEV(player))
-```
-`estimateUncappedOwnTurnEV` sums the player's own-turn blue+green income using `c=99` (no clamp).
-
-**Stage 2 — step-aware accumulation (active player only):**
-The active player earns blue income on each opponent's turn. Before evaluating opponent turn #step, the active player's projected coins are updated:
-```
-coinsAtStep = baseProjectedCoins + step × bluePerOpponentTurn
-
-where:
-  step              = position of this opponent in the turn order (1..n-1)
-  bluePerOppTurn    = Σ_r P2[r] × blueIncome(r)   (2d6 pass; takes max with 1d6 pass)
-```
-This ensures red card clamping reflects realistic coin accumulation for players earlier in the turn order.
-
-`immediateEV` is **not** affected — it correctly uses actual current coins for the turn happening right now.
-
-### 2.5 Red Card Payment (Café, Familienrestaurant)
-
-`get_I` is called from the *roller's* perspective for red cards:
-- Returns a **negative** integer (the amount the roller loses)
-- Clamped to `−min(base_cost, current_coins)` to enforce inability-to-pay
-- Einkaufszentrum (`eb = true`) adds +1 to the amount the owner collects (roller pays +1)
-
-The owner's gain equals the absolute value of the roller's loss. In `computeAllDeltasForRoll`, the owner's delta is set to `-loss` directly, ensuring the gain exactly matches what the roller pays (no double-counting).
-
-### 2.6 Stadion (Lila, Roll 6)
-
-Takes **2 coins from each opponent** (not just the richest). Total is uncapped.
-```
-gain = Σ_opponents min(2, opponent_coins)
+gain = Sum_opponents min(2, opponent_coins)
 ```
 
-### 2.7 Fernsehsender (Lila, Roll 6)
+### 3.7 Fernsehsender (Lila, Roll 6)
 
 Takes **up to 5 coins from the single richest opponent** (one target only).
 ```
 gain = min(5, max(opponent_coins))
 ```
 
-### 2.8 Bürohaus (Lila, Roll 6) — Special Handling
+### 3.8 Bürohaus (Lila, Roll 6) — Special Handling
 
-`get_I` returns `0` for bürohaus because card-swapping is non-monetary.
+`get_I` returns 0 for bürohaus because card-swapping is non-monetary. The swap mechanics are implemented in `BürohausLogic.executeSwap`: remove the active player's chosen non-landmark card and replace it with a chosen non-landmark from any opponent. The **choice** of which cards to swap (or whether to swap at all) is engine territory.
 
-The EV is computed separately in `ProbabilityCalc.bürohausSwapEV()` and added to `immediateEV()`:
-```
-bürohausSwapEV = max(0, contextualCardEvPerRound(bestOppNonLandmark, activePlayerStats)
-                       − contextualCardEvPerRound(worstOwnNonLandmark, activePlayerStats))
-
-Contribution to immediateEV = P(roll = 6 | dice_mode) × bürohausSwapEV
-```
-
-Both the opponent's card and the player's worst card are evaluated **in the active player's real context** (actual Einkaufszentrum, food/animal/production counts via `contextualCardEvPerRound`). This ensures synergy multipliers are correctly reflected: a player with Einkaufszentrum values café correctly at 2 coins/activation; a player with food cards values Markthalle at its true multiplied payout.
-
-**Live session flow:** In `MainWindow.onConfirmTurn`, after `session.applyTurn()` succeeds on a roll=6 with Bürohaus in the active player's portfolio, `ProbabilityCalc.bürohausSwapNote` is called. If a beneficial swap exists, a `JOptionPane.showConfirmDialog` is shown to the player. If accepted, `session.applyBürohausSwap(pi)` is called, which executes the swap and patches the last `TurnRecord` with the `swappedAway`/`swappedIn` fields. These fields are serialized to save files and replayed correctly on load.
-
-### 2.9 Category Multipliers
+### 3.9 Category Multipliers
 
 | Card | Category multiplier |
 |------|-------------------|
-| Molkerei (roll 7) | 3 coins × animal card count (`a_c`) |
-| Möbelfabrik (roll 8) | 3 coins × production card count (`p_c`) |
-| Markthalle (rolls 11–12) | 2 coins × food card count (`f_c`) |
+| Molkerei (roll 7) | 3 coins x animal card count (`a_c`) |
+| Möbelfabrik (roll 8) | 3 coins x production card count (`p_c`) |
+| Markthalle (rolls 11–12) | 2 coins x food card count (`f_c`) |
 
-`f_c`, `a_c`, `p_c` are passed pre-computed by `PlayerStats.of(player)` to avoid recomputing
-per card in the hot loop.
-
----
-
-## 3. Data Model Design Rationales
-
-### 3.1 Why `Project` is Immutable
-
-`Project` objects are loaded once from JSON and reused everywhere: in player owned lists,
-unbuilt pools, `GameState` copies, and simulation states. Making them immutable and using
-`id`-based `equals`/`hashCode` means they can be safely shared across threads and copies
-without any defensive copying.
-
-Consequence: `Player.copy()` and `GameState.copy()` only need to copy the *lists*, not the
-`Project` objects themselves.
-
-### 3.2 Why `Player.copy()` is Shallow-Safe
-
-`Player.copy()` creates a new `ArrayList` but keeps the same `Project` references. This is
-safe *only* because `Project` is immutable. If `Project` were ever made mutable, this would
-need to change to a deep copy.
-
-### 3.3 Why `GameState` Uses Deep Copy
-
-`GameState.copy()` calls `Player.copy()` for each player, producing independent player objects
-with independent owned-project lists. This is needed because:
-- Simulations mutate `Player.coins` and `Player.owned_projects`
-- Multiple hypothetical states (one per candidate card) are evaluated in parallel
-- A deep copy ensures mutations in one evaluation don't affect others
-
-### 3.4 Why `ProjectLoader` Caches
-
-`ProjectLoader` reads `projects.json` once at class load and stores a `Map<String, Project>`.
-All subsequent calls to `getProject()` and `getAllProjects()` are pure map lookups. This
-matters because `get_I` calls (inside ranking hot loops) may call `ProjectLoader` indirectly,
-and file I/O on every call would be ~1000× slower.
+`f_c`, `a_c`, `p_c` are passed pre-computed by `PlayerStats.of(player)` to avoid recomputing per card in hot loops.
 
 ---
 
-## 4. GameSimulator Design
+## 4. Data Model Design Rationales
 
-### 4.1 Greedy Rollout Policy
+### 4.1 Why `Project` is Immutable
 
-Each simulated player follows this buy priority each turn:
+`Project` objects are loaded once from JSON and reused everywhere. Making them immutable with `id`-based `equals`/`hashCode` means they can be safely shared across threads and copies without defensive copying. `Player.copy()` and `GameState.copy()` only need to copy the lists, not the objects.
 
-1. **Landmark first:** if the player can afford the cheapest unbuilt landmark (Bahnhof → Einkaufszentrum → Freizeitpark → Funkturm in cost order), buy it.
-2. **Best establishment:** else buy the establishment with the highest contextual `evPerRound / cost` score that the player can afford and is still in supply. Card EV is computed inline using `CardIncome.contextualCardEvPerRound` with the player's actual `PlayerStats`, so synergy multipliers (Markthalle, Molkerei, Möbelfabrik, Einkaufszentrum) are correctly reflected.
-3. **Save:** if nothing is affordable, skip.
+### 4.2 Why `Player.copy()` is Shallow-Safe
 
-The landmark order is always cheapest-first because landmark abilities stack and it is never
-correct to skip a cheaper landmark to buy a more expensive one.
+`Player.copy()` creates a new `ArrayList` but keeps the same `Project` references. Safe only because `Project` is immutable.
 
-### 4.2 Card Evaluation in the Simulation Policy
+### 4.3 Why `GameState` Uses Deep Copy
 
-Card buy decisions use `CardIncome.contextualCardEvPerRound(card, playerStats, n, oppCoins)`:
-- 2d6 pass over rolls 2–12 plus a 1d6 pass for roll-1 activations (takes max)
-- Uses the buying player's real `PlayerStats` (Einkaufszentrum, food/animal/production counts)
-- Blue cards scaled by `n` (fire every turn); red cards scaled by `n-1`
-- Cost is `c=99` (no clamp) — evaluates the card's income potential, not payment ability
+`GameState.copy()` calls `Player.copy()` for each player, producing independent player objects. Needed because simulations mutate `Player.coins` and `Player.owned_projects`, and multiple hypothetical states may be evaluated in parallel.
 
-This inline computation (~12 `get_I` calls per candidate) is allocation-free and negligible
-compared to the `computeAllDeltasForRoll` calls that dominate each simulated turn.
+### 4.4 Why `ProjectLoader` Caches
 
-### 4.3 Card Supply Tracking
+`ProjectLoader` reads `projects.json` once at class load and stores a `Map<String, Project>`. All subsequent calls are pure map lookups, avoiding file I/O in hot paths.
 
-```
-initialSupply(card) = 6 − (copies already owned by players at simulation start)
-```
+### 4.5 Card Supply
 
-Non-landmark establishments have 6 copies in the base game. The simulator tracks
-`Map<String, Integer>` supply and prevents purchases when supply reaches 0. Landmarks have
-unlimited supply (one per player, not shared).
-
-**`GameState.unbuilt_projects` semantics (live game path):** Stores one entry per non-landmark
-card *type* that still has at least one copy available. A type is removed from the list only
-when total copies owned across all players reaches 6. `GameState.initial()` includes all 15
-non-landmark types (including weizenfeld and bäckerei — starter copies given to players are
-counted against the shared pool of 6). `GameSession.applyTurn` removes a type after the 6th
-copy is purchased; `GameStateBuilder.build()` excludes a type when its owned count ≥ 6.
-
-### 4.4 Remaining Approximations in the Simulator
-
-| Approximation | Impact | Location |
-|---------------|--------|----------|
-| Bahnhof always picks 2d6 when high-range card present | Overestimates income in early game when 1d6 might be better | `GameSimulator.rollDice()` |
-| Bürohaus not executed in simulation | Bürohaus owners never swap; slightly underestimates their win rate | `GameSimulator.greedyBuy()` |
-| `MAX_TURNS = 200` cap | Rare timeout returns -1 (excluded from win rate denominator) | `GameSimulator.simulate()` |
+Non-landmark establishments have 6 copies in the base game. Starting cards (Weizenfeld, Bäckerei) given to players are separate from the 6-copy supply pool — they do not reduce the available copies for purchase. `GameState.unbuilt_projects` stores one entry per non-landmark card type that still has copies available; a type is removed when total copies owned across all players reaches 6.
 
 ---
 
-## 5. Ranking Note Annotations
+## 5. Engine Interface Contract
 
-Each `RankEntry.notes` string is assembled from up to three annotation sources, concatenated with `"  |  "`:
+Defined in NORTH-STAR.md Section 6.2. Key points for implementers:
 
-### 5.1 Bürohaus Swap Note
-
-When a player buys Bürohaus, `bürohausSwapNote(stateWithBürohaus, pi)` returns a human-readable recommendation like `"Swap your Weizenfeld for P1's Bergwerk"` (or `null` if no beneficial swap exists). This uses `BürohausLogic.swapNote` which compares `singleCardEvPerRound` for all owned and opponent cards.
-
-### 5.2 Synergy Note (`computeSynergyNote`)
-
-For each candidate card A, scans all remaining pool cards B to find the one that maximally increases A's `contextualCardEvPerRound` when also owned. Uses `buildStatsWithCards(player, A, B)` and compares to `buildStatsWithCard(player, A)` baseline. Threshold: gain ≥ 0.05¢/round. Separately checks Einkaufszentrum for green/store cards.
-
-```
-synergyGain(A, B) = contextualCardEvPerRound(A, statsWithAB) − contextualCardEvPerRound(A, statsWithA)
+```java
+interface SimulationEngine {
+    String id();
+    String description();
+    EngineResult evaluate(GameState state, int playerIndex, EngineConfig config);
+}
 ```
 
-### 5.3 Two-Turn Lookahead Note (`computeTwoTurnNote`)
-
-After buying card A, finds the best card B to buy next. Uses `contextualCardEvPerRound(B, statsAfterA, n, oppCoins)` — `statsAfterA` reflects the portfolio *after* buying A. Converts to ROI using `geometricSum(horizonTurns, discountFactor)`. Only affordable cards are given this annotation (unaffordable cards' follow-up plans are speculative). Threshold: follow-up ROI > 0.5.
-
-```
-roiB_in_postA_portfolio = contextualCardEvPerRound(B, statsAfterA) × geometricSum(T, γ) − B.cost
-```
-
-`geometricSum(T, γ) = γ(1−γ^T)/(1−γ)` with L'Hôpital guard (returns T when γ ≈ 1).
-
-No `GameState.copy()` is performed in either synergy or two-turn lookahead — only `PlayerStats` objects are allocated per candidate pair. Total cost: O(n²) `contextualCardEvPerRound` calls per ranking (n ≤ 19 pool cards → ≤ 361 calls), well within the 5ms budget.
+- `EngineResult` must contain: ranked purchase options with scores, explanation data (factor list with weights), and metadata (confidence, computation time, iterations).
+- Engines share everything they compute — the UI decides what to display.
+- Engines may call Standard Calcs and Core freely, but must not mutate the passed-in `GameState` (use copies).
 
 ---
 
----
+## 6. MCTS Design
 
-## 6. Entscheidungsarchitektur-Vision
+See NORTH-STAR.md Section 7 for the full specification. Key technical details:
 
-### 6.1 Grundproblem: Greedy vs. Optimal
+### 6.1 Tree Node Types
 
-Der aktuelle Calculator berechnet einen **1-Step-Greedy-Entscheid**: Welche Karte maximiert `roiOverHorizon` im aktuellen Zustand? Das ist keine optimale Strategie, sondern eine lokale Näherung. Das Ziel ist ein **stochastischer Entscheidungsbaum** (analog zu Schach-Engines mit alpha-beta): Für alle möglichen Würfelwürfe und Kaufaktionen wird der resultierende Zustand rekursiv bewertet; die Empfehlung ist die Aktion mit maximalem erwartetem Sieg-Wert.
+- **Chance nodes**: dice outcomes, weighted by `P1` or `P2` probabilities
+- **Decision nodes**: purchase choices (including save), one per player per turn
+- All players modeled as decision-makers with the MCTS rollout policy
 
-### 6.2 Branching-Faktor
+### 6.2 Rollout Approaches
 
-| Phase | Würfelergebnisse | Kaufoptionen | Branching/Zug |
-|-------|-----------------|--------------|---------------|
-| Frühspiel | 6–11 | ~20 | ~120–150 |
-| Mittelspiel | 6–11 | ~8 | ~50–80 |
-| Endspiel | 6–11 | ~2–4 | ~15–25 |
+- **v1 (full game)**: simulate until someone wins. Simple, accurate, slower.
+- **v2 (depth-limited)**: stop after N turns, estimate winner via heuristic on position. Faster, quality depends on heuristic. To be validated head-to-head against v1.
 
-Ein vollständiger Baum bis Spielende ist nicht realisierbar (~150^30 Knoten). Die Lösung ist eine begrenzte Tiefe mit analytischer Blatt-Evaluation und Top-k-Pruning.
+### 6.3 Safety Valve
 
-### 6.3 Zielarchitektur: Dreistufiges Hybrid-System
-
-**Stufe 1 — Rollout-Tree (implementiert, `RolloutTree.java`):**
-`RolloutTree.evaluate(gs, pi, depth, topK)` enumiert Kaufoptionen bis Tiefe `d`. Eine Tiefe = eigener Zug (probabilistisch über alle Würfelwürfe) + N−1 Gegner-Züge (stochastisch, einzelner Sample-Roll + Boltzmann-Policy T=0.7). Sonderfälle: Bahnhof (1d6 vs 2d6), Freizeitpark (Pasch→Bonus-Zug), Funkturm (Re-Roll wenn g(r)<Baseline). `RolloutResult` record: `(Project bestAction, double expectedWinProb, Map<Project,Double> allValues)`. UI: 5. Tab "Rollout" in MainWindow.
-
-Kosten bei d=1, k=5, 4 Spieler: ~12ms (gemessen).
-
-**Stufe 2 — Analytische Blatt-Evaluation (implementiert, `WinProbabilityCalc`):**
-`portfolioEvPerRound × remainingTurns + LANDMARK_WEIGHTS + coinAdvantage + endgameProximityBonus` → Softmax-Win-Prob. Formel und Konstanten: siehe §1.4. Kosten: ~0.1ms/Knoten.
-
-**Stufe 3 — Adaptives MC-Budget (implementiert, `ProbabilityCalc.adaptiveMCRefinement`):**
-Top-k=5 Kandidaten analytisch vorfiltern. Budget-Splitting: wenn Spread ≤ 0.02 → alle Top-k mit je 2.500 Sims; wenn ein Kandidat klar führt (>0.05 Vorsprung) → nur Verfolger validieren. MC-Ergebnisse überschreiben Stufe-2-Schätzungen in den `RankEntry`-Objekten.
-
-### 6.4 Synergie-Bewertung: per-Karte vs. Portfolio
-
-**Aktuell (per-Karte):** `contextualCardEvPerRound(A, statsWithA)` — bewertet Karte A im Kontext des Portfolios.
-**Besser (Portfolio-Delta):** `playerEvPerRound(portfolio + A) − playerEvPerRound(portfolio)` — misst den echten Marginalwert von A für das Gesamtportfolio. Nutzt alle Synergien korrekt (Multiplikatoren, Würfelverteilung, Gegner-Interaktion). Geplant als `portfolioDeltaEV` in `ProbabilityCalc`.
-
-### 6.5 MC-Policy: Greedy vs. Boltzmann
-
-**Aktuell:** `greedyBuy` wählt immer die Karte mit höchstem Score (deterministisch). Alle simulierten Spieler spielen „perfekt" — überschätzt Spieler-Qualität, verzerrte Win-Raten.
-
-**Geplant (M7):** Boltzmann-Sampling mit Temperatur T:
-```
-P(buy X) ∝ exp(score(X) / T)
-```
-T=0: greedy (aktuell). T=0.7: realistische Spieler. T=∞: uniform random. Toggle in UI.
-
-*Offene Bugs und geplante Verbesserungen: siehe `PLAN.md`.*
+Maximum turn limit for rollouts. Games rarely exceed 60–70 turns with reasonable play — the limit must account for unlucky edge cases while preventing infinite loops.

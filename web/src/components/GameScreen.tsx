@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { useLocale } from '../i18n/useLocale';
 import { useEngine } from '../hooks/useEngine';
 import { useRollPreview } from '../hooks/useRollPreview';
+import { useInsights } from '../hooks/useInsights';
 import type { UseSessionReturn } from '../hooks/useSession';
 import type { Settings } from '../hooks/useSettings';
 import type { UseHoverReturn } from '../hooks/useHover';
@@ -13,6 +14,7 @@ import { DiceInterface } from './DiceInterface';
 import { CoinFlowDisplay } from './CoinFlowDisplay';
 import { PurchaseArea } from './PurchaseArea';
 import { OpponentTurnEntry } from './OpponentTurnEntry';
+import { InsightsPanel } from './InsightsPanel';
 import { BürohausModal } from './BürohausModal';
 import { SettingsScreen } from './SettingsScreen';
 import { SaveLoadMenu } from './SaveLoadMenu';
@@ -42,6 +44,9 @@ export function GameScreen({ session, settings, updateSettings, projects, hover 
   const activePlayer = s.state.players[s.nextPlayerIndex];
   const isUserTurn = s.nextPlayerIndex === settings.userPlayerIndex;
   const canUse2d6 = activePlayer.ownedIds.includes('bahnhof');
+
+  // Insights for opponent turns
+  const insights = useInsights(settings.userPlayerIndex, isUserTurn);
   const ownsBürohaus = activePlayer.ownedIds.includes('bürohaus');
 
   // Bürohaus modal state
@@ -272,16 +277,24 @@ export function GameScreen({ session, settings, updateSettings, projects, hover 
               )}
             </>
           ) : (
-            /* Opponent turn tracking */
-            <div className="bg-machi-surface rounded-xl border border-machi-border p-4">
-              <OpponentTurnEntry
-                opponentName={activePlayer.name}
-                canUse2d6={canUse2d6}
+            /* Opponent turn tracking + insights */
+            <div className="space-y-4">
+              <div className="bg-machi-surface rounded-xl border border-machi-border p-4">
+                <OpponentTurnEntry
+                  opponentName={activePlayer.name}
+                  canUse2d6={canUse2d6}
+                  projects={projects}
+                  language={settings.language}
+                  coinsAvailable={activePlayer.coins}
+                  onConfirm={handleOpponentConfirm}
+                  loading={session.loading}
+                />
+              </div>
+              <InsightsPanel
+                insights={insights.data}
+                loading={insights.loading}
                 projects={projects}
                 language={settings.language}
-                coinsAvailable={activePlayer.coins}
-                onConfirm={handleOpponentConfirm}
-                loading={session.loading}
               />
             </div>
           )}

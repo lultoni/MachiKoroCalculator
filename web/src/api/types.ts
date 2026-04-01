@@ -108,11 +108,17 @@ export interface PlayerInsight {
   landmarksOwned: number;
 }
 
+export interface NarrativeInsight {
+  type: string;
+  text: string;
+}
+
 export interface InsightsResponse {
   playerInsights: PlayerInsight[];
   tempoAdvantage: number;
   portfolioEV: number;
   supplyWarnings: { cardId: string; remaining: number }[];
+  narrative?: NarrativeInsight[];
 }
 
 // ─── Saves ───────────────────────────────────────────────────────────────

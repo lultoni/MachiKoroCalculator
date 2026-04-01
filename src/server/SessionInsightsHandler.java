@@ -132,6 +132,10 @@ final class SessionInsightsHandler implements HttpHandler {
             response.addProperty("portfolioEV", round4(portfolioEV));
             response.add("supplyWarnings", supplyWarnings);
 
+            // Narrative insights — short natural-language observations
+            JsonArray narrative = buildNarrative(state, playerIndex, tempoAdvantage, portfolioEV, supplyWarnings);
+            response.add("narrative", narrative);
+
             ApiUtils.sendJson(exchange, 200, response);
 
         } catch (NumberFormatException e) {
@@ -223,6 +227,70 @@ final class SessionInsightsHandler implements HttpHandler {
         }
         if (opponentMinEtw == Double.MAX_VALUE) return 0.0;
         return opponentMinEtw - playerEtw;
+    }
+
+    /**
+     * Builds narrative insight entries from current game state.
+     */
+    private static JsonArray buildNarrative(GameState state, int playerIndex,
+            double tempoAdvantage, double portfolioEV, JsonArray supplyWarnings) {
+        JsonArray narrative = new JsonArray();
+        Player[] players = state.getPlayers();
+
+        // Position insight
+        if (tempoAdvantage > 1.0) {
+            JsonObject n = new JsonObject();
+            n.addProperty("type", "position");
+            n.addProperty("text", String.format("You are %.1f turns ahead of the nearest opponent.", tempoAdvantage));
+            narrative.add(n);
+        } else if (tempoAdvantage < -1.0) {
+            JsonObject n = new JsonObject();
+            n.addProperty("type", "position");
+            n.addProperty("text", String.format("You are %.1f turns behind the leader.", Math.abs(tempoAdvantage)));
+            narrative.add(n);
+        }
+
+        // Supply pressure
+        for (int i = 0; i < supplyWarnings.size(); i++) {
+            JsonObject w = supplyWarnings.get(i).getAsJsonObject();
+            int remaining = w.get("remaining").getAsInt();
+            if (remaining <= 1) {
+                String cardId = w.get("cardId").getAsString();
+                Project card = ProjectLoader.getProject(cardId).orElse(null);
+                String name = card != null ? card.getLocalizedName() : cardId;
+                JsonObject n = new JsonObject();
+                n.addProperty("type", "supply");
+                n.addProperty("text", name + ": only " + remaining + " copy left.");
+                narrative.add(n);
+            }
+        }
+
+        // Strategy suggestion based on position
+        if (tempoAdvantage > 3.0) {
+            JsonObject n = new JsonObject();
+            n.addProperty("type", "strategy");
+            n.addProperty("text", "Strong lead — consider lower-risk purchases to lock in your advantage.");
+            narrative.add(n);
+        } else if (tempoAdvantage < -3.0) {
+            JsonObject n = new JsonObject();
+            n.addProperty("type", "strategy");
+            n.addProperty("text", "Behind — consider high-EV purchases to catch up quickly.");
+            narrative.add(n);
+        }
+
+        // Landmark progress
+        int landmarksOwned = 0;
+        for (Project p : players[playerIndex].getOwned_projects()) {
+            if (p.isIs_grossprojekt()) landmarksOwned++;
+        }
+        if (landmarksOwned == 3) {
+            JsonObject n = new JsonObject();
+            n.addProperty("type", "landmark");
+            n.addProperty("text", "One landmark away from winning!");
+            narrative.add(n);
+        }
+
+        return narrative;
     }
 
     /** Rounds a double to 4 decimal places. */

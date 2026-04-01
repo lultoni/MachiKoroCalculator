@@ -1,7 +1,6 @@
 package engine.mcts;
 
 import calcs.Calcs;
-import calcs.RankEntry;
 import calcs.WinProbability;
 import core.GameState;
 import core.Player;
@@ -9,8 +8,6 @@ import core.Project;
 import core.ProjectLoader;
 import core.RollResolver;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
@@ -40,6 +37,9 @@ public final class GreedyRollout {
     private static final int    GREEDY_HORIZON  = 5;
     private static final double GREEDY_DISCOUNT = 0.95;
 
+    /** Number of turns between cache refreshes in the EV cache. */
+    private static final int EV_CACHE_REFRESH = 20;
+
     private GreedyRollout() {}
 
     /**
@@ -53,9 +53,12 @@ public final class GreedyRollout {
         int n            = state.getPlayers().length;
         int activePlayer = startingPlayer;
         int turnCount    = 0;
+        int[] deltas     = new int[n];
+        RolloutEvCache evCache = new RolloutEvCache(state, startingPlayer, EV_CACHE_REFRESH);
 
         while (turnCount < MctsRollout.MAX_TURNS) {
             Player active = state.getPlayers()[activePlayer];
+            evCache.tickTurn();
 
             // ---- Dice count: 2d6 if Bahnhof and has useful 7-12 card ----
             boolean hasBahnhof  = active.hasProject("bahnhof");
@@ -75,8 +78,8 @@ public final class GreedyRollout {
 
             // ---- Funkturm: keep if income >= expected reroll income ----
             if (active.hasProject("funkturm")) {
-                double currentIncome = computeRollIncome(state, activePlayer, roll);
-                double rerollEV      = computeExpectedRollIncome(state, activePlayer, twoDice);
+                double currentIncome = computeRollIncome(state, activePlayer, roll, deltas);
+                double rerollEV      = computeExpectedRollIncome(state, activePlayer, twoDice, deltas);
                 if (currentIncome < rerollEV) {
                     // Reroll
                     if (twoDice) {
@@ -92,7 +95,7 @@ public final class GreedyRollout {
             }
 
             // ---- Apply roll ----
-            int[] deltas = RollResolver.computeAllDeltasForRoll(state, activePlayer, roll);
+            RollResolver.computeAllDeltasForRoll(state, activePlayer, roll, deltas);
             for (int i = 0; i < n; i++) {
                 state.getPlayers()[i].setCoins(Math.max(0, state.getPlayers()[i].getCoins() + deltas[i]));
             }
@@ -103,7 +106,7 @@ public final class GreedyRollout {
             }
 
             // ---- Purchase: greedy ----
-            applyPurchaseGreedy(state, supply, activePlayer);
+            applyPurchaseGreedy(state, supply, activePlayer, evCache);
 
             // ---- Win check ----
             if (GameState.hasWon(state.getPlayers()[activePlayer])) {
@@ -113,7 +116,7 @@ public final class GreedyRollout {
             // ---- Freizeitpark bonus turn ----
             boolean hasFreizeit = state.getPlayers()[activePlayer].hasProject("freizeitpark");
             if (hasFreizeit && doubles) {
-                playBonusTurn(state, supply, activePlayer, rng);
+                playBonusTurn(state, supply, activePlayer, rng, deltas, evCache);
                 if (GameState.hasWon(state.getPlayers()[activePlayer])) {
                     return activePlayer == playerPerspective ? 1.0 : 0.0;
                 }
@@ -139,30 +142,30 @@ public final class GreedyRollout {
         return false;
     }
 
-    private static double computeRollIncome(GameState state, int playerIndex, int roll) {
-        int[] deltas = RollResolver.computeAllDeltasForRoll(state, playerIndex, roll);
+    private static double computeRollIncome(GameState state, int playerIndex, int roll, int[] deltas) {
+        RollResolver.computeAllDeltasForRoll(state, playerIndex, roll, deltas);
         return deltas[playerIndex];
     }
 
-    private static double computeExpectedRollIncome(GameState state, int playerIndex, boolean twoDice) {
+    private static double computeExpectedRollIncome(GameState state, int playerIndex, boolean twoDice, int[] deltas) {
         double ev = 0.0;
         if (twoDice) {
             for (int r = 2; r <= 12; r++) {
-                ev += core.CardIncome.P2[r] * computeRollIncome(state, playerIndex, r);
+                ev += core.CardIncome.P2[r] * computeRollIncome(state, playerIndex, r, deltas);
             }
         } else {
             for (int r = 1; r <= 6; r++) {
-                ev += core.CardIncome.P1[r] * computeRollIncome(state, playerIndex, r);
+                ev += core.CardIncome.P1[r] * computeRollIncome(state, playerIndex, r, deltas);
             }
         }
         return ev;
     }
 
     /**
-     * Greedy purchase: landmark priority, then best net EV, else save.
+     * Greedy purchase: landmark priority, then best net EV (from cache), else save.
      */
     private static void applyPurchaseGreedy(GameState state, SupplyTracker.MutableSupplyTracker supply,
-                                                      int activePlayer) {
+                                                      int activePlayer, RolloutEvCache evCache) {
         Player active = state.getPlayers()[activePlayer];
         int coins = active.getCoins();
 
@@ -192,7 +195,7 @@ public final class GreedyRollout {
             if (coins < p.getCost()) continue;
             // Purple cards (lila) are unique — max 1 per player per type
             if ("lila".equals(p.getColor()) && active.hasProject(p.getId())) continue;
-            double ev  = Calcs.evPerRound(state, activePlayer, p);
+            double ev  = evCache.getOrRefresh(state, activePlayer, p.getId());
             double net = ev * Calcs.geometricSum(GREEDY_HORIZON, GREEDY_DISCOUNT) - p.getCost();
             if (net > bestScore) {
                 bestScore = net;
@@ -208,7 +211,8 @@ public final class GreedyRollout {
     }
 
     private static void playBonusTurn(GameState state, SupplyTracker.MutableSupplyTracker supply,
-                                                int activePlayer, ThreadLocalRandom rng) {
+                                                int activePlayer, ThreadLocalRandom rng,
+                                                int[] deltas, RolloutEvCache evCache) {
         Player active   = state.getPlayers()[activePlayer];
         boolean hasBahnhof = active.hasProject("bahnhof");
         boolean twoDice    = hasBahnhof && hasHigh7to12Card(active);
@@ -222,14 +226,14 @@ public final class GreedyRollout {
         }
 
         if (active.hasProject("funkturm")) {
-            double currentIncome = computeRollIncome(state, activePlayer, roll);
-            double rerollEV      = computeExpectedRollIncome(state, activePlayer, twoDice);
+            double currentIncome = computeRollIncome(state, activePlayer, roll, deltas);
+            double rerollEV      = computeExpectedRollIncome(state, activePlayer, twoDice, deltas);
             if (currentIncome < rerollEV) {
                 roll = twoDice ? rng.nextInt(1, 7) + rng.nextInt(1, 7) : rng.nextInt(1, 7);
             }
         }
 
-        int[] deltas = RollResolver.computeAllDeltasForRoll(state, activePlayer, roll);
+        RollResolver.computeAllDeltasForRoll(state, activePlayer, roll, deltas);
         for (int i = 0; i < n; i++) {
             state.getPlayers()[i].setCoins(Math.max(0, state.getPlayers()[i].getCoins() + deltas[i]));
         }
@@ -238,6 +242,6 @@ public final class GreedyRollout {
             core.BürohausLogic.executeSwap(state, activePlayer);
         }
 
-        applyPurchaseGreedy(state, supply, activePlayer);
+        applyPurchaseGreedy(state, supply, activePlayer, evCache);
     }
 }

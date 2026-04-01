@@ -50,6 +50,7 @@ public final class DepthLimitedRollout {
         int activePlayer = startingPlayer;
         int turnCount    = 0;
         int depthLimit   = Math.max(1, maxDepth);
+        int[] deltas     = new int[n];
 
         while (turnCount < depthLimit) {
             // ---- Dice count (uniform random) ----
@@ -77,7 +78,7 @@ public final class DepthLimitedRollout {
             }
 
             // ---- Apply roll ----
-            int[] deltas = RollResolver.computeAllDeltasForRoll(state, activePlayer, roll);
+            RollResolver.computeAllDeltasForRoll(state, activePlayer, roll, deltas);
             for (int i = 0; i < n; i++) {
                 state.getPlayers()[i].setCoins(Math.max(0, state.getPlayers()[i].getCoins() + deltas[i]));
             }
@@ -98,7 +99,7 @@ public final class DepthLimitedRollout {
             // ---- Freizeitpark bonus turn ----
             if (state.getPlayers()[activePlayer].hasProject("freizeitpark") && doubles) {
                 // Simplified bonus turn: just apply one more action (no depth counting)
-                MctsRollout.playBonusTurnPackage(state, supply, activePlayer, playerPerspective, rng);
+                MctsRollout.playBonusTurnPackage(state, supply, activePlayer, playerPerspective, rng, deltas);
                 if (GameState.hasWon(state.getPlayers()[activePlayer])) {
                     return activePlayer == playerPerspective ? 1.0 : 0.0;
                 }

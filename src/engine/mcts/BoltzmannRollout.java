@@ -1,7 +1,6 @@
 package engine.mcts;
 
 import calcs.Calcs;
-import calcs.RankEntry;
 import calcs.WinProbability;
 import core.GameState;
 import core.Player;
@@ -9,8 +8,6 @@ import core.Project;
 import core.ProjectLoader;
 import core.RollResolver;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
@@ -38,6 +35,8 @@ public final class BoltzmannRollout {
     private static final String[] LANDMARK_IDS = {"bahnhof", "einkaufszentrum", "freizeitpark", "funkturm"};
     private static final int    BOLTZMANN_HORIZON  = 5;
     private static final double BOLTZMANN_DISCOUNT = 0.95;
+    /** Number of turns between cache refreshes in the EV cache. */
+    private static final int EV_CACHE_REFRESH = 20;
 
     private BoltzmannRollout() {}
 
@@ -64,9 +63,12 @@ public final class BoltzmannRollout {
         int n            = state.getPlayers().length;
         int activePlayer = startingPlayer;
         int turnCount    = 0;
+        int[] deltas     = new int[n];
+        RolloutEvCache evCache = new RolloutEvCache(state, startingPlayer, EV_CACHE_REFRESH);
 
         while (turnCount < MctsRollout.MAX_TURNS) {
             Player active = state.getPlayers()[activePlayer];
+            evCache.tickTurn();
 
             // ---- Dice count: greedy (same as Variant A) ----
             boolean hasBahnhof = active.hasProject("bahnhof");
@@ -84,8 +86,8 @@ public final class BoltzmannRollout {
 
             // ---- Funkturm: greedy ----
             if (active.hasProject("funkturm")) {
-                double cur    = computeRollIncome(state, activePlayer, roll);
-                double expEV  = computeExpectedRollIncome(state, activePlayer, twoDice);
+                double cur    = computeRollIncome(state, activePlayer, roll, deltas);
+                double expEV  = computeExpectedRollIncome(state, activePlayer, twoDice, deltas);
                 if (cur < expEV) {
                     if (twoDice) {
                         int d1 = rng.nextInt(1, 7); int d2 = rng.nextInt(1, 7);
@@ -97,7 +99,7 @@ public final class BoltzmannRollout {
             }
 
             // ---- Apply roll ----
-            int[] deltas = RollResolver.computeAllDeltasForRoll(state, activePlayer, roll);
+            RollResolver.computeAllDeltasForRoll(state, activePlayer, roll, deltas);
             for (int i = 0; i < n; i++) {
                 state.getPlayers()[i].setCoins(Math.max(0, state.getPlayers()[i].getCoins() + deltas[i]));
             }
@@ -108,7 +110,7 @@ public final class BoltzmannRollout {
             }
 
             // ---- Purchase: Boltzmann ----
-            applyPurchaseBoltzmann(state, supply, activePlayer, temperature, rng);
+            applyPurchaseBoltzmann(state, supply, activePlayer, temperature, rng, evCache);
 
             // ---- Win check ----
             if (GameState.hasWon(state.getPlayers()[activePlayer])) {
@@ -118,7 +120,7 @@ public final class BoltzmannRollout {
             // ---- Freizeitpark bonus turn ----
             boolean hasFreizeit = state.getPlayers()[activePlayer].hasProject("freizeitpark");
             if (hasFreizeit && doubles) {
-                playBonusTurn(state, supply, activePlayer, temperature, rng);
+                playBonusTurn(state, supply, activePlayer, temperature, rng, deltas, evCache);
                 if (GameState.hasWon(state.getPlayers()[activePlayer])) {
                     return activePlayer == playerPerspective ? 1.0 : 0.0;
                 }
@@ -137,7 +139,7 @@ public final class BoltzmannRollout {
 
     private static void applyPurchaseBoltzmann(GameState state, SupplyTracker.MutableSupplyTracker supply,
                                                          int activePlayer, double temperature,
-                                                         ThreadLocalRandom rng) {
+                                                         ThreadLocalRandom rng, RolloutEvCache evCache) {
         Player active = state.getPlayers()[activePlayer];
         int coins = active.getCoins();
 
@@ -160,48 +162,54 @@ public final class BoltzmannRollout {
         }
 
         // 2. Boltzmann sampling over non-landmark cards + save
-        List<Project> candidates = new ArrayList<>();
-        List<Double> scores      = new ArrayList<>();
-
-        // Save option: ROI = 0
-        candidates.add(RankEntry.WAIT_SENTINEL);
-        scores.add(0.0);
-
+        //    Count eligible cards first to size arrays
+        int candidateCount = 1; // save option
         for (Project p : state.getUnbuilt_projects()) {
             if (!supply.canPurchase(p.getId())) continue;
             if (coins < p.getCost()) continue;
-            // Purple cards (lila) are unique — max 1 per player per type
             if ("lila".equals(p.getColor()) && active.hasProject(p.getId())) continue;
-            double ev  = Calcs.evPerRound(state, activePlayer, p);
+            candidateCount++;
+        }
+
+        Project[] candidates = new Project[candidateCount];
+        double[] scores      = new double[candidateCount];
+        candidates[0] = null; // save sentinel (null = save)
+        scores[0]     = 0.0;
+
+        int idx = 1;
+        for (Project p : state.getUnbuilt_projects()) {
+            if (!supply.canPurchase(p.getId())) continue;
+            if (coins < p.getCost()) continue;
+            if ("lila".equals(p.getColor()) && active.hasProject(p.getId())) continue;
+            double ev  = evCache.getOrRefresh(state, activePlayer, p.getId());
             double roi = ev * Calcs.geometricSum(BOLTZMANN_HORIZON, BOLTZMANN_DISCOUNT) - p.getCost();
-            candidates.add(p);
-            scores.add(roi);
+            candidates[idx] = p;
+            scores[idx]     = roi;
+            idx++;
         }
 
         // Compute Boltzmann probabilities: P_i ∝ exp(score_i / T)
-        double[] probs = new double[candidates.size()];
         double sum = 0.0;
-        for (int i = 0; i < scores.size(); i++) {
-            probs[i] = Math.exp(scores.get(i) / temperature);
-            sum += probs[i];
+        for (int i = 0; i < candidateCount; i++) {
+            scores[i] = Math.exp(scores[i] / temperature);
+            sum += scores[i];
         }
         if (sum < 1e-12) {
-            // Degenerate: uniform
-            sum = candidates.size();
-            for (int i = 0; i < probs.length; i++) probs[i] = 1.0;
+            sum = candidateCount;
+            for (int i = 0; i < candidateCount; i++) scores[i] = 1.0;
         }
 
         // Sample
         double r = rng.nextDouble() * sum;
         double cumulative = 0.0;
         int chosen = 0;
-        for (int i = 0; i < probs.length; i++) {
-            cumulative += probs[i];
+        for (int i = 0; i < candidateCount; i++) {
+            cumulative += scores[i];
             if (r <= cumulative) { chosen = i; break; }
         }
 
-        Project card = candidates.get(chosen);
-        if (card == RankEntry.WAIT_SENTINEL) return; // save
+        Project card = candidates[chosen];
+        if (card == null) return; // save
 
         active.setCoins(coins - card.getCost());
         active.addProject(card);
@@ -221,24 +229,24 @@ public final class BoltzmannRollout {
         return false;
     }
 
-    private static double computeRollIncome(GameState state, int playerIndex, int roll) {
-        int[] deltas = RollResolver.computeAllDeltasForRoll(state, playerIndex, roll);
+    private static double computeRollIncome(GameState state, int playerIndex, int roll, int[] deltas) {
+        RollResolver.computeAllDeltasForRoll(state, playerIndex, roll, deltas);
         return deltas[playerIndex];
     }
 
-    private static double computeExpectedRollIncome(GameState state, int playerIndex, boolean twoDice) {
+    private static double computeExpectedRollIncome(GameState state, int playerIndex, boolean twoDice, int[] deltas) {
         double ev = 0.0;
         if (twoDice) {
-            for (int r = 2; r <= 12; r++) ev += core.CardIncome.P2[r] * computeRollIncome(state, playerIndex, r);
+            for (int r = 2; r <= 12; r++) ev += core.CardIncome.P2[r] * computeRollIncome(state, playerIndex, r, deltas);
         } else {
-            for (int r = 1; r <= 6; r++) ev += core.CardIncome.P1[r] * computeRollIncome(state, playerIndex, r);
+            for (int r = 1; r <= 6; r++) ev += core.CardIncome.P1[r] * computeRollIncome(state, playerIndex, r, deltas);
         }
         return ev;
     }
 
     private static void playBonusTurn(GameState state, SupplyTracker.MutableSupplyTracker supply,
                                                 int activePlayer, double temperature,
-                                                ThreadLocalRandom rng) {
+                                                ThreadLocalRandom rng, int[] deltas, RolloutEvCache evCache) {
         Player active   = state.getPlayers()[activePlayer];
         boolean hasBahnhof = active.hasProject("bahnhof");
         boolean twoDice    = hasBahnhof && hasHigh7to12Card(active);
@@ -247,16 +255,16 @@ public final class BoltzmannRollout {
         int roll = twoDice ? rng.nextInt(1,7) + rng.nextInt(1,7) : rng.nextInt(1,7);
 
         if (active.hasProject("funkturm")) {
-            double cur = computeRollIncome(state, activePlayer, roll);
-            double exp = computeExpectedRollIncome(state, activePlayer, twoDice);
+            double cur = computeRollIncome(state, activePlayer, roll, deltas);
+            double exp = computeExpectedRollIncome(state, activePlayer, twoDice, deltas);
             if (cur < exp) roll = twoDice ? rng.nextInt(1,7) + rng.nextInt(1,7) : rng.nextInt(1,7);
         }
 
-        int[] deltas = RollResolver.computeAllDeltasForRoll(state, activePlayer, roll);
+        RollResolver.computeAllDeltasForRoll(state, activePlayer, roll, deltas);
         for (int i = 0; i < n; i++) {
             state.getPlayers()[i].setCoins(Math.max(0, state.getPlayers()[i].getCoins() + deltas[i]));
         }
         if (active.hasProject("bürohaus") && roll == 6) core.BürohausLogic.executeSwap(state, activePlayer);
-        applyPurchaseBoltzmann(state, supply, activePlayer, temperature, rng);
+        applyPurchaseBoltzmann(state, supply, activePlayer, temperature, rng, evCache);
     }
 }

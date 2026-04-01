@@ -23,9 +23,25 @@ public final class RollResolver {
      * @return delta array indexed by player; positive = gained, negative = lost
      */
     public static int[] computeAllDeltasForRoll(GameState state, int activePlayer, int roll) {
+        int[] deltas = new int[state.getPlayers().length];
+        computeAllDeltasForRoll(state, activePlayer, roll, deltas);
+        return deltas;
+    }
+
+    /**
+     * Computes coin deltas into a pre-allocated array, avoiding allocation on every call.
+     * The array must have length >= number of players. Contents are zeroed before use.
+     *
+     * @param state         current game state
+     * @param activePlayer  index of the rolling player
+     * @param roll          dice total (1–12)
+     * @param deltas        pre-allocated output array (will be zeroed and filled)
+     */
+    public static void computeAllDeltasForRoll(GameState state, int activePlayer, int roll,
+                                                int[] deltas) {
         Player[] players = state.getPlayers();
         int n = players.length;
-        int[] deltas = new int[n];
+        java.util.Arrays.fill(deltas, 0, n, 0);
 
         // Step 1: Red card payments (counter-clockwise, sequential).
         int rollerCoins = players[activePlayer].getCoins();
@@ -71,7 +87,5 @@ public final class RollResolver {
                         active.getCoins() + deltas[activePlayer], freshOpponentCoins);
             }
         }
-
-        return deltas;
     }
 }

@@ -1,6 +1,5 @@
 package engine.mcts;
 
-import calcs.RankEntry;
 import calcs.WinProbability;
 import core.GameState;
 import core.Player;
@@ -8,8 +7,6 @@ import core.Project;
 import core.ProjectLoader;
 import core.RollResolver;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
@@ -72,6 +69,7 @@ public final class MctsRollout {
         int n = state.getPlayers().length;
         int activePlayer = startingPlayer;
         int turnCount = 0;
+        int[] deltas = new int[n];
 
         while (turnCount < MAX_TURNS) {
             // ---- Dice count ----
@@ -108,7 +106,7 @@ public final class MctsRollout {
             }
 
             // ---- Apply roll ----
-            int[] deltas = RollResolver.computeAllDeltasForRoll(state, activePlayer, roll);
+            RollResolver.computeAllDeltasForRoll(state, activePlayer, roll, deltas);
             for (int i = 0; i < n; i++) {
                 int newCoins = state.getPlayers()[i].getCoins() + deltas[i];
                 state.getPlayers()[i].setCoins(Math.max(0, newCoins));
@@ -131,7 +129,7 @@ public final class MctsRollout {
             boolean hasFreizeit = state.getPlayers()[activePlayer].hasProject("freizeitpark");
             if (hasFreizeit && doubles) {
                 // Bonus turn: same player acts again (no further chaining if bonus doubles)
-                playBonusTurnPackage(state, supply, activePlayer, playerPerspective, rng);
+                playBonusTurnPackage(state, supply, activePlayer, playerPerspective, rng, deltas);
                 // Win check after bonus turn
                 if (GameState.hasWon(state.getPlayers()[activePlayer])) {
                     return activePlayer == playerPerspective ? 1.0 : 0.0;
@@ -158,7 +156,7 @@ public final class MctsRollout {
      */
     static void playBonusTurnPackage(GameState state, SupplyTracker.MutableSupplyTracker supply,
                                                 int activePlayer, int playerPerspective,
-                                                ThreadLocalRandom rng) {
+                                                ThreadLocalRandom rng, int[] deltas) {
         boolean hasBahnhof = state.getPlayers()[activePlayer].hasProject("bahnhof");
         boolean twoDice    = hasBahnhof && rng.nextBoolean();
 
@@ -174,7 +172,7 @@ public final class MctsRollout {
         }
 
         int n = state.getPlayers().length;
-        int[] deltas = RollResolver.computeAllDeltasForRoll(state, activePlayer, roll);
+        RollResolver.computeAllDeltasForRoll(state, activePlayer, roll, deltas);
         for (int i = 0; i < n; i++) {
             state.getPlayers()[i].setCoins(Math.max(0, state.getPlayers()[i].getCoins() + deltas[i]));
         }
@@ -187,8 +185,9 @@ public final class MctsRollout {
     }
 
     /**
-     * Enumerates all valid Bürohaus swap pairs (non-landmark, non-purple) plus no-swap,
-     * picks uniformly at random, and applies the chosen swap to {@code state} in-place.
+     * Counts all valid Bürohaus swap pairs (non-landmark, non-purple) plus no-swap,
+     * picks uniformly at random via count-then-index (no list allocation), and applies
+     * the chosen swap to {@code state} in-place.
      */
     static void applyBürohausRandomPackage(GameState state,
                                                       int activePlayer,
@@ -196,45 +195,71 @@ public final class MctsRollout {
         Player active = state.getPlayers()[activePlayer];
         int n = state.getPlayers().length;
 
-        // Build list of (ownCard, oppPlayerIdx, oppCard) triples
-        List<int[]> swapOptions = new ArrayList<>(); // [ownListIdx, oppPlayerIdx, oppListIdx]
-        List<Project> ownEligible = new ArrayList<>();
+        // Count eligible own cards
+        int ownCount = 0;
         for (Project p : active.getOwned_projects()) {
-            if (!p.isIs_grossprojekt() && !"lila".equals(p.getColor())) {
-                ownEligible.add(p);
-            }
+            if (!p.isIs_grossprojekt() && !"lila".equals(p.getColor())) ownCount++;
         }
+        if (ownCount == 0) return; // no swap possible
+
+        // Count eligible opponent cards
+        int oppCardCount = 0;
         for (int oppIdx = 0; oppIdx < n; oppIdx++) {
             if (oppIdx == activePlayer) continue;
-            Player opp = state.getPlayers()[oppIdx];
-            for (int ci = 0; ci < opp.getOwned_projects().size(); ci++) {
-                Project oppCard = opp.getOwned_projects().get(ci);
-                if (!oppCard.isIs_grossprojekt() && !"lila".equals(oppCard.getColor())) {
-                    for (int oi = 0; oi < ownEligible.size(); oi++) {
-                        swapOptions.add(new int[]{oi, oppIdx, ci});
-                    }
+            for (Project p : state.getPlayers()[oppIdx].getOwned_projects()) {
+                if (!p.isIs_grossprojekt() && !"lila".equals(p.getColor())) oppCardCount++;
+            }
+        }
+        if (oppCardCount == 0) return; // no opponent card to swap with
+
+        int totalSwaps = ownCount * oppCardCount;
+        int totalChoices = 1 + totalSwaps; // 0 = no-swap
+        int choice = rng.nextInt(totalChoices);
+        if (choice == 0) return; // no-swap
+
+        // Decode choice: swap index (choice - 1) maps to (ownIdx, oppCard)
+        int swapIdx = choice - 1;
+        int ownTarget = swapIdx / oppCardCount;
+        int oppTarget = swapIdx % oppCardCount;
+
+        // Find own card at index ownTarget
+        Project ownCard = null;
+        int oi = 0;
+        for (Project p : active.getOwned_projects()) {
+            if (!p.isIs_grossprojekt() && !"lila".equals(p.getColor())) {
+                if (oi == ownTarget) { ownCard = p; break; }
+                oi++;
+            }
+        }
+
+        // Find opponent card at flat index oppTarget
+        Project oppCard = null;
+        int oppPlayerIdx = -1;
+        int ci = 0;
+        outer:
+        for (int oppIdx = 0; oppIdx < n; oppIdx++) {
+            if (oppIdx == activePlayer) continue;
+            for (Project p : state.getPlayers()[oppIdx].getOwned_projects()) {
+                if (!p.isIs_grossprojekt() && !"lila".equals(p.getColor())) {
+                    if (ci == oppTarget) { oppCard = p; oppPlayerIdx = oppIdx; break outer; }
+                    ci++;
                 }
             }
         }
 
-        int totalChoices = 1 + swapOptions.size();
-        int choice = rng.nextInt(totalChoices);
-        if (choice == 0) return; // no-swap
-
-        int[] pair = swapOptions.get(choice - 1);
-        Project ownCard = ownEligible.get(pair[0]);
-        int oppPlayerIdx = pair[1];
-        Project oppCard = state.getPlayers()[oppPlayerIdx].getOwned_projects().get(pair[2]);
-
-        active.getOwned_projects().remove(ownCard);
-        state.getPlayers()[oppPlayerIdx].getOwned_projects().remove(oppCard);
-        active.addProject(oppCard);
-        state.getPlayers()[oppPlayerIdx].addProject(ownCard);
+        // Execute swap
+        if (ownCard != null && oppCard != null) {
+            active.getOwned_projects().remove(ownCard);
+            state.getPlayers()[oppPlayerIdx].getOwned_projects().remove(oppCard);
+            active.addProject(oppCard);
+            state.getPlayers()[oppPlayerIdx].addProject(ownCard);
+        }
     }
 
     /**
-     * Builds the list of affordable purchase options (non-landmark + landmark + save),
-     * picks one uniformly at random, and applies the purchase to {@code state} in-place.
+     * Counts affordable purchase options (non-landmark + landmark + save), picks one
+     * uniformly at random via count-then-index (no list allocation), and applies the
+     * purchase to {@code state} in-place.
      */
     static void applyPurchaseRandomPackage(GameState state, SupplyTracker.MutableSupplyTracker supply,
                                                       int activePlayer,
@@ -242,41 +267,62 @@ public final class MctsRollout {
         Player active = state.getPlayers()[activePlayer];
         int coins = active.getCoins();
 
-        List<Object[]> options = new ArrayList<>(); // [Project, isLandmark]
+        // Count eligible options: 1 (save) + non-landmarks + landmarks
+        int count = 1; // save is always option 0
 
-        // Save option always available
-        options.add(new Object[]{RankEntry.WAIT_SENTINEL, false});
-
-        // Non-landmark cards from unbuilt pool
         for (Project p : state.getUnbuilt_projects()) {
             if (supply.canPurchase(p.getId()) && coins >= p.getCost()) {
-                // Purple cards (lila) are unique — max 1 per player per type
                 if ("lila".equals(p.getColor()) && active.hasProject(p.getId())) continue;
-                options.add(new Object[]{p, false});
+                count++;
             }
         }
 
-        // Landmarks (no supply limit)
+        int landmarkStart = count; // index where landmarks begin
         for (String lmId : LANDMARK_IDS) {
             if (!active.hasProject(lmId)) {
                 Project lm = ProjectLoader.getProject(lmId).orElse(null);
                 if (lm != null && coins >= lm.getCost()) {
-                    options.add(new Object[]{lm, true});
+                    count++;
                 }
             }
         }
 
         // Pick uniformly
-        Object[] chosen = options.get(rng.nextInt(options.size()));
-        Project card = (Project) chosen[0];
-        boolean isLandmark = (boolean) chosen[1];
+        int choice = rng.nextInt(count);
+        if (choice == 0) return; // save
 
-        if (card == RankEntry.WAIT_SENTINEL) return; // save: no-op
-
-        active.setCoins(active.getCoins() - card.getCost());
-        active.addProject(card);
-        if (!isLandmark) {
-            supply.purchase(card.getId());
+        // Walk again to find the chosen option
+        if (choice < landmarkStart) {
+            // Non-landmark card at index (choice - 1)
+            int idx = 1;
+            for (Project p : state.getUnbuilt_projects()) {
+                if (supply.canPurchase(p.getId()) && coins >= p.getCost()) {
+                    if ("lila".equals(p.getColor()) && active.hasProject(p.getId())) continue;
+                    if (idx == choice) {
+                        active.setCoins(coins - p.getCost());
+                        active.addProject(p);
+                        supply.purchase(p.getId());
+                        return;
+                    }
+                    idx++;
+                }
+            }
+        } else {
+            // Landmark at index (choice - landmarkStart)
+            int idx = landmarkStart;
+            for (String lmId : LANDMARK_IDS) {
+                if (!active.hasProject(lmId)) {
+                    Project lm = ProjectLoader.getProject(lmId).orElse(null);
+                    if (lm != null && coins >= lm.getCost()) {
+                        if (idx == choice) {
+                            active.setCoins(coins - lm.getCost());
+                            active.addProject(lm);
+                            return;
+                        }
+                        idx++;
+                    }
+                }
+            }
         }
     }
 }

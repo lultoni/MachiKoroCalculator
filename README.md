@@ -6,23 +6,21 @@ A local desktop decision support tool for the board game Machi Koro (base game).
 
 ## Status
 
-The project is undergoing a complete restructure from a monolithic Java/Swing app into a 5-layer architecture with a web frontend. See `NORTH-STAR.md` for the vision and `PLAN.md` for the implementation backlog.
+Phases 1–5 complete. The app is a fully functional web-based Machi Koro purchase advisor with MCTS engines and structured explanations.
 
-**What works today (pre-restructure):**
-- All 19 base-game cards implemented with correct income rules
+**What works today:**
+- All 19 base-game cards with correct income rules
 - Turn-by-turn game tracking with undo and session persistence
-- Analytical EV, ROI, variance, win probability calculations
-- Monte Carlo simulation with Boltzmann policy
-- Expectimax rollout tree (Stufe 1/2/3)
-- Full DE/EN localization
-- Swing UI (being replaced by web SPA)
+- 6 MCTS engine variants (v1, greedy rollout, Boltzmann, greedy tree, depth-limited, adaptive budget)
+- 11 advanced statistical metrics (Sharpe, Sortino, Kelly, VaR/CVaR, HHI, entropy, IG, ETW, tempo, urgency, roll correlation)
+- Weighted structured explanations with expandable detail per purchase option
+- Passive-turn insights panel with ETW bars, tempo, supply warnings, narrative guidance
+- Background pre-computation during opponent turns for instant results
+- Web SPA (React 18 + TypeScript + Vite + Tailwind CSS v4) with full DE/EN localization
 
-**What's being built:**
-- 5-layer architecture: Core (game rules) / Standard Calcs / Simulation Engines / Interface / UI
-- MCTS-based strategy engine with pluggable versions
-- Web SPA frontend with streamlined 4-component UI
-- Head-to-head engine testing framework
-- Transparent purchase assistant with structured explanations
+**What's next:**
+- Phase 6: Head-to-head engine testing framework
+- Phase 7: Performance optimization, game-over review, expansion support
 
 ## Documentation
 
@@ -43,11 +41,14 @@ Java 17+, `gson-2.11.0.jar` (bundled in repo root).
 # Compile
 javac -cp "src:gson-2.11.0.jar" -d out $(find src -name "*.java")
 
-# Run (Swing UI)
-java -cp "out:src:gson-2.11.0.jar" logic.Main
+# Run web server (localhost:8080)
+java -cp "out:src:gson-2.11.0.jar" server.ServerMain
 
-# Tests (224 passing)
-java -cp "out:src:gson-2.11.0.jar" Tests.RuntimeTester
+# Tests (run specific section)
+java -cp "out:src:gson-2.11.0.jar" Tests.RuntimeTester --section "Phase 5 Explanation"
+
+# Run (legacy Swing UI)
+java -cp "out:src:gson-2.11.0.jar" logic.Main
 ```
 
 Note: `src` must be on the runtime classpath for resource loading.

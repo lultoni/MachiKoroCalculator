@@ -136,12 +136,12 @@ Build the purchase assistant with transparent, structured explanations.
 
 | Task | Description | Status |
 |------|-------------|--------|
-| 5.1 | Define explanation data model: factor list with weights, expandable detail, summary sentence (Section 5.2). | pending |
-| 5.2 | Implement explanation generation from `EngineResult` data. Factors ordered by impact weight. | pending |
-| 5.3 | Build expandable bullet-point UI component with dropdown details. | pending |
-| 5.4 | Implement full ranked list view with sortable columns for comparison. | pending |
-| 5.5 | Implement passive-turn insights: position analysis, opponent predictions, dashboard (Section 4). | pending |
-| 5.6 | Implement pre-computation: start engine analysis during opponent turns. | pending |
+| 5.1 | Define explanation data model: `ExplanationFactor` inner class with category, weight, summary, detail. Extended `Option` with `structuredFactors` and `summarySentence`. | done |
+| 5.2 | Implement weighted explanation generation: two-pass enrichment in `MctsV1Engine` — cross-option means/ranges compute weights per category (winRate, income, synergy, risk, tempo, landmark, cost, coverage). Serialized in `EvaluateHandler`. | done |
+| 5.3 | Build expandable factor UI: `ExplanationFactors` component with color-coded category badges, weight bars, click-to-expand detail. `AssistantPanel` uses summary sentence. i18n for 9 categories. | done |
+| 5.4 | Enhance ranked list: added portfolioDeltaEV, winProbDelta, turnsToWin, tempoAdvantage columns. Row-expand shows structured factors inline. | done |
+| 5.5 | Implement passive-turn insights: narrative generation (position, supply, strategy, landmark) in `SessionInsightsHandler`. `useInsights` hook + `InsightsPanel` with ETW bars, tempo, supply warnings, narrative cards. | done |
+| 5.6 | Implement pre-computation: `PrecomputeCache` (single-entry, daemon thread), `PrecomputeHandler` (202 Accepted), `EvaluateHandler` cache check, `GameState.structuralHash()`. Frontend fires precompute after opponent turn. | done |
 
 ---
 

@@ -4,6 +4,68 @@ Implementation history: what was built, why, and which design decisions were mad
 
 ---
 
+## Phase 5: Kauf Assistent
+
+### 5.1 — Structured Explanation Factor Data Model
+
+New `ExplanationFactor` inner class in `EngineResult` with `category`, `weight` (0–1), `summary`, and `detail` fields. `Option` extended with `structuredFactors` (sorted by weight desc) and `summarySentence`. Backward-compatible constructor preserved for engines not yet producing structured data. 24 unit tests.
+
+### 5.2 — Weighted Explanation Generation
+
+Two-pass option enrichment in `MctsV1Engine.buildResult()`:
+1. **Pass 1**: Build all options with metrics and raw factors (existing flow).
+2. **Pass 2**: Compute cross-option means/ranges per metric, generate weighted `ExplanationFactor` entries per category.
+
+9 factor categories: `winRate`, `income`, `synergy`, `risk`, `tempo`, `landmark`, `cost`, `coverage`, `winRate` (probability delta). Weight = `|value - mean| / range` — metrics that differentiate an option from the average get higher weight. Summary sentences generated automatically. Flat `explanationFactors` derived from structured data for backward compatibility.
+
+`EvaluateHandler` serializes `structuredFactors` and `summarySentence` per option. 290 integration tests verify weights in [0,1], sort order, and factor completeness.
+
+### 5.3 — Expandable Explanation Factor UI
+
+New `ExplanationFactors.tsx` component renders structured factors with:
+- Color-coded category badges (9 distinct colors)
+- Weight indicator bars (proportional fill)
+- Click-to-expand detail sections
+- Fallback to flat string factors when structured data absent
+
+`AssistantPanel` updated: uses `summarySentence` for top recommendation subtitle. i18n keys for all 9 categories in DE and EN.
+
+### 5.4 — Ranked List Enhancement
+
+4 new columns: `portfolioDeltaEV`, `winProbDelta`, `turnsToWin`, `tempoAdvantage`. Engine-adaptive filter automatically hides columns not present in engine response.
+
+Row-expand: click any row to show that option's structured factors inline below the table via `ExplanationFactors` component.
+
+### 5.5 — Passive-Turn Insights Panel
+
+Backend: `SessionInsightsHandler` generates `narrative` array with typed insight entries:
+- `position` — tempo advantage vs nearest opponent
+- `supply` — critically low card supply warnings
+- `strategy` — position-based purchase guidance
+- `landmark` — proximity to win condition
+
+Frontend: `useInsights` hook fetches on opponent turns with player-change cache invalidation. `InsightsPanel` component shows:
+- ETW horizontal bars per player
+- Tempo advantage + portfolio EV summary
+- Supply warnings with card names
+- Narrative insight cards with type-specific styling
+
+Integrated below `OpponentTurnEntry` in `GameScreen`.
+
+### 5.6 — Background Pre-computation
+
+`PrecomputeCache`: single-entry thread-safe cache with daemon `ExecutorService`. Key = `(structuralHash, playerIndex, engineId)`. New request cancels in-flight computation.
+
+`PrecomputeHandler`: `POST /api/evaluate/precompute` accepts the same request body as evaluate, returns 202 Accepted immediately.
+
+`EvaluateHandler`: checks cache before running evaluation; adds `"cached": true/false` to response.
+
+`GameState.structuralHash()`: deterministic hash of player coins and sorted owned card IDs.
+
+Frontend: `useEngine.precompute()` fire-and-forget method. `GameScreen` triggers precompute after opponent turn confirmation.
+
+---
+
 ## Phase 4: Web UI
 
 ### 4.1 — Backend Session API + Evaluate Enhancement
@@ -52,7 +114,7 @@ BürohausNode dedup bugfix: deduplicate own/opponent card types before building 
 
 ---
 
-## Phase 3: Engine Variants + Calcs Extensions (in progress)
+## Phase 3: Engine Variants + Calcs Extensions
 
 ### 3.0 — 11 Advanced Calcs Metrics (commit cb3a1d9)
 

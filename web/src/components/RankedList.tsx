@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react';
 import type { RankedOption, MetricRange, ProjectDef } from '../api/types';
 import { COLUMNS, formatMetric, type ColumnDef } from '../utils/columns';
 import { metricBgStyle } from '../utils/metricColor';
+import { ExplanationFactors } from './ExplanationFactors';
 
 interface Props {
   options: RankedOption[];
@@ -18,6 +19,7 @@ interface Props {
 export function RankedList({ options, metricRanges, projects, language, onHover, onSelect, selectedId }: Props) {
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortAsc, setSortAsc] = useState(false);
+  const [expandedRow, setExpandedRow] = useState<string | null>(null);
 
   // Filter columns to only those present in the first option's metrics
   const visibleColumns = useMemo(() => {
@@ -78,13 +80,17 @@ export function RankedList({ options, metricRanges, projects, language, onHover,
           {sorted.map(opt => {
             const proj = projects.byId(opt.projectId);
             const isSelected = opt.projectId === selectedId;
+            const isExpanded = opt.projectId === expandedRow;
             return (
               <tr
                 key={opt.projectId}
                 className={`border-b border-machi-border/50 transition-colors cursor-pointer ${
                   isSelected ? 'bg-machi-accent/10' : 'hover:bg-machi-surface/50'
                 } ${!opt.affordable ? 'opacity-50' : ''}`}
-                onClick={() => onSelect(isSelected ? null : opt.projectId)}
+                onClick={() => {
+                  onSelect(isSelected ? null : opt.projectId);
+                  setExpandedRow(isExpanded ? null : opt.projectId);
+                }}
                 onMouseEnter={() => proj && onHover({ projectId: opt.projectId, cost: proj.cost })}
                 onMouseLeave={() => onHover(null)}
               >
@@ -104,6 +110,9 @@ export function RankedList({ options, metricRanges, projects, language, onHover,
                       {col.key === 'projectId' ? (
                         <span className={cardTextClass(proj?.color)}>
                           {formatted}
+                          <span className="ml-1 text-[10px] text-machi-text-dim/50">
+                            {isExpanded ? '▾' : '▸'}
+                          </span>
                         </span>
                       ) : formatted}
                     </td>
@@ -112,8 +121,22 @@ export function RankedList({ options, metricRanges, projects, language, onHover,
               </tr>
             );
           })}
+          {/* Expanded row detail — rendered as a separate element after the table */}
         </tbody>
       </table>
+      {/* Row expand detail panel (outside table for layout flexibility) */}
+      {expandedRow && (() => {
+        const opt = sorted.find(o => o.projectId === expandedRow);
+        if (!opt) return null;
+        return (
+          <div className="mt-1 mb-2 px-2 py-2 bg-machi-border/10 rounded-lg">
+            <ExplanationFactors
+              factors={opt.structuredFactors ?? []}
+              fallback={opt.explanationFactors}
+            />
+          </div>
+        );
+      })()}
     </div>
   );
 }

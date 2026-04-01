@@ -11,14 +11,18 @@ export interface ColumnDef {
 
 /** Default columns for the ranked options table. */
 export const COLUMNS: ColumnDef[] = [
-  { key: 'rank',        label: '#',           sortable: false, format: 'number' },
-  { key: 'projectId',   label: 'Card',        sortable: true,  format: 'card' },
-  { key: 'score',       label: 'Win Rate',    sortable: true,  format: 'percent', colorGradient: true },
-  { key: 'cost',        label: 'Cost',        sortable: true,  format: 'coins' },
-  { key: 'immediateEV', label: 'EV/Turn',     sortable: true,  format: 'decimal', colorGradient: true },
-  { key: 'evPerRound',  label: 'EV/Round',    sortable: true,  format: 'decimal', colorGradient: true },
-  { key: 'variance',    label: 'Variance',    sortable: true,  format: 'decimal', colorGradient: true, invertColor: true },
-  { key: 'affordable',  label: 'Affordable',  sortable: false, format: 'boolean' },
+  { key: 'rank',            label: '#',              sortable: false, format: 'number' },
+  { key: 'projectId',       label: 'Card',           sortable: true,  format: 'card' },
+  { key: 'score',           label: 'Win Rate',       sortable: true,  format: 'percent', colorGradient: true },
+  { key: 'cost',            label: 'Cost',           sortable: true,  format: 'coins' },
+  { key: 'immediateEV',     label: 'EV/Turn',        sortable: true,  format: 'decimal', colorGradient: true },
+  { key: 'evPerRound',      label: 'EV/Round',       sortable: true,  format: 'decimal', colorGradient: true },
+  { key: 'portfolioDeltaEV',label: 'Port. Delta',    sortable: true,  format: 'decimal', colorGradient: true },
+  { key: 'winProbDelta',    label: 'Win% Delta',     sortable: true,  format: 'percent', colorGradient: true },
+  { key: 'turnsToWin',      label: 'ETW',            sortable: true,  format: 'decimal' },
+  { key: 'tempoAdvantage',  label: 'Tempo',          sortable: true,  format: 'decimal', colorGradient: true },
+  { key: 'variance',        label: 'Variance',       sortable: true,  format: 'decimal', colorGradient: true, invertColor: true },
+  { key: 'affordable',      label: 'Affordable',     sortable: false, format: 'boolean' },
 ];
 
 /**

@@ -4,6 +4,32 @@ Implementation history: what was built, why, and which design decisions were mad
 
 ---
 
+## Phase 7: Iteration
+
+### 7.6 — MCTS Engine Performance Optimization
+
+Six implementation-level optimizations to MCTS rollout hot paths, without changing strategic behavior (same UCT, same rollout policies, same scoring):
+
+1. **Cached unmodifiable children** (`MctsNode`): `getChildren()` caches the `Collections.unmodifiableList` wrapper instead of creating one per call.
+2. **Shared `EMPTY_INT_ARRAY`** (`CardIncome`): All `new int[0]` replaced with a shared constant.
+3. **Landmark bitfield** (`Player`): O(1) `hasProject()` for landmarks via `int landmarkFlags` with bits for bahnhof/einkaufszentrum/freizeitpark/funkturm. `hasWon()` becomes `landmarkCount >= 4`. Saves ~15,000 string comparisons per rollout.
+4. **Pre-allocated deltas array** (`RollResolver`): New `void computeAllDeltasForRoll(state, player, roll, int[] deltas)` overload. All four rollouts allocate once before the main loop and reuse across 200+ turns.
+5. **Allocation-free uniform rollout** (`MctsRollout`): Purchase and Bürohaus selection use count-then-index pattern instead of building `ArrayList<Object[]>` per turn.
+6. **RolloutEvCache**: Precomputes per-card EV scores once per 20 turns instead of calling `Calcs.evPerRound()` for every card on every turn. Greedy/Boltzmann rollouts now do ~10 full EV computations per rollout instead of ~2000.
+
+**Performance results (500 iterations, mid-game state):**
+
+| Variant | Before | After | Speedup |
+|---------|--------|-------|---------|
+| v1 (uniform) | ~60ms | ~53ms | 1.1× |
+| A (greedy rollout) | ~3,600ms | ~500ms | **7.2×** |
+| B (Boltzmann) | ~3,600ms | ~545ms | **6.6×** |
+| C (greedy tree) | ~60ms | ~50ms | 1.2× |
+| D (depth-limited) | ~10ms | ~9ms | 1.1× |
+| E (adaptive) | ~60ms | ~51ms | 1.2× |
+
+---
+
 ## Phase 6: Head-to-Head Engine Testing
 
 ### 6.0 — Performance Optimizations

@@ -6,6 +6,23 @@ Implementation history: what was built, why, and which design decisions were mad
 
 ## Phase 7: Iteration
 
+### 7.13 — Web UI Polish (Round 2)
+
+Second round of UI improvements from gameplay testing:
+
+1. **Column tooltips:** All 12 ranked-list columns now have `title` tooltips explaining what each metric means (Win Rate, EV/Turn, ETW, Tempo, etc.).
+2. **Color gradients fixed:** Score column maps to `winRate` range via new `rangeKey` field. Cost and ETW columns now have `colorGradient: true, invertColor: true` for correct color scaling.
+3. **Settings engine detail panel:** Selected engine now shows a detail card with description, tier badge, iteration count, and any extra config parameters.
+4. **CoinFlowDisplay hover jitter:** Fixed layout shift when hovering purchase options by reserving a fixed `h-4` div for the project name (renders `\u00A0` when empty).
+5. **Engine re-evaluation on switch:** Added `settings.engineId` to the `useEffect` dependency array that triggers `engine.evaluate()`, so changing engines in settings immediately re-evaluates.
+6. **H2H per-engine iteration display:** Replaced shared iteration input with per-engine info (tier, iterations, description) and an optional override field. Effective iteration count defaults to max of both engines' registry configs.
+7. **Engine API enrichment:** `/api/engines` now returns `tier`, `description`, and full `config` (iterations, extra params) per engine. Frontend `EngineRegistryEntry` type updated to match.
+
+Skipped with explanation:
+- H2H per-game progress bar (would require per-game status tracking, hurting performance for minimal UX gain)
+- Engine overview/leaderboard in H2H (larger feature, better as standalone phase)
+- Roll correlation identical for blue/green at start (expected — same starting cards produce same distributions)
+
 ### 7.12 — Web UI Bug Fixes
 
 Nine UI bugs found during real gameplay testing, fixed in one batch:

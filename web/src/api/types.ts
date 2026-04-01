@@ -59,10 +59,18 @@ export interface ProjectDef {
 export interface EngineRegistryEntry {
   id: string;
   engineClass: string;
+  description: string;
+  tier: string;
   iterations: number;
   timeBudgetMs: number;
   isDefault: boolean;
   extra: Record<string, string>;
+  config: {
+    iterations: number;
+    timeBudgetMs: number;
+    riskToleranceWeight: number;
+    extra?: Record<string, string>;
+  };
 }
 
 export interface ExplanationFactor {

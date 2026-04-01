@@ -79,6 +79,7 @@ export function RankedList({ options, metricRanges, projects, language, onHover,
                   col.sortable ? 'cursor-pointer hover:text-machi-text transition-colors select-none' : ''
                 }`}
                 onClick={() => handleSort(col)}
+                title={col.tooltip}
               >
                 {col.label}
                 {sortKey === col.key && (
@@ -110,11 +111,12 @@ export function RankedList({ options, metricRanges, projects, language, onHover,
                 {visibleColumns.map(col => {
                   const raw = getCellValue(opt, col.key, proj, language);
                   const formatted = formatMetric(raw, col.format);
-                  const cellStyle = col.colorGradient && metricRanges && col.key in (metricRanges ?? {})
+                  const rk = col.rangeKey ?? col.key;
+                  const cellStyle = col.colorGradient && metricRanges && rk in (metricRanges ?? {})
                     ? metricBgStyle(
                         parseFloat(String(raw)),
-                        parseFloat(metricRanges[col.key].min),
-                        parseFloat(metricRanges[col.key].max),
+                        parseFloat(metricRanges[rk].min),
+                        parseFloat(metricRanges[rk].max),
                         col.invertColor,
                       )
                     : {};

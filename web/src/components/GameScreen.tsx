@@ -68,7 +68,7 @@ export function GameScreen({ session, settings, updateSettings, projects, hover 
     ? hoveredProj[`name_${settings.language}` as 'name_de' | 'name_en'] ?? hoveredProj.name_de
     : undefined;
 
-  // Trigger engine evaluation when turn starts
+  // Trigger engine evaluation when turn starts or engine changes
   useEffect(() => {
     if (s.finished) return;
     engine.evaluate(s.state, s.nextPlayerIndex, settings.engineId, s.state);
@@ -77,7 +77,7 @@ export function GameScreen({ session, settings, updateSettings, projects, hover 
     setDie2(null);
     setDiceCount(canUse2d6 ? 1 : 1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [s.nextPlayerIndex, s.effectiveTurnCount]);
+  }, [s.nextPlayerIndex, s.effectiveTurnCount, settings.engineId]);
 
   const handleRollSelect = useCallback((count: 1 | 2, d1: number, d2: number | null) => {
     setDiceCount(count);

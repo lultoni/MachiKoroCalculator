@@ -49,12 +49,15 @@ export function CoinFlowDisplay({ coinsNow, coinDelta, hovered, projectName }: P
             <div className={`text-2xl font-bold ${coinsAfterBuy < 0 ? 'text-machi-red' : 'text-machi-text'}`}>
               {coinsAfterBuy}
             </div>
-            {projectName && (
-              <div className="text-xs text-machi-text-dim mt-0.5 truncate">{projectName}</div>
-            )}
+            <div className="text-xs text-machi-text-dim mt-0.5 truncate h-4">
+              {projectName ?? '\u00A0'}
+            </div>
           </>
         ) : (
-          <div className="text-2xl font-bold text-machi-text-dim">—</div>
+          <>
+            <div className="text-2xl font-bold text-machi-text-dim">—</div>
+            <div className="h-4" />
+          </>
         )}
       </div>
     </div>

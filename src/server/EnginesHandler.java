@@ -31,6 +31,7 @@ final class EnginesHandler implements HttpHandler {
             obj.addProperty("id", e.id());
             obj.addProperty("engineClass", e.engineClass());
             obj.addProperty("description", e.description());
+            obj.addProperty("tier", e.tier());
             obj.addProperty("isDefault", e.isDefault());
 
             JsonObject config = new JsonObject();

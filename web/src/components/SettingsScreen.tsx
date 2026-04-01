@@ -27,6 +27,9 @@ export function SettingsScreen({ settings, update, players, onClose }: Props) {
     return acc;
   }, {});
 
+  // Selected engine details
+  const selectedEngine = engines.find(e => e.id === settings.engineId);
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <div
@@ -59,6 +62,7 @@ export function SettingsScreen({ settings, update, players, onClose }: Props) {
                         : 'border border-machi-border text-machi-text-dim hover:text-machi-text hover:border-machi-text-dim'
                     }`}
                     onClick={() => update({ engineId: e.id })}
+                    title={e.description}
                   >
                     {e.id}
                     {e.isDefault && ' ★'}
@@ -69,6 +73,27 @@ export function SettingsScreen({ settings, update, players, onClose }: Props) {
           ))}
           {engines.length === 0 && (
             <p className="text-xs text-machi-text-dim animate-pulse">Loading engines...</p>
+          )}
+
+          {/* Selected engine details */}
+          {selectedEngine && (
+            <div className="mt-3 p-3 rounded-lg bg-machi-bg/50 border border-machi-border/50 space-y-1.5">
+              <div className="text-xs font-medium text-machi-text">{selectedEngine.id}</div>
+              <div className="text-xs text-machi-text-dim">{selectedEngine.description}</div>
+              <div className="flex flex-wrap gap-2 text-[10px]">
+                <span className="px-1.5 py-0.5 rounded bg-machi-accent/15 text-machi-accent font-medium uppercase">
+                  {selectedEngine.tier}
+                </span>
+                <span className="text-machi-text-dim">
+                  {selectedEngine.config?.iterations ?? 0} iterations
+                </span>
+                {selectedEngine.config?.extra && Object.entries(selectedEngine.config.extra).map(([k, v]) => (
+                  <span key={k} className="text-machi-text-dim">
+                    {k}: {v}
+                  </span>
+                ))}
+              </div>
+            </div>
           )}
         </div>
 

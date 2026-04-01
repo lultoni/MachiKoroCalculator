@@ -17,12 +17,19 @@ export function H2hOverview({ onBack }: Props) {
   const [engineA, setEngineA] = useState('mcts-v1-fast');
   const [engineB, setEngineB] = useState('mcts-v1-fast');
   const [games, setGames] = useState(100);
-  const [iterations, setIterations] = useState(500);
+  const [iterOverride, setIterOverride] = useState<number | null>(null);
 
   useEffect(() => {
     h2h.loadResults();
     api.getEngines().then(setEngines).catch(() => {});
   }, []);
+
+  const engineAInfo = engines.find(e => e.id === engineA);
+  const engineBInfo = engines.find(e => e.id === engineB);
+  const effectiveIter = iterOverride ?? Math.max(
+    engineAInfo?.config?.iterations ?? 500,
+    engineBInfo?.config?.iterations ?? 500,
+  );
 
   // Game replay view
   if (h2h.selectedGame && h2h.selectedResult) {
@@ -69,25 +76,35 @@ export function H2hOverview({ onBack }: Props) {
               <label className="block text-sm text-machi-text-dim mb-1">{t('h2h.engineA')}</label>
               <select
                 value={engineA}
-                onChange={e => setEngineA(e.target.value)}
+                onChange={e => { setEngineA(e.target.value); setIterOverride(null); }}
                 className="w-full bg-machi-bg border border-machi-border rounded-lg px-3 py-2 text-sm"
               >
                 {engines.map(e => (
                   <option key={e.id} value={e.id}>{e.id}</option>
                 ))}
               </select>
+              {engineAInfo && (
+                <div className="text-[10px] text-machi-text-dim/60 mt-1">
+                  {engineAInfo.tier} · {engineAInfo.config?.iterations ?? 0} iter · {engineAInfo.description}
+                </div>
+              )}
             </div>
             <div>
               <label className="block text-sm text-machi-text-dim mb-1">{t('h2h.engineB')}</label>
               <select
                 value={engineB}
-                onChange={e => setEngineB(e.target.value)}
+                onChange={e => { setEngineB(e.target.value); setIterOverride(null); }}
                 className="w-full bg-machi-bg border border-machi-border rounded-lg px-3 py-2 text-sm"
               >
                 {engines.map(e => (
                   <option key={e.id} value={e.id}>{e.id}</option>
                 ))}
               </select>
+              {engineBInfo && (
+                <div className="text-[10px] text-machi-text-dim/60 mt-1">
+                  {engineBInfo.tier} · {engineBInfo.config?.iterations ?? 0} iter · {engineBInfo.description}
+                </div>
+              )}
             </div>
             <div>
               <label className="block text-sm text-machi-text-dim mb-1">{t('h2h.games')}</label>
@@ -101,16 +118,23 @@ export function H2hOverview({ onBack }: Props) {
               />
             </div>
             <div>
-              <label className="block text-sm text-machi-text-dim mb-1">{t('h2h.iterations')}</label>
+              <label className="block text-sm text-machi-text-dim mb-1">
+                {t('h2h.iterations')}
+                <span className="text-[10px] text-machi-text-dim/50 ml-1">(override)</span>
+              </label>
               <input
                 type="number"
-                value={iterations}
-                onChange={e => setIterations(Number(e.target.value))}
+                value={iterOverride ?? ''}
+                onChange={e => setIterOverride(e.target.value ? Number(e.target.value) : null)}
+                placeholder={String(effectiveIter)}
                 min={50}
                 max={10000}
                 step={50}
-                className="w-full bg-machi-bg border border-machi-border rounded-lg px-3 py-2 text-sm"
+                className="w-full bg-machi-bg border border-machi-border rounded-lg px-3 py-2 text-sm placeholder:text-machi-text-dim/30"
               />
+              <div className="text-[10px] text-machi-text-dim/60 mt-1">
+                {iterOverride ? `Override: ${iterOverride}` : `Using max of registry configs: ${effectiveIter}`}
+              </div>
             </div>
           </div>
 
@@ -129,7 +153,7 @@ export function H2hOverview({ onBack }: Props) {
             </div>
           ) : (
             <button
-              onClick={() => h2h.startMatch(engineA, engineB, games, iterations)}
+              onClick={() => h2h.startMatch(engineA, engineB, games, effectiveIter)}
               disabled={h2h.loading}
               className="w-full bg-machi-accent text-machi-bg font-semibold py-2.5 rounded-lg
                          hover:brightness-110 transition disabled:opacity-50"

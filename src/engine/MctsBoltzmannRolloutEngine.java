@@ -36,11 +36,18 @@ public final class MctsBoltzmannRolloutEngine extends MctsV1Engine {
     protected MctsTree buildTree(GameState state, SupplyTracker supply,
                                  int activePlayer, int playerPerspective,
                                  double explorationConstant) {
-        // Temperature is read from the config that was passed to evaluate(); we stash it
-        // in a thread-local so buildTree can access it without changing the method signature.
         double temperature = currentTemperature.get();
         return new MctsTree(state, supply, activePlayer, playerPerspective,
                 explorationConstant, BoltzmannRollout.withTemperature(temperature));
+    }
+
+    @Override
+    protected MctsTree buildFullTurnTree(GameState state, SupplyTracker supply,
+                                          int activePlayer, int playerPerspective,
+                                          double explorationConstant) {
+        double temperature = currentTemperature.get();
+        return new MctsTree(state, supply, activePlayer, playerPerspective,
+                explorationConstant, BoltzmannRollout.withTemperature(temperature), false, true);
     }
 
     // -------------------------------------------------------------------------
@@ -57,6 +64,18 @@ public final class MctsBoltzmannRolloutEngine extends MctsV1Engine {
         currentTemperature.set(temperature);
         try {
             return super.evaluate(state, playerIndex, config);
+        } finally {
+            currentTemperature.remove();
+        }
+    }
+
+    @Override
+    public TurnPlan evaluateFullTurn(GameState state, int playerIndex, EngineConfig config) {
+        double temperature = Double.parseDouble(
+                config.getExtra("rolloutTemperature", "0.7"));
+        currentTemperature.set(temperature);
+        try {
+            return super.evaluateFullTurn(state, playerIndex, config);
         } finally {
             currentTemperature.remove();
         }

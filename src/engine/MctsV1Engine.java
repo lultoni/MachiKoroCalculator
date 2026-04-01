@@ -8,7 +8,9 @@ import core.Player;
 import core.Project;
 import core.ProjectLoader;
 import engine.mcts.BuyDecisionNode;
+import engine.mcts.DiceChoiceNode;
 import engine.mcts.MctsNode;
+import engine.mcts.MctsRollout;
 import engine.mcts.MctsTree;
 import engine.mcts.SupplyTracker;
 
@@ -86,6 +88,69 @@ public class MctsV1Engine implements SimulationEngine {
 
         long computeTimeMs = System.currentTimeMillis() - startMs;
         return buildResult(state, playerIndex, tree, iterationsUsed, computeTimeMs, config);
+    }
+
+    // -------------------------------------------------------------------------
+    // evaluateFullTurn — for H2H match runner
+    // -------------------------------------------------------------------------
+
+    /**
+     * Evaluates a full turn from the start: dice choice → roll → Funkturm → Bürohaus → purchase.
+     *
+     * <p>Roots the MCTS tree at DiceChoiceNode (if player has Bahnhof) or ChanceNode (1d6 only).
+     * All four decision types come from one tree search. The returned {@link TurnPlan} allows
+     * progressive decision extraction as the match runner feeds actual dice outcomes.
+     *
+     * @param state       current game state (read-only)
+     * @param playerIndex index of the active player
+     * @param config      engine configuration (iterations, explorationConstant, etc.)
+     * @return turn plan; call {@link TurnPlan#navigateRoll} after rolling dice
+     */
+    @Override
+    public TurnPlan evaluateFullTurn(GameState state, int playerIndex, EngineConfig config) {
+        long startMs = System.currentTimeMillis();
+        double explorationConstant = Double.parseDouble(
+                config.getExtra("explorationConstant", "1.4142"));
+
+        SupplyTracker supply = SupplyTracker.fromGameState(state);
+        MctsTree tree = buildFullTurnTree(state, supply, playerIndex, playerIndex, explorationConstant);
+
+        int iterationsUsed;
+        if (config.iterations > 0) {
+            tree.runIterations(config.iterations);
+            iterationsUsed = config.iterations;
+        } else if (config.timeBudgetMs > 0) {
+            long deadline = startMs + config.timeBudgetMs;
+            iterationsUsed = tree.runUntilDeadline(deadline);
+        } else {
+            tree.runIterations(100);
+            iterationsUsed = 100;
+        }
+
+        long computeTimeMs = System.currentTimeMillis() - startMs;
+
+        // Extract dice count decision
+        boolean hasBahnhof = state.getPlayers()[playerIndex].hasProject("bahnhof");
+        int diceCount = 1;
+        if (hasBahnhof && tree.fullTurnRoot instanceof DiceChoiceNode diceNode) {
+            if (diceNode.expanded && diceNode.getChildren().size() == 2) {
+                MctsNode best = MctsTree.bestChild(diceNode);
+                diceCount = (diceNode.getChildren().indexOf(best) == 1) ? 2 : 1;
+            }
+        }
+
+        return new TurnPlan(tree, diceCount, iterationsUsed, computeTimeMs);
+    }
+
+    /**
+     * Builds a full-turn MctsTree rooted at DiceChoiceNode or ChanceNode.
+     * Overridable by subclasses to inject custom rollout functions.
+     */
+    protected MctsTree buildFullTurnTree(GameState state, SupplyTracker supply,
+                                          int activePlayer, int playerPerspective,
+                                          double explorationConstant) {
+        return new MctsTree(state, supply, activePlayer, playerPerspective,
+                explorationConstant, MctsRollout::simulate, false, true);
     }
 
     /**

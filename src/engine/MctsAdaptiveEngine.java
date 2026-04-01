@@ -63,10 +63,48 @@ public final class MctsAdaptiveEngine extends MctsV1Engine {
         tree.runIterations(surveyBudget);
 
         // ---- Phase 2: identify top-2 root children by win rate ----
-        if (!tree.root.expanded) {
-            tree.root.expand();
+        runAdaptiveFocusedPhase(tree, tree.root, closeMargin, splitThreshold, remainingBudget);
+
+        long computeTimeMs = System.currentTimeMillis() - startMs;
+        return buildResult(state, playerIndex, tree, tree.getIterationsPerformed(), computeTimeMs);
+    }
+
+    @Override
+    public TurnPlan evaluateFullTurn(GameState state, int playerIndex, EngineConfig config) {
+        long startMs = System.currentTimeMillis();
+        double explorationConstant = Double.parseDouble(
+                config.getExtra("explorationConstant", "1.4142"));
+
+        SupplyTracker supply = SupplyTracker.fromGameState(state);
+        MctsTree tree = buildFullTurnTree(state, supply, playerIndex, playerIndex, explorationConstant);
+
+        int totalBudget = config.iterations > 0 ? config.iterations : 100;
+
+        // For full-turn eval, just run all iterations (adaptive focus is for buy decisions only)
+        tree.runIterations(totalBudget);
+
+        long computeTimeMs = System.currentTimeMillis() - startMs;
+
+        boolean hasBahnhof = state.getPlayers()[playerIndex].hasProject("bahnhof");
+        int diceCount = 1;
+        if (hasBahnhof && tree.fullTurnRoot instanceof engine.mcts.DiceChoiceNode diceNode) {
+            if (diceNode.expanded && diceNode.getChildren().size() == 2) {
+                MctsNode best = MctsTree.bestChild(diceNode);
+                diceCount = (diceNode.getChildren().indexOf(best) == 1) ? 2 : 1;
+            }
         }
-        List<MctsNode> children = tree.root.getChildren();
+
+        return new TurnPlan(tree, diceCount, tree.getIterationsPerformed(), computeTimeMs);
+    }
+
+    /**
+     * Runs the adaptive focused phase on a given parent node's children.
+     */
+    private void runAdaptiveFocusedPhase(MctsTree tree, MctsNode parent,
+                                          double closeMargin, double splitThreshold,
+                                          int remainingBudget) {
+        if (!parent.expanded) return;
+        List<MctsNode> children = parent.getChildren();
 
         MctsNode top1 = null, top2 = null;
         double wr1 = -1.0, wr2 = -1.0;
@@ -82,21 +120,17 @@ public final class MctsAdaptiveEngine extends MctsV1Engine {
             }
         }
 
-        // ---- Phase 3: allocate remaining budget ----
         if (top1 != null && top2 != null && remainingBudget > 0) {
             double margin = wr1 - wr2;
             int budget1, budget2;
 
             if (margin <= closeMargin) {
-                // Close race: split evenly between both
                 budget1 = remainingBudget / 2;
                 budget2 = remainingBudget - budget1;
             } else if (margin > splitThreshold) {
-                // Clear leader: 70% to second place to confirm inferiority
                 budget2 = (int) (remainingBudget * 0.70);
                 budget1 = remainingBudget - budget2;
             } else {
-                // Between thresholds: 60% to leader
                 budget1 = (int) (remainingBudget * 0.60);
                 budget2 = remainingBudget - budget1;
             }
@@ -104,11 +138,7 @@ public final class MctsAdaptiveEngine extends MctsV1Engine {
             tree.runIterationsFromNode(top1, budget1);
             tree.runIterationsFromNode(top2, budget2);
         } else if (top1 != null && remainingBudget > 0) {
-            // Only one candidate: give it all remaining budget
             tree.runIterationsFromNode(top1, remainingBudget);
         }
-
-        long computeTimeMs = System.currentTimeMillis() - startMs;
-        return buildResult(state, playerIndex, tree, tree.getIterationsPerformed(), computeTimeMs);
     }
 }

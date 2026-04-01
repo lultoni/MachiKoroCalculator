@@ -40,4 +40,24 @@ public interface SimulationEngine {
      * @return ranked evaluation result; never null
      */
     EngineResult evaluate(GameState state, int playerIndex, EngineConfig config);
+
+    /**
+     * Evaluates a full turn from the start: dice choice, Funkturm, Bürohaus, purchase.
+     *
+     * <p>For H2H testing: roots the MCTS tree at {@link engine.mcts.DiceChoiceNode}
+     * (if player has Bahnhof) or {@link engine.mcts.ChanceNode} (1d6 only), runs iterations,
+     * then the match runner navigates the tree based on actual dice outcomes to extract
+     * all decisions.
+     *
+     * <p>Returns a {@link TurnPlan} containing all decisions. The default implementation
+     * throws {@link UnsupportedOperationException}; MCTS engines override this.
+     *
+     * @param state       current game state (read-only)
+     * @param playerIndex index of the active player
+     * @param config      engine configuration
+     * @return turn plan with all decisions; never null
+     */
+    default TurnPlan evaluateFullTurn(GameState state, int playerIndex, EngineConfig config) {
+        throw new UnsupportedOperationException("Engine does not support full-turn evaluation");
+    }
 }

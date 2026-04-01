@@ -46,11 +46,31 @@ public final class MctsDepthLimitedEngine extends MctsV1Engine {
     }
 
     @Override
+    public TurnPlan evaluateFullTurn(GameState state, int playerIndex, EngineConfig config) {
+        int maxDepth = Integer.parseInt(config.getExtra("maxRolloutDepth", "10"));
+        currentMaxDepth.set(maxDepth);
+        try {
+            return super.evaluateFullTurn(state, playerIndex, config);
+        } finally {
+            currentMaxDepth.remove();
+        }
+    }
+
+    @Override
     protected MctsTree buildTree(GameState state, SupplyTracker supply,
                                  int activePlayer, int playerPerspective,
                                  double explorationConstant) {
         int maxDepth = currentMaxDepth.get();
         return new MctsTree(state, supply, activePlayer, playerPerspective,
                 explorationConstant, DepthLimitedRollout.withMaxDepth(maxDepth));
+    }
+
+    @Override
+    protected MctsTree buildFullTurnTree(GameState state, SupplyTracker supply,
+                                          int activePlayer, int playerPerspective,
+                                          double explorationConstant) {
+        int maxDepth = currentMaxDepth.get();
+        return new MctsTree(state, supply, activePlayer, playerPerspective,
+                explorationConstant, DepthLimitedRollout.withMaxDepth(maxDepth), false, true);
     }
 }

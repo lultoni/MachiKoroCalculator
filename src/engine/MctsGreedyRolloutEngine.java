@@ -38,4 +38,12 @@ public final class MctsGreedyRolloutEngine extends MctsV1Engine {
         return new MctsTree(state, supply, activePlayer, playerPerspective,
                 explorationConstant, GreedyRollout::simulate);
     }
+
+    @Override
+    protected MctsTree buildFullTurnTree(GameState state, SupplyTracker supply,
+                                          int activePlayer, int playerPerspective,
+                                          double explorationConstant) {
+        return new MctsTree(state, supply, activePlayer, playerPerspective,
+                explorationConstant, GreedyRollout::simulate, false, true);
+    }
 }

@@ -4,7 +4,9 @@ import calcs.WinProbability;
 import core.GameState;
 import core.Player;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * MCTS tree manager: runs UCT selection → expansion → rollout → backpropagation
@@ -45,6 +47,13 @@ public final class MctsTree {
     /** Root node: BuyDecisionNode for the current purchase decision. */
     public final BuyDecisionNode root;
 
+    /**
+     * Full-turn root: DiceChoiceNode or ChanceNode when the tree models an entire turn.
+     * When set, {@link #runIterations} starts selection from this node instead of {@link #root}.
+     * Null for standard purchase-only evaluation.
+     */
+    public final MctsNode fullTurnRoot;
+
     /** Total iterations performed so far. */
     private int iterationsPerformed = 0;
 
@@ -56,6 +65,16 @@ public final class MctsTree {
      * (greedy exploitation) instead of UCT. All other node types still use UCT.
      */
     private final boolean greedyBuySelection;
+
+    // -------------------------------------------------------------------------
+    // Profiling counters (nanoseconds, accumulated across all iterations)
+    // -------------------------------------------------------------------------
+
+    private boolean profilingEnabled = false;
+    private long selectionNs;
+    private long expansionNs;
+    private long rolloutNs;
+    private long backpropNs;
 
     /**
      * @param rootState           game state at the purchase decision point
@@ -100,6 +119,73 @@ public final class MctsTree {
         this.greedyBuySelection  = greedyBuySelection;
         int nextPlayer = (activePlayer + 1) % rootState.getPlayers().length;
         this.root = new BuyDecisionNode(rootState, rootSupply, null, activePlayer, nextPlayer);
+        this.fullTurnRoot = null;
+    }
+
+    /**
+     * Full-turn constructor: builds a tree rooted at DiceChoiceNode (if player has Bahnhof)
+     * or ChanceNode (1d6 only). Used for H2H full-turn evaluation.
+     *
+     * <p>The {@code root} field is still a BuyDecisionNode for API compatibility, but
+     * iterations run from {@code fullTurnRoot} instead.
+     *
+     * @param rootState          game state at the start of the player's turn
+     * @param rootSupply         supply tracker
+     * @param activePlayer       the player whose turn it is
+     * @param playerPerspective  the player we are advising
+     * @param explorationConstant UCB1 C value
+     * @param rolloutFn          rollout strategy
+     * @param greedyBuySelection if true, BuyDecisionNode uses greedy selection
+     * @param fullTurn           must be true (distinguishes from other constructors)
+     */
+    public MctsTree(GameState rootState, SupplyTracker rootSupply,
+                    int activePlayer, int playerPerspective,
+                    double explorationConstant, RolloutFn rolloutFn,
+                    boolean greedyBuySelection, boolean fullTurn) {
+        this.explorationConstant = explorationConstant;
+        this.playerPerspective   = playerPerspective;
+        this.activePlayer        = activePlayer;
+        this.rolloutFn           = rolloutFn;
+        this.greedyBuySelection  = greedyBuySelection;
+
+        boolean hasBahnhof = rootState.getPlayers()[activePlayer].hasProject("bahnhof");
+        if (hasBahnhof) {
+            this.fullTurnRoot = new DiceChoiceNode(rootState, rootSupply, null, activePlayer, false);
+        } else {
+            this.fullTurnRoot = new ChanceNode(rootState, rootSupply, null, activePlayer, false, false);
+        }
+
+        // root field: not directly meaningful for full-turn trees, but set it to a dummy
+        // to avoid null. The real tree navigation goes through fullTurnRoot.
+        int nextPlayer = (activePlayer + 1) % rootState.getPlayers().length;
+        this.root = new BuyDecisionNode(rootState, rootSupply, null, activePlayer, nextPlayer);
+    }
+
+    /**
+     * Enables per-phase timing collection. Call before running iterations.
+     * Adds ~5-10% overhead from {@code System.nanoTime()} calls per iteration.
+     */
+    public void enableProfiling() {
+        profilingEnabled = true;
+        selectionNs = 0;
+        expansionNs = 0;
+        rolloutNs   = 0;
+        backpropNs  = 0;
+    }
+
+    /**
+     * Returns profiling stats (selection/expansion/rollout/backprop time in ms).
+     * Returns empty map if profiling was not enabled.
+     */
+    public Map<String, Long> getProfilingStats() {
+        if (!profilingEnabled) return Map.of();
+        Map<String, Long> stats = new LinkedHashMap<>();
+        stats.put("selectionMs",  selectionNs / 1_000_000);
+        stats.put("expansionMs",  expansionNs / 1_000_000);
+        stats.put("rolloutMs",    rolloutNs   / 1_000_000);
+        stats.put("backpropMs",   backpropNs  / 1_000_000);
+        stats.put("totalMs",      (selectionNs + expansionNs + rolloutNs + backpropNs) / 1_000_000);
+        return stats;
     }
 
     // -------------------------------------------------------------------------
@@ -158,17 +244,21 @@ public final class MctsTree {
     // -------------------------------------------------------------------------
 
     private void runOneIteration() {
+        long t0, t1;
+        MctsNode iterRoot = fullTurnRoot != null ? fullTurnRoot : root;
+
         // 1. Selection: walk tree via UCB1 to a leaf
-        MctsNode leaf = select(root);
+        if (profilingEnabled) { t0 = System.nanoTime(); } else { t0 = 0; }
+        MctsNode leaf = select(iterRoot);
+        if (profilingEnabled) { selectionNs += System.nanoTime() - t0; }
 
         // 2. Expansion: if the leaf has been visited and is not terminal, expand it
         if (!leaf.isTerminal()) {
             if (!leaf.expanded) {
+                if (profilingEnabled) { t0 = System.nanoTime(); } else { t0 = 0; }
                 expand(leaf);
+                if (profilingEnabled) { expansionNs += System.nanoTime() - t0; }
             }
-            // After expansion (or if already expanded), pick the first unvisited child.
-            // This correctly handles the case where select() returned a node because it had
-            // unvisited children — we must pick one of those, not arbitrarily pick index 0.
             MctsNode firstUnvisited = firstUnvisitedChild(leaf);
             if (firstUnvisited != null) {
                 leaf = firstUnvisited;
@@ -176,9 +266,9 @@ public final class MctsTree {
         }
 
         // 3. Rollout (or terminal scoring)
+        if (profilingEnabled) { t0 = System.nanoTime(); } else { t0 = 0; }
         double score;
         if (leaf.isTerminal()) {
-            // Someone has already won in this state
             score = terminalScore(leaf);
         } else {
             score = rolloutFn.simulate(
@@ -186,9 +276,12 @@ public final class MctsTree {
                     getActivePlayerForNode(leaf),
                     playerPerspective);
         }
+        if (profilingEnabled) { rolloutNs += System.nanoTime() - t0; }
 
         // 4. Backpropagation
+        if (profilingEnabled) { t0 = System.nanoTime(); } else { t0 = 0; }
         leaf.backpropagate(score);
+        if (profilingEnabled) { backpropNs += System.nanoTime() - t0; }
     }
 
     private void runOneIterationFrom(MctsNode startNode) {
@@ -314,5 +407,47 @@ public final class MctsTree {
         if (node instanceof DiceChoiceNode dc)  return dc.activePlayer;
         if (node instanceof FunkturmNode fn)    return fn.activePlayer;
         return activePlayer; // fallback
+    }
+
+    // -------------------------------------------------------------------------
+    // Tree navigation (for H2H full-turn evaluation)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Returns the child of a decision node that received the most visits.
+     * For decision nodes (DiceChoice, Funkturm, Bürohaus, BuyDecision), the most-visited
+     * child represents the engine's preferred action.
+     *
+     * @param node an expanded decision node
+     * @return the most-visited child, or null if no children
+     */
+    public static MctsNode bestChild(MctsNode node) {
+        List<MctsNode> children = node.getChildren();
+        if (children.isEmpty()) return null;
+        MctsNode best = children.get(0);
+        for (int i = 1; i < children.size(); i++) {
+            if (children.get(i).visitCount > best.visitCount) {
+                best = children.get(i);
+            }
+        }
+        return best;
+    }
+
+    /**
+     * Navigates to the child of a ChanceNode that corresponds to a specific roll value.
+     * ChanceNode children are created in order: for 1d6 → children[0]=roll 1, children[1]=roll 2, ...;
+     * for 2d6 → children[0]=roll 2, children[1]=roll 3, ....
+     *
+     * @param chanceNode an expanded ChanceNode
+     * @param roll       the actual dice roll total
+     * @return the child node for that roll, or null if the ChanceNode is not expanded
+     */
+    public static MctsNode navigateToRoll(ChanceNode chanceNode, int roll) {
+        if (!chanceNode.expanded) return null;
+        int minRoll = chanceNode.twoDice ? 2 : 1;
+        int index = roll - minRoll;
+        List<MctsNode> children = chanceNode.getChildren();
+        if (index < 0 || index >= children.size()) return null;
+        return children.get(index);
     }
 }

@@ -14,9 +14,12 @@ interface Props {
   language: 'de' | 'en';
   onHover: (card: { projectId: string; cost: number } | null) => void;
   onBuy: (projectId: string | null) => void;
+  engineId?: string;
+  iterationsUsed?: number;
+  computeTimeMs?: number;
 }
 
-export function AssistantPanel({ options, metricRanges, loading, projects, language, onHover, onBuy }: Props) {
+export function AssistantPanel({ options, metricRanges, loading, projects, language, onHover, onBuy, engineId, iterationsUsed, computeTimeMs }: Props) {
   const { t } = useLocale();
   const [showAll, setShowAll] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -37,9 +40,24 @@ export function AssistantPanel({ options, metricRanges, loading, projects, langu
     );
   }
 
-  const top = options[0];
+  // Deduplicate _wait_ entries
+  const dedupedOptions = (() => {
+    let seenWait = false;
+    return options.filter(o => {
+      if (o.projectId === '_wait_') {
+        if (seenWait) return false;
+        seenWait = true;
+      }
+      return true;
+    });
+  })();
+
+  const top = dedupedOptions[0];
+  const isWait = top.projectId === '_wait_';
   const topProj = projects.byId(top.projectId);
-  const topName = topProj?.[`name_${language}` as 'name_de' | 'name_en'] ?? top.projectId;
+  const topName = isWait
+    ? (language === 'de' ? 'Sparen' : 'Save')
+    : (topProj?.[`name_${language}` as 'name_de' | 'name_en'] ?? top.projectId);
   const winPct = (top.score * 100).toFixed(1);
 
   return (
@@ -51,7 +69,7 @@ export function AssistantPanel({ options, metricRanges, loading, projects, langu
             <div className="text-xs text-machi-text-dim uppercase tracking-wider mb-1">
               {t('purchase.recommendation')}
             </div>
-            <div className={`text-lg font-bold ${cardTextClass(topProj?.color)}`}>
+            <div className={`text-lg font-bold ${isWait ? 'text-machi-text-dim' : cardTextClass(topProj?.color)}`}>
               {topName}
             </div>
             {top.summarySentence ? (
@@ -63,6 +81,11 @@ export function AssistantPanel({ options, metricRanges, loading, projects, langu
           <div className="text-right shrink-0">
             <div className="text-2xl font-bold text-machi-green">{winPct}%</div>
             <div className="text-xs text-machi-text-dim">{t('purchase.winRate')}</div>
+            {engineId && (
+              <div className="text-[10px] text-machi-text-dim/60 mt-1">
+                {engineId} · {iterationsUsed ?? 0} iter · {computeTimeMs ?? 0}ms
+              </div>
+            )}
           </div>
         </div>
 
@@ -103,7 +126,7 @@ export function AssistantPanel({ options, metricRanges, loading, projects, langu
       {showAll && (
         <div className="bg-machi-surface rounded-xl border border-machi-border p-3">
           <RankedList
-            options={options}
+            options={dedupedOptions}
             metricRanges={metricRanges}
             projects={projects}
             language={language}

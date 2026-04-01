@@ -33,9 +33,21 @@ export function RankedList({ options, metricRanges, projects, language, onHover,
     });
   }, [options]);
 
+  // Deduplicate _wait_ entries (backend may return multiple)
+  const dedupedOptions = useMemo(() => {
+    let seenWait = false;
+    return options.filter(o => {
+      if (o.projectId === '_wait_') {
+        if (seenWait) return false;
+        seenWait = true;
+      }
+      return true;
+    });
+  }, [options]);
+
   // Sort
   const sorted = useMemo(() => {
-    const ranked = options.map((o, i) => ({ ...o, rank: i + 1 }));
+    const ranked = dedupedOptions.map((o, i) => ({ ...o, rank: i + 1 }));
     if (!sortKey) return ranked;
     return [...ranked].sort((a, b) => {
       const av = getValue(a, sortKey);
@@ -43,7 +55,7 @@ export function RankedList({ options, metricRanges, projects, language, onHover,
       const diff = av - bv;
       return sortAsc ? diff : -diff;
     });
-  }, [options, sortKey, sortAsc]);
+  }, [dedupedOptions, sortKey, sortAsc]);
 
   const handleSort = (col: ColumnDef) => {
     if (!col.sortable) return;
@@ -77,13 +89,14 @@ export function RankedList({ options, metricRanges, projects, language, onHover,
           </tr>
         </thead>
         <tbody>
-          {sorted.map(opt => {
+          {sorted.map((opt, idx) => {
             const proj = projects.byId(opt.projectId);
+            const isWait = opt.projectId === '_wait_';
             const isSelected = opt.projectId === selectedId;
             const isExpanded = opt.projectId === expandedRow;
             return (
               <tr
-                key={opt.projectId}
+                key={isWait ? `_wait_${idx}` : opt.projectId}
                 className={`border-b border-machi-border/50 transition-colors cursor-pointer ${
                   isSelected ? 'bg-machi-accent/10' : 'hover:bg-machi-surface/50'
                 } ${!opt.affordable ? 'opacity-50' : ''}`}
@@ -91,8 +104,8 @@ export function RankedList({ options, metricRanges, projects, language, onHover,
                   onSelect(isSelected ? null : opt.projectId);
                   setExpandedRow(isExpanded ? null : opt.projectId);
                 }}
-                onMouseEnter={() => proj && onHover({ projectId: opt.projectId, cost: proj.cost })}
-                onMouseLeave={() => onHover(null)}
+                onMouseEnter={() => !isWait && proj && onHover({ projectId: opt.projectId, cost: proj.cost })}
+                onMouseLeave={() => !isWait && onHover(null)}
               >
                 {visibleColumns.map(col => {
                   const raw = getCellValue(opt, col.key, proj, language);
@@ -157,9 +170,12 @@ function getCellValue(
 ): string | number | boolean {
   switch (key) {
     case 'rank': return opt.rank;
-    case 'projectId': return proj?.[`name_${language}` as 'name_de' | 'name_en'] ?? opt.projectId;
+    case 'projectId': {
+      if (opt.projectId === '_wait_') return language === 'de' ? 'Sparen' : 'Save';
+      return proj?.[`name_${language}` as 'name_de' | 'name_en'] ?? opt.projectId;
+    }
     case 'score': return opt.score;
-    case 'cost': return proj?.cost ?? 0;
+    case 'cost': return opt.projectId === '_wait_' ? 0 : (proj?.cost ?? 0);
     case 'affordable': return opt.affordable;
     default: return opt.metrics?.[key] ?? '—';
   }

@@ -319,14 +319,32 @@ public class MctsV1Engine implements SimulationEngine {
      * Infers which card the player at {@code playerIdx} purchased to go from
      * {@code beforeState} to {@code afterState}.
      * Returns {@link RankEntry#WAIT_SENTINEL} if no card was added (save action).
+     *
+     * <p>Handles duplicate purchases correctly (e.g. buying a second Weizenfeld)
+     * by counting occurrences rather than using {@code List.contains}.
      */
     private static Project inferPurchasedCard(
             GameState beforeState, int playerIdx,
             GameState afterState, int afterPlayerIdx) {
         List<Project> before = beforeState.getPlayers()[playerIdx].getOwned_projects();
         List<Project> after  = afterState.getPlayers()[afterPlayerIdx].getOwned_projects();
+
+        // Count occurrences of each card ID in before state
+        java.util.Map<String, Integer> beforeCounts = new java.util.HashMap<>();
+        for (Project p : before) {
+            beforeCounts.merge(p.getId(), 1, Integer::sum);
+        }
+
+        // Find the card whose count increased
+        java.util.Map<String, Integer> afterCounts = new java.util.HashMap<>();
         for (Project p : after) {
-            if (!before.contains(p)) return p;
+            afterCounts.merge(p.getId(), 1, Integer::sum);
+        }
+
+        for (Project p : after) {
+            int bc = beforeCounts.getOrDefault(p.getId(), 0);
+            int ac = afterCounts.getOrDefault(p.getId(), 0);
+            if (ac > bc) return p;
         }
         return RankEntry.WAIT_SENTINEL;
     }
@@ -662,10 +680,10 @@ public class MctsV1Engine implements SimulationEngine {
             for (String lmId : LANDMARK_IDS) {
                 ProjectLoader.getProject(lmId).ifPresent(lm -> {});
             }
-            // Normalize cost weight by player's coin count
+            // Normalize cost weight by player's coin count — low cost = high weight (affordable)
             int coins = state.getPlayers()[playerIndex].getCoins();
             double costFraction = coins > 0 ? (double) cost / coins : 1.0;
-            double w = Math.min(1.0, costFraction);
+            double w = Math.min(1.0, Math.max(0.0, 1.0 - costFraction));
             factors.add(new EngineResult.ExplanationFactor("cost", w,
                     String.format("Cost: %d coins (%d remaining)", cost, Math.max(0, coins - cost)),
                     String.format("Card costs %d of %d available coins. %d coins remaining after purchase.",

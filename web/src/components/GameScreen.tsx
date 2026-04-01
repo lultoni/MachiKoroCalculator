@@ -71,7 +71,7 @@ export function GameScreen({ session, settings, updateSettings, projects, hover 
   // Trigger engine evaluation when turn starts
   useEffect(() => {
     if (s.finished) return;
-    engine.evaluate(s.state, s.nextPlayerIndex, settings.engineId);
+    engine.evaluate(s.state, s.nextPlayerIndex, settings.engineId, s.state);
     // Reset dice on turn change
     setDie1(null);
     setDie2(null);
@@ -97,7 +97,7 @@ export function GameScreen({ session, settings, updateSettings, projects, hover 
     const isDoubles = diceCount === 2 && die1 === die2;
     session.applyTurn({
       roll: rollTotal,
-      boughtId: projectId,
+      boughtId: projectId === '_wait_' ? null : projectId,
       isDoubles,
       diceCount,
     });
@@ -281,6 +281,9 @@ export function GameScreen({ session, settings, updateSettings, projects, hover 
                   coinsAfterRoll={coinsAfterRoll}
                   onHover={hover.onHover}
                   onBuy={handleBuy}
+                  engineId={engine.result?.engineId}
+                  iterationsUsed={engine.result?.iterationsUsed}
+                  computeTimeMs={engine.result?.computeTimeMs}
                 />
               )}
             </>
@@ -296,6 +299,9 @@ export function GameScreen({ session, settings, updateSettings, projects, hover 
                   coinsAvailable={activePlayer.coins}
                   onConfirm={handleOpponentConfirm}
                   loading={session.loading}
+                  state={s.state}
+                  activePlayerIndex={s.nextPlayerIndex}
+                  players={s.state.players}
                 />
               </div>
               <InsightsPanel

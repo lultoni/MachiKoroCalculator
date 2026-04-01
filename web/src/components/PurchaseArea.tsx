@@ -13,12 +13,15 @@ interface Props {
   coinsAfterRoll: number | null;
   onHover: (card: { projectId: string; cost: number } | null) => void;
   onBuy: (projectId: string | null) => void;
+  engineId?: string;
+  iterationsUsed?: number;
+  computeTimeMs?: number;
 }
 
 export function PurchaseArea({
   options, metricRanges, evaluating,
   projects, language, coinsAfterRoll,
-  onHover, onBuy,
+  onHover, onBuy, engineId, iterationsUsed, computeTimeMs,
 }: Props) {
   const { t } = useLocale();
 
@@ -38,6 +41,9 @@ export function PurchaseArea({
         language={language}
         onHover={onHover}
         onBuy={onBuy}
+        engineId={engineId}
+        iterationsUsed={iterationsUsed}
+        computeTimeMs={computeTimeMs}
       />
 
       {/* Manual buy fallback */}

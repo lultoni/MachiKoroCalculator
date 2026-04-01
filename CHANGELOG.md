@@ -6,6 +6,22 @@ Implementation history: what was built, why, and which design decisions were mad
 
 ## Phase 7: Iteration
 
+### 7.12 — Web UI Bug Fixes
+
+Nine UI bugs found during real gameplay testing, fixed in one batch:
+
+1. **Settings modal overflow:** `max-w-md` was too narrow for 28 engine buttons. Changed to `max-w-2xl` with `max-h-[85vh] overflow-y-auto`.
+2. **CoinFlowDisplay not updating on dice click:** `evaluate()` was called without `preRollState`, so the backend never computed `perRollDeltas`. Fixed by passing `s.state` as `preRollState`.
+3. **"_wait_" showing as raw ID:** `projects.byId("_wait_")` returns undefined, falling through to raw ID. Added explicit `_wait_` handling with localized "Sparen"/"Save" text.
+4. **Multiple _wait_ duplicates:** Backend could return duplicate save entries; sorting triggered React key collisions. Fixed with frontend deduplication and index-based keys.
+5. **Engine metadata not visible:** `engineId`, `iterationsUsed`, `computeTimeMs` were in the API response but not displayed. Added to AssistantPanel under the win rate.
+6. **Cost factor bars inverted:** Weight formula `cost/coins` made expensive cards show big bars. Inverted to `1 - cost/coins` (cheap = big bar = good). Display-only; does not affect engine ranking.
+7. **Weizenfeld/Bäckerei missing from ranked list:** `inferPurchasedCard` used `List.contains()` which matched by Project.equals (ID comparison). Buying a second copy of a card already owned was invisible. Fixed with occurrence-counting comparison.
+8. **Buy button sending "_wait_" as project ID:** Backend rejected `"_wait_"` as unknown project. Fixed by mapping `_wait_` to `null` in `handleBuy`.
+9. **No coin flow during opponent turns:** Added live coin delta display per player when opponent dice are selected, using the `/api/roll` preview endpoint.
+
+Supply sidebar showing 4 remaining for Weizenfeld/Bäckerei in 2-player game is **correct** per official rules (starters count against 6-copy supply).
+
 ### 7.8–7.11 — Engine Compliance Suite + New Engine Types
 
 **Engine Compliance Test Suite (7.8):** Generic `runEngineComplianceTests()` method in RuntimeTester with 3 tiers of assertions:

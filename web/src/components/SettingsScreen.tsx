@@ -30,7 +30,7 @@ export function SettingsScreen({ settings, update, players, onClose }: Props) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <div
-        className="bg-machi-surface rounded-2xl border border-machi-border p-6 max-w-md w-full mx-4 space-y-5 shadow-2xl"
+        className="bg-machi-surface rounded-2xl border border-machi-border p-6 max-w-2xl w-full mx-4 space-y-5 shadow-2xl max-h-[85vh] overflow-y-auto"
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">

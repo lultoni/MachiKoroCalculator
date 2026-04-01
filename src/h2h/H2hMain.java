@@ -55,7 +55,7 @@ public final class H2hMain {
         orchestrator.register(new MctsAdaptiveEngine());
 
         MatchConfig config = new MatchConfig(
-                new String[]{engineA, engineB}, games, maxTurns, iterations);
+                new String[]{engineA, engineB}, games, maxTurns, iterations, true);
 
         System.out.printf("[H2H] %s vs %s — %d games, %d iter/eval, %d max turns%n",
                 engineA, engineB, games, iterations, maxTurns);

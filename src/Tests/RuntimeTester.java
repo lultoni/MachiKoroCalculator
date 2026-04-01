@@ -10,6 +10,10 @@ import engine.MctsV1Engine;
 import engine.EngineConfig;
 import engine.EngineResult;
 import engine.mcts.SupplyTracker;
+import h2h.MatchConfig;
+import h2h.MatchResult;
+import h2h.TournamentResult;
+import h2h.TournamentRunner;
 
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
@@ -19,7 +23,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -338,6 +345,15 @@ public class RuntimeTester {
             test_summary_sentence_present();
             test_flat_factors_derived_from_structured();
             test_all_weights_in_valid_range();
+        });
+
+        runSection("Tournament Infrastructure", () -> {
+            test_tournament_matchup_generation();
+            test_tournament_leaderboard_ranking();
+            test_tournament_h2h_matrix();
+            test_build_eval_config_preserves_extras();
+            test_engine_registry_get_by_tier();
+            test_abbreviate_engine_ids();
         });
 
         System.out.println("\n--- Results: " + passed + " passed, " + failed + " failed ---");
@@ -2967,6 +2983,133 @@ public class RuntimeTester {
             threw = e.getMessage().contains("already owns purple card");
         }
         assertTrue("GameSession rejects duplicate purple card purchase", threw);
+    }
+
+    // =========================================================================
+    // Tournament Infrastructure tests
+    // =========================================================================
+
+    private static void test_tournament_matchup_generation() {
+        // 4 engines → C(4,2) = 6 unordered pairs, no self-play
+        List<int[]> pairs = TournamentRunner.generatePairs(4);
+        assertEq("4 engines generate 6 pairs", 6, pairs.size());
+
+        // No self-play
+        for (int[] p : pairs) {
+            assertTrue("Pair has distinct indices: " + p[0] + " vs " + p[1], p[0] != p[1]);
+        }
+
+        // 2 engines → 1 pair
+        assertEq("2 engines generate 1 pair", 1, TournamentRunner.generatePairs(2).size());
+
+        // 5 engines → 10 pairs
+        assertEq("5 engines generate 10 pairs", 10, TournamentRunner.generatePairs(5).size());
+    }
+
+    private static void test_tournament_leaderboard_ranking() {
+        // Mock: 3 engines, engine B wins both matchups, A splits, C loses both
+        List<String> ids = List.of("engineA", "engineB", "engineC");
+
+        // Create mock match results using simple GameLogs
+        MatchResult abResult = mockMatchResult("engineA", "engineB", 2, 8);  // A wins 2/10
+        MatchResult acResult = mockMatchResult("engineA", "engineC", 6, 4);  // A wins 6/10
+        MatchResult bcResult = mockMatchResult("engineB", "engineC", 7, 3);  // B wins 7/10
+
+        TournamentResult result = new TournamentResult(ids,
+                List.of(abResult, acResult, bcResult), 1000);
+
+        assertEq("Leaderboard has 3 entries", 3, result.leaderboard.size());
+        assertEq("Rank 1 is engineB", "engineB", result.leaderboard.get(0).engineId);
+        assertEq("Rank 2 is engineA", "engineA", result.leaderboard.get(1).engineId);
+        assertEq("Rank 3 is engineC", "engineC", result.leaderboard.get(2).engineId);
+
+        // B wins 15/20 = 75%
+        assertTrue("engineB win rate ≈ 75%",
+                Math.abs(result.leaderboard.get(0).winRate - 0.75) < 0.01);
+    }
+
+    private static void test_tournament_h2h_matrix() {
+        List<String> ids = List.of("A", "B", "C");
+        MatchResult ab = mockMatchResult("A", "B", 7, 3);   // A beats B 70%
+        MatchResult ac = mockMatchResult("A", "C", 4, 6);   // A loses to C 40%
+        MatchResult bc = mockMatchResult("B", "C", 5, 5);   // B ties C 50%
+
+        TournamentResult result = new TournamentResult(ids, List.of(ab, ac, bc), 1000);
+
+        // Matrix symmetry: matrix[i][j] + matrix[j][i] = 1
+        assertTrue("A vs B = 0.7", Math.abs(result.h2hMatrix[0][1] - 0.7) < 0.01);
+        assertTrue("B vs A = 0.3", Math.abs(result.h2hMatrix[1][0] - 0.3) < 0.01);
+        assertTrue("A vs C = 0.4", Math.abs(result.h2hMatrix[0][2] - 0.4) < 0.01);
+        assertTrue("C vs A = 0.6", Math.abs(result.h2hMatrix[2][0] - 0.6) < 0.01);
+        assertTrue("B vs C = 0.5", Math.abs(result.h2hMatrix[1][2] - 0.5) < 0.01);
+    }
+
+    private static void test_build_eval_config_preserves_extras() {
+        // Simulate a registry config with rolloutTemperature and maxRolloutDepth
+        Map<String, String> extras = new HashMap<>();
+        extras.put("rolloutTemperature", "0.3");
+        extras.put("maxRolloutDepth", "7");
+        EngineConfig registryConfig = new EngineConfig(2000, 0, 0.0, extras);
+
+        // Build eval config with iteration override
+        EngineConfig eval = MatchConfig.buildEvalConfig(registryConfig, 500);
+
+        assertEq("iterations overridden to 500", 500, eval.iterations);
+        assertEq("rolloutTemperature preserved", "0.3", eval.getExtra("rolloutTemperature", "missing"));
+        assertEq("maxRolloutDepth preserved", "7", eval.getExtra("maxRolloutDepth", "missing"));
+        assertEq("skipEnrichment added", "true", eval.getExtra("skipEnrichment", "false"));
+
+        // Build eval config without iteration override (0 = use registry)
+        EngineConfig evalDefault = MatchConfig.buildEvalConfig(registryConfig, 0);
+        assertEq("iterations default from registry", 2000, evalDefault.iterations);
+    }
+
+    private static void test_engine_registry_get_by_tier() {
+        // Force reload to pick up tier field
+        EngineRegistry.reload();
+
+        List<EngineRegistryEntry> fast = EngineRegistry.getByTier("fast");
+        List<EngineRegistryEntry> balanced = EngineRegistry.getByTier("balanced");
+        List<EngineRegistryEntry> deep = EngineRegistry.getByTier("deep");
+
+        assertEq("fast tier has 10 engines", 10, fast.size());
+        assertEq("balanced tier has 7 engines", 7, balanced.size());
+        assertEq("deep tier has 7 engines", 7, deep.size());
+
+        // Total = 24
+        assertEq("total engines = 24", 24, fast.size() + balanced.size() + deep.size());
+
+        // Verify depth3 is in fast tier
+        assertTrue("depth3 is fast tier",
+                fast.stream().anyMatch(e -> e.id().equals("mcts-v1-depth3")));
+    }
+
+    private static void test_abbreviate_engine_ids() {
+        assertEq("v1 fast", "v1-f", h2h.TournamentMain.abbreviate("mcts-v1-fast"));
+        assertEq("depth3", "d3", h2h.TournamentMain.abbreviate("mcts-v1-depth3"));
+        assertEq("greedy tree fast", "grTree-f",
+                h2h.TournamentMain.abbreviate("mcts-v1-greedy-tree-fast"));
+        assertEq("boltzmann t07 balanced", "bolt-t07-b",
+                h2h.TournamentMain.abbreviate("mcts-v1-boltzmann-t07-balanced"));
+        assertEq("adaptive deep", "adapt-d",
+                h2h.TournamentMain.abbreviate("mcts-v1-adaptive-deep"));
+    }
+
+    /**
+     * Creates a mock MatchResult with the given win distribution.
+     * Uses minimal GameLogs with only winnerIndex set.
+     */
+    private static MatchResult mockMatchResult(String idA, String idB, int winsA, int winsB) {
+        int total = winsA + winsB;
+        List<h2h.GameLog> logs = new ArrayList<>();
+        for (int i = 0; i < total; i++) {
+            h2h.GameLog log = new h2h.GameLog(i);
+            log.winnerIndex = i < winsA ? 0 : 1;
+            log.totalTurns = 100;
+            logs.add(log);
+        }
+        MatchConfig config = new MatchConfig(new String[]{idA, idB}, total, 200, 500, true);
+        return new MatchResult(config, logs, 1000);
     }
 
     private static void assertTrue(String label, boolean condition) {

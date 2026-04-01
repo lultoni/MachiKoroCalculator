@@ -15,6 +15,7 @@ import java.util.Map;
  * @param engineClass the engine class identifier that must match {@link engine.SimulationEngine#id()}
  * @param description human-readable description shown in the settings UI
  * @param isDefault   true if this entry is the default for normal play
+ * @param tier        performance tier: "fast", "balanced", or "deep"
  * @param config      parsed {@link EngineConfig} built from the JSON {@code config} object
  */
 public record EngineRegistryEntry(
@@ -22,6 +23,7 @@ public record EngineRegistryEntry(
         String engineClass,
         String description,
         boolean isDefault,
+        String tier,
         EngineConfig config
 ) {
     /**

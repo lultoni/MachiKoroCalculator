@@ -87,7 +87,7 @@ final class H2hHandler implements HttpHandler {
         int maxTurns = body.has("maxTurns") ? body.get("maxTurns").getAsInt() : 200;
 
         MatchConfig config = new MatchConfig(
-                new String[]{engineA, engineB}, games, maxTurns, iterations);
+                new String[]{engineA, engineB}, games, maxTurns, iterations, true);
 
         String matchId = java.util.UUID.randomUUID().toString().substring(0, 8);
         MatchProgress progress = new MatchProgress(matchId, config);

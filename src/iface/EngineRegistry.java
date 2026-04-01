@@ -71,6 +71,14 @@ public final class EngineRegistry {
     }
 
     /**
+     * Returns all entries matching the given performance tier ("fast", "balanced", "deep").
+     */
+    public static List<EngineRegistryEntry> getByTier(String tier) {
+        ensureLoaded();
+        return entries.stream().filter(e -> tier.equals(e.tier())).toList();
+    }
+
+    /**
      * Forces a reload of the registry from disk. Useful in tests or when the file changes.
      */
     public static void reload() {
@@ -113,6 +121,7 @@ public final class EngineRegistry {
         String engineClass = obj.get("engineClass").getAsString();
         String description = obj.get("description").getAsString();
         boolean isDefault  = obj.has("default") && obj.get("default").getAsBoolean();
+        String tier        = obj.has("tier") ? obj.get("tier").getAsString() : "fast";
 
         java.util.Map<String, String> rawConfig = new java.util.HashMap<>();
         if (obj.has("config")) {
@@ -122,7 +131,7 @@ public final class EngineRegistry {
             }
         }
 
-        return new EngineRegistryEntry(id, engineClass, description, isDefault,
+        return new EngineRegistryEntry(id, engineClass, description, isDefault, tier,
                 EngineRegistryEntry.buildConfig(rawConfig));
     }
 }

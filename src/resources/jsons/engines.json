@@ -4,6 +4,7 @@
     "engineClass": "mcts-v1",
     "description": "MCTS v1 — fast mode (~500 iterations)",
     "default": false,
+    "tier": "fast",
     "config": {
       "iterations": "500",
       "rolloutPolicy": "greedy"
@@ -14,6 +15,7 @@
     "engineClass": "mcts-v1",
     "description": "MCTS v1 — balanced mode (~5000 iterations)",
     "default": true,
+    "tier": "balanced",
     "config": {
       "iterations": "5000",
       "rolloutPolicy": "greedy"
@@ -24,6 +26,7 @@
     "engineClass": "mcts-v1",
     "description": "MCTS v1 — deep mode (~50000 iterations)",
     "default": false,
+    "tier": "deep",
     "config": {
       "iterations": "50000",
       "rolloutPolicy": "greedy"
@@ -34,6 +37,7 @@
     "engineClass": "mcts-v1-greedy-rollout",
     "description": "MCTS Variant A — greedy rollout, fast mode (~500 iterations)",
     "default": false,
+    "tier": "fast",
     "config": {
       "iterations": "500"
     }
@@ -43,6 +47,7 @@
     "engineClass": "mcts-v1-greedy-rollout",
     "description": "MCTS Variant A — greedy rollout, balanced mode (~5000 iterations)",
     "default": false,
+    "tier": "balanced",
     "config": {
       "iterations": "5000"
     }
@@ -52,6 +57,7 @@
     "engineClass": "mcts-v1-greedy-rollout",
     "description": "MCTS Variant A — greedy rollout, deep mode (~50000 iterations)",
     "default": false,
+    "tier": "deep",
     "config": {
       "iterations": "50000"
     }
@@ -61,6 +67,7 @@
     "engineClass": "mcts-v1-boltzmann-rollout",
     "description": "MCTS Variant B — Boltzmann rollout T=0.3, fast mode (~500 iterations)",
     "default": false,
+    "tier": "fast",
     "config": {
       "iterations": "500",
       "rolloutTemperature": "0.3"
@@ -71,6 +78,7 @@
     "engineClass": "mcts-v1-boltzmann-rollout",
     "description": "MCTS Variant B — Boltzmann rollout T=0.3, balanced mode (~5000 iterations)",
     "default": false,
+    "tier": "balanced",
     "config": {
       "iterations": "5000",
       "rolloutTemperature": "0.3"
@@ -81,6 +89,7 @@
     "engineClass": "mcts-v1-boltzmann-rollout",
     "description": "MCTS Variant B — Boltzmann rollout T=0.3, deep mode (~50000 iterations)",
     "default": false,
+    "tier": "deep",
     "config": {
       "iterations": "50000",
       "rolloutTemperature": "0.3"
@@ -91,6 +100,7 @@
     "engineClass": "mcts-v1-boltzmann-rollout",
     "description": "MCTS Variant B — Boltzmann rollout T=0.7, fast mode (~500 iterations)",
     "default": false,
+    "tier": "fast",
     "config": {
       "iterations": "500",
       "rolloutTemperature": "0.7"
@@ -101,6 +111,7 @@
     "engineClass": "mcts-v1-boltzmann-rollout",
     "description": "MCTS Variant B — Boltzmann rollout T=0.7, balanced mode (~5000 iterations)",
     "default": false,
+    "tier": "balanced",
     "config": {
       "iterations": "5000",
       "rolloutTemperature": "0.7"
@@ -111,6 +122,7 @@
     "engineClass": "mcts-v1-boltzmann-rollout",
     "description": "MCTS Variant B — Boltzmann rollout T=0.7, deep mode (~50000 iterations)",
     "default": false,
+    "tier": "deep",
     "config": {
       "iterations": "50000",
       "rolloutTemperature": "0.7"
@@ -121,6 +133,7 @@
     "engineClass": "mcts-v1-boltzmann-rollout",
     "description": "MCTS Variant B — Boltzmann rollout T=2.0, fast mode (~500 iterations)",
     "default": false,
+    "tier": "fast",
     "config": {
       "iterations": "500",
       "rolloutTemperature": "2.0"
@@ -131,6 +144,7 @@
     "engineClass": "mcts-v1-boltzmann-rollout",
     "description": "MCTS Variant B — Boltzmann rollout T=2.0, balanced mode (~5000 iterations)",
     "default": false,
+    "tier": "balanced",
     "config": {
       "iterations": "5000",
       "rolloutTemperature": "2.0"
@@ -141,6 +155,7 @@
     "engineClass": "mcts-v1-boltzmann-rollout",
     "description": "MCTS Variant B — Boltzmann rollout T=2.0, deep mode (~50000 iterations)",
     "default": false,
+    "tier": "deep",
     "config": {
       "iterations": "50000",
       "rolloutTemperature": "2.0"
@@ -151,6 +166,7 @@
     "engineClass": "mcts-v1-greedy-tree",
     "description": "MCTS Variant C — greedy BuyDecisionNode selection, fast mode (~500 iterations)",
     "default": false,
+    "tier": "fast",
     "config": {
       "iterations": "500"
     }
@@ -160,6 +176,7 @@
     "engineClass": "mcts-v1-greedy-tree",
     "description": "MCTS Variant C — greedy BuyDecisionNode selection, balanced mode (~5000 iterations)",
     "default": false,
+    "tier": "balanced",
     "config": {
       "iterations": "5000"
     }
@@ -169,6 +186,7 @@
     "engineClass": "mcts-v1-greedy-tree",
     "description": "MCTS Variant C — greedy BuyDecisionNode selection, deep mode (~50000 iterations)",
     "default": false,
+    "tier": "deep",
     "config": {
       "iterations": "50000"
     }
@@ -178,6 +196,7 @@
     "engineClass": "mcts-v1-depth-limited",
     "description": "MCTS Variant D — depth-limited rollout (depth=3) with heuristic eval",
     "default": false,
+    "tier": "fast",
     "config": {
       "iterations": "2000",
       "maxRolloutDepth": "3"
@@ -188,6 +207,7 @@
     "engineClass": "mcts-v1-depth-limited",
     "description": "MCTS Variant D — depth-limited rollout (depth=7) with heuristic eval",
     "default": false,
+    "tier": "fast",
     "config": {
       "iterations": "2000",
       "maxRolloutDepth": "7"
@@ -198,6 +218,7 @@
     "engineClass": "mcts-v1-depth-limited",
     "description": "MCTS Variant D — depth-limited rollout (depth=10) with heuristic eval",
     "default": false,
+    "tier": "fast",
     "config": {
       "iterations": "2000",
       "maxRolloutDepth": "10"
@@ -208,6 +229,7 @@
     "engineClass": "mcts-v1-adaptive",
     "description": "MCTS Variant E — adaptive budget, fast mode (~500 iterations)",
     "default": false,
+    "tier": "fast",
     "config": {
       "iterations": "500"
     }
@@ -217,6 +239,7 @@
     "engineClass": "mcts-v1-adaptive",
     "description": "MCTS Variant E — adaptive budget, balanced mode (~5000 iterations)",
     "default": false,
+    "tier": "balanced",
     "config": {
       "iterations": "5000"
     }
@@ -226,6 +249,7 @@
     "engineClass": "mcts-v1-adaptive",
     "description": "MCTS Variant E — adaptive budget, deep mode (~50000 iterations)",
     "default": false,
+    "tier": "deep",
     "config": {
       "iterations": "50000"
     }

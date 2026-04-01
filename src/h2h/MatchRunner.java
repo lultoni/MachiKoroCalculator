@@ -58,6 +58,11 @@ public final class MatchRunner {
     }
 
     /**
+     * Resolved engine instances and their per-seat configs.
+     */
+    private record ResolvedMatch(SimulationEngine[] engines, EngineConfig[] configs) {}
+
+    /**
      * Runs the full match: {@code config.gameCount()} games in parallel.
      *
      * @param config   match configuration
@@ -67,9 +72,8 @@ public final class MatchRunner {
     public MatchResult runMatch(MatchConfig config, ProgressListener listener) {
         long startMs = System.currentTimeMillis();
 
-        // Resolve engines from registry
-        SimulationEngine[] engines = resolveEngines(config);
-        EngineConfig evalConfig = config.toEngineConfig();
+        // Resolve engines and per-seat configs from registry
+        ResolvedMatch resolved = resolveMatch(config);
 
         // Run games in parallel
         int parallelism = Math.max(1, Runtime.getRuntime().availableProcessors());
@@ -81,7 +85,7 @@ public final class MatchRunner {
         for (int g = 0; g < config.gameCount(); g++) {
             final int gameIdx = g;
             futures.add(pool.submit(() -> {
-                GameLog log = playGame(gameIdx, config, engines, evalConfig);
+                GameLog log = playGame(gameIdx, config, resolved.engines, resolved.configs);
                 int done = completed.incrementAndGet();
                 if (listener != null) {
                     listener.onGameCompleted(gameIdx, log);
@@ -111,8 +115,9 @@ public final class MatchRunner {
     // Engine resolution
     // -------------------------------------------------------------------------
 
-    private SimulationEngine[] resolveEngines(MatchConfig config) {
+    private ResolvedMatch resolveMatch(MatchConfig config) {
         SimulationEngine[] engines = new SimulationEngine[config.playerCount()];
+        EngineConfig[] configs = new EngineConfig[config.playerCount()];
         for (int i = 0; i < config.playerCount(); i++) {
             String registryId = config.engineIds()[i];
             EngineRegistryEntry entry = EngineRegistry.findById(registryId)
@@ -125,8 +130,9 @@ public final class MatchRunner {
                         + " (from registry id: " + registryId + ")");
             }
             engines[i] = engine;
+            configs[i] = MatchConfig.buildEvalConfig(entry.config(), config.iterationsPerEval());
         }
-        return engines;
+        return new ResolvedMatch(engines, configs);
     }
 
     // -------------------------------------------------------------------------
@@ -134,33 +140,43 @@ public final class MatchRunner {
     // -------------------------------------------------------------------------
 
     private GameLog playGame(int gameIndex, MatchConfig config,
-                             SimulationEngine[] engines, EngineConfig evalConfig) {
+                             SimulationEngine[] engines, EngineConfig[] evalConfigs) {
         GameLog log = new GameLog(gameIndex);
         GameState state = GameState.initial(config.playerCount());
         int n = config.playerCount();
         int activePlayer = 0;
         int turnCount = 0;
 
+        // Seat swap: after half the games, swap P1/P2 positions
+        boolean swapped = config.seatSwap() && n == 2 && gameIndex >= config.gameCount() / 2;
+        SimulationEngine[] gameEngines = swapped
+                ? new SimulationEngine[]{engines[1], engines[0]} : engines;
+        EngineConfig[] gameConfigs = swapped
+                ? new EngineConfig[]{evalConfigs[1], evalConfigs[0]} : evalConfigs;
+
         while (turnCount < config.maxTurnsPerGame()) {
-            TurnLog turnLog = playTurn(state, activePlayer, engines[activePlayer], evalConfig);
+            TurnLog turnLog = playTurn(state, activePlayer,
+                    gameEngines[activePlayer], gameConfigs[activePlayer]);
             log.turns.add(turnLog);
             turnCount++;
 
             // Win check
             if (GameState.hasWon(state.getPlayers()[activePlayer])) {
-                log.winnerIndex = activePlayer;
+                // Map winner back to original seat index
+                log.winnerIndex = swapped ? (1 - activePlayer) : activePlayer;
                 break;
             }
 
             // Freizeitpark bonus turn
             boolean hasFreizeit = state.getPlayers()[activePlayer].hasProject("freizeitpark");
             if (hasFreizeit && turnLog.isDoubles) {
-                TurnLog bonusTurnLog = playTurn(state, activePlayer, engines[activePlayer], evalConfig);
+                TurnLog bonusTurnLog = playTurn(state, activePlayer,
+                        gameEngines[activePlayer], gameConfigs[activePlayer]);
                 log.turns.add(bonusTurnLog);
                 turnCount++;
 
                 if (GameState.hasWon(state.getPlayers()[activePlayer])) {
-                    log.winnerIndex = activePlayer;
+                    log.winnerIndex = swapped ? (1 - activePlayer) : activePlayer;
                     break;
                 }
             }
@@ -171,7 +187,8 @@ public final class MatchRunner {
         // Turn limit reached — softmax winner
         if (log.winnerIndex < 0) {
             log.timeoutWin = true;
-            log.winnerIndex = softmaxWinner(state);
+            int rawWinner = softmaxWinner(state);
+            log.winnerIndex = swapped ? (1 - rawWinner) : rawWinner;
         }
 
         log.totalTurns = turnCount;

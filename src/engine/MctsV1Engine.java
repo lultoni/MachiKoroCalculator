@@ -64,9 +64,11 @@ public class MctsV1Engine implements SimulationEngine {
         long startMs = System.currentTimeMillis();
         double explorationConstant = Double.parseDouble(
                 config.getExtra("explorationConstant", "1.4142"));
+        boolean profile = "true".equals(config.getExtra("profile", "false"));
 
         SupplyTracker supply = SupplyTracker.fromGameState(state);
         MctsTree tree = buildTree(state, supply, playerIndex, playerIndex, explorationConstant);
+        if (profile) tree.enableProfiling();
 
         // Run iterations or time budget
         int iterationsUsed;
@@ -83,7 +85,7 @@ public class MctsV1Engine implements SimulationEngine {
         }
 
         long computeTimeMs = System.currentTimeMillis() - startMs;
-        return buildResult(state, playerIndex, tree, iterationsUsed, computeTimeMs);
+        return buildResult(state, playerIndex, tree, iterationsUsed, computeTimeMs, config);
     }
 
     /**
@@ -96,12 +98,18 @@ public class MctsV1Engine implements SimulationEngine {
      * @param tree           fully-run tree (root must be expanded)
      * @param iterationsUsed total iterations reflected in the tree
      * @param computeTimeMs  elapsed wall-clock time to report
+     * @param config         engine config (used for skipEnrichment and profiling flags)
      * @return ranked evaluation result
      */
     protected EngineResult buildResult(GameState state, int playerIndex, MctsTree tree,
-                                       int iterationsUsed, long computeTimeMs) {
+                                       int iterationsUsed, long computeTimeMs, EngineConfig config) {
+        boolean skipEnrichment = config != null
+                && "true".equals(config.getExtra("skipEnrichment", "false"));
+
         // ---- Pass 1: Collect options from root children ----
-        List<EngineResult.Option> rawOptions = buildOptions(state, playerIndex, tree, iterationsUsed);
+        List<EngineResult.Option> rawOptions = skipEnrichment
+                ? buildOptionsLite(tree, state, playerIndex)
+                : buildOptions(state, playerIndex, tree, iterationsUsed);
 
         // Sort descending by score; on ties, non-save options rank above save
         rawOptions.sort(Comparator
@@ -109,7 +117,9 @@ public class MctsV1Engine implements SimulationEngine {
                 .thenComparing(o -> "_wait_".equals(o.project.getId()) ? 1 : 0));
 
         // ---- Pass 2: Enrich with structured factors using cross-option stats ----
-        List<EngineResult.Option> options = enrichWithStructuredFactors(state, playerIndex, rawOptions);
+        List<EngineResult.Option> options = skipEnrichment
+                ? rawOptions
+                : enrichWithStructuredFactors(state, playerIndex, rawOptions);
 
         // Confidence = margin between top-2
         double confidence = 0.0;
@@ -118,10 +128,22 @@ public class MctsV1Engine implements SimulationEngine {
                     options.get(0).score - options.get(1).score));
         }
 
-        // Debug info
+        // Debug info (with optional profiling stats)
         String debugInfo = buildDebugInfo(tree, iterationsUsed);
+        java.util.Map<String, Long> profStats = tree.getProfilingStats();
+        if (!profStats.isEmpty()) {
+            debugInfo += " | profiling: " + profStats;
+        }
 
         return new EngineResult(options, confidence, iterationsUsed, computeTimeMs, debugInfo);
+    }
+
+    /**
+     * Backward-compatible overload for subclasses that don't pass config.
+     */
+    protected EngineResult buildResult(GameState state, int playerIndex, MctsTree tree,
+                                       int iterationsUsed, long computeTimeMs) {
+        return buildResult(state, playerIndex, tree, iterationsUsed, computeTimeMs, null);
     }
 
     // -------------------------------------------------------------------------
@@ -182,6 +204,47 @@ public class MctsV1Engine implements SimulationEngine {
         boolean hasSave = options.stream().anyMatch(o -> "_wait_".equals(o.project.getId()));
         if (!hasSave) {
             options.add(buildSaveOption(state, playerIndex, coins, n, iterationsUsed));
+        }
+
+        return options;
+    }
+
+    /**
+     * Lightweight option extraction — only card ID, win rate, visit count, and affordable flag.
+     * Skips all Calcs metric computation and explanation factors. Used by H2H match runner.
+     */
+    private List<EngineResult.Option> buildOptionsLite(MctsTree tree, GameState state, int playerIndex) {
+        List<EngineResult.Option> options = new ArrayList<>();
+        Player active = state.getPlayers()[playerIndex];
+        int coins = active.getCoins();
+
+        if (!tree.root.expanded) {
+            tree.root.expand();
+        }
+
+        for (MctsNode child : tree.root.getChildren()) {
+            Project purchased = inferPurchasedCard(state, playerIndex, child.state, playerIndex);
+            if (purchased == null) continue;
+
+            double winRate = child.visitCount > 0
+                    ? child.totalScore / child.visitCount
+                    : 0.0;
+
+            boolean affordable = (purchased == RankEntry.WAIT_SENTINEL)
+                    || (coins >= purchased.getCost());
+
+            Map<String, String> metrics = new LinkedHashMap<>();
+            metrics.put("winRate", String.format("%.4f", winRate));
+            metrics.put("visitCount", String.valueOf(child.visitCount));
+
+            options.add(new EngineResult.Option(
+                    purchased, winRate, List.of(), metrics, affordable));
+        }
+
+        boolean hasSave = options.stream().anyMatch(o -> "_wait_".equals(o.project.getId()));
+        if (!hasSave) {
+            options.add(new EngineResult.Option(
+                    RankEntry.WAIT_SENTINEL, 0.0, List.of(), Map.of("winRate", "0.0000"), true));
         }
 
         return options;

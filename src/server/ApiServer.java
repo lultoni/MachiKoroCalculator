@@ -1,6 +1,7 @@
 package server;
 
 import com.sun.net.httpserver.HttpServer;
+import h2h.H2hResultStore;
 import iface.EngineOrchestrator;
 
 import java.net.InetSocketAddress;
@@ -31,6 +32,10 @@ import java.util.concurrent.Executors;
  *   <li>{@code GET  /api/session/saves}       — list saved .mkoro files</li>
  *   <li>{@code POST /api/session/from-snapshot} — create session from mid-game state</li>
  *   <li>{@code GET  /api/session/insights}    — position insights for the assistant panel</li>
+ *   <li>{@code POST /api/h2h/start}             — start H2H match in background</li>
+ *   <li>{@code GET  /api/h2h/status/{matchId}}  — match progress</li>
+ *   <li>{@code GET  /api/h2h/results}           — all completed matches (summary)</li>
+ *   <li>{@code GET  /api/h2h/results/{matchId}} — full match result with game logs</li>
  *   <li>{@code GET  /}                        — serve static files from web/dist/</li>
  * </ul>
  *
@@ -50,6 +55,7 @@ public final class ApiServer {
     private final EngineOrchestrator orchestrator;
     private final SessionManager sessionManager;
     private final PrecomputeCache precomputeCache;
+    private final H2hResultStore h2hStore;
     private HttpServer httpServer;
 
     /**
@@ -63,6 +69,7 @@ public final class ApiServer {
         this.orchestrator   = orchestrator;
         this.sessionManager = new SessionManager(Path.of("saves"));
         this.precomputeCache = new PrecomputeCache(orchestrator);
+        this.h2hStore = new H2hResultStore();
     }
 
     /** Convenience constructor using {@link #DEFAULT_PORT}. */
@@ -101,6 +108,12 @@ public final class ApiServer {
         httpServer.createContext("/api/session/saves",         new SessionSavesListHandler(sessionManager));
         httpServer.createContext("/api/session/from-snapshot", new SessionFromSnapshotHandler(sessionManager));
         httpServer.createContext("/api/session/insights",      new SessionInsightsHandler(sessionManager));
+
+        // H2H engine testing endpoints
+        H2hHandler h2hHandler = new H2hHandler(orchestrator, h2hStore);
+        httpServer.createContext("/api/h2h/start",   h2hHandler);
+        httpServer.createContext("/api/h2h/status",  h2hHandler);
+        httpServer.createContext("/api/h2h/results", h2hHandler);
 
         // Static file serving (SPA fallback)
         httpServer.createContext("/", new StaticFileHandler(Path.of("web", "dist")));

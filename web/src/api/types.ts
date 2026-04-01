@@ -160,3 +160,74 @@ export interface EvaluateRequest {
 export interface FromSnapshotRequest {
   players: PlayerState[];
 }
+
+// ─── H2H (Head-to-Head) ────────────────────────────────────────────────
+
+export interface H2hStartRequest {
+  engineA: string;
+  engineB: string;
+  games: number;
+  iterations: number;
+  maxTurns?: number;
+}
+
+export interface H2hStartResponse {
+  matchId: string;
+  status: string;
+  gameCount: number;
+}
+
+export interface H2hStatusResponse {
+  matchId: string;
+  gamesCompleted: number;
+  gameCount: number;
+  completed: boolean;
+  error?: string;
+  resultId?: string;
+}
+
+export interface H2hTurnLog {
+  playerIndex: number;
+  diceCount: number;
+  roll: number;
+  isDoubles: boolean;
+  coinDeltas: number[];
+  purchasedCardId: string | null;
+  purchaseWinRate: number;
+  coinsAfterPurchase: number;
+  bürohausSwap: string | null;
+  funkturmRerolled: boolean;
+  evaluateTimeMs: number;
+}
+
+export interface H2hGameLog {
+  gameIndex: number;
+  winnerIndex: number;
+  totalTurns: number;
+  timeoutWin: boolean;
+  turns: H2hTurnLog[];
+  finalCoins: number[];
+  landmarkCounts: number[];
+}
+
+export interface H2hMatchSummary {
+  id: string;
+  date: string;
+  totalTimeMs: number;
+  avgGameLength: number;
+  avgEvalTimeMs: number;
+  gameCount: number;
+  engines: string[];
+  wins: number[];
+  winRates: number[];
+}
+
+export interface H2hMatchResult extends H2hMatchSummary {
+  gameLogs: H2hGameLog[];
+  config: {
+    engineIds: string[];
+    gameCount: number;
+    maxTurnsPerGame: number;
+    iterationsPerEval: number;
+  };
+}

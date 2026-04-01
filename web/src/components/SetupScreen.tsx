@@ -11,11 +11,12 @@ interface Props {
   onFromSnapshot: (req: FromSnapshotRequest) => Promise<void>;
   loading: boolean;
   error: string | null;
+  onH2h?: () => void;
 }
 
 const DEFAULT_NAMES = ['Alice', 'Bob', 'Carol', 'Dave'];
 
-export function SetupScreen({ onStart, onLoad, onFromSnapshot, loading, error }: Props) {
+export function SetupScreen({ onStart, onLoad, onFromSnapshot, loading, error, onH2h }: Props) {
   const { t, locale, setLocale } = useLocale();
   const [playerCount, setPlayerCount] = useState(2);
   const [names, setNames] = useState<string[]>([...DEFAULT_NAMES]);
@@ -50,12 +51,22 @@ export function SetupScreen({ onStart, onLoad, onFromSnapshot, loading, error }:
         {/* Header */}
         <div className="text-center">
           <h1 className="text-3xl font-bold text-machi-text">{t('app.title')}</h1>
-          <button
-            className="mt-2 text-sm text-machi-text-dim hover:text-machi-accent transition-colors"
-            onClick={() => setLocale(locale === 'de' ? 'en' : 'de')}
-          >
-            {locale === 'de' ? 'EN' : 'DE'}
-          </button>
+          <div className="mt-2 flex items-center justify-center gap-4">
+            <button
+              className="text-sm text-machi-text-dim hover:text-machi-accent transition-colors"
+              onClick={() => setLocale(locale === 'de' ? 'en' : 'de')}
+            >
+              {locale === 'de' ? 'EN' : 'DE'}
+            </button>
+            {onH2h && (
+              <button
+                className="text-sm text-machi-text-dim hover:text-machi-accent transition-colors"
+                onClick={onH2h}
+              >
+                {t('h2h.nav')}
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Error */}

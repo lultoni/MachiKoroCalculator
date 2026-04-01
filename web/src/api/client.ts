@@ -12,6 +12,12 @@ import type {
   ProjectDef,
   EngineRegistryEntry,
   SaveEntry,
+  H2hStartRequest,
+  H2hStartResponse,
+  H2hStatusResponse,
+  H2hMatchSummary,
+  H2hMatchResult,
+  H2hGameLog,
 } from './types';
 
 const BASE = '';  // same-origin; Vite proxy handles /api → :8080
@@ -100,3 +106,20 @@ export const previewRoll = (state: unknown, playerIndex: number, roll: number) =
     playerIndex,
     roll,
   });
+
+// ─── H2H (Head-to-Head) ──────────────────────────────────────────────
+
+export const h2hStart = (req: H2hStartRequest) =>
+  post<H2hStartResponse>('/api/h2h/start', req);
+
+export const h2hStatus = (matchId: string) =>
+  json<H2hStatusResponse>(`/api/h2h/status/${matchId}`);
+
+export const h2hResults = () =>
+  json<H2hMatchSummary[]>('/api/h2h/results');
+
+export const h2hResult = (matchId: string) =>
+  json<H2hMatchResult>(`/api/h2h/results/${matchId}`);
+
+export const h2hGameLog = (matchId: string, gameIndex: number) =>
+  json<H2hGameLog>(`/api/h2h/results/${matchId}/game/${gameIndex}`);

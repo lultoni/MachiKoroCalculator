@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useSession } from './hooks/useSession';
 import { useSettings } from './hooks/useSettings';
 import { useProjects } from './hooks/useProjects';
@@ -5,6 +6,9 @@ import { useHover } from './hooks/useHover';
 import { useLocale } from './i18n/useLocale';
 import { SetupScreen } from './components/SetupScreen';
 import { GameScreen } from './components/GameScreen';
+import { H2hOverview } from './components/H2hOverview';
+
+type AppView = 'game' | 'h2h';
 
 export default function App() {
   const session = useSession();
@@ -12,6 +16,7 @@ export default function App() {
   const projects = useProjects();
   const hover = useHover();
   const { t } = useLocale();
+  const [view, setView] = useState<AppView>('game');
 
   // Loading project data
   if (projects.loading) {
@@ -20,6 +25,11 @@ export default function App() {
         <p className="text-machi-text-dim text-lg animate-pulse">{t('app.title')}</p>
       </div>
     );
+  }
+
+  // H2H view
+  if (view === 'h2h') {
+    return <H2hOverview onBack={() => setView('game')} />;
   }
 
   // No active session → setup screen
@@ -31,6 +41,7 @@ export default function App() {
         onFromSnapshot={session.fromSnapshot}
         loading={session.loading}
         error={session.error}
+        onH2h={() => setView('h2h')}
       />
     );
   }

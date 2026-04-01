@@ -9,6 +9,7 @@ import server.ApiServer;
 import engine.MctsV1Engine;
 import engine.EngineConfig;
 import engine.EngineResult;
+import engine.SimulationEngine;
 import engine.mcts.SupplyTracker;
 import h2h.MatchConfig;
 import h2h.MatchResult;
@@ -354,6 +355,38 @@ public class RuntimeTester {
             test_build_eval_config_preserves_extras();
             test_engine_registry_get_by_tier();
             test_abbreviate_engine_ids();
+        });
+
+        runSection("Engine Compliance", () -> {
+            // Discover all engine classes from the registry and run the generic compliance suite.
+            // This ensures any newly added engine passes the universal contract tests.
+            EngineOrchestrator orch = new EngineOrchestrator();
+            orch.register(new MctsV1Engine());
+            orch.register(new engine.MctsGreedyRolloutEngine());
+            orch.register(new engine.MctsBoltzmannRolloutEngine());
+            orch.register(new engine.MctsGreedyTreeEngine());
+            orch.register(new engine.MctsDepthLimitedEngine());
+            orch.register(new engine.MctsAdaptiveEngine());
+
+            // Group registry entries by engineClass to avoid running the same engine multiple times
+            Map<String, List<EngineRegistryEntry>> byClass = new HashMap<>();
+            for (EngineRegistryEntry entry : EngineRegistry.getAll()) {
+                byClass.computeIfAbsent(entry.engineClass(), k -> new ArrayList<>()).add(entry);
+            }
+
+            for (Map.Entry<String, List<EngineRegistryEntry>> group : byClass.entrySet()) {
+                String engineClass = group.getKey();
+                List<EngineRegistryEntry> entries = group.getValue();
+                engine.SimulationEngine eng = orch.getEngine(engineClass);
+                if (eng == null) {
+                    System.out.println("  SKIP: no registered engine for class '" + engineClass + "'");
+                    continue;
+                }
+                String[] registryIds = entries.stream().map(EngineRegistryEntry::id).toArray(String[]::new);
+                // MCTS engines report full metrics; new engines may not
+                boolean fullMetrics = engineClass.startsWith("mcts-");
+                runEngineComplianceTests(eng, engineClass, registryIds, fullMetrics);
+            }
         });
 
         System.out.println("\n--- Results: " + passed + " passed, " + failed + " failed ---");
@@ -3294,6 +3327,163 @@ public class RuntimeTester {
                 assertTrue("weight <= 1 for " + f.category + " on " + opt.project.getId(),
                         f.weight <= 1.0 + 1e-9);
             }
+        }
+    }
+
+    // =========================================================================
+    // Generic Engine Compliance Tests
+    // =========================================================================
+
+    /**
+     * Runs the standard engine compliance test suite against any {@link SimulationEngine}.
+     *
+     * <h2>Tier 1 — Universal (every engine must pass)</h2>
+     * <ol>
+     *   <li>{@code evaluate()} returns non-null {@link EngineResult}</li>
+     *   <li>{@code rankedOptions} is non-empty</li>
+     *   <li>{@code rankedOptions} contains the {@code _wait_} save sentinel</li>
+     *   <li>Scores are non-increasing (sorted best→worst)</li>
+     *   <li>{@code affordable} flag matches {@code player.getCoins() >= card.getCost()}</li>
+     *   <li>{@code iterationsUsed >= 0}</li>
+     *   <li>{@code computeTimeMs >= 0}</li>
+     *   <li>Obvious winning move: 3 landmarks + 22 coins → recommends Funkturm</li>
+     *   <li>Engine's {@code id()} matches at least one registry entry's {@code engineClass}</li>
+     * </ol>
+     *
+     * <h2>Tier 2 — Metrics (engines reporting full metric maps)</h2>
+     * <ol start="10">
+     *   <li>Top option has all 14 mandatory metric keys</li>
+     *   <li>Confidence ∈ [0,1] or NaN</li>
+     * </ol>
+     *
+     * <h2>Tier 3 — Performance</h2>
+     * <ol start="12">
+     *   <li>500-iteration eval completes in &lt; 10,000ms</li>
+     *   <li>Registry entries exist for all declared IDs</li>
+     * </ol>
+     *
+     * @param engine       the engine instance to test
+     * @param engineLabel  label for test messages (typically the engineClass id)
+     * @param registryIds  expected registry entry IDs for this engine
+     * @param fullMetrics  true to run Tier 2 (metric key completeness) assertions
+     */
+    private static void runEngineComplianceTests(SimulationEngine engine, String engineLabel,
+                                                  String[] registryIds, boolean fullMetrics) {
+        String tag = "[" + engineLabel + "] ";
+        core.GameState gs = core.GameState.initial(2);
+        EngineConfig cfg = EngineConfig.ofIterations(500);
+
+        // ---- Tier 1: Universal ----
+
+        // 1. evaluate() returns non-null
+        EngineResult result = engine.evaluate(gs, 0, cfg);
+        assertTrue(tag + "evaluate() returns non-null", result != null);
+        if (result == null) return; // can't continue
+
+        // 2. rankedOptions non-empty
+        assertTrue(tag + "rankedOptions is non-empty", !result.rankedOptions.isEmpty());
+
+        // 3. Contains save sentinel (_wait_)
+        boolean hasSave = result.rankedOptions.stream()
+                .anyMatch(o -> "_wait_".equals(o.project.getId()));
+        assertTrue(tag + "rankedOptions contains _wait_ save sentinel", hasSave);
+
+        // 4. Scores non-increasing
+        boolean sorted = true;
+        for (int i = 1; i < result.rankedOptions.size(); i++) {
+            if (result.rankedOptions.get(i).score > result.rankedOptions.get(i - 1).score + 1e-9) {
+                sorted = false;
+                break;
+            }
+        }
+        assertTrue(tag + "scores are non-increasing (sorted best→worst)", sorted);
+
+        // 5. affordable flag matches coins >= cost
+        int coins = gs.getPlayers()[0].getCoins();
+        for (EngineResult.Option opt : result.rankedOptions) {
+            if ("_wait_".equals(opt.project.getId())) continue;
+            boolean expected = coins >= opt.project.getCost();
+            assertTrue(tag + "affordable flag correct for " + opt.project.getId(),
+                    opt.affordable == expected);
+        }
+
+        // 6. iterationsUsed >= 0
+        assertTrue(tag + "iterationsUsed >= 0 (was " + result.iterationsUsed + ")",
+                result.iterationsUsed >= 0);
+
+        // 7. computeTimeMs >= 0
+        assertTrue(tag + "computeTimeMs >= 0 (was " + result.computeTimeMs + ")",
+                result.computeTimeMs >= 0);
+
+        // 8. Obvious winning move: 3 landmarks + 22 coins → Funkturm
+        core.Project bahnhof   = core.ProjectLoader.getProject("bahnhof").orElseThrow();
+        core.Project einkauf   = core.ProjectLoader.getProject("einkaufszentrum").orElseThrow();
+        core.Project freizeit  = core.ProjectLoader.getProject("freizeitpark").orElseThrow();
+        core.Project funkturm  = core.ProjectLoader.getProject("funkturm").orElseThrow();
+        core.Project weizen    = core.ProjectLoader.getProject("weizenfeld").orElseThrow();
+        core.Project baeckerei = core.ProjectLoader.getProject("bäckerei").orElseThrow();
+
+        java.util.ArrayList<core.Project> owned0 = new java.util.ArrayList<>();
+        owned0.add(weizen); owned0.add(baeckerei);
+        owned0.add(bahnhof); owned0.add(einkauf); owned0.add(freizeit);
+        java.util.ArrayList<core.Project> owned1 = new java.util.ArrayList<>();
+        owned1.add(weizen); owned1.add(baeckerei);
+        java.util.ArrayList<core.Project> unbuilt = new java.util.ArrayList<>();
+        unbuilt.add(funkturm);
+
+        core.Player p0 = new core.Player("Alice", 22, owned0);
+        core.Player p1 = new core.Player("Bob",    3, owned1);
+        core.GameState winGs = new core.GameState(new core.Player[]{p0, p1}, unbuilt);
+        EngineResult winResult = engine.evaluate(winGs, 0, cfg);
+        String topId = winResult.topRecommendation().project.getId();
+        assertTrue(tag + "obvious winning move is Funkturm", "funkturm".equals(topId));
+
+        // 9. Engine id matches at least one registry entry's engineClass
+        boolean foundInRegistry = false;
+        for (EngineRegistryEntry entry : EngineRegistry.getAll()) {
+            if (entry.engineClass().equals(engine.id())) {
+                foundInRegistry = true;
+                break;
+            }
+        }
+        assertTrue(tag + "engine id '" + engine.id() + "' found in registry", foundInRegistry);
+
+        // ---- Tier 2: Metrics (optional) ----
+        if (fullMetrics) {
+            EngineResult.Option top = result.topRecommendation();
+            assertTrue(tag + "top option has non-null metrics map", top.metrics != null);
+            if (top.metrics != null) {
+                String[] required = {
+                    "winRate", "confidence", "visitCount",
+                    "immediateEV", "evPerRound", "roiOverHorizon",
+                    "winProbDelta", "portfolioDeltaEV", "variance",
+                    "probNoIncomeOwnTurn", "probNoIncomeRound",
+                    "cost", "turnsToWin", "tempoAdvantage"
+                };
+                for (String key : required) {
+                    assertTrue(tag + "metrics contains key '" + key + "'",
+                            top.metrics.containsKey(key));
+                }
+            }
+
+            // Confidence in [0,1] or NaN
+            assertTrue(tag + "confidence in [0,1] or NaN",
+                    Double.isNaN(result.confidence)
+                    || (result.confidence >= 0.0 && result.confidence <= 1.0));
+        }
+
+        // ---- Tier 3: Performance ----
+
+        // 12. 500-iteration eval < 10,000ms (already timed above, but let's do it explicitly)
+        long start = System.currentTimeMillis();
+        engine.evaluate(gs, 0, cfg);
+        long elapsed = System.currentTimeMillis() - start;
+        assertTrue(tag + "500-iter eval < 10,000ms (was " + elapsed + "ms)", elapsed < 10_000);
+
+        // 13. Registry entries exist for all declared IDs
+        for (String rid : registryIds) {
+            assertTrue(tag + "registry entry '" + rid + "' exists",
+                    EngineRegistry.findById(rid).isPresent());
         }
     }
 

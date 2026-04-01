@@ -14,12 +14,64 @@ import java.util.List;
  * <h2>Usage</h2>
  * <ol>
  *   <li>Iterate {@link #rankedOptions} from index 0 (best) to N (worst).</li>
- *   <li>The first entry is the top recommendation; use its {@link Option#explanationFactors}
- *       for expandable detail in the UI.</li>
+ *   <li>The first entry is the top recommendation; use its {@link Option#structuredFactors}
+ *       for expandable detail in the UI, or {@link Option#explanationFactors} for flat strings.</li>
  *   <li>Check {@link #iterationsUsed} and {@link #computeTimeMs} for quality indicators.</li>
  * </ol>
  */
 public final class EngineResult {
+
+    // -------------------------------------------------------------------------
+    // ExplanationFactor — structured, weighted explanation entry
+    // -------------------------------------------------------------------------
+
+    /**
+     * A single weighted explanation factor for a purchase recommendation.
+     *
+     * <p>Factors are generated per-option and sorted by {@link #weight} descending.
+     * The UI renders them as expandable bullet points: the {@link #summary} is always
+     * visible; clicking expands to show {@link #detail}.
+     *
+     * <h2>Categories</h2>
+     * Categories are free-form strings so engines can define their own. Known categories:
+     * {@code "winRate"}, {@code "income"}, {@code "synergy"}, {@code "risk"},
+     * {@code "tempo"}, {@code "landmark"}, {@code "scarcity"}, {@code "coverage"},
+     * {@code "cost"}.
+     */
+    public static final class ExplanationFactor {
+
+        /** Category label (e.g. "synergy", "risk", "tempo"). */
+        public final String category;
+
+        /**
+         * Relative importance of this factor for this recommendation, in [0, 1].
+         * Higher = more important. Factors are sorted by weight descending.
+         * Weight represents how much this metric differentiates this option from the average.
+         */
+        public final double weight;
+
+        /** One-line summary (e.g. "Synergy: +1.3 EV/round with 2 Bauernhöfe"). */
+        public final String summary;
+
+        /** Multi-sentence breakdown for the expandable detail view. */
+        public final String detail;
+
+        public ExplanationFactor(String category, double weight, String summary, String detail) {
+            this.category = category;
+            this.weight   = weight;
+            this.summary  = summary;
+            this.detail   = detail != null ? detail : "";
+        }
+
+        @Override
+        public String toString() {
+            return String.format("[%.2f] %s: %s", weight, category, summary);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Option — a single evaluated purchase candidate
+    // -------------------------------------------------------------------------
 
     /**
      * A single evaluated purchase option within a ranked result set.
@@ -37,10 +89,23 @@ public final class EngineResult {
 
         /**
          * Human-readable factors that contributed to this score, ordered by magnitude.
-         * Each entry is a short phrase like "High EV on own turn (+2.4¢/turn)" or
-         * "Win-probability boost +4.2%". May be empty but never null.
+         * Each entry is a short phrase derived from {@link #structuredFactors} summaries.
+         * May be empty but never null. Kept for backward compatibility.
          */
         public final List<String> explanationFactors;
+
+        /**
+         * Structured explanation factors with categories, weights, and expandable detail.
+         * Sorted by weight descending (highest-impact factor first).
+         * May be empty but never null.
+         */
+        public final List<ExplanationFactor> structuredFactors;
+
+        /**
+         * One-line recommendation summary (e.g. "Buy Käsefabrik — strongest synergy
+         * with your 2 Bauernhöfe"). May be null if the engine does not generate summaries.
+         */
+        public final String summarySentence;
 
         /**
          * Optional per-metric breakdown for power-user display (e.g. immediateEV, variance,
@@ -54,14 +119,29 @@ public final class EngineResult {
          */
         public final boolean affordable;
 
+        /**
+         * Full constructor with structured factors and summary sentence.
+         */
         public Option(Project project, double score, List<String> explanationFactors,
+                      List<ExplanationFactor> structuredFactors, String summarySentence,
                       java.util.Map<String, String> metrics, boolean affordable) {
             this.project            = project;
             this.score              = score;
             this.explanationFactors = explanationFactors != null
                     ? List.copyOf(explanationFactors) : List.of();
+            this.structuredFactors  = structuredFactors != null
+                    ? List.copyOf(structuredFactors) : List.of();
+            this.summarySentence    = summarySentence;
             this.metrics            = metrics;
             this.affordable         = affordable;
+        }
+
+        /**
+         * Backward-compatible constructor without structured factors.
+         */
+        public Option(Project project, double score, List<String> explanationFactors,
+                      java.util.Map<String, String> metrics, boolean affordable) {
+            this(project, score, explanationFactors, null, null, metrics, affordable);
         }
     }
 

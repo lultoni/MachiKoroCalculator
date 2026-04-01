@@ -323,6 +323,15 @@ public class RuntimeTester {
             test_session_rejects_duplicate_purple_purchase();
         });
 
+        runSection("Phase 5 Explanation Model", () -> {
+            test_explanation_factor_construction();
+            test_explanation_factor_toString();
+            test_option_structured_factors_immutable();
+            test_option_backward_compat_constructor();
+            test_option_null_structured_factors_default_empty();
+            test_engine_result_top_recommendation();
+        });
+
         System.out.println("\n--- Results: " + passed + " passed, " + failed + " failed ---");
 
         if (failed > 0) {
@@ -2971,6 +2980,103 @@ public class RuntimeTester {
             System.out.println("  FAIL: " + label + " — expected [" + expected + "] got [" + actual + "]");
             failed++;
         }
+    }
+
+    // =========================================================================
+    // Phase 5 Explanation Model Tests
+    // =========================================================================
+
+    private static void test_explanation_factor_construction() {
+        EngineResult.ExplanationFactor f = new EngineResult.ExplanationFactor(
+                "synergy", 0.82, "Synergy: +1.3 EV/round with 2 Bauernhöfe", "Detailed breakdown here.");
+        assertEq("category is synergy", "synergy", f.category);
+        assertDoubleEq("weight is 0.82", 0.82, f.weight, 0.001);
+        assertEq("summary matches", "Synergy: +1.3 EV/round with 2 Bauernhöfe", f.summary);
+        assertEq("detail matches", "Detailed breakdown here.", f.detail);
+    }
+
+    private static void test_explanation_factor_toString() {
+        EngineResult.ExplanationFactor f = new EngineResult.ExplanationFactor(
+                "risk", 0.50, "Low variance", null);
+        String s = f.toString();
+        assertTrue("toString contains weight", s.contains("0.50"));
+        assertTrue("toString contains category", s.contains("risk"));
+        assertTrue("toString contains summary", s.contains("Low variance"));
+        // null detail should default to ""
+        assertEq("null detail defaults to empty string", "", f.detail);
+    }
+
+    private static void test_option_structured_factors_immutable() {
+        core.Project p = core.ProjectLoader.getProject("weizenfeld").orElseThrow();
+        java.util.List<EngineResult.ExplanationFactor> factors = new java.util.ArrayList<>();
+        factors.add(new EngineResult.ExplanationFactor("income", 0.9, "High EV", "Detail"));
+        factors.add(new EngineResult.ExplanationFactor("risk", 0.3, "Low risk", "Detail"));
+
+        EngineResult.Option opt = new EngineResult.Option(
+                p, 0.65, java.util.List.of("High EV", "Low risk"),
+                factors, "Buy Weizenfeld — high income",
+                null, true);
+
+        assertEq("structuredFactors has 2 entries", 2, opt.structuredFactors.size());
+        assertEq("summarySentence set", "Buy Weizenfeld — high income", opt.summarySentence);
+
+        // Verify immutability — mutating the original list must not affect the option
+        factors.add(new EngineResult.ExplanationFactor("tempo", 0.1, "x", "y"));
+        assertEq("structuredFactors still has 2 after external mutation", 2, opt.structuredFactors.size());
+
+        // Verify the list itself is unmodifiable
+        boolean threw = false;
+        try {
+            opt.structuredFactors.add(new EngineResult.ExplanationFactor("x", 0.0, "x", "x"));
+        } catch (UnsupportedOperationException e) {
+            threw = true;
+        }
+        assertTrue("structuredFactors list is unmodifiable", threw);
+    }
+
+    private static void test_option_backward_compat_constructor() {
+        core.Project p = core.ProjectLoader.getProject("bäckerei").orElseThrow();
+        EngineResult.Option opt = new EngineResult.Option(
+                p, 0.42, java.util.List.of("Factor A"), null, true);
+
+        assertEq("backward compat: structuredFactors is empty list", 0, opt.structuredFactors.size());
+        assertEq("backward compat: summarySentence is null", null, opt.summarySentence);
+        assertEq("backward compat: explanationFactors has 1 entry", 1, opt.explanationFactors.size());
+        assertTrue("backward compat: affordable is true", opt.affordable);
+    }
+
+    private static void test_option_null_structured_factors_default_empty() {
+        core.Project p = core.ProjectLoader.getProject("stadion").orElseThrow();
+        EngineResult.Option opt = new EngineResult.Option(
+                p, 0.30, null, null, null, null, false);
+
+        assertEq("null explanationFactors defaults to empty", 0, opt.explanationFactors.size());
+        assertEq("null structuredFactors defaults to empty", 0, opt.structuredFactors.size());
+        assertEq("null summarySentence stays null", null, opt.summarySentence);
+        assertTrue("affordable is false", !opt.affordable);
+    }
+
+    private static void test_engine_result_top_recommendation() {
+        core.Project p1 = core.ProjectLoader.getProject("weizenfeld").orElseThrow();
+        core.Project p2 = core.ProjectLoader.getProject("bäckerei").orElseThrow();
+
+        EngineResult.ExplanationFactor f1 = new EngineResult.ExplanationFactor("income", 0.9, "Best", "");
+        EngineResult.ExplanationFactor f2 = new EngineResult.ExplanationFactor("income", 0.3, "OK", "");
+
+        EngineResult.Option opt1 = new EngineResult.Option(
+                p1, 0.80, java.util.List.of("Best"),
+                java.util.List.of(f1), "Buy Weizenfeld", null, true);
+        EngineResult.Option opt2 = new EngineResult.Option(
+                p2, 0.40, java.util.List.of("OK"),
+                java.util.List.of(f2), "Buy Bäckerei", null, true);
+
+        EngineResult result = new EngineResult(
+                java.util.List.of(opt1, opt2), 0.95, 1000, 50L, "test");
+
+        assertEq("topRecommendation is first option", p1, result.topRecommendation().project);
+        assertEq("rankedOptions has 2 entries", 2, result.rankedOptions.size());
+        assertDoubleEq("confidence is 0.95", 0.95, result.confidence, 0.001);
+        assertEq("iterationsUsed is 1000", 1000, result.iterationsUsed);
     }
 
     private static void assertDoubleEq(String label, double expected, double actual, double tol) {

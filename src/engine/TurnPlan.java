@@ -122,7 +122,7 @@ public final class TurnPlan {
                 MctsNode rollChild = MctsTree.navigateToRoll(rerollCN, newRoll);
                 if (rollChild != null) {
                     currentNode = rollChild;
-                    extractRemainingDecisions();
+                    extractRemainingDecisions(true);
                     return;
                 }
             }
@@ -136,29 +136,50 @@ public final class TurnPlan {
     // -------------------------------------------------------------------------
 
     private void extractRemainingDecisions() {
+        extractRemainingDecisions(false);
+    }
+
+    private void extractRemainingDecisions(boolean afterReroll) {
         // Walk through node chain: FunkturmNode? → BürohausNode? → BuyDecisionNode
 
         if (currentNode instanceof FunkturmNode fn) {
-            hasFunkturmChoice = true;
-            MctsNode bestFn = MctsTree.bestChild(fn);
-            if (bestFn != null) {
-                int idx = fn.getChildren().indexOf(bestFn);
-                funkturmKeep = (idx == 0); // child 0 = keep, child 1 = reroll
-            } else {
-                funkturmKeep = true;
-            }
-
-            if (!funkturmKeep) {
-                // Reroll chosen — caller must roll again and call navigateReroll()
+            if (!fn.expanded || fn.getChildren().isEmpty()) {
+                // Unexpanded FunkturmNode — default to keep/save
+                purchase = RankEntry.WAIT_SENTINEL;
                 return;
             }
 
-            // Keep: advance to keep child
-            currentNode = fn.getChildren().get(0);
+            if (afterReroll) {
+                // After a reroll, the tree may create another FunkturmNode on the reroll
+                // branch. Funkturm can only be used once per turn — force "keep".
+                currentNode = fn.getChildren().get(0);
+            } else {
+                hasFunkturmChoice = true;
+                MctsNode bestFn = MctsTree.bestChild(fn);
+                if (bestFn != null) {
+                    int idx = fn.getChildren().indexOf(bestFn);
+                    funkturmKeep = (idx == 0); // child 0 = keep, child 1 = reroll
+                } else {
+                    funkturmKeep = true;
+                }
+
+                if (!funkturmKeep) {
+                    // Reroll chosen — caller must roll again and call navigateReroll()
+                    return;
+                }
+
+                // Keep: advance to keep child
+                currentNode = fn.getChildren().get(0);
+            }
         }
 
         if (currentNode instanceof BürohausNode bn) {
             hasBürohausChoice = true;
+            if (!bn.expanded || bn.getChildren().isEmpty()) {
+                // Unexpanded — no swap, fall through to buy default
+                purchase = RankEntry.WAIT_SENTINEL;
+                return;
+            }
             MctsNode bestBn = MctsTree.bestChild(bn);
             if (bestBn != null) {
                 int bestIdx = bn.getChildren().indexOf(bestBn);
@@ -177,6 +198,11 @@ public final class TurnPlan {
         }
 
         if (currentNode instanceof BuyDecisionNode buyNode) {
+            if (!buyNode.expanded || buyNode.getChildren().isEmpty()) {
+                purchase = RankEntry.WAIT_SENTINEL;
+                purchaseWinRate = 0.0;
+                return;
+            }
             MctsNode bestBuy = MctsTree.bestChild(buyNode);
             if (bestBuy != null) {
                 purchase = inferPurchase(buyNode, bestBuy);

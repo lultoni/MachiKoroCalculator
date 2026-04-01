@@ -330,7 +330,10 @@ export function GameScreen({ session, settings, updateSettings, projects, hover 
               const totalOwned = s.state.players.reduce(
                 (sum, pl) => sum + pl.ownedIds.filter(id => id === p.id).length, 0
               );
-              const remaining = 6 - totalOwned;
+              // Starter cards (weizenfeld, bäckerei) are outside the 6-copy market pool
+              const starterCopies = (p.id === 'weizenfeld' || p.id === 'bäckerei')
+                ? s.state.players.length : 0;
+              const remaining = 6 - (totalOwned - starterCopies);
               return (
                 <div
                   key={p.id}

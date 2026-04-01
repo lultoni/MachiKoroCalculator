@@ -8,6 +8,23 @@ public class GameState {
     /** Market supply copies per non-landmark card in the base game. */
     public static final int SUPPLY_PER_CARD = 6;
 
+    /** Card IDs that each player receives one copy of at game start (outside the market supply). */
+    private static final java.util.Set<String> STARTER_CARD_IDS =
+            java.util.Set.of("weizenfeld", "bäckerei");
+
+    /**
+     * Returns the number of starter copies of the given card that exist outside the market supply.
+     * In Machi Koro, each player starts with 1 Weizenfeld and 1 Bäckerei — these are separate
+     * from the 6-copy shared market pool.
+     *
+     * @param cardId     card ID
+     * @param numPlayers number of players (2–4)
+     * @return number of starter copies (0 for most cards; numPlayers for weizenfeld/bäckerei)
+     */
+    public static int starterCopies(String cardId, int numPlayers) {
+        return STARTER_CARD_IDS.contains(cardId) ? numPlayers : 0;
+    }
+
     private final Player[] players;
     /**
      * List of card types available for purchase in the current game state.

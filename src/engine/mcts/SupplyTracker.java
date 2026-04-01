@@ -16,9 +16,9 @@ import java.util.Map;
  *
  * <p>Landmarks have no supply limit and are NOT tracked here.
  *
- * <p>Starting cards (weizenfeld, bäckerei) are each owned one copy per player outside
- * the 6-copy shared pool, so their player-owned copies ARE subtracted from the supply
- * (each player's starter copy occupies one of the 6 market slots).
+ * <p>Starting cards (weizenfeld, bäckerei) are given to each player outside the 6-copy
+ * market pool — they do NOT count against the supply. Only purchased copies reduce
+ * the market count.
  *
  * <h2>Immutability</h2>
  * Every mutation operation returns a new {@code SupplyTracker}; the original is unchanged.
@@ -38,12 +38,14 @@ public final class SupplyTracker {
 
     /**
      * Builds a SupplyTracker from a live game state by counting owned copies across
-     * all players and subtracting from {@link GameState#SUPPLY_PER_CARD}.
+     * all players, subtracting starter copies (which are outside the market pool),
+     * and computing remaining market supply.
      *
      * @param state current game state
-     * @return supply tracker reflecting current ownership
+     * @return supply tracker reflecting current market availability
      */
     public static SupplyTracker fromGameState(GameState state) {
+        int numPlayers = state.getPlayers().length;
         // Start with full supply for every non-landmark card
         Map<String, Integer> counts = new HashMap<>();
         for (Project p : ProjectLoader.getAllProjects()) {
@@ -51,12 +53,19 @@ public final class SupplyTracker {
                 counts.put(p.getId(), GameState.SUPPLY_PER_CARD);
             }
         }
-        // Subtract owned copies
+        // Subtract owned copies, but NOT starter copies (they are outside the market pool)
         for (Player player : state.getPlayers()) {
             for (Project p : player.getOwned_projects()) {
                 if (!p.isIs_grossprojekt()) {
                     counts.merge(p.getId(), -1, Integer::sum);
                 }
+            }
+        }
+        // Add back starter copies (they don't come from the market)
+        for (String cardId : counts.keySet()) {
+            int starters = GameState.starterCopies(cardId, numPlayers);
+            if (starters > 0) {
+                counts.merge(cardId, starters, Integer::sum);
             }
         }
         // Clamp negatives to 0 (safety)

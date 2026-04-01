@@ -93,8 +93,8 @@ public class GameStateBuilder {
 
     /**
      * Builds and returns the {@link GameState}.
-     * The unbuilt_projects pool is all non-landmark card types where total copies owned
-     * across all players is less than {@link GameState#SUPPLY_PER_CARD}.
+     * The unbuilt_projects pool is all non-landmark card types where purchased copies
+     * (total owned minus starter copies) is less than {@link GameState#SUPPLY_PER_CARD}.
      */
     public GameState build() {
         Player[] players = new Player[numPlayers];
@@ -115,7 +115,9 @@ public class GameStateBuilder {
         for (Project p : allProjects) {
             if (p.isIs_grossprojekt()) continue;  // landmarks never go in the unbuilt pool
             int count = ownedCount.getOrDefault(p.getId(), 0);
-            if (count < GameState.SUPPLY_PER_CARD) unbuilt.add(p);
+            int starters = GameState.starterCopies(p.getId(), numPlayers);
+            int purchased = count - starters;
+            if (purchased < GameState.SUPPLY_PER_CARD) unbuilt.add(p);
         }
 
         return new GameState(players, unbuilt);

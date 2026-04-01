@@ -24,7 +24,7 @@ The Core layer owns everything determined by game rules or card effects:
 - Income clamping (can't pay more than you have)
 - Counter-clockwise resolution for multiple red claims
 - Card supply tracking (6 copies per non-landmark; 1 purple per player)
-- Starting cards: each player begins with 1 Weizenfeld + 1 Bäckerei (these count against the 6-copy supply)
+- Starting cards: each player begins with 1 Weizenfeld + 1 Bäckerei (these are separate from the 6-copy market supply)
 - Card purchase validation (enough coins, card available, purple uniqueness)
 - Mechanical landmark effects: Freizeitpark doubles → bonus turn, Einkaufszentrum +1 coin per green/red store card
 - Turn order progression
@@ -201,7 +201,7 @@ gain = min(5, max(opponent_coins))
 
 ### 4.5 Card Supply
 
-Non-landmark establishments have 6 copies in the base game. Starting cards (Weizenfeld, Bäckerei) given to players count against the 6-copy supply pool — each player's starter copy occupies one of the 6 market slots (e.g., in a 2-player game, 4 copies of each remain purchasable). `GameStateBuilder.build()` counts all owned copies across all players and removes a card type from `unbuilt_projects` when total copies reach 6.
+Non-landmark establishments have 6 copies in the base game market. Starting cards (Weizenfeld, Bäckerei) given to players at game start are **separate** from the 6-copy market pool — they do not reduce the purchasable supply. In a 2-player game, all 6 market copies of Weizenfeld and Bäckerei remain available. `GameState.starterCopies()` returns the number of starter copies per card type; `SupplyTracker.fromGameState()` and `GameStateBuilder.build()` subtract only purchased copies (total owned minus starters) when computing remaining supply.
 
 ---
 

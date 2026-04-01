@@ -6,6 +6,16 @@ Implementation history: what was built, why, and which design decisions were mad
 
 ## Phase 7: Iteration
 
+### 7.14 — Fix Supply Count: Starter Cards Separate from Market
+
+Starting cards (Weizenfeld, Bäckerei) are given to each player at game start **outside** the 6-copy market supply pool, per official Machi Koro rules. Previously, the codebase incorrectly counted these starter copies against the supply, showing 4 remaining instead of 6 in a 2-player game.
+
+**Root cause:** `SupplyTracker.fromGameState()` subtracted all owned copies from 6, including starters. The same error existed in `GameSession.applyTurn()` (pool removal threshold), `GameStateBuilder.build()` (unbuilt pool construction), `MatchRunner.updateSupply()` (H2H games), and the frontend supply sidebar.
+
+**Fix:** Added `GameState.starterCopies(cardId, numPlayers)` — returns `numPlayers` for weizenfeld/bäckerei, 0 for all other cards. All supply calculations now subtract only purchased copies (`totalOwned - starterCopies`) from the 6-copy market pool. Updated 6 source files, corrected supply tracker tests, and fixed incorrect documentation in ARCHITECTURE.md and SupplyTracker Javadoc.
+
+This affects engine simulations (MCTS, Flat MC, Heuristic EV) — they now correctly see more Weizenfeld/Bäckerei available for purchase, which may shift early-game recommendations.
+
 ### 7.13 — Web UI Polish (Round 2)
 
 Second round of UI improvements from gameplay testing:
@@ -37,7 +47,7 @@ Nine UI bugs found during real gameplay testing, fixed in one batch:
 8. **Buy button sending "_wait_" as project ID:** Backend rejected `"_wait_"` as unknown project. Fixed by mapping `_wait_` to `null` in `handleBuy`.
 9. **No coin flow during opponent turns:** Added live coin delta display per player when opponent dice are selected, using the `/api/roll` preview endpoint.
 
-Supply sidebar showing 4 remaining for Weizenfeld/Bäckerei in 2-player game is **correct** per official rules (starters count against 6-copy supply).
+**Note:** The claim in 7.12 that "4 remaining is correct" was wrong — see 7.14 for the fix.
 
 ### 7.8–7.11 — Engine Compliance Suite + New Engine Types
 

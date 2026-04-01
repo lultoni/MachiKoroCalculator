@@ -176,6 +176,7 @@ Build the engine comparison and validation framework. Used both during Phase 3 v
 | 7.11 | Static TurnPlan support: `TurnPlan.staticPlan()` factory for non-MCTS engines to participate in H2H matches with heuristic dice/purchase decisions. | done |
 | 7.12 | Web UI bug fixes: settings overflow, CoinFlowDisplay not updating, _wait_ display/duplicates, engine metadata, cost factor inversion, missing starter cards in ranked list, buy button, opponent coin flow. | done |
 | 7.13 | Web UI polish (round 2): column tooltips for all metrics, color gradients on score/cost/ETW columns, settings engine detail panel (description/tier/iterations/params), CoinFlowDisplay hover jitter fix, re-evaluate on engine switch, H2H per-engine iteration display with optional override, expose tier/description in engine API. | done |
+| 7.14 | Fix supply count: starter cards (Weizenfeld, Bäckerei) are separate from the 6-copy market pool. Added `GameState.starterCopies()`, fixed SupplyTracker, GameSession, GameStateBuilder, MatchRunner, and frontend sidebar. | done |
 
 ---
 

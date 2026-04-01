@@ -98,14 +98,17 @@ public class GameSession {
                 if (!state.getUnbuilt_projects().contains(card))
                     throw new IllegalArgumentException(
                             "Card " + card.getId() + " is not in the unbuilt pool");
-                // Remove from pool only when all physical copies are now owned
+                // Remove from pool only when all market copies are now owned.
+                // Starter copies (weizenfeld, bäckerei) are outside the market pool.
                 int totalOwned = 0;
                 for (Player p : players) {
                     for (Project owned : p.getOwned_projects()) {
                         if (owned.getId().equals(card.getId())) totalOwned++;
                     }
                 }
-                if (totalOwned >= GameState.SUPPLY_PER_CARD) {
+                int starters = GameState.starterCopies(card.getId(), players.length);
+                int purchasedCopies = totalOwned - starters;
+                if (purchasedCopies >= GameState.SUPPLY_PER_CARD) {
                     state.getUnbuilt_projects().remove(card);
                 }
             }

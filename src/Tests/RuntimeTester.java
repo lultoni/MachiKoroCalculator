@@ -1889,11 +1889,12 @@ public class RuntimeTester {
         }
         assertTrue("supply tracker: all non-landmark cards have non-negative count", allNonLandmarksPresent);
 
-        // Starter cards: weizenfeld and bäckerei each owned by 2 players → 6 - 2 = 4 remain
+        // Starter cards: weizenfeld and bäckerei each owned by 2 players, but starter copies
+        // are outside the 6-copy market pool → all 6 market copies remain at game start
         int weizenCount   = tracker.getCount("weizenfeld");
         int bäckereiCount = tracker.getCount("bäckerei");
-        assertEq("supply tracker: weizenfeld has 4 remaining in 2-player game", 4, weizenCount);
-        assertEq("supply tracker: bäckerei has 4 remaining in 2-player game", 4, bäckereiCount);
+        assertEq("supply tracker: weizenfeld has 6 remaining in 2-player game", 6, weizenCount);
+        assertEq("supply tracker: bäckerei has 6 remaining in 2-player game", 6, bäckereiCount);
 
         // A card no player owns (bergwerk) should have full supply
         int bergwerkCount = tracker.getCount("bergwerk");

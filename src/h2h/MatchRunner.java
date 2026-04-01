@@ -306,7 +306,8 @@ public final class MatchRunner {
 
     /**
      * Updates the unbuilt_projects list when a non-landmark card is purchased.
-     * If all SUPPLY_PER_CARD copies are now owned, removes the card type from the list.
+     * If all SUPPLY_PER_CARD market copies are now owned, removes the card type from the list.
+     * Starter copies (weizenfeld, bäckerei) are outside the market pool and not counted.
      */
     private void updateSupply(GameState state, Project purchased, int playerCount) {
         int ownedCount = 0;
@@ -315,7 +316,9 @@ public final class MatchRunner {
                 if (p.getId().equals(purchased.getId())) ownedCount++;
             }
         }
-        if (ownedCount >= GameState.SUPPLY_PER_CARD) {
+        int starters = GameState.starterCopies(purchased.getId(), playerCount);
+        int purchasedCopies = ownedCount - starters;
+        if (purchasedCopies >= GameState.SUPPLY_PER_CARD) {
             state.getUnbuilt_projects().removeIf(p -> p.getId().equals(purchased.getId()));
         }
     }

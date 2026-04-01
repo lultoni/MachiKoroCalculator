@@ -15,6 +15,9 @@ public class CardIncome {
     // Pre-computed probability tables (O(1) lookup)
     // -------------------------------------------------------------------------
 
+    /** Shared empty int array — avoids repeated {@code new int[0]} allocation in hot paths. */
+    public static final int[] EMPTY_INT_ARRAY = new int[0];
+
     /** P1[r] = probability of rolling r with 1d6. Valid indices: 1–6. */
     public static final double[] P1 = new double[13];
 
@@ -310,8 +313,8 @@ public class CardIncome {
     public static double estimateUncappedOwnTurnEV(Player player, boolean hasBahnhof) {
         PlayerStats stats = PlayerStats.of(player);
         IntToDoubleFunction payout = r -> {
-            int blue  = sumColorIncome(player, "blau", r, stats, 99, new int[0]);
-            int green = sumColorIncome(player, "grün", r, stats, 99, new int[0]);
+            int blue  = sumColorIncome(player, "blau", r, stats, 99, EMPTY_INT_ARRAY);
+            int green = sumColorIncome(player, "grün", r, stats, 99, EMPTY_INT_ARRAY);
             return blue + green;
         };
         return bestDiceEV(hasBahnhof, payout);

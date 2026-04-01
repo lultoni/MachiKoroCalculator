@@ -228,8 +228,8 @@ public final class MctsRollout {
 
         active.getOwned_projects().remove(ownCard);
         state.getPlayers()[oppPlayerIdx].getOwned_projects().remove(oppCard);
-        active.getOwned_projects().add(oppCard);
-        state.getPlayers()[oppPlayerIdx].getOwned_projects().add(ownCard);
+        active.addProject(oppCard);
+        state.getPlayers()[oppPlayerIdx].addProject(ownCard);
     }
 
     /**
@@ -274,7 +274,7 @@ public final class MctsRollout {
         if (card == RankEntry.WAIT_SENTINEL) return; // save: no-op
 
         active.setCoins(active.getCoins() - card.getCost());
-        active.getOwned_projects().add(card);
+        active.addProject(card);
         if (!isLandmark) {
             supply.purchase(card.getId());
         }

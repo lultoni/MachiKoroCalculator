@@ -280,7 +280,7 @@ public final class MatchRunner {
             Player active = state.getPlayers()[activePlayer];
             if (active.getCoins() >= cost) {
                 active.setCoins(active.getCoins() - cost);
-                active.getOwned_projects().add(purchase);
+                active.addProject(purchase);
                 purchasedCardId = purchase.getId();
 
                 // Update unbuilt_projects if supply exhausted

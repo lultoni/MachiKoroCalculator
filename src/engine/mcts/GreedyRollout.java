@@ -180,7 +180,7 @@ public final class GreedyRollout {
         }
         if (landmarkToBuy != null) {
             active.setCoins(coins - landmarkToBuy.getCost());
-            active.getOwned_projects().add(landmarkToBuy);
+            active.addProject(landmarkToBuy);
             return; // landmarks don't use supply
         }
 
@@ -201,7 +201,7 @@ public final class GreedyRollout {
         }
         if (bestCard != null) {
             active.setCoins(coins - bestCard.getCost());
-            active.getOwned_projects().add(bestCard);
+            active.addProject(bestCard);
             supply.purchase(bestCard.getId());
         }
         // else: save (no-op)

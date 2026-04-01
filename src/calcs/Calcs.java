@@ -188,12 +188,12 @@ public final class Calcs {
             final CardIncome.PlayerStats activeStats = CardIncome.PlayerStats.of(activeP);
             double bluePerOppTurn = 0.0;
             for (int r = 2; r <= 12; r++) {
-                int blueIncome = CardIncome.sumColorIncome(activeP, "blau", r, activeStats, 99, new int[0]);
+                int blueIncome = CardIncome.sumColorIncome(activeP, "blau", r, activeStats, 99, CardIncome.EMPTY_INT_ARRAY);
                 bluePerOppTurn += CardIncome.P2[r] * blueIncome;
             }
             double bluePerOppTurn1d6 = 0.0;
             for (int r = 1; r <= 6; r++) {
-                int blueIncome = CardIncome.sumColorIncome(activeP, "blau", r, activeStats, 99, new int[0]);
+                int blueIncome = CardIncome.sumColorIncome(activeP, "blau", r, activeStats, 99, CardIncome.EMPTY_INT_ARRAY);
                 bluePerOppTurn1d6 += CardIncome.P1[r] * blueIncome;
             }
             bluePerOppTurn = Math.max(bluePerOppTurn, bluePerOppTurn1d6);
@@ -787,7 +787,7 @@ public final class Calcs {
                 if ("rot".equals(p.getColor())) {
                     int loss = CardIncome.get_I(roll, p.getId(), false,
                             oppStats.hasEinkaufszentrum, 0, 0, 0,
-                            remainingCoins, new int[0]);
+                            remainingCoins, CardIncome.EMPTY_INT_ARRAY);
                     if (loss < 0 && -loss > remainingCoins) loss = -remainingCoins;
                     net += loss;
                     remainingCoins += loss;
@@ -836,7 +836,7 @@ public final class Calcs {
                 int rollerLoss = CardIncome.get_I(roll, p.getId(), false,
                         trackedStats.hasEinkaufszentrum,
                         0, 0, 0,
-                        Math.max(0, rollerCoins), new int[0]);
+                        Math.max(0, rollerCoins), CardIncome.EMPTY_INT_ARRAY);
                 net += Math.abs(rollerLoss);
             }
         }

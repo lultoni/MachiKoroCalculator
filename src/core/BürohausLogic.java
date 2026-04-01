@@ -125,8 +125,8 @@ public final class BürohausLogic {
         Player opponent = state.getPlayers()[c.bestOppPlayer()];
         active.getOwned_projects().remove(c.worstOwn());
         opponent.getOwned_projects().remove(c.bestOpp());
-        active.getOwned_projects().add(c.bestOpp());
-        opponent.getOwned_projects().add(c.worstOwn());
+        active.addProject(c.bestOpp());
+        opponent.addProject(c.worstOwn());
     }
 
     /**
@@ -152,13 +152,13 @@ public final class BürohausLogic {
         Player active   = state.getPlayers()[playerIndex];
         Player opponent = state.getPlayers()[oppPlayerIndex];
 
-        if (!active.getOwned_projects().remove(ownCard))
+        if (!active.removeProject(ownCard))
             throw new IllegalArgumentException("Active player does not own: " + ownCard.getId());
-        if (!opponent.getOwned_projects().remove(oppCard))
+        if (!opponent.removeProject(oppCard))
             throw new IllegalArgumentException("Opponent does not own: " + oppCard.getId());
 
-        active.getOwned_projects().add(oppCard);
-        opponent.getOwned_projects().add(ownCard);
+        active.addProject(oppCard);
+        opponent.addProject(ownCard);
     }
 
     // -------------------------------------------------------------------------

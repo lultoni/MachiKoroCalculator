@@ -106,8 +106,8 @@ public final class BürohausNode extends MctsNode {
                 GameState swapped = state.copy();
                 swapped.getPlayers()[activePlayer].getOwned_projects().remove(ownCard);
                 swapped.getPlayers()[oppPlayerIdx].getOwned_projects().remove(oppCard);
-                swapped.getPlayers()[activePlayer].getOwned_projects().add(oppCard);
-                swapped.getPlayers()[oppPlayerIdx].getOwned_projects().add(ownCard);
+                swapped.getPlayers()[activePlayer].addProject(oppCard);
+                swapped.getPlayers()[oppPlayerIdx].addProject(ownCard);
 
                 children.add(reparentAfterBuy(swapped, supply, this));
             }

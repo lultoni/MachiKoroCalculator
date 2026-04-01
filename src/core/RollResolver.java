@@ -37,7 +37,7 @@ public final class RollResolver {
                 if ("rot".equals(p.getColor())) {
                     int loss = CardIncome.get_I(roll, p.getId(), false,
                             oppStats.hasEinkaufszentrum, 0, 0, 0,
-                            rollerCoins, new int[0]);
+                            rollerCoins, CardIncome.EMPTY_INT_ARRAY);
                     if (loss < 0 && -loss > rollerCoins) loss = -rollerCoins;
                     int gain = -loss;
                     deltas[activePlayer] += loss;

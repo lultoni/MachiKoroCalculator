@@ -78,11 +78,7 @@ public class GameState {
      * Returns true if the given player owns all 4 landmarks (win condition).
      */
     public static boolean hasWon(Player player) {
-        int landmarkCount = 0;
-        for (Project p : player.getOwned_projects()) {
-            if (p.isIs_grossprojekt()) landmarkCount++;
-        }
-        return landmarkCount >= 4;
+        return player.getLandmarkCount() >= 4;
     }
 
     /**

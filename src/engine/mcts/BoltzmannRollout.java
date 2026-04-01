@@ -155,7 +155,7 @@ public final class BoltzmannRollout {
         }
         if (landmarkToBuy != null) {
             active.setCoins(coins - landmarkToBuy.getCost());
-            active.getOwned_projects().add(landmarkToBuy);
+            active.addProject(landmarkToBuy);
             return;
         }
 
@@ -204,7 +204,7 @@ public final class BoltzmannRollout {
         if (card == RankEntry.WAIT_SENTINEL) return; // save
 
         active.setCoins(coins - card.getCost());
-        active.getOwned_projects().add(card);
+        active.addProject(card);
         supply.purchase(card.getId());
     }
 

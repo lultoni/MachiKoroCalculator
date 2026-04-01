@@ -126,7 +126,7 @@ public final class BuyDecisionNode extends MctsNode {
         if (!isSave) {
             Player childActive = childState.getPlayers()[activePlayer];
             childActive.setCoins(childActive.getCoins() - card.getCost());
-            childActive.getOwned_projects().add(card);
+            childActive.addProject(card);
             if (!isLandmark) {
                 childSupply = childSupply.withPurchase(card.getId());
             }

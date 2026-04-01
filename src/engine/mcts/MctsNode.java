@@ -34,6 +34,9 @@ public abstract class MctsNode {
     /** Expanded children, in the order they were added. */
     protected final List<MctsNode> children = new ArrayList<>();
 
+    /** Cached unmodifiable view (live — reflects subsequent additions to children). */
+    private List<MctsNode> unmodifiableChildren;
+
     /** Number of times this node has been visited during MCTS. */
     public int visitCount = 0;
 
@@ -55,7 +58,10 @@ public abstract class MctsNode {
 
     /** Returns an unmodifiable view of this node's children. */
     public List<MctsNode> getChildren() {
-        return java.util.Collections.unmodifiableList(children);
+        if (unmodifiableChildren == null) {
+            unmodifiableChildren = java.util.Collections.unmodifiableList(children);
+        }
+        return unmodifiableChildren;
     }
 
     // -------------------------------------------------------------------------

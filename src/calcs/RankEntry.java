@@ -20,7 +20,7 @@ public class RankEntry {
      * Never appears in {@code projects.json}; use {@link #isWaitEntry()} to detect it.
      */
     public static final Project WAIT_SENTINEL = new Project(
-            "_wait_", "wait", false, 0, new int[0], "none",
+            "_wait_", "wait", false, 0, core.CardIncome.EMPTY_INT_ARRAY, "none",
             "Save coins for a better card", "Save coins for a better card", "Save coins for a better card");
 
     /** Returns true if this entry represents the synthetic "Wait/Save" option. */

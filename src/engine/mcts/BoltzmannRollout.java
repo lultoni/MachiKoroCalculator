@@ -170,6 +170,8 @@ public final class BoltzmannRollout {
         for (Project p : state.getUnbuilt_projects()) {
             if (!supply.canPurchase(p.getId())) continue;
             if (coins < p.getCost()) continue;
+            // Purple cards (lila) are unique — max 1 per player per type
+            if ("lila".equals(p.getColor()) && active.hasProject(p.getId())) continue;
             double ev  = Calcs.evPerRound(state, activePlayer, p);
             double roi = ev * Calcs.geometricSum(BOLTZMANN_HORIZON, BOLTZMANN_DISCOUNT) - p.getCost();
             candidates.add(p);

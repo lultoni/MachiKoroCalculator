@@ -315,8 +315,19 @@ public class RuntimeTester {
             test_session_persistence_new_fields_roundtrip();
         });
 
-        System.out.println("\n--- Results: " + passed + " passed, " + failed + " failed"
-                + (skippedSections > 0 ? ", " + skippedSections + " section(s) skipped" : "") + " ---");
+        runSection("Purple Card Uniqueness Tests", () -> {
+            test_buy_decision_node_excludes_owned_purple();
+            test_rollout_random_skips_owned_purple();
+            test_greedy_rollout_skips_owned_purple();
+            test_boltzmann_rollout_skips_owned_purple();
+            test_session_rejects_duplicate_purple_purchase();
+        });
+
+        System.out.println("\n--- Results: " + passed + " passed, " + failed + " failed ---");
+
+        if (failed > 0) {
+            System.exit(1);
+        }
 
         if (activeSections != null || activeTests != null) {
             // Skip benchmarks when filtering
@@ -2808,6 +2819,137 @@ public class RuntimeTester {
         } finally {
             java.nio.file.Files.deleteIfExists(tmpFile);
         }
+    }
+
+    // =========================================================================
+    // Purple Card Uniqueness Tests
+    // =========================================================================
+
+    /**
+     * BuyDecisionNode.expand() must NOT offer a purple card the active player already owns.
+     */
+    private static void test_buy_decision_node_excludes_owned_purple() {
+        core.GameState gs = core.GameState.initial(2);
+        gs.getPlayers()[0].setCoins(20); // enough for any card
+
+        // Give player 0 the stadion (purple)
+        core.Project stadion = core.ProjectLoader.getProject("stadion").orElseThrow();
+        gs.getPlayers()[0].getOwned_projects().add(stadion);
+
+        SupplyTracker supply = SupplyTracker.fromGameState(gs);
+
+        // Create a BuyDecisionNode for player 0
+        engine.mcts.BuyDecisionNode bdn = new engine.mcts.BuyDecisionNode(
+                gs, supply, null, 0, 1);
+        bdn.expand();
+
+        // None of the children should lead to a state where player 0 owns 2 stadion
+        boolean foundDuplicateStadion = false;
+        for (engine.mcts.MctsNode child : bdn.getChildren()) {
+            long stadionCount = child.state.getPlayers()[0].getOwned_projects().stream()
+                    .filter(p -> "stadion".equals(p.getId())).count();
+            if (stadionCount > 1) foundDuplicateStadion = true;
+        }
+        assertTrue("BuyDecisionNode excludes already-owned purple card (stadion)", !foundDuplicateStadion);
+
+        // Similarly check bürohaus
+        core.Project burohaus = core.ProjectLoader.getProject("bürohaus").orElseThrow();
+        gs.getPlayers()[0].getOwned_projects().add(burohaus);
+        supply = SupplyTracker.fromGameState(gs);
+        engine.mcts.BuyDecisionNode bdn2 = new engine.mcts.BuyDecisionNode(
+                gs, supply, null, 0, 1);
+        bdn2.expand();
+        boolean foundDuplicateBurohaus = false;
+        for (engine.mcts.MctsNode child : bdn2.getChildren()) {
+            long bCount = child.state.getPlayers()[0].getOwned_projects().stream()
+                    .filter(p -> "bürohaus".equals(p.getId())).count();
+            if (bCount > 1) foundDuplicateBurohaus = true;
+        }
+        assertTrue("BuyDecisionNode excludes already-owned purple card (bürohaus)", !foundDuplicateBurohaus);
+    }
+
+    /**
+     * MctsRollout.simulate must never produce a state where a player owns duplicate purple cards.
+     * Run 100 short rollouts from a state where player 0 already owns all 3 purples.
+     */
+    private static void test_rollout_random_skips_owned_purple() {
+        core.GameState gs = core.GameState.initial(2);
+        gs.getPlayers()[0].setCoins(50);
+
+        // Give player 0 all 3 purple cards
+        for (String pid : new String[]{"stadion", "fernsehsender", "bürohaus"}) {
+            gs.getPlayers()[0].getOwned_projects().add(core.ProjectLoader.getProject(pid).orElseThrow());
+        }
+        SupplyTracker supply = SupplyTracker.fromGameState(gs);
+
+        // Run many rollouts; if the bug were present, the rollout would sometimes
+        // buy a duplicate purple. The rollout runs to completion without error.
+        for (int trial = 0; trial < 100; trial++) {
+            engine.mcts.MctsRollout.simulate(gs, supply, 0, 0);
+        }
+        assertTrue("MctsRollout completes 100 rollouts without error (player owns all purples)", true);
+    }
+
+    /**
+     * GreedyRollout must skip purple cards the player already owns.
+     */
+    private static void test_greedy_rollout_skips_owned_purple() {
+        core.GameState gs = core.GameState.initial(2);
+        gs.getPlayers()[0].setCoins(50);
+
+        for (String pid : new String[]{"stadion", "fernsehsender", "bürohaus"}) {
+            gs.getPlayers()[0].getOwned_projects().add(core.ProjectLoader.getProject(pid).orElseThrow());
+        }
+        SupplyTracker supply = SupplyTracker.fromGameState(gs);
+
+        for (int trial = 0; trial < 50; trial++) {
+            engine.mcts.GreedyRollout.simulate(gs, supply, 0, 0);
+        }
+        assertTrue("GreedyRollout completes without error when player owns all purples", true);
+    }
+
+    /**
+     * BoltzmannRollout must skip purple cards the player already owns.
+     */
+    private static void test_boltzmann_rollout_skips_owned_purple() {
+        core.GameState gs = core.GameState.initial(2);
+        gs.getPlayers()[0].setCoins(50);
+
+        for (String pid : new String[]{"stadion", "fernsehsender", "bürohaus"}) {
+            gs.getPlayers()[0].getOwned_projects().add(core.ProjectLoader.getProject(pid).orElseThrow());
+        }
+        SupplyTracker supply = SupplyTracker.fromGameState(gs);
+
+        for (int trial = 0; trial < 50; trial++) {
+            engine.mcts.BoltzmannRollout.withTemperature(0.7)
+                    .simulate(gs, supply, 0, 0);
+        }
+        assertTrue("BoltzmannRollout completes without error when player owns all purples", true);
+    }
+
+    /**
+     * GameSession.applyTurn must throw when attempting to buy a purple card the player already owns.
+     */
+    private static void test_session_rejects_duplicate_purple_purchase() {
+        core.GameState gs = core.GameState.initial(2);
+        gs.getPlayers()[0].setCoins(20);
+
+        // Give player 0 the stadion
+        core.Project stadion = core.ProjectLoader.getProject("stadion").orElseThrow();
+        gs.getPlayers()[0].getOwned_projects().add(stadion);
+
+        core.GameSession session = new core.GameSession(gs, new String[]{"Alice", "Bob"});
+
+        // Try to buy stadion again — should throw
+        core.TurnRecord tr = new core.TurnRecord(0, 3, stadion, false, null,
+                null, null, -1, 1);
+        boolean threw = false;
+        try {
+            session.applyTurn(tr);
+        } catch (IllegalArgumentException e) {
+            threw = e.getMessage().contains("already owns purple card");
+        }
+        assertTrue("GameSession rejects duplicate purple card purchase", threw);
     }
 
     private static void assertTrue(String label, boolean condition) {

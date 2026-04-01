@@ -190,6 +190,8 @@ public final class GreedyRollout {
         for (Project p : state.getUnbuilt_projects()) {
             if (!supply.canPurchase(p.getId())) continue;
             if (coins < p.getCost()) continue;
+            // Purple cards (lila) are unique — max 1 per player per type
+            if ("lila".equals(p.getColor()) && active.hasProject(p.getId())) continue;
             double ev  = Calcs.evPerRound(state, activePlayer, p);
             double net = ev * Calcs.geometricSum(GREEDY_HORIZON, GREEDY_DISCOUNT) - p.getCost();
             if (net > bestScore) {

@@ -89,6 +89,8 @@ public final class BuyDecisionNode extends MctsNode {
         // --- Non-landmark cards from the unbuilt pool ---
         for (Project p : state.getUnbuilt_projects()) {
             if (supply.canPurchase(p.getId()) && coins >= p.getCost()) {
+                // Purple cards (lila) are unique — max 1 per player per type
+                if ("lila".equals(p.getColor()) && active.hasProject(p.getId())) continue;
                 addChild(state, supply, p, false);
             }
         }

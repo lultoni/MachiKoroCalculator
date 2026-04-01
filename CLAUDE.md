@@ -67,6 +67,13 @@ java -cp "out:src:gson-2.11.0.jar" logic.Main
 java -cp "out:src:gson-2.11.0.jar" Tests.RuntimeTester
 ```
 
+**Run specific test section (preferred):**
+```bash
+java -cp "out:src:gson-2.11.0.jar" Tests.RuntimeTester --section "Section Name"
+```
+
+**Testing rule: Never run the full test suite.** Always use `--section` to run only the section(s) relevant to the code you changed. The full suite includes slow MCTS engine tests and benchmarks that take minutes. Assume all unrelated sections pass. If you changed code in multiple areas, run each relevant section separately.
+
 Note: `src` must be on the runtime classpath so `ClassLoader.getResourceAsStream` can locate `resources/jsons/projects.json`.
 
 ## Committing Changes

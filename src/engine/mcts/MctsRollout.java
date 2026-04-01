@@ -258,6 +258,8 @@ public final class MctsRollout {
         // Non-landmark cards from unbuilt pool
         for (Project p : state.getUnbuilt_projects()) {
             if (supply.canPurchase(p.getId()) && coins >= p.getCost()) {
+                // Purple cards (lila) are unique — max 1 per player per type
+                if ("lila".equals(p.getColor()) && active.hasProject(p.getId())) continue;
                 options.add(new Object[]{p, false});
             }
         }

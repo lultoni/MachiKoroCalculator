@@ -74,11 +74,6 @@ public final class ChanceNode extends MctsNode {
         int maxRoll = twoDice ? 12 : 6;
 
         for (int roll = minRoll; roll <= maxRoll; roll++) {
-            if (twoDice && roll % 2 != 0 && roll > 7) continue; // skip impossible 2d6 sums (odd > 7 impossible? No — all 2-12 are possible)
-            // Actually all 2-12 are possible for 2d6. The skip above is wrong — remove it.
-            // Note: handled via minRoll/maxRoll loop; all values 2-12 inclusive are valid.
-            // (The if-continue above is never reached because it checks odd > 7, but 9 and 11 are valid 2d6 rolls.)
-            // Just build the child for every roll in range.
             buildChild(roll);
         }
         expanded = true;

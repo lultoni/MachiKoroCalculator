@@ -87,6 +87,12 @@ public class GameSession {
                         "Player " + pi + " cannot afford " + card.getId()
                         + " (has " + buyer.getCoins() + ", needs " + card.getCost() + ")");
 
+            // Purple cards (lila) are unique — max 1 per player per type
+            if ("lila".equals(card.getColor()) && buyer.hasProject(card.getId()))
+                throw new IllegalArgumentException(
+                        "Player " + pi + " already owns purple card " + card.getId()
+                        + " (max 1 per type per player)");
+
             // Großprojekte are never in the pool — they are always available for purchase
             if (!card.isIs_grossprojekt()) {
                 if (!state.getUnbuilt_projects().contains(card))

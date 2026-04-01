@@ -14,9 +14,11 @@ import java.util.function.IntToDoubleFunction;
 /**
  * Public API for version-agnostic Machi Koro math utilities.
  *
- * <p>All methods are stateless and side-effect-free. Any simulation engine or other
- * layer may call these freely. The {@link core.GameState} passed in is never mutated
- * except where a copy is taken internally.
+ * <p>All methods are stateless and side-effect-free from the caller's perspective.
+ * Any simulation engine or other layer may call these freely. Some methods
+ * (e.g. {@link #evPerRound}) temporarily mutate the passed-in {@link core.GameState}
+ * for performance but always restore original values before returning.
+ * <b>Not thread-safe for concurrent calls on the same GameState instance.</b>
  *
  * <p>EV figures are in coins. Positive = income; negative = payment.
  */
@@ -157,54 +159,74 @@ public final class Calcs {
      * @return expected coins gained over one full round
      */
     public static double evPerRound(GameState gs, int playerIndex, Project candidate) {
-        GameState state = gs.copy();
-        state.getPlayers()[playerIndex].getOwned_projects().add(candidate);
+        // Mutation-and-restore: temporarily add candidate to the player's portfolio,
+        // mutate coins for projection, compute, then restore everything.
+        // Avoids GameState.copy() — the dominant cost in Variant A/B rollouts.
+        int n = gs.getPlayers().length;
 
-        int n = state.getPlayers().length;
-        double[] baseCoins = new double[n];
+        // Save original coins for all players
+        int[] savedCoins = new int[n];
         for (int i = 0; i < n; i++) {
-            Player p = state.getPlayers()[i];
-            boolean pHasBahnhof = p.hasProject("bahnhof");
-            baseCoins[i] = p.getCoins() + CardIncome.estimateUncappedOwnTurnEV(p, pHasBahnhof);
-            p.setCoins((int) Math.round(baseCoins[i]));
+            savedCoins[i] = gs.getPlayers()[i].getCoins();
         }
 
-        final Player activeP = state.getPlayers()[playerIndex];
-        final CardIncome.PlayerStats activeStats = CardIncome.PlayerStats.of(activeP);
-        double bluePerOppTurn = 0.0;
-        for (int r = 2; r <= 12; r++) {
-            int blueIncome = CardIncome.sumColorIncome(activeP, "blau", r, activeStats, 99, new int[0]);
-            bluePerOppTurn += CardIncome.P2[r] * blueIncome;
+        // Temporarily add candidate to the player's portfolio
+        java.util.List<Project> ownedList = gs.getPlayers()[playerIndex].getOwned_projects();
+        ownedList.add(candidate);
+
+        try {
+            // Project coins forward
+            double[] baseCoins = new double[n];
+            for (int i = 0; i < n; i++) {
+                Player p = gs.getPlayers()[i];
+                boolean pHasBahnhof = p.hasProject("bahnhof");
+                baseCoins[i] = savedCoins[i] + CardIncome.estimateUncappedOwnTurnEV(p, pHasBahnhof);
+                p.setCoins((int) Math.round(baseCoins[i]));
+            }
+
+            final Player activeP = gs.getPlayers()[playerIndex];
+            final CardIncome.PlayerStats activeStats = CardIncome.PlayerStats.of(activeP);
+            double bluePerOppTurn = 0.0;
+            for (int r = 2; r <= 12; r++) {
+                int blueIncome = CardIncome.sumColorIncome(activeP, "blau", r, activeStats, 99, new int[0]);
+                bluePerOppTurn += CardIncome.P2[r] * blueIncome;
+            }
+            double bluePerOppTurn1d6 = 0.0;
+            for (int r = 1; r <= 6; r++) {
+                int blueIncome = CardIncome.sumColorIncome(activeP, "blau", r, activeStats, 99, new int[0]);
+                bluePerOppTurn1d6 += CardIncome.P1[r] * blueIncome;
+            }
+            bluePerOppTurn = Math.max(bluePerOppTurn, bluePerOppTurn1d6);
+
+            double total = 0.0;
+
+            boolean hasBahnhof = gs.getPlayers()[playerIndex].hasProject("bahnhof");
+            boolean hasFreizeitpark = gs.getPlayers()[playerIndex].hasProject("freizeitpark");
+            boolean hasFunkturm    = gs.getPlayers()[playerIndex].hasProject("funkturm");
+            double[] ownCache = buildRollGainCache(gs, playerIndex);
+            total += computeOwnTurnEV(gs, playerIndex, ownCache, hasBahnhof, hasFreizeitpark, hasFunkturm);
+
+            int step = 0;
+            for (int opponentIdx = 0; opponentIdx < n; opponentIdx++) {
+                if (opponentIdx == playerIndex) continue;
+                step++;
+                int stepCoins = (int) Math.round(baseCoins[playerIndex] + step * bluePerOppTurn);
+                gs.getPlayers()[playerIndex].setCoins(stepCoins);
+
+                boolean opponentHasBahnhof = gs.getPlayers()[opponentIdx].hasProject("bahnhof");
+                final int oppIdx = opponentIdx;
+                total += CardIncome.bestDiceEV(opponentHasBahnhof,
+                        r -> computeOpponentTurnGainForRoll(gs, playerIndex, oppIdx, r));
+            }
+
+            return total;
+        } finally {
+            // Restore: remove candidate and reset all coins
+            ownedList.remove(ownedList.size() - 1);
+            for (int i = 0; i < n; i++) {
+                gs.getPlayers()[i].setCoins(savedCoins[i]);
+            }
         }
-        double bluePerOppTurn1d6 = 0.0;
-        for (int r = 1; r <= 6; r++) {
-            int blueIncome = CardIncome.sumColorIncome(activeP, "blau", r, activeStats, 99, new int[0]);
-            bluePerOppTurn1d6 += CardIncome.P1[r] * blueIncome;
-        }
-        bluePerOppTurn = Math.max(bluePerOppTurn, bluePerOppTurn1d6);
-
-        double total = 0.0;
-
-        boolean hasBahnhof = state.getPlayers()[playerIndex].hasProject("bahnhof");
-        boolean hasFreizeitpark = state.getPlayers()[playerIndex].hasProject("freizeitpark");
-        boolean hasFunkturm    = state.getPlayers()[playerIndex].hasProject("funkturm");
-        double[] ownCache = buildRollGainCache(state, playerIndex);
-        total += computeOwnTurnEV(state, playerIndex, ownCache, hasBahnhof, hasFreizeitpark, hasFunkturm);
-
-        int step = 0;
-        for (int opponentIdx = 0; opponentIdx < n; opponentIdx++) {
-            if (opponentIdx == playerIndex) continue;
-            step++;
-            int stepCoins = (int) Math.round(baseCoins[playerIndex] + step * bluePerOppTurn);
-            state.getPlayers()[playerIndex].setCoins(stepCoins);
-
-            boolean opponentHasBahnhof = state.getPlayers()[opponentIdx].hasProject("bahnhof");
-            final int oppIdx = opponentIdx;
-            total += CardIncome.bestDiceEV(opponentHasBahnhof,
-                    r -> computeOpponentTurnGainForRoll(state, playerIndex, oppIdx, r));
-        }
-
-        return total;
     }
 
     // -------------------------------------------------------------------------

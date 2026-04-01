@@ -76,6 +76,8 @@ public final class TournamentMain {
         orchestrator.register(new MctsGreedyTreeEngine());
         orchestrator.register(new MctsDepthLimitedEngine());
         orchestrator.register(new MctsAdaptiveEngine());
+        orchestrator.register(new FlatMcEngine());
+        orchestrator.register(new HeuristicEvEngine());
 
         // Select engines
         List<String> engineIds;

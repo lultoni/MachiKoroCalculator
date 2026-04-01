@@ -65,6 +65,18 @@ public final class HeuristicEvEngine implements SimulationEngine {
     public String description() { return "Heuristic EV — zero-search, formula-based ranking"; }
 
     @Override
+    public TurnPlan evaluateFullTurn(GameState state, int playerIndex, EngineConfig config) {
+        long start = System.currentTimeMillis();
+        int diceCount = Calcs.optimalDiceCount(state, playerIndex);
+        EngineResult result = evaluate(state, playerIndex, config);
+        EngineResult.Option top = result.topRecommendation();
+        Project purchase = "_wait_".equals(top.project.getId()) ? null : top.project;
+        long elapsed = System.currentTimeMillis() - start;
+        return TurnPlan.staticPlan(diceCount, purchase != null ? purchase : RankEntry.WAIT_SENTINEL,
+                top.score, 0, elapsed);
+    }
+
+    @Override
     public EngineResult evaluate(GameState state, int playerIndex, EngineConfig config) {
         long startTime = System.currentTimeMillis();
 

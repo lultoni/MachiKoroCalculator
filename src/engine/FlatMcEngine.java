@@ -52,6 +52,18 @@ public final class FlatMcEngine implements SimulationEngine {
     public String description() { return "Flat Monte Carlo — pure sampling, no tree search"; }
 
     @Override
+    public TurnPlan evaluateFullTurn(GameState state, int playerIndex, EngineConfig config) {
+        long start = System.currentTimeMillis();
+        int diceCount = calcs.Calcs.optimalDiceCount(state, playerIndex);
+        EngineResult result = evaluate(state, playerIndex, config);
+        EngineResult.Option top = result.topRecommendation();
+        Project purchase = "_wait_".equals(top.project.getId()) ? null : top.project;
+        long elapsed = System.currentTimeMillis() - start;
+        return TurnPlan.staticPlan(diceCount, purchase != null ? purchase : calcs.RankEntry.WAIT_SENTINEL,
+                top.score, result.iterationsUsed, elapsed);
+    }
+
+    @Override
     public EngineResult evaluate(GameState state, int playerIndex, EngineConfig config) {
         long startTime = System.currentTimeMillis();
         int totalIterations = config.iterations > 0 ? config.iterations : 500;

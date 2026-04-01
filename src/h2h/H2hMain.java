@@ -53,6 +53,8 @@ public final class H2hMain {
         orchestrator.register(new MctsGreedyTreeEngine());
         orchestrator.register(new MctsDepthLimitedEngine());
         orchestrator.register(new MctsAdaptiveEngine());
+        orchestrator.register(new FlatMcEngine());
+        orchestrator.register(new HeuristicEvEngine());
 
         MatchConfig config = new MatchConfig(
                 new String[]{engineA, engineB}, games, maxTurns, iterations, true);

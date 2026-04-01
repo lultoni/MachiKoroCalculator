@@ -74,12 +74,46 @@ public final class TurnPlan {
     }
 
     /**
+     * Creates a TurnPlan with pre-populated decisions (no tree navigation).
+     *
+     * <p>Used by non-MCTS engines that make decisions heuristically rather than
+     * via tree search. {@link #navigateRoll} and {@link #navigateReroll} are no-ops
+     * on static plans — all decisions must be set before returning.
+     *
+     * @param diceCount      1 or 2
+     * @param purchase       card to buy, or {@link RankEntry#WAIT_SENTINEL} for save
+     * @param purchaseWinRate engine's confidence / score for the purchase
+     * @param iterationsUsed 0 for heuristic engines
+     * @param computeTimeMs  wall-clock computation time
+     */
+    public static TurnPlan staticPlan(int diceCount, Project purchase,
+                                       double purchaseWinRate, int iterationsUsed,
+                                       long computeTimeMs) {
+        TurnPlan plan = new TurnPlan(diceCount, iterationsUsed, computeTimeMs);
+        plan.purchase = purchase;
+        plan.purchaseWinRate = purchaseWinRate;
+        return plan;
+    }
+
+    /** Private constructor for static plans (no tree). */
+    private TurnPlan(int diceCount, int iterationsUsed, long computeTimeMs) {
+        this.tree = null;
+        this.currentNode = null;
+        this.diceCount = diceCount;
+        this.iterationsUsed = iterationsUsed;
+        this.computeTimeMs = computeTimeMs;
+    }
+
+    /**
      * After the match runner rolls the dice, navigate the tree to the roll outcome
      * and extract Funkturm, Bürohaus, and purchase decisions.
      *
      * @param roll    actual dice total
      */
     public void navigateRoll(int roll) {
+        // Static plans have decisions pre-populated — nothing to navigate
+        if (tree == null) return;
+
         // Get the ChanceNode for our diceCount
         MctsNode chanceNode;
         if (currentNode instanceof DiceChoiceNode diceNode) {
@@ -111,6 +145,9 @@ public final class TurnPlan {
      * @param newRoll the reroll dice total
      */
     public void navigateReroll(int newRoll) {
+        // Static plans have decisions pre-populated — nothing to navigate
+        if (tree == null) return;
+
         // currentNode should be at a FunkturmNode; child 1 = reroll = new ChanceNode
         if (currentNode instanceof FunkturmNode fn) {
             if (!fn.expanded || fn.getChildren().size() < 2) {

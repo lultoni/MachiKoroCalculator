@@ -6,6 +6,23 @@ Implementation history: what was built, why, and which design decisions were mad
 
 ## Phase 7: Iteration
 
+### 7.8–7.11 — Engine Compliance Suite + New Engine Types
+
+**Engine Compliance Test Suite (7.8):** Generic `runEngineComplianceTests()` method in RuntimeTester with 3 tiers of assertions:
+- **Tier 1 (Universal):** non-null result, non-empty options, `_wait_` save sentinel, sorted scores, affordable flag correctness, iterationsUsed≥0, computeTimeMs≥0, obvious Funkturm win, registry presence.
+- **Tier 2 (Metrics):** 14 mandatory metric keys (winRate, confidence, visitCount, etc.), confidence ∈ [0,1] or NaN.
+- **Tier 3 (Performance):** 500-iter eval < 10,000ms, registry entries exist.
+
+New "Engine Compliance" test section auto-discovers all engines from the registry and runs the full suite — 273 assertions across 8 engine classes.
+
+**Flat Monte Carlo Engine (7.9):** `FlatMcEngine` — the simplest possible search engine. For each purchase option, runs N complete random-rollout games (reusing `MctsRollout.simulate`) and ranks by observed win rate. No tree structure, no UCT. Budget allocation: 20% survey phase (evenly distributed), 80% focus phase (top-5 candidates). Registry: `flat-mc-fast` (500), `flat-mc-balanced` (5000), `flat-mc-deep` (20000).
+
+**Heuristic EV Engine (7.10):** `HeuristicEvEngine` — zero-search, pure formula-based ranking. Composite score: `w_ev × evPerRound + w_roi × roiOverHorizon + w_landmark × landmarkBonus + w_tempo × tempoAdvantage + w_delta × portfolioDeltaEV + w_win × winProbDelta`. Instant decisions (<5ms). Registry: `heuristic-ev-default`.
+
+**Static TurnPlan (7.11):** `TurnPlan.staticPlan()` factory creates pre-populated decision plans for non-MCTS engines. `navigateRoll()`/`navigateReroll()` are no-ops — all decisions set upfront. Enables flat-mc and heuristic-ev to participate in H2H matches.
+
+Engine registry now has 28 entries across 8 engine classes. Total: 6 MCTS variants (24 entries) + 1 Flat MC (3 entries) + 1 Heuristic EV (1 entry).
+
 ### 7.6 — MCTS Engine Performance Optimization
 
 Six implementation-level optimizations to MCTS rollout hot paths, without changing strategic behavior (same UCT, same rollout policies, same scoring):

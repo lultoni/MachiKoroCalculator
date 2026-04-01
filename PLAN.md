@@ -155,6 +155,7 @@ Build the engine comparison and validation framework. Used both during Phase 3 v
 | 6.2 | Implement result storage in `h2h-results.json`: match metadata, aggregate stats, per-game logs (Section 8.6). | done |
 | 6.3 | Build testing UI: high-level overview (win rates, avg game length) + detailed game replay with step-through (Section 8.4). | done |
 | 6.4 | Establish baseline: MCTS v1 (all modes) vs. itself as reference. | done |
+| 6.5 | Round-robin tournament runner: every engine vs every other engine with seat-swapping fairness. CLI with tier selection, `--unleashed` for all 24 engines, runtime estimation, leaderboard + H2H matrix output. Fix per-engine EngineConfig bug (registry extras were dropped). Add tier field to engine registry. | done |
 
 ---
 

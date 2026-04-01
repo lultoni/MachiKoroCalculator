@@ -54,6 +54,15 @@ Three new React components:
 
 `useH2h` hook manages API integration with 1-second polling during active matches. Full DE/EN localization (35 new i18n keys).
 
+### 6.6 — Round-Robin Tournament
+
+- **Per-engine EngineConfig fix**: `MatchConfig.toEngineConfig()` was creating a shared config that dropped engine-specific extras (`rolloutTemperature`, `maxRolloutDepth`). Now each seat gets its own `EngineConfig` built from registry entry + match overrides via `MatchConfig.buildEvalConfig()`.
+- **Mid-match seat swapping**: After half the games, P1/P2 swap seats for first-player fairness. Win attribution maps back to original indices. Toggleable via `--no-swap`.
+- **Engine registry tier field**: `"tier": "fast"|"balanced"|"deep"` on each of the 24 registry entries. `EngineRegistry.getByTier()` for tournament engine selection.
+- **TournamentRunner**: Generates N×(N-1)/2 unordered pairs, delegates to `MatchRunner`, aggregates into leaderboard (sorted by win rate) + H2H win-rate matrix.
+- **TournamentMain CLI**: `--tier`, `--engines`, `--unleashed` (all 24), `--games`, `--no-swap`, `--estimate`, `--verbose`, `--help`. Runtime estimation based on measured per-engine-class performance baselines.
+- 34 new tests in "Tournament Infrastructure" section.
+
 ---
 
 ## Phase 5: Kauf Assistent

@@ -37,7 +37,7 @@ The restructure is complete (Phases 1–6 done). The 5-layer architecture is ful
 - **Standard Calcs** layer (`calcs/` package): `Calcs` (all metrics), `WinProbability`, `RankEntry`
 - **Engines** layer (`engine/` package): `MctsV1Engine` (base) + 5 variants (A–E), `TurnPlan` (full-turn decision extraction), `mcts/` subpackage with all tree node types, rollout policies, `SupplyTracker`, `MctsTree`
 - **Interface** layer (`iface/` package): `EngineOrchestrator`, `EngineRegistry`, `EngineRegistryEntry`
-- **H2H** layer (`h2h/` package): `MatchRunner` (parallel game execution), `MatchConfig`, `GameLog`/`TurnLog`/`MatchResult`, `H2hResultStore` (JSON persistence), `H2hMain` (CLI runner)
+- **H2H** layer (`h2h/` package): `MatchRunner` (parallel game execution, seat swapping), `MatchConfig`, `GameLog`/`TurnLog`/`MatchResult`, `H2hResultStore` (JSON persistence), `H2hMain` (single-match CLI), `TournamentRunner`/`TournamentResult`/`TournamentMain` (round-robin tournament with leaderboard + matrix)
 - **Server** layer (`server/` package): `ApiServer` with 20 endpoints, `SessionManager`, `PrecomputeCache`, `H2hHandler`, `EvaluateHandler`, `SessionInsightsHandler`, plus various session handlers
 - **UI** layer (`web/` directory): React 19 SPA with full game dashboard, structured explanation UI, insights panel, pre-computation integration
 
@@ -85,6 +85,13 @@ Note: `src` must be on the runtime classpath so `ClassLoader.getResourceAsStream
 **Run H2H engine match (CLI):**
 ```bash
 java -cp "out:src:gson-2.11.0.jar" h2h.H2hMain --engineA mcts-v1-fast --engineB mcts-v1-depth3 --games 100 --iterations 500
+```
+
+**Run round-robin tournament (CLI):**
+```bash
+java -cp "out:src:gson-2.11.0.jar" h2h.TournamentMain --tier fast --games 50
+java -cp "out:src:gson-2.11.0.jar" h2h.TournamentMain --engines mcts-v1-fast,mcts-v1-depth3 --games 20
+java -cp "out:src:gson-2.11.0.jar" h2h.TournamentMain --unleashed --games 30  # all 24 engines
 ```
 
 ## Committing Changes

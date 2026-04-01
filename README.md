@@ -17,10 +17,10 @@ Phases 1–6 complete. The app is a fully functional web-based Machi Koro purcha
 - Passive-turn insights panel with ETW bars, tempo, supply warnings, narrative guidance
 - Background pre-computation during opponent turns for instant results
 - Head-to-head engine testing: full games where all decisions (dice, Funkturm, Bürohaus, purchase) come from real MCTS tree search
-- H2H match runner with parallel game execution, CLI runner, REST API, and visual replay UI
+- H2H match runner with parallel game execution, mid-match seat swapping, CLI runner, round-robin tournament with leaderboard + matrix, REST API, and visual replay UI
 - Web SPA (React 19 + TypeScript + Vite 8 + Tailwind CSS 4) with full DE/EN localization
 - 20 REST API endpoints (game state, session management, engine evaluation, insights, pre-computation, H2H testing)
-- 370+ test assertions across 28 test sections
+- 400+ test assertions across 29 test sections
 
 **What's next:**
 - Phase 6.4: Establish H2H baseline results across all engine variants
@@ -59,6 +59,16 @@ cd web && npm run build                # Production build → web/dist/
 java -cp "out:src:gson-2.11.0.jar" h2h.H2hMain \
   --engineA mcts-v1-fast --engineB mcts-v1-depth3 \
   --games 100 --iterations 500 --verbose
+
+# Round-robin tournament (all fast-tier engines)
+java -cp "out:src:gson-2.11.0.jar" h2h.TournamentMain --tier fast --games 50
+
+# Tournament with specific engines
+java -cp "out:src:gson-2.11.0.jar" h2h.TournamentMain \
+  --engines mcts-v1-fast,mcts-v1-depth3,mcts-v1-greedy-tree-fast --games 20
+
+# Tournament with ALL 24 engines (warning: may take hours)
+java -cp "out:src:gson-2.11.0.jar" h2h.TournamentMain --unleashed --games 30
 
 # Run (legacy Swing UI — deprecated, kept for reference)
 java -cp "out:src:gson-2.11.0.jar" logic.Main

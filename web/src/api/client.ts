@@ -57,6 +57,9 @@ export const getEngines = () => json<EngineRegistryEntry[]>('/api/engines');
 export const evaluate = (req: EvaluateRequest) =>
   post<EvaluateResponse>('/api/evaluate', req);
 
+export const precompute = (req: EvaluateRequest) =>
+  post<{ status: string }>('/api/evaluate/precompute', req);
+
 // ─── Session Management ──────────────────────────────────────────────────
 
 export const createSession = (req: CreateSessionRequest) =>

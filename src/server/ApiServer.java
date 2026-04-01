@@ -49,6 +49,7 @@ public final class ApiServer {
     private final int port;
     private final EngineOrchestrator orchestrator;
     private final SessionManager sessionManager;
+    private final PrecomputeCache precomputeCache;
     private HttpServer httpServer;
 
     /**
@@ -61,6 +62,7 @@ public final class ApiServer {
         this.port           = port;
         this.orchestrator   = orchestrator;
         this.sessionManager = new SessionManager(Path.of("saves"));
+        this.precomputeCache = new PrecomputeCache(orchestrator);
     }
 
     /** Convenience constructor using {@link #DEFAULT_PORT}. */
@@ -85,7 +87,8 @@ public final class ApiServer {
         httpServer.createContext("/api/projects", new ProjectsHandler());
         httpServer.createContext("/api/engines",  new EnginesHandler());
         httpServer.createContext("/api/roll",     new RollHandler());
-        httpServer.createContext("/api/evaluate", new EvaluateHandler(orchestrator));
+        httpServer.createContext("/api/evaluate", new EvaluateHandler(orchestrator, precomputeCache));
+        httpServer.createContext("/api/evaluate/precompute", new PrecomputeHandler(precomputeCache));
 
         // Session management endpoints
         httpServer.createContext("/api/session/create",        new SessionCreateHandler(sessionManager));

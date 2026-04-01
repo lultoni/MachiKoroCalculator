@@ -86,6 +86,26 @@ public class GameState {
     }
 
     /**
+     * Returns a structural hash of this game state: player coins, owned card IDs (sorted), and landmarks.
+     * Used by the pre-computation cache to detect when the state has changed meaningfully.
+     */
+    public int structuralHash() {
+        int hash = 17;
+        for (Player p : players) {
+            hash = 31 * hash + p.getCoins();
+            java.util.List<String> ids = new java.util.ArrayList<>();
+            for (Project proj : p.getOwned_projects()) {
+                ids.add(proj.getId());
+            }
+            java.util.Collections.sort(ids);
+            for (String id : ids) {
+                hash = 31 * hash + id.hashCode();
+            }
+        }
+        return hash;
+    }
+
+    /**
      * Builds the standard starting state for a new game.
      * <p>
      * Each player starts with 3 coins and owns one Weizenfeld and one Bäckerei.

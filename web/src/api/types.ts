@@ -93,6 +93,7 @@ export interface EvaluateResponse {
   computeTimeMs: number;
   confidence: number;
   debugInfo?: string;
+  cached?: boolean;
   rankedOptions: RankedOption[];
   perRollDeltas?: Record<string, number[]>;
   metricRanges?: Record<string, MetricRange>;

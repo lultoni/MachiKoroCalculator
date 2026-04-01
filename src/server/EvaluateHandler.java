@@ -49,9 +49,15 @@ import java.util.Optional;
 final class EvaluateHandler implements HttpHandler {
 
     private final EngineOrchestrator orchestrator;
+    private final PrecomputeCache precomputeCache;
 
     EvaluateHandler(EngineOrchestrator orchestrator) {
+        this(orchestrator, null);
+    }
+
+    EvaluateHandler(EngineOrchestrator orchestrator, PrecomputeCache precomputeCache) {
         this.orchestrator = orchestrator;
+        this.precomputeCache = precomputeCache;
     }
 
     @Override
@@ -108,9 +114,21 @@ final class EvaluateHandler implements HttpHandler {
                 preRollState = GameStateSerializer.fromJson(body.getAsJsonObject("preRollState"));
             }
 
-            EngineResult result = orchestrator.evaluate(state, playerIndex, entry);
+            EngineResult result;
+            boolean cached = false;
+            if (precomputeCache != null) {
+                result = precomputeCache.getIfReady(state, playerIndex, entry.id());
+                if (result != null) {
+                    cached = true;
+                } else {
+                    result = orchestrator.evaluate(state, playerIndex, entry);
+                }
+            } else {
+                result = orchestrator.evaluate(state, playerIndex, entry);
+            }
 
             JsonObject response = serializeResult(entry.id(), result);
+            response.addProperty("cached", cached);
 
             // Add per-roll deltas if pre-roll state was provided
             if (preRollState != null) {

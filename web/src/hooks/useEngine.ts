@@ -9,6 +9,7 @@ export interface UseEngineReturn {
   loading: boolean;
   error: string | null;
   evaluate: (state: GameStateJson, playerIndex: number, engineId?: string, preRollState?: GameStateJson) => Promise<void>;
+  precompute: (state: GameStateJson, playerIndex: number, engineId?: string) => void;
   clear: () => void;
 }
 
@@ -56,5 +57,14 @@ export function useEngine(): UseEngineReturn {
     setLoading(false);
   }, []);
 
-  return { result, loading, error, evaluate, clear };
+  const precompute = useCallback((
+    state: GameStateJson,
+    playerIndex: number,
+    engineId?: string,
+  ) => {
+    // Fire and forget — no state updates needed
+    api.precompute({ state, playerIndex, engineId }).catch(() => {});
+  }, []);
+
+  return { result, loading, error, evaluate, precompute, clear };
 }

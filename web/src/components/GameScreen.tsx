@@ -105,7 +105,15 @@ export function GameScreen({ session, settings, updateSettings, projects, hover 
 
   const handleOpponentConfirm = useCallback((req: ApplyTurnRequest) => {
     session.applyTurn(req);
-  }, [session]);
+    // Pre-compute evaluation for user's upcoming turn
+    // (fires after state update — the actual precompute runs against the new state)
+    setTimeout(() => {
+      const nextSession = session.session;
+      if (nextSession && !nextSession.finished) {
+        engine.precompute(nextSession.state, settings.userPlayerIndex, settings.engineId);
+      }
+    }, 100);
+  }, [session, engine, settings]);
 
   const handleBürohausSwap = useCallback((req: import('../api/types').BürohausRequest) => {
     session.applyBürohaus(req);

@@ -154,7 +154,7 @@ Build the engine comparison and validation framework. Used both during Phase 3 v
 | 6.1 | Implement match runner: N games between two engine registry entries, parallel execution (Section 8.2). | done |
 | 6.2 | Implement result storage in `h2h-results.json`: match metadata, aggregate stats, per-game logs (Section 8.6). | done |
 | 6.3 | Build testing UI: high-level overview (win rates, avg game length) + detailed game replay with step-through (Section 8.4). | done |
-| 6.4 | Establish baseline: MCTS v1 (all modes) vs. itself as reference. | pending |
+| 6.4 | Establish baseline: MCTS v1 (all modes) vs. itself as reference. | done |
 
 ---
 

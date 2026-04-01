@@ -80,6 +80,17 @@ const de: Record<string, string> = {
   'color.grün': 'Grün',
   'color.lila': 'Lila',
   'color.gelb': 'Gelb',
+
+  // Explanation factor categories
+  'factor.winRate': 'Gewinn',
+  'factor.income': 'Einkommen',
+  'factor.synergy': 'Synergie',
+  'factor.risk': 'Risiko',
+  'factor.tempo': 'Tempo',
+  'factor.landmark': 'Wahrzeichen',
+  'factor.cost': 'Kosten',
+  'factor.coverage': 'Abdeckung',
+  'factor.scarcity': 'Knappheit',
 };
 
 export default de;

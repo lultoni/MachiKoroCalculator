@@ -80,6 +80,17 @@ const en: Record<string, string> = {
   'color.grün': 'Green',
   'color.lila': 'Purple',
   'color.gelb': 'Yellow',
+
+  // Explanation factor categories
+  'factor.winRate': 'Win',
+  'factor.income': 'Income',
+  'factor.synergy': 'Synergy',
+  'factor.risk': 'Risk',
+  'factor.tempo': 'Tempo',
+  'factor.landmark': 'Landmark',
+  'factor.cost': 'Cost',
+  'factor.coverage': 'Coverage',
+  'factor.scarcity': 'Scarcity',
 };
 
 export default en;

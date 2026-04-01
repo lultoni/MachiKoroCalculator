@@ -65,11 +65,20 @@ export interface EngineRegistryEntry {
   extra: Record<string, string>;
 }
 
+export interface ExplanationFactor {
+  category: string;
+  weight: number;
+  summary: string;
+  detail: string;
+}
+
 export interface RankedOption {
   projectId: string;
   score: number;
   affordable: boolean;
   explanationFactors: string[];
+  structuredFactors?: ExplanationFactor[];
+  summarySentence?: string;
   metrics: Record<string, string> | null;
 }
 

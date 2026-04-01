@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useLocale } from '../i18n/useLocale';
 import type { RankedOption, MetricRange, ProjectDef } from '../api/types';
 import { RankedList } from './RankedList';
+import { ExplanationFactors } from './ExplanationFactors';
 
 interface Props {
   options: RankedOption[];
@@ -53,9 +54,11 @@ export function AssistantPanel({ options, metricRanges, loading, projects, langu
             <div className={`text-lg font-bold ${cardTextClass(topProj?.color)}`}>
               {topName}
             </div>
-            {top.explanationFactors.length > 0 && (
+            {top.summarySentence ? (
+              <p className="text-sm text-machi-text-dim mt-1">{top.summarySentence}</p>
+            ) : top.explanationFactors.length > 0 ? (
               <p className="text-sm text-machi-text-dim mt-1">{top.explanationFactors[0]}</p>
-            )}
+            ) : null}
           </div>
           <div className="text-right shrink-0">
             <div className="text-2xl font-bold text-machi-green">{winPct}%</div>
@@ -64,13 +67,10 @@ export function AssistantPanel({ options, metricRanges, loading, projects, langu
         </div>
 
         {/* Explanation factors */}
-        {top.explanationFactors.length > 1 && (
-          <ul className="text-xs text-machi-text-dim space-y-0.5 pl-3 list-disc">
-            {top.explanationFactors.slice(1).map((f, i) => (
-              <li key={i}>{f}</li>
-            ))}
-          </ul>
-        )}
+        <ExplanationFactors
+          factors={top.structuredFactors ?? []}
+          fallback={top.explanationFactors.slice(1)}
+        />
 
         {/* Action buttons */}
         <div className="flex gap-2">

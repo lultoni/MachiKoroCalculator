@@ -100,15 +100,16 @@ public class MctsV1Engine implements SimulationEngine {
      */
     protected EngineResult buildResult(GameState state, int playerIndex, MctsTree tree,
                                        int iterationsUsed, long computeTimeMs) {
-        // ---- Collect options from root children ----
-        List<EngineResult.Option> options = buildOptions(state, playerIndex, tree, iterationsUsed);
+        // ---- Pass 1: Collect options from root children ----
+        List<EngineResult.Option> rawOptions = buildOptions(state, playerIndex, tree, iterationsUsed);
 
         // Sort descending by score; on ties, non-save options rank above save
-        // (if buying and saving both win with equal probability, prefer the purchase
-        // that makes immediate progress toward the win)
-        options.sort(Comparator
+        rawOptions.sort(Comparator
                 .comparingDouble((EngineResult.Option o) -> o.score).reversed()
                 .thenComparing(o -> "_wait_".equals(o.project.getId()) ? 1 : 0));
+
+        // ---- Pass 2: Enrich with structured factors using cross-option stats ----
+        List<EngineResult.Option> options = enrichWithStructuredFactors(state, playerIndex, rawOptions);
 
         // Confidence = margin between top-2
         double confidence = 0.0;
@@ -368,6 +369,251 @@ public class MctsV1Engine implements SimulationEngine {
         }
 
         return factors;
+    }
+
+    // -------------------------------------------------------------------------
+    // Pass 2: Structured factor enrichment (cross-option weighting)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Enriches each option with weighted {@link EngineResult.ExplanationFactor} entries
+     * and a summary sentence, using cross-option statistics to compute relative weights.
+     *
+     * <p>Weight for each category = {@code |optionValue - mean| / range} (0 when range = 0).
+     * This makes the most differentiating metrics bubble to the top for each option.
+     */
+    private List<EngineResult.Option> enrichWithStructuredFactors(
+            GameState state, int playerIndex, List<EngineResult.Option> rawOptions) {
+
+        // Extract numeric values per metric across all options
+        String[] metricKeys = {"winRate", "evPerRound", "portfolioDeltaEV",
+                "variance", "probNoIncomeOwnTurn", "tempoAdvantage",
+                "roiOverHorizon", "winProbDelta"};
+        Map<String, double[]> metricValues = new LinkedHashMap<>();
+        for (String key : metricKeys) {
+            double[] vals = new double[rawOptions.size()];
+            for (int i = 0; i < rawOptions.size(); i++) {
+                vals[i] = parseMetricValue(rawOptions.get(i).metrics, key);
+            }
+            metricValues.put(key, vals);
+        }
+
+        // Compute mean and range per metric
+        Map<String, Double> means  = new LinkedHashMap<>();
+        Map<String, Double> ranges = new LinkedHashMap<>();
+        for (String key : metricKeys) {
+            double[] vals = metricValues.get(key);
+            double sum = 0, min = Double.MAX_VALUE, max = -Double.MAX_VALUE;
+            int valid = 0;
+            for (double v : vals) {
+                if (Double.isNaN(v)) continue;
+                sum += v;
+                if (v < min) min = v;
+                if (v > max) max = v;
+                valid++;
+            }
+            means.put(key, valid > 0 ? sum / valid : 0.0);
+            ranges.put(key, valid > 0 ? max - min : 0.0);
+        }
+
+        // Build enriched options
+        List<EngineResult.Option> enriched = new ArrayList<>();
+        for (int i = 0; i < rawOptions.size(); i++) {
+            EngineResult.Option raw = rawOptions.get(i);
+            List<EngineResult.ExplanationFactor> structured =
+                    buildStructuredFactors(state, playerIndex, raw, i, means, ranges, metricValues);
+
+            // Sort by weight descending
+            structured.sort(Comparator.comparingDouble(
+                    (EngineResult.ExplanationFactor f) -> f.weight).reversed());
+
+            // Derive flat explanation factors from structured
+            List<String> flatFactors = new ArrayList<>();
+            for (EngineResult.ExplanationFactor f : structured) {
+                flatFactors.add(f.summary);
+            }
+
+            // Build summary sentence
+            String summary = buildSummarySentence(raw.project, structured);
+
+            enriched.add(new EngineResult.Option(
+                    raw.project, raw.score, flatFactors,
+                    structured, summary, raw.metrics, raw.affordable));
+        }
+        return enriched;
+    }
+
+    /**
+     * Builds structured factors for a single option across all categories.
+     */
+    private List<EngineResult.ExplanationFactor> buildStructuredFactors(
+            GameState state, int playerIndex, EngineResult.Option opt, int optIdx,
+            Map<String, Double> means, Map<String, Double> ranges,
+            Map<String, double[]> metricValues) {
+
+        List<EngineResult.ExplanationFactor> factors = new ArrayList<>();
+        Project card = opt.project;
+        boolean isSave = "_wait_".equals(card.getId());
+
+        // 1. Win rate factor (always present)
+        {
+            double val = parseMetricValue(opt.metrics, "winRate");
+            double w = computeWeight(val, means.get("winRate"), ranges.get("winRate"));
+            String visitStr = opt.metrics != null ? opt.metrics.getOrDefault("visitCount", "0") : "0";
+            factors.add(new EngineResult.ExplanationFactor("winRate", w,
+                    String.format("Win rate: %.1f%% (%s rollouts)", val * 100, visitStr),
+                    String.format("MCTS simulation win rate across %s rollouts. "
+                            + "Mean across all options: %.1f%%.", visitStr, means.get("winRate") * 100)));
+        }
+
+        // 2. Income factor (evPerRound)
+        {
+            double val = parseMetricValue(opt.metrics, "evPerRound");
+            double w = computeWeight(val, means.get("evPerRound"), ranges.get("evPerRound"));
+            String immEV = opt.metrics != null ? opt.metrics.getOrDefault("immediateEV", "0.00") : "0.00";
+            String roiStr = opt.metrics != null ? opt.metrics.getOrDefault("roiOverHorizon", "-") : "-";
+            factors.add(new EngineResult.ExplanationFactor("income", w,
+                    String.format("EV per round: %+.3f coins", val),
+                    String.format("Immediate EV: %s coins. EV/round: %.3f. ROI over %d turns: %s.",
+                            immEV, val, DEFAULT_HORIZON, roiStr)));
+        }
+
+        // 3. Synergy factor (portfolioDeltaEV)
+        {
+            double val = parseMetricValue(opt.metrics, "portfolioDeltaEV");
+            double w = computeWeight(val, means.get("portfolioDeltaEV"), ranges.get("portfolioDeltaEV"));
+            String detail = String.format("Portfolio delta EV: %+.3f coins/round.", val);
+            boolean hasEinkauf = state.getPlayers()[playerIndex].hasProject("einkaufszentrum");
+            if (hasEinkauf && !isSave && isRedOrGreen(card)) {
+                detail += " Einkaufszentrum +1 coin bonus applies.";
+            }
+            factors.add(new EngineResult.ExplanationFactor("synergy", w,
+                    String.format("Synergy: %+.3f EV/round to portfolio", val), detail));
+        }
+
+        // 4. Risk factor (variance + probNoIncome)
+        {
+            double variance = parseMetricValue(opt.metrics, "variance");
+            double pni = parseMetricValue(opt.metrics, "probNoIncomeOwnTurn");
+            // Weight: average of both deviations
+            double wVar = computeWeight(variance, means.get("variance"), ranges.get("variance"));
+            double wPni = computeWeight(pni, means.get("probNoIncomeOwnTurn"),
+                    ranges.get("probNoIncomeOwnTurn"));
+            double w = (wVar + wPni) / 2.0;
+            String pniRound = opt.metrics != null
+                    ? opt.metrics.getOrDefault("probNoIncomeRound", "0.00") : "0.00";
+            factors.add(new EngineResult.ExplanationFactor("risk", w,
+                    String.format("Risk: variance %.3f, P(no income) %.1f%%", variance, pni * 100),
+                    String.format("Variance: %.3f coins²/turn. P(no income, own turn): %.1f%%. "
+                            + "P(no income, full round): %s%%.", variance, pni * 100,
+                            formatPercent(pniRound))));
+        }
+
+        // 5. Tempo factor (tempoAdvantage)
+        {
+            double val = parseMetricValue(opt.metrics, "tempoAdvantage");
+            double w = computeWeight(val, means.get("tempoAdvantage"), ranges.get("tempoAdvantage"));
+            String ttw = opt.metrics != null ? opt.metrics.getOrDefault("turnsToWin", "N/A") : "N/A";
+            factors.add(new EngineResult.ExplanationFactor("tempo", w,
+                    String.format("Tempo: %+.1f turns advantage", val),
+                    String.format("Estimated turns to win: %s. Tempo advantage vs nearest opponent: %+.1f turns.",
+                            ttw, val)));
+        }
+
+        // 6. Landmark factor (only for Großprojekte)
+        if (!isSave && card.isIs_grossprojekt()) {
+            factors.add(new EngineResult.ExplanationFactor("landmark", 1.0,
+                    "Landmark — " + landmarkEffect(card.getId()),
+                    "Landmark cards provide permanent abilities. " + landmarkEffect(card.getId()) + "."));
+        }
+
+        // 7. Cost factor
+        if (!isSave) {
+            int cost = card.getCost();
+            int maxCost = 0;
+            for (String lmId : LANDMARK_IDS) {
+                ProjectLoader.getProject(lmId).ifPresent(lm -> {});
+            }
+            // Normalize cost weight by player's coin count
+            int coins = state.getPlayers()[playerIndex].getCoins();
+            double costFraction = coins > 0 ? (double) cost / coins : 1.0;
+            double w = Math.min(1.0, costFraction);
+            factors.add(new EngineResult.ExplanationFactor("cost", w,
+                    String.format("Cost: %d coins (%d remaining)", cost, Math.max(0, coins - cost)),
+                    String.format("Card costs %d of %d available coins. %d coins remaining after purchase.",
+                            cost, coins, Math.max(0, coins - cost))));
+        }
+
+        // 8. Win probability delta (winProbDelta)
+        {
+            double val = parseMetricValue(opt.metrics, "winProbDelta");
+            double w = computeWeight(val, means.get("winProbDelta"), ranges.get("winProbDelta"));
+            if (Math.abs(val) > 1e-4) {
+                factors.add(new EngineResult.ExplanationFactor("winRate", w,
+                        String.format("Win probability: %+.1f%%", val * 100),
+                        String.format("Heuristic win probability delta: %+.4f.", val)));
+            }
+        }
+
+        // 9. Coverage factor (activation rolls + color)
+        if (!isSave && !card.isIs_grossprojekt()) {
+            int[] rolls = card.getDice_activation();
+            double rollCorr = 0.0;
+            try {
+                rollCorr = Calcs.rollCorrelation(state, playerIndex, card);
+            } catch (Exception ignored) {}
+            double w = computeWeight(rollCorr,
+                    0.5, 1.0); // normalized against [0,1] range
+            factors.add(new EngineResult.ExplanationFactor("coverage", Math.min(1.0, Math.abs(w)),
+                    String.format("Coverage: rolls %s (%s)", formatRolls(rolls), card.getColor()),
+                    String.format("Activates on rolls %s. Color: %s. Roll correlation with portfolio: %.3f.",
+                            formatRolls(rolls), card.getColor(), rollCorr)));
+        }
+
+        return factors;
+    }
+
+    /**
+     * Parses a numeric metric value from the metrics map.
+     * Returns NaN for missing, "N/A", "-", or "∞" values.
+     */
+    private static double parseMetricValue(Map<String, String> metrics, String key) {
+        if (metrics == null) return Double.NaN;
+        String v = metrics.get(key);
+        if (v == null || v.equals("N/A") || v.equals("-") || v.equals("∞")) return Double.NaN;
+        try {
+            return Double.parseDouble(v);
+        } catch (NumberFormatException e) {
+            return Double.NaN;
+        }
+    }
+
+    /**
+     * Computes the weight for a single metric: {@code |value - mean| / range}.
+     * Returns 0 when range is 0 or value is NaN.
+     */
+    private static double computeWeight(double value, double mean, double range) {
+        if (Double.isNaN(value) || range <= 0.0) return 0.0;
+        return Math.min(1.0, Math.abs(value - mean) / range);
+    }
+
+    /**
+     * Builds a one-line summary sentence for the option.
+     */
+    private static String buildSummarySentence(Project card, List<EngineResult.ExplanationFactor> factors) {
+        String topFactor = factors.isEmpty() ? "" : factors.get(0).summary;
+        if ("_wait_".equals(card.getId())) {
+            return "Save coins — " + (topFactor.isEmpty() ? "no strong purchase available" : topFactor);
+        }
+        return "Buy " + card.getLocalizedName() + " — " + (topFactor.isEmpty() ? "best option" : topFactor);
+    }
+
+    private static String formatPercent(String rawValue) {
+        try {
+            return String.format("%.1f", Double.parseDouble(rawValue) * 100);
+        } catch (NumberFormatException e) {
+            return rawValue;
+        }
     }
 
     // -------------------------------------------------------------------------

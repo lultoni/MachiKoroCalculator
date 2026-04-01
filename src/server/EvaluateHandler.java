@@ -152,6 +152,23 @@ final class EvaluateHandler implements HttpHandler {
             for (String f : opt.explanationFactors) factors.add(f);
             o.add("explanationFactors", factors);
 
+            // Structured factors (Phase 5)
+            if (!opt.structuredFactors.isEmpty()) {
+                JsonArray sf = new JsonArray();
+                for (EngineResult.ExplanationFactor ef : opt.structuredFactors) {
+                    JsonObject fObj = new JsonObject();
+                    fObj.addProperty("category", ef.category);
+                    fObj.addProperty("weight", ef.weight);
+                    fObj.addProperty("summary", ef.summary);
+                    fObj.addProperty("detail", ef.detail);
+                    sf.add(fObj);
+                }
+                o.add("structuredFactors", sf);
+            }
+            if (opt.summarySentence != null) {
+                o.addProperty("summarySentence", opt.summarySentence);
+            }
+
             if (opt.metrics != null) {
                 JsonObject metrics = new JsonObject();
                 opt.metrics.forEach(metrics::addProperty);

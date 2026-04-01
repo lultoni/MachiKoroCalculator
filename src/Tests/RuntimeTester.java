@@ -332,6 +332,14 @@ public class RuntimeTester {
             test_engine_result_top_recommendation();
         });
 
+        runSection("Phase 5 Structured Factors Integration", () -> {
+            test_engine_produces_structured_factors();
+            test_structured_factors_sorted_by_weight();
+            test_summary_sentence_present();
+            test_flat_factors_derived_from_structured();
+            test_all_weights_in_valid_range();
+        });
+
         System.out.println("\n--- Results: " + passed + " passed, " + failed + " failed ---");
 
         if (failed > 0) {
@@ -3077,6 +3085,73 @@ public class RuntimeTester {
         assertEq("rankedOptions has 2 entries", 2, result.rankedOptions.size());
         assertDoubleEq("confidence is 0.95", 0.95, result.confidence, 0.001);
         assertEq("iterationsUsed is 1000", 1000, result.iterationsUsed);
+    }
+
+    // =========================================================================
+    // Phase 5 Structured Factors Integration Tests
+    // =========================================================================
+
+    /** Helper: run MCTS v1 engine on a 2-player starting state with 200 iterations. */
+    private static EngineResult runQuickMctsEval() {
+        core.GameState gs = core.GameState.initial(2);
+        gs.getPlayers()[0].setCoins(5); // enough for some cards
+        MctsV1Engine engine = new MctsV1Engine();
+        EngineConfig config = new EngineConfig(200, 0, 0.0, java.util.Map.of());
+        return engine.evaluate(gs, 0, config);
+    }
+
+    private static void test_engine_produces_structured_factors() {
+        EngineResult result = runQuickMctsEval();
+        EngineResult.Option top = result.topRecommendation();
+        assertTrue("top option has structuredFactors", !top.structuredFactors.isEmpty());
+        assertTrue("top option has summarySentence", top.summarySentence != null && !top.summarySentence.isEmpty());
+    }
+
+    private static void test_structured_factors_sorted_by_weight() {
+        EngineResult result = runQuickMctsEval();
+        for (EngineResult.Option opt : result.rankedOptions) {
+            java.util.List<EngineResult.ExplanationFactor> sf = opt.structuredFactors;
+            for (int i = 1; i < sf.size(); i++) {
+                assertTrue("factors sorted by weight desc for " + opt.project.getId()
+                        + " [" + (i-1) + "]=" + sf.get(i-1).weight + " >= [" + i + "]=" + sf.get(i).weight,
+                        sf.get(i - 1).weight >= sf.get(i).weight - 1e-9);
+            }
+        }
+    }
+
+    private static void test_summary_sentence_present() {
+        EngineResult result = runQuickMctsEval();
+        for (EngineResult.Option opt : result.rankedOptions) {
+            assertTrue("summarySentence non-null for " + opt.project.getId(),
+                    opt.summarySentence != null);
+            assertTrue("summarySentence non-empty for " + opt.project.getId(),
+                    !opt.summarySentence.isEmpty());
+        }
+    }
+
+    private static void test_flat_factors_derived_from_structured() {
+        EngineResult result = runQuickMctsEval();
+        EngineResult.Option top = result.topRecommendation();
+        // Flat factors should have same count as structured factors
+        assertEq("flat factors count matches structured count",
+                top.structuredFactors.size(), top.explanationFactors.size());
+        // First flat factor should match first structured factor's summary
+        if (!top.structuredFactors.isEmpty()) {
+            assertEq("first flat factor matches first structured summary",
+                    top.structuredFactors.get(0).summary, top.explanationFactors.get(0));
+        }
+    }
+
+    private static void test_all_weights_in_valid_range() {
+        EngineResult result = runQuickMctsEval();
+        for (EngineResult.Option opt : result.rankedOptions) {
+            for (EngineResult.ExplanationFactor f : opt.structuredFactors) {
+                assertTrue("weight >= 0 for " + f.category + " on " + opt.project.getId(),
+                        f.weight >= 0.0);
+                assertTrue("weight <= 1 for " + f.category + " on " + opt.project.getId(),
+                        f.weight <= 1.0 + 1e-9);
+            }
+        }
     }
 
     private static void assertDoubleEq(String label, double expected, double actual, double tol) {

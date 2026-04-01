@@ -4,6 +4,58 @@ Implementation history: what was built, why, and which design decisions were mad
 
 ---
 
+## Phase 6: Head-to-Head Engine Testing
+
+### 6.0 — Performance Optimizations
+
+Three optimizations to speed up H2H simulation without changing strategic behavior:
+
+- **Mutation-and-restore in `Calcs.evPerRound()`**: Replaced `GameState.copy()` with temporary add/remove of candidate card. ~12% speedup for Variants A/B.
+- **MutableSupplyTracker**: In-place `int[]`-backed tracker for rollouts, eliminating HashMap allocation per purchase. Methods return void, use `purchase()`/`undoPurchase()`.
+- **skipEnrichment flag**: When `EngineConfig.extra("skipEnrichment", "true")`, `buildResult()` skips structured factor computation and Calcs metrics — only win rates + card IDs returned. Sufficient for H2H decision extraction.
+
+### 6.1 — Full-Turn MCTS Evaluation
+
+`TurnPlan` — progressive decision extraction from full-turn MCTS trees. Tree rooted at `DiceChoiceNode` (if Bahnhof) or `ChanceNode`, covering all 4 decision types: dice count, Funkturm reroll, Bürohaus swap, purchase.
+
+The match runner navigates the tree step by step as actual dice events unfold: `navigateRoll(roll)` → extract Funkturm decision → if reroll, `navigateReroll(newRoll)` → extract Bürohaus swap → extract purchase. Defensive fallback to save when MCTS exploration doesn't reach a branch.
+
+All 6 engine variants override `evaluateFullTurn()` and `buildFullTurnTree()`. `MctsTree` gains `fullTurnRoot` field parallel to `root`.
+
+### 6.2 — Match Runner + Result Storage
+
+New `h2h` package:
+- **MatchRunner**: Parallel game execution via ForkJoinPool. Full game loop using `evaluateFullTurn()` for all decisions. Freizeitpark bonus turns, supply tracking, Bürohaus swap execution. Turn limit (200) with softmax fallback for winner (no draws).
+- **MatchConfig**: Engine IDs per seat, game count, iteration budget, max turns.
+- **GameLog/TurnLog/MatchResult**: Structured per-turn logging (dice, income, purchase, win rate, eval time, coins, Bürohaus swaps).
+- **H2hResultStore**: Append-only JSON persistence to `h2h-results.json`.
+
+### 6.3 — CLI Runner
+
+`h2h.H2hMain` with flags: `--engineA`, `--engineB`, `--games`, `--iterations`, `--maxTurns`, `--verbose`. Progress to stdout, results saved to JSON. Lists available engines with `--help`.
+
+### 6.4 — API Endpoints
+
+`H2hHandler` with 5 endpoints:
+- `POST /api/h2h/start` — start match in background, return match ID (202 Accepted)
+- `GET /api/h2h/status/{matchId}` — polling for progress (gamesCompleted / gameCount)
+- `GET /api/h2h/results` — all completed matches (summary, no game logs)
+- `GET /api/h2h/results/{matchId}` — full result with game logs
+- `GET /api/h2h/results/{matchId}/game/{gameIndex}` — single game log
+
+Matches run in a single-threaded background executor. Atomic game-completion tracking for progress polling.
+
+### 6.5 — Testing Web UI
+
+Three new React components:
+- **H2hOverview**: Engine A/B dropdowns, games/iterations inputs, progress bar with polling, results table sorted newest-first. Accessible from setup screen.
+- **H2hMatchDetail**: Aggregate stats cards (win rate, avg turns, avg eval), visual win rate bar, scrollable game list with winner/turns/landmarks/coins.
+- **H2hGameReplay**: Turn-by-turn step-through (⏮◀▶⏭ navigation), per-turn detail: dice roll, income deltas, purchase + win rate, running coin totals, Bürohaus/Funkturm annotations. Final state comparison.
+
+`useH2h` hook manages API integration with 1-second polling during active matches. Full DE/EN localization (35 new i18n keys).
+
+---
+
 ## Phase 5: Kauf Assistent
 
 ### 5.1 — Structured Explanation Factor Data Model

@@ -27,17 +27,18 @@ UI (Web SPA) → Interface (orchestration) → Simulation Engines → Standard C
 - **Standard Calcs** — reusable, version-agnostic math: EV, ROI, probability distributions, variance, plus 11 advanced metrics (Sharpe, Sortino, Kelly, VaR/CVaR, HHI, entropy, IG, ETW, tempo, urgency, roll correlation). Any engine can call these.
 - **Simulation Engines** — pluggable strategy implementations (6 MCTS variants with 33 configurations). Each implements `SimulationEngine` interface and returns ranked purchase options with scores, structured explanations, and metrics.
 - **Interface** — orchestration layer: engine registry (JSON with 33 entries), request routing, result formatting, pre-computation cache.
-- **UI** — web SPA (React 19 + TypeScript + Vite 8 + Tailwind CSS 4) talking to a local Java HTTP API (15 endpoints). 14 components, 7 hooks, DE/EN localization.
+- **UI** — web SPA (React 19 + TypeScript + Vite 8 + Tailwind CSS 4) talking to a local Java HTTP API (20 endpoints). 17 components, 8 hooks, DE/EN localization.
 
 ### Current State
 
-The restructure is complete (Phases 1–5 done). The 5-layer architecture is fully implemented and operational:
+The restructure is complete (Phases 1–6 done). The 5-layer architecture is fully implemented and operational:
 
 - **Core** layer (`core/` package): `GameState`, `Player`, `Project`, `ProjectLoader`, `CardIncome`, `RollResolver`, `BürohausLogic`, `GameSession`, `GameSessionPersistence`, `TurnRecord`
 - **Standard Calcs** layer (`calcs/` package): `Calcs` (all metrics), `WinProbability`, `RankEntry`
-- **Engines** layer (`engine/` package): `MctsV1Engine` (base) + 5 variants (A–E), `mcts/` subpackage with all tree node types, rollout policies, `SupplyTracker`, `MctsTree`
+- **Engines** layer (`engine/` package): `MctsV1Engine` (base) + 5 variants (A–E), `TurnPlan` (full-turn decision extraction), `mcts/` subpackage with all tree node types, rollout policies, `SupplyTracker`, `MctsTree`
 - **Interface** layer (`iface/` package): `EngineOrchestrator`, `EngineRegistry`, `EngineRegistryEntry`
-- **Server** layer (`server/` package): `ApiServer` with 15 endpoints, `SessionManager`, `PrecomputeCache`, `EvaluateHandler`, `SessionInsightsHandler`, plus various session handlers
+- **H2H** layer (`h2h/` package): `MatchRunner` (parallel game execution), `MatchConfig`, `GameLog`/`TurnLog`/`MatchResult`, `H2hResultStore` (JSON persistence), `H2hMain` (CLI runner)
+- **Server** layer (`server/` package): `ApiServer` with 20 endpoints, `SessionManager`, `PrecomputeCache`, `H2hHandler`, `EvaluateHandler`, `SessionInsightsHandler`, plus various session handlers
 - **UI** layer (`web/` directory): React 19 SPA with full game dashboard, structured explanation UI, insights panel, pre-computation integration
 
 **Legacy code** (`logic/`, `gui/`): The old Swing UI and probability calc code remain in the repo but are unused. The web SPA is the current app.
@@ -80,6 +81,11 @@ java -cp "out:src:gson-2.11.0.jar" Tests.RuntimeTester --section "Section Name"
 **Testing rule: Never run the full test suite.** Always use `--section` to run only the section(s) relevant to the code you changed. The full suite includes slow MCTS engine tests and benchmarks that take minutes. Assume all unrelated sections pass. If you changed code in multiple areas, run each relevant section separately.
 
 Note: `src` must be on the runtime classpath so `ClassLoader.getResourceAsStream` can locate `resources/jsons/projects.json`.
+
+**Run H2H engine match (CLI):**
+```bash
+java -cp "out:src:gson-2.11.0.jar" h2h.H2hMain --engineA mcts-v1-fast --engineB mcts-v1-depth3 --games 100 --iterations 500
+```
 
 ## Committing Changes
 

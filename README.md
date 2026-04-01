@@ -6,7 +6,7 @@ A local desktop decision support tool for the board game Machi Koro (base game).
 
 ## Status
 
-Phases 1–5 complete. The app is a fully functional web-based Machi Koro purchase advisor with MCTS engines and structured explanations.
+Phases 1–6 complete. The app is a fully functional web-based Machi Koro purchase advisor with MCTS engines, structured explanations, and head-to-head engine testing.
 
 **What works today:**
 - All 19 base-game cards with correct income rules
@@ -16,12 +16,14 @@ Phases 1–5 complete. The app is a fully functional web-based Machi Koro purcha
 - Weighted structured explanations with expandable detail per purchase option (9 factor categories)
 - Passive-turn insights panel with ETW bars, tempo, supply warnings, narrative guidance
 - Background pre-computation during opponent turns for instant results
+- Head-to-head engine testing: full games where all decisions (dice, Funkturm, Bürohaus, purchase) come from real MCTS tree search
+- H2H match runner with parallel game execution, CLI runner, REST API, and visual replay UI
 - Web SPA (React 19 + TypeScript + Vite 8 + Tailwind CSS 4) with full DE/EN localization
-- 15 REST API endpoints (game state, session management, engine evaluation, insights, pre-computation)
+- 20 REST API endpoints (game state, session management, engine evaluation, insights, pre-computation, H2H testing)
 - 370+ test assertions across 28 test sections
 
 **What's next:**
-- Phase 6: Head-to-head engine testing framework
+- Phase 6.4: Establish H2H baseline results across all engine variants
 - Phase 7: Performance optimization, game-over review, expansion support
 
 ## Documentation
@@ -53,6 +55,11 @@ java -cp "out:src:gson-2.11.0.jar" Tests.RuntimeTester --section "Phase 5 Explan
 cd web && npm install && npm run dev   # Vite dev server (hot reload)
 cd web && npm run build                # Production build → web/dist/
 
+# Head-to-head engine testing (CLI)
+java -cp "out:src:gson-2.11.0.jar" h2h.H2hMain \
+  --engineA mcts-v1-fast --engineB mcts-v1-depth3 \
+  --games 100 --iterations 500 --verbose
+
 # Run (legacy Swing UI — deprecated, kept for reference)
 java -cp "out:src:gson-2.11.0.jar" logic.Main
 ```
@@ -69,7 +76,7 @@ UI (Web SPA) → Interface (orchestration) → Simulation Engines → Standard C
 - **Standard Calcs** — reusable math: EV, ROI, probability, variance, 11 advanced risk/tempo metrics
 - **Simulation Engines** — pluggable strategy: 6 MCTS variants with 33 configurations
 - **Interface** — engine registry (JSON), request routing, result formatting
-- **UI** — React 19 SPA (14 components, 7 hooks) with Java HTTP API backend (15 endpoints)
+- **UI** — React 19 SPA (17 components, 8 hooks) with Java HTTP API backend (20 endpoints)
 
 See `NORTH-STAR.md` for the complete specification.
 

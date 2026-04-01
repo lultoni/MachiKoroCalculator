@@ -60,7 +60,10 @@ Three new React components:
 - **Mid-match seat swapping**: After half the games, P1/P2 swap seats for first-player fairness. Win attribution maps back to original indices. Toggleable via `--no-swap`.
 - **Engine registry tier field**: `"tier": "fast"|"balanced"|"deep"` on each of the 24 registry entries. `EngineRegistry.getByTier()` for tournament engine selection.
 - **TournamentRunner**: Generates N×(N-1)/2 unordered pairs, delegates to `MatchRunner`, aggregates into leaderboard (sorted by win rate) + H2H win-rate matrix.
-- **TournamentMain CLI**: `--tier`, `--engines`, `--unleashed` (all 24), `--games`, `--no-swap`, `--estimate`, `--verbose`, `--help`. Runtime estimation based on measured per-engine-class performance baselines.
+- **TournamentMain CLI**: `--tier`, `--engines`, `--unleashed` (all 24), `--games`, `--no-swap`, `--estimate`, `--verbose`, `--help`. Runtime estimation based on measured per-engine-class performance baselines (adjusted for CPU parallelism).
+- **Ctrl+C partial results**: JVM shutdown hook captures completed matchups on interrupt and prints the same full summary (leaderboard, H2H matrix, matchup details, notable stats).
+- **Detailed tournament output**: Four-section results display — leaderboard with W/L/Win%, abbreviated H2H matrix, per-matchup detail table, notable stats (most dominant, closest, shortest/longest games, totals).
+- **Tournament guide in README.md**: Preset examples (quick test, speed demons, fast tier, balanced/deep, unleashed), options reference, result interpretation, tips.
 - 34 new tests in "Tournament Infrastructure" section.
 
 ---

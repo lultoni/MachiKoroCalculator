@@ -6,10 +6,12 @@ import iface.EngineRegistry;
 import iface.EngineRegistryEntry;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * CLI entry point for running round-robin tournaments.
+ *
+ * <p>On Ctrl+C or normal completion, prints a detailed summary: leaderboard,
+ * head-to-head matrix, per-matchup results, and notable stats.
  *
  * <h2>Usage</h2>
  * <pre>
@@ -33,6 +35,10 @@ public final class TournamentMain {
             "mcts-v1-depth-limited",    new long[]{2000, 1400},     // ~10ms/eval × 140
             "mcts-v1-adaptive",         new long[]{500, 8000}       // similar to v1
     );
+
+    /** Shared reference for the shutdown hook. */
+    private static volatile TournamentRunner activeRunner = null;
+    private static volatile long tournamentStartMs = 0;
 
     public static void main(String[] args) {
         // Parse args
@@ -124,11 +130,29 @@ public final class TournamentMain {
 
         if (estimateOnly) return;
 
-        // Run tournament
+        // Set up runner with shutdown hook for Ctrl+C
         TournamentRunner runner = new TournamentRunner(orchestrator);
-        final boolean verb = verbose;
+        activeRunner = runner;
+        tournamentStartMs = System.currentTimeMillis();
+
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            TournamentRunner r = activeRunner;
+            if (r == null) return; // already printed results normally
+            List<MatchResult> partial = r.getCompletedResults();
+            List<String> ids = r.getCurrentEngineIds();
+            if (partial.isEmpty() || ids.isEmpty()) return;
+
+            long elapsed = System.currentTimeMillis() - tournamentStartMs;
+            TournamentResult partialResult = new TournamentResult(ids, partial, elapsed);
+
+            System.out.println();
+            System.out.println("[TOURNAMENT] Interrupted! Printing results from completed matchups...");
+            System.out.println();
+            printResults(partialResult, partial, true);
+        }, "tournament-shutdown-hook"));
+
+        // Run tournament
         final int totalM = totalMatchups;
-        final int gamesPerMatch = games;
 
         TournamentResult result = runner.runTournament(engineIds, games, maxTurns, iterations,
                 seatSwap, new TournamentRunner.ProgressListener() {
@@ -150,22 +174,52 @@ public final class TournamentMain {
                     }
                 });
 
+        // Clear runner reference so shutdown hook knows we printed normally
+        activeRunner = null;
+
         // Print results
         System.out.println();
         System.out.printf("[TOURNAMENT] Complete in %s%n", formatDuration(result.totalTimeMs));
         System.out.println();
-
-        // Leaderboard
-        printLeaderboard(result);
-        System.out.println();
-
-        // H2H matrix
-        printMatrix(result);
+        printResults(result, runner.getCompletedResults(), false);
     }
 
     // -------------------------------------------------------------------------
-    // Output formatting
+    // Result display (used for both normal completion and Ctrl+C)
     // -------------------------------------------------------------------------
+
+    /**
+     * Prints the full tournament summary: leaderboard, H2H matrix, per-matchup
+     * results, and notable stats.
+     */
+    private static void printResults(TournamentResult result, List<MatchResult> matchResults,
+                                     boolean partial) {
+        int completedMatchups = matchResults.size();
+        int totalPossible = result.engineIds.size() * (result.engineIds.size() - 1) / 2;
+
+        if (partial) {
+            System.out.printf("[TOURNAMENT] %d / %d matchups completed (%.0f%%)%n",
+                    completedMatchups, totalPossible,
+                    (double) completedMatchups / totalPossible * 100);
+            System.out.printf("[TOURNAMENT] Elapsed: %s%n", formatDuration(result.totalTimeMs));
+            System.out.println();
+        }
+
+        // 1. Leaderboard
+        printLeaderboard(result);
+        System.out.println();
+
+        // 2. H2H matrix
+        printMatrix(result);
+        System.out.println();
+
+        // 3. Per-matchup detail
+        printMatchupDetails(matchResults);
+        System.out.println();
+
+        // 4. Notable stats
+        printNotableStats(result, matchResults);
+    }
 
     private static void printLeaderboard(TournamentResult result) {
         System.out.println("=== LEADERBOARD ===");
@@ -209,12 +263,100 @@ public final class TournamentMain {
             for (int j = 0; j < n; j++) {
                 if (i == j) {
                     System.out.printf("%" + colWidth + "s", "---");
+                } else if (result.h2hMatrix[i][j] == 0.0 && result.h2hMatrix[j][i] == 0.0) {
+                    // Not yet played
+                    System.out.printf("%" + colWidth + "s", "  -");
                 } else {
                     System.out.printf("%" + (colWidth - 1) + ".0f%%", result.h2hMatrix[i][j] * 100);
                 }
             }
             System.out.println();
         }
+    }
+
+    private static void printMatchupDetails(List<MatchResult> matchResults) {
+        System.out.println("=== MATCHUP DETAILS ===");
+        System.out.printf("%-30s %-30s %6s %6s %8s %8s%n",
+                "Engine A", "Engine B", "A wins", "B wins", "Avg len", "Time");
+        System.out.println("-".repeat(120));
+        for (MatchResult r : matchResults) {
+            System.out.printf("%-30s %-30s %6d %6d %8.0f %7.1fs%n",
+                    r.config.engineIds()[0],
+                    r.config.engineIds()[1],
+                    r.wins[0], r.wins[1],
+                    r.avgGameLength,
+                    r.totalTimeMs / 1000.0);
+        }
+    }
+
+    private static void printNotableStats(TournamentResult result, List<MatchResult> matchResults) {
+        if (matchResults.isEmpty()) return;
+
+        System.out.println("=== NOTABLE STATS ===");
+
+        // Most dominant matchup (highest win rate)
+        MatchResult mostDominant = null;
+        double highestRate = 0;
+        for (MatchResult r : matchResults) {
+            double rate = Math.max(r.winRates[0], r.winRates[1]);
+            if (rate > highestRate) {
+                highestRate = rate;
+                mostDominant = r;
+            }
+        }
+        if (mostDominant != null) {
+            int winnerIdx = mostDominant.winRates[0] >= mostDominant.winRates[1] ? 0 : 1;
+            int loserIdx = 1 - winnerIdx;
+            System.out.printf("  Most dominant: %s beat %s %.0f%%-%.0f%%%n",
+                    mostDominant.config.engineIds()[winnerIdx],
+                    mostDominant.config.engineIds()[loserIdx],
+                    mostDominant.winRates[winnerIdx] * 100,
+                    mostDominant.winRates[loserIdx] * 100);
+        }
+
+        // Closest matchup (nearest to 50-50)
+        MatchResult closest = null;
+        double closestDiff = 1.0;
+        for (MatchResult r : matchResults) {
+            double diff = Math.abs(r.winRates[0] - r.winRates[1]);
+            if (diff < closestDiff) {
+                closestDiff = diff;
+                closest = r;
+            }
+        }
+        if (closest != null) {
+            System.out.printf("  Closest match: %s vs %s (%.0f%%-%.0f%%)%n",
+                    closest.config.engineIds()[0],
+                    closest.config.engineIds()[1],
+                    closest.winRates[0] * 100,
+                    closest.winRates[1] * 100);
+        }
+
+        // Shortest avg game length
+        MatchResult shortest = matchResults.stream()
+                .min(Comparator.comparingDouble(r -> r.avgGameLength)).orElse(null);
+        if (shortest != null) {
+            System.out.printf("  Shortest games: %s vs %s (avg %.0f turns)%n",
+                    shortest.config.engineIds()[0],
+                    shortest.config.engineIds()[1],
+                    shortest.avgGameLength);
+        }
+
+        // Longest avg game length
+        MatchResult longest = matchResults.stream()
+                .max(Comparator.comparingDouble(r -> r.avgGameLength)).orElse(null);
+        if (longest != null) {
+            System.out.printf("  Longest games:  %s vs %s (avg %.0f turns)%n",
+                    longest.config.engineIds()[0],
+                    longest.config.engineIds()[1],
+                    longest.avgGameLength);
+        }
+
+        // Total games, total eval time
+        int totalGamesPlayed = matchResults.stream().mapToInt(r -> r.gameLogs.size()).sum();
+        double totalEvalMs = matchResults.stream().mapToDouble(r -> r.totalTimeMs).sum();
+        System.out.printf("  Total: %d games played across %d matchups in %s%n",
+                totalGamesPlayed, matchResults.size(), formatDuration((long) totalEvalMs));
     }
 
     /**
@@ -244,6 +386,7 @@ public final class TournamentMain {
 
     private static long estimateRuntime(List<String> engineIds, int gamesPerMatchup,
                                         int iterationsOverride) {
+        int cores = Runtime.getRuntime().availableProcessors();
         long totalMs = 0;
         for (int i = 0; i < engineIds.size(); i++) {
             for (int j = i + 1; j < engineIds.size(); j++) {
@@ -251,7 +394,9 @@ public final class TournamentMain {
                 long msPerGameB = estimateMsPerGame(engineIds.get(j), iterationsOverride);
                 // Both engines evaluate every turn, runtime dominated by the slower one
                 long msPerGame = Math.max(msPerGameA, msPerGameB);
-                totalMs += msPerGame * gamesPerMatchup;
+                // Games within a match run in parallel via ForkJoinPool
+                long matchMs = msPerGame * gamesPerMatchup / cores;
+                totalMs += matchMs;
             }
         }
         return totalMs;
@@ -273,7 +418,7 @@ public final class TournamentMain {
         return baseMsPerGame * effectiveIter / baselineIter;
     }
 
-    private static String formatDuration(long ms) {
+    static String formatDuration(long ms) {
         long seconds = ms / 1000;
         if (seconds < 60) return seconds + "s";
         long minutes = seconds / 60;
@@ -304,6 +449,25 @@ public final class TournamentMain {
         System.out.println("  --estimate                   Print runtime estimate and exit");
         System.out.println("  --verbose                    Print every game result");
         System.out.println("  --help                       Show this help");
+        System.out.println();
+
+        System.out.println("Presets:");
+        System.out.println("  Quick test (3 engines, ~30s):");
+        System.out.println("    --engines mcts-v1-fast,mcts-v1-depth3,mcts-v1-greedy-tree-fast --games 10");
+        System.out.println();
+        System.out.println("  Fast tier (10 engines, ~5 min without A/B, hours with):");
+        System.out.println("    --tier fast --games 20");
+        System.out.println();
+        System.out.println("  Speed demons only (6 engines, ~30 min):");
+        System.out.println("    --engines mcts-v1-fast,mcts-v1-greedy-tree-fast,mcts-v1-depth3,mcts-v1-depth7,mcts-v1-depth10,mcts-v1-adaptive-fast --games 50");
+        System.out.println();
+        System.out.println("  Full fast tier (10 engines, est. hours — A/B variants are slow):");
+        System.out.println("    --tier fast --games 50");
+        System.out.println();
+        System.out.println("  All engines (24 engines, est. days):");
+        System.out.println("    --unleashed --games 30");
+        System.out.println();
+        System.out.println("  Tip: Ctrl+C at any time prints results from completed matchups.");
         System.out.println();
 
         System.out.println("Engine tiers:");

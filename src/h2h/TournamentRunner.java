@@ -3,6 +3,7 @@ package h2h;
 import iface.EngineOrchestrator;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -15,10 +16,16 @@ import java.util.List;
  *
  * <p>Matches run sequentially (each match already uses ForkJoinPool for game-level
  * parallelism). Individual match results are saved to {@link H2hResultStore}.
+ *
+ * <p>Completed results are accessible at any time via {@link #getCompletedResults()}
+ * for partial reporting on interruption.
  */
 public final class TournamentRunner {
 
     private final EngineOrchestrator orchestrator;
+    private volatile List<String> currentEngineIds = List.of();
+    private final List<MatchResult> completedResults =
+            Collections.synchronizedList(new ArrayList<>());
 
     public TournamentRunner(EngineOrchestrator orchestrator) {
         this.orchestrator = orchestrator;
@@ -30,6 +37,23 @@ public final class TournamentRunner {
     public interface ProgressListener {
         void onMatchStarted(int matchIndex, int totalMatches, String engineA, String engineB);
         void onMatchCompleted(int matchIndex, int totalMatches, MatchResult result);
+    }
+
+    /**
+     * Returns results collected so far (thread-safe).
+     * Useful for building partial results on Ctrl+C interruption.
+     */
+    public List<MatchResult> getCompletedResults() {
+        synchronized (completedResults) {
+            return new ArrayList<>(completedResults);
+        }
+    }
+
+    /**
+     * Returns the engine IDs for the current tournament (set at start).
+     */
+    public List<String> getCurrentEngineIds() {
+        return currentEngineIds;
     }
 
     /**
@@ -47,6 +71,8 @@ public final class TournamentRunner {
                                           int maxTurnsPerGame, int iterationsOverride,
                                           boolean seatSwap, ProgressListener listener) {
         long startMs = System.currentTimeMillis();
+        this.currentEngineIds = new ArrayList<>(engineIds);
+        completedResults.clear();
 
         // Generate all unordered pairs
         List<int[]> pairs = generatePairs(engineIds.size());
@@ -54,7 +80,6 @@ public final class TournamentRunner {
 
         MatchRunner runner = new MatchRunner(orchestrator);
         H2hResultStore store = new H2hResultStore();
-        List<MatchResult> results = new ArrayList<>();
 
         for (int m = 0; m < totalMatches; m++) {
             int[] pair = pairs.get(m);
@@ -71,7 +96,7 @@ public final class TournamentRunner {
 
             MatchResult result = runner.runMatch(config, null);
             store.save(result);
-            results.add(result);
+            completedResults.add(result);
 
             if (listener != null) {
                 listener.onMatchCompleted(m, totalMatches, result);
@@ -79,7 +104,7 @@ public final class TournamentRunner {
         }
 
         long totalMs = System.currentTimeMillis() - startMs;
-        return new TournamentResult(engineIds, results, totalMs);
+        return new TournamentResult(engineIds, getCompletedResults(), totalMs);
     }
 
     /**

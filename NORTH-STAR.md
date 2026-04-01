@@ -281,7 +281,7 @@ All engine+config combinations are stored in a **flat JSON registry**:
 ### 6.4 UI ↔ Backend Communication
 
 - **Technology**: Java HTTP server (lightweight, e.g. Javalin or built-in `com.sun.net.httpserver`) serving a REST-ish API
-- **Frontend**: Single-page app (SPA) — framework chosen for best fit with live-update requirements and component-based UI (React or Svelte)
+- **Frontend**: Single-page app (SPA) — React 19 + TypeScript + Vite 8 + Tailwind CSS 4
 - **Runs locally**: user starts the app, it opens in their browser
 - **Not a deployed service**: no server hosting, no phone support — purely local desktop use
 
@@ -295,7 +295,7 @@ Everything determined by rules or card effects:
 - Income clamping (can't pay more than you have)
 - Counter-clockwise resolution order for multiple red claims
 - Card supply tracking (6 copies per non-landmark; 1 purple per player)
-  - Starting Cards tracking: Every Player starts with 1 Weizenfeld and 1 Bäckerei, which both don't take away from the 6 copies of each of the cards still available for purchase
+  - Starting Cards tracking: Every Player starts with 1 Weizenfeld and 1 Bäckerei. These starting copies count against the 6-copy market supply (e.g., in a 2-player game, 4 copies of each remain purchasable).
 - Card purchase validation (enough coins, card available, purple uniqueness)
 - Landmark effects that are purely mechanical:
   - Freizeitpark: doubles → bonus turn (the *rule*; whether to *aim* for doubles is engine territory)

@@ -24,7 +24,7 @@ The Core layer owns everything determined by game rules or card effects:
 - Income clamping (can't pay more than you have)
 - Counter-clockwise resolution for multiple red claims
 - Card supply tracking (6 copies per non-landmark; 1 purple per player)
-- Starting cards: each player begins with 1 Weizenfeld + 1 Bäckerei (not deducted from the 6-copy supply)
+- Starting cards: each player begins with 1 Weizenfeld + 1 Bäckerei (these count against the 6-copy supply)
 - Card purchase validation (enough coins, card available, purple uniqueness)
 - Mechanical landmark effects: Freizeitpark doubles → bonus turn, Einkaufszentrum +1 coin per green/red store card
 - Turn order progression
@@ -201,7 +201,7 @@ gain = min(5, max(opponent_coins))
 
 ### 4.5 Card Supply
 
-Non-landmark establishments have 6 copies in the base game. Starting cards (Weizenfeld, Bäckerei) given to players are separate from the 6-copy supply pool — they do not reduce the available copies for purchase. `GameState.unbuilt_projects` stores one entry per non-landmark card type that still has copies available; a type is removed when total copies owned across all players reaches 6.
+Non-landmark establishments have 6 copies in the base game. Starting cards (Weizenfeld, Bäckerei) given to players count against the 6-copy supply pool — each player's starter copy occupies one of the 6 market slots (e.g., in a 2-player game, 4 copies of each remain purchasable). `GameStateBuilder.build()` counts all owned copies across all players and removes a card type from `unbuilt_projects` when total copies reach 6.
 
 ---
 
@@ -235,9 +235,41 @@ See NORTH-STAR.md Section 7 for the full specification. Key technical details:
 
 ### 6.2 Rollout Approaches
 
-- **v1 (full game)**: simulate until someone wins. Simple, accurate, slower.
-- **v2 (depth-limited)**: stop after N turns, estimate winner via heuristic on position. Faster, quality depends on heuristic. To be validated head-to-head against v1.
+Six engine variants are implemented:
+
+- **v1 (full game)**: Simulate until someone wins. Uniform-random rollout policy. Simple, accurate, slower.
+- **Variant A (greedy rollout)**: Informed rollout policy — landmark priority, then argmax over EV×geometricSum−cost. Tree phase unchanged (full UCT).
+- **Variant B (Boltzmann rollout)**: Softmax purchase sampling with temperature T in rollouts. Stochastic-but-informed exploration.
+- **Variant C (greedy tree)**: Argmax selection at `BuyDecisionNode` instead of UCT. All other nodes keep UCT. Rollout = uniform random.
+- **Variant D (depth-limited)**: Stop rollout after N turns, evaluate position via `WinProbability.computeBaselineWinProb`. Faster, quality depends on heuristic.
+- **Variant E (adaptive budget)**: Survey phase (iterations/5), then concentrate remaining budget on close races. Focused subtree exploration via `MctsTree.runIterationsFromNode`.
+
+Each variant has fast/balanced/deep configurations. Total: 33 registry entries across 6 engine classes.
 
 ### 6.3 Safety Valve
 
 Maximum turn limit for rollouts. Games rarely exceed 60–70 turns with reasonable play — the limit must account for unlucky edge cases while preventing infinite loops.
+
+---
+
+## 7. Structured Explanation System
+
+### 7.1 ExplanationFactor Model
+
+Each purchase option carries structured explanation data:
+- `ExplanationFactor`: `category` (9 types), `weight` [0,1], `summary` (one-line), `detail` (expandable)
+- `Option.structuredFactors`: sorted by weight descending
+- `Option.summarySentence`: "Buy {cardName} — {highestWeightFactor.summary}"
+
+### 7.2 Weight Computation (Two-Pass Enrichment)
+
+1. **Pass 1**: Build all options with metrics (existing flow)
+2. **Pass 2**: Compute cross-option means and ranges per metric, then for each option generate weighted factors
+
+Weight formula: `|value - mean| / range` normalized to [0,1]. Weight = 0 when range = 0 (metric doesn't discriminate).
+
+9 factor categories: `winRate`, `income`, `synergy`, `risk`, `tempo`, `landmark`, `cost`, `coverage`, `scarcity`.
+
+### 7.3 Pre-computation
+
+`PrecomputeCache`: single-entry thread-safe cache with daemon `ExecutorService`. Key = `(structuralHash, playerIndex, engineId)`. New request cancels in-flight computation. `GameState.structuralHash()` provides a deterministic hash of player coins and sorted owned card IDs.

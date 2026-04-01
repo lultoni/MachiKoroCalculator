@@ -162,7 +162,7 @@ Build the engine comparison and validation framework. Used both during Phase 3 v
 
 | Task | Description | Status |
 |------|-------------|--------|
-| 7.1 | Card scraping: automated script to collect all cards (all expansions) from Machi Koro wiki for reference data (Section 6.6). | pending |
+| 7.1 | Card scraping: automated script to collect all cards (all expansions) from Machi Koro wiki for reference data (Section 6.6). | done |
 | 7.2 | Refine UI based on real gameplay usage. | pending |
 | 7.3 | Expansion card support (out of scope until core is perfected). | pending |
 | 7.4 | Opponent archetypes for more realistic simulation (Landmark-Rusher, Income-Maximizer, Blocker). | pending |

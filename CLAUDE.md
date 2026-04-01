@@ -24,40 +24,45 @@ UI (Web SPA) → Interface (orchestration) → Simulation Engines → Standard C
 ```
 
 - **Core** — pure game rules: `GameState`, `Player`, `Project`, `ProjectLoader`, card income (`get_I`), dice resolution, turn order, win condition. No strategy, no opinions.
-- **Standard Calcs** — reusable, version-agnostic math: EV, ROI, probability distributions, variance. Any engine can call these.
-- **Simulation Engines** — pluggable strategy implementations (MCTS, future alternatives). Each implements `SimulationEngine` interface and returns ranked purchase options with scores and explanations.
-- **Interface** — orchestration layer: engine registry (JSON), request routing, result formatting.
-- **UI** — web SPA (React or Svelte) talking to a local Java HTTP API. Handles display, input, interaction.
+- **Standard Calcs** — reusable, version-agnostic math: EV, ROI, probability distributions, variance, plus 11 advanced metrics (Sharpe, Sortino, Kelly, VaR/CVaR, HHI, entropy, IG, ETW, tempo, urgency, roll correlation). Any engine can call these.
+- **Simulation Engines** — pluggable strategy implementations (6 MCTS variants with 33 configurations). Each implements `SimulationEngine` interface and returns ranked purchase options with scores, structured explanations, and metrics.
+- **Interface** — orchestration layer: engine registry (JSON with 33 entries), request routing, result formatting, pre-computation cache.
+- **UI** — web SPA (React 19 + TypeScript + Vite 8 + Tailwind CSS 4) talking to a local Java HTTP API (15 endpoints). 14 components, 7 hooks, DE/EN localization.
 
-### Current State (Pre-Restructure)
+### Current State
 
-The codebase is currently a single Java layer with Swing UI. The restructure separates it into the 5 layers above. Code that survives:
+The restructure is complete (Phases 1–5 done). The 5-layer architecture is fully implemented and operational:
 
-**Preserved (game rules + core data model):**
-- `Project`, `Player`, `GameState`, `GameStateBuilder`, `TurnRecord` — core data model
-- `GameSession`, `GameSessionPersistence` — game tracking + persistence
-- `ProjectLoader` — card data loading from JSON
-- `CardIncome.get_I`, `P1`/`P2` — per-card income calculation (all 19 cards) + dice probabilities
-- `computeAllDeltasForRoll` — full roll resolution for all players
-- `BürohausLogic.executeSwap` — swap execution mechanics
-- `Strings` — localization registry (adapted for web)
-- `projects.json` — card data
+- **Core** layer (`core/` package): `GameState`, `Player`, `Project`, `ProjectLoader`, `CardIncome`, `RollResolver`, `BürohausLogic`, `GameSession`, `GameSessionPersistence`, `TurnRecord`
+- **Standard Calcs** layer (`calcs/` package): `Calcs` (all metrics), `WinProbability`, `RankEntry`
+- **Engines** layer (`engine/` package): `MctsV1Engine` (base) + 5 variants (A–E), `mcts/` subpackage with all tree node types, rollout policies, `SupplyTracker`, `MctsTree`
+- **Interface** layer (`iface/` package): `EngineOrchestrator`, `EngineRegistry`, `EngineRegistryEntry`
+- **Server** layer (`server/` package): `ApiServer` with 15 endpoints, `SessionManager`, `PrecomputeCache`, `EvaluateHandler`, `SessionInsightsHandler`, plus various session handlers
+- **UI** layer (`web/` directory): React 19 SPA with full game dashboard, structured explanation UI, insights panel, pre-computation integration
 
-**Being replaced (see NORTH-STAR.md Section 10):**
-- Strategy/ranking layer (`RolloutTree`, `WinProbabilityCalc`, `adaptiveMCRefinement`, `rankPurchasableProjects`, `GameSimulator`) → replaced by pluggable `SimulationEngine` implementations
-- Entire Swing UI (`gui.newui/*`) → replaced by web SPA
-- `AssistantConfig`, `PhaseFitter`, `LabelingWindow` → replaced by engine-computed explanations
+**Legacy code** (`logic/`, `gui/`): The old Swing UI and probability calc code remain in the repo but are unused. The web SPA is the current app.
 
 ## Build & Run
 
-Java 17+, `gson-2.11.0.jar` (bundled in repo root).
+Java 17+, `gson-2.11.0.jar` (bundled in repo root). Node.js 18+ for web frontend.
 
 **Manual compile (from repo root):**
 ```bash
 javac -cp "src:gson-2.11.0.jar" -d out $(find src -name "*.java")
 ```
 
-**Run main app (current Swing UI):**
+**Run web server (serves API + built SPA on localhost:8080):**
+```bash
+java -cp "out:src:gson-2.11.0.jar" server.ServerMain
+```
+
+**Web frontend development:**
+```bash
+cd web && npm install && npm run dev    # Vite dev server (hot reload)
+cd web && npm run build                 # Production build → web/dist/
+```
+
+**Run legacy Swing UI (deprecated, kept for reference):**
 ```bash
 java -cp "out:src:gson-2.11.0.jar" logic.Main
 ```
@@ -165,6 +170,16 @@ After finishing any task, update all of the following that are affected by the c
 - A new card is added or an existing card's data is corrected
 
 Do not batch documentation updates — apply them as part of the same change that modifies the code.
+
+### Documentation Accuracy Audit
+
+At the end of each phase (or when the user requests it), perform a cross-document accuracy audit:
+
+1. **Read every doc file** — README.md, NORTH-STAR.md, PLAN.md, CLAUDE.md, ARCHITECTURE.md, CHANGELOG.md, ARCHIVE.md
+2. **Verify against the codebase** — Check that version numbers, file counts, component lists, API endpoint counts, test counts, tech stack versions, and behavioral descriptions match the actual code
+3. **Fix contradictions** — When code and docs disagree, determine the ground truth from tests and source code, then fix the docs
+4. **Check task statuses** — Ensure completed work is marked done in PLAN.md
+5. **Update MEMORY.md** — Ensure session memory reflects the current state
 
 ## Card Rules Reference
 

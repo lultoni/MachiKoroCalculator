@@ -67,7 +67,7 @@ public final class MctsRollout {
     public static double simulate(GameState startState, SupplyTracker startSupply,
                                   int startingPlayer, int playerPerspective) {
         GameState state   = startState.copy();
-        SupplyTracker supply = startSupply; // SupplyTracker is immutable (withPurchase returns new)
+        SupplyTracker.MutableSupplyTracker supply = startSupply.toMutable();
         ThreadLocalRandom rng = ThreadLocalRandom.current();
         int n = state.getPlayers().length;
         int activePlayer = startingPlayer;
@@ -116,11 +116,11 @@ public final class MctsRollout {
 
             // ---- Bürohaus: on roll 6, pick uniformly from all valid swaps + no-swap ----
             if (state.getPlayers()[activePlayer].hasProject("bürohaus") && roll == 6) {
-                supply = applyBürohausRandomPackage(state, supply, activePlayer, rng);
+                applyBürohausRandomPackage(state, activePlayer, rng);
             }
 
             // ---- Purchase ----
-            supply = applyPurchaseRandomPackage(state, supply, activePlayer, rng);
+            applyPurchaseRandomPackage(state, supply, activePlayer, rng);
 
             // ---- Win check ----
             if (GameState.hasWon(state.getPlayers()[activePlayer])) {
@@ -131,7 +131,7 @@ public final class MctsRollout {
             boolean hasFreizeit = state.getPlayers()[activePlayer].hasProject("freizeitpark");
             if (hasFreizeit && doubles) {
                 // Bonus turn: same player acts again (no further chaining if bonus doubles)
-                supply = playBonusTurnPackage(state, supply, activePlayer, playerPerspective, rng);
+                playBonusTurnPackage(state, supply, activePlayer, playerPerspective, rng);
                 // Win check after bonus turn
                 if (GameState.hasWon(state.getPlayers()[activePlayer])) {
                     return activePlayer == playerPerspective ? 1.0 : 0.0;
@@ -156,7 +156,7 @@ public final class MctsRollout {
      * Uses the same uniform-random policy as the main loop, but with {@code isBonusTurn=true}
      * so no further Freizeitpark chaining occurs even on doubles.
      */
-    static SupplyTracker playBonusTurnPackage(GameState state, SupplyTracker supply,
+    static void playBonusTurnPackage(GameState state, SupplyTracker.MutableSupplyTracker supply,
                                                 int activePlayer, int playerPerspective,
                                                 ThreadLocalRandom rng) {
         boolean hasBahnhof = state.getPlayers()[activePlayer].hasProject("bahnhof");
@@ -180,20 +180,17 @@ public final class MctsRollout {
         }
 
         if (state.getPlayers()[activePlayer].hasProject("bürohaus") && roll == 6) {
-            supply = applyBürohausRandomPackage(state, supply, activePlayer, rng);
+            applyBürohausRandomPackage(state, activePlayer, rng);
         }
 
-        supply = applyPurchaseRandomPackage(state, supply, activePlayer, rng);
-        return supply;
+        applyPurchaseRandomPackage(state, supply, activePlayer, rng);
     }
 
     /**
      * Enumerates all valid Bürohaus swap pairs (non-landmark, non-purple) plus no-swap,
      * picks uniformly at random, and applies the chosen swap to {@code state} in-place.
-     *
-     * @return updated supply (unchanged, since swaps don't affect supply counts)
      */
-    static SupplyTracker applyBürohausRandomPackage(GameState state, SupplyTracker supply,
+    static void applyBürohausRandomPackage(GameState state,
                                                       int activePlayer,
                                                       ThreadLocalRandom rng) {
         Player active = state.getPlayers()[activePlayer];
@@ -220,10 +217,9 @@ public final class MctsRollout {
             }
         }
 
-        // Total choices: 1 (no-swap) + swapOptions.size()
         int totalChoices = 1 + swapOptions.size();
         int choice = rng.nextInt(totalChoices);
-        if (choice == 0) return supply; // no-swap
+        if (choice == 0) return; // no-swap
 
         int[] pair = swapOptions.get(choice - 1);
         Project ownCard = ownEligible.get(pair[0]);
@@ -234,17 +230,13 @@ public final class MctsRollout {
         state.getPlayers()[oppPlayerIdx].getOwned_projects().remove(oppCard);
         active.getOwned_projects().add(oppCard);
         state.getPlayers()[oppPlayerIdx].getOwned_projects().add(ownCard);
-
-        return supply; // supply unchanged by swap
     }
 
     /**
      * Builds the list of affordable purchase options (non-landmark + landmark + save),
      * picks one uniformly at random, and applies the purchase to {@code state} in-place.
-     *
-     * @return updated supply tracker (decremented for non-landmark purchases)
      */
-    static SupplyTracker applyPurchaseRandomPackage(GameState state, SupplyTracker supply,
+    static void applyPurchaseRandomPackage(GameState state, SupplyTracker.MutableSupplyTracker supply,
                                                       int activePlayer,
                                                       ThreadLocalRandom rng) {
         Player active = state.getPlayers()[activePlayer];
@@ -279,14 +271,12 @@ public final class MctsRollout {
         Project card = (Project) chosen[0];
         boolean isLandmark = (boolean) chosen[1];
 
-        if (card == RankEntry.WAIT_SENTINEL) return supply; // save: no-op
+        if (card == RankEntry.WAIT_SENTINEL) return; // save: no-op
 
         active.setCoins(active.getCoins() - card.getCost());
         active.getOwned_projects().add(card);
         if (!isLandmark) {
-            supply = supply.withPurchase(card.getId());
+            supply.purchase(card.getId());
         }
-
-        return supply;
     }
 }

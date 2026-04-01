@@ -44,7 +44,7 @@ public final class DepthLimitedRollout {
     static double simulate(GameState startState, SupplyTracker startSupply,
                            int startingPlayer, int playerPerspective, int maxDepth) {
         GameState state      = startState.copy();
-        SupplyTracker supply = startSupply;
+        SupplyTracker.MutableSupplyTracker supply = startSupply.toMutable();
         ThreadLocalRandom rng = ThreadLocalRandom.current();
         int n            = state.getPlayers().length;
         int activePlayer = startingPlayer;
@@ -84,11 +84,11 @@ public final class DepthLimitedRollout {
 
             // ---- Bürohaus: uniform random ----
             if (state.getPlayers()[activePlayer].hasProject("bürohaus") && roll == 6) {
-                MctsRollout.applyBürohausRandomPackage(state, supply, activePlayer, rng);
+                MctsRollout.applyBürohausRandomPackage(state, activePlayer, rng);
             }
 
             // ---- Purchase: uniform random ----
-            supply = MctsRollout.applyPurchaseRandomPackage(state, supply, activePlayer, rng);
+            MctsRollout.applyPurchaseRandomPackage(state, supply, activePlayer, rng);
 
             // ---- Win check ----
             if (GameState.hasWon(state.getPlayers()[activePlayer])) {

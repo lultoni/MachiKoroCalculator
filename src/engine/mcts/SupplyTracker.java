@@ -101,4 +101,75 @@ public final class SupplyTracker {
         updated.put(cardId, current - 1);
         return new SupplyTracker(updated);
     }
+
+    // -------------------------------------------------------------------------
+    // Mutable variant for rollout hot paths
+    // -------------------------------------------------------------------------
+
+    /**
+     * Creates a mutable copy of this tracker for use in rollout simulations.
+     * The mutable tracker avoids HashMap allocation on every purchase by
+     * using an in-place {@code int[]} array.
+     */
+    public MutableSupplyTracker toMutable() {
+        return new MutableSupplyTracker(counts);
+    }
+
+    /**
+     * Mutable, array-backed supply tracker for rollout hot paths.
+     *
+     * <p>Backed by a flat {@code int[]} indexed by a card-ID-to-index map built
+     * once per instance. {@link #purchase} and {@link #undoPurchase} are O(1)
+     * with no allocation. Use {@link SupplyTracker#toMutable()} to create.
+     *
+     * <p>Not thread-safe. Intended for single-threaded rollout loops.
+     */
+    public static final class MutableSupplyTracker {
+
+        private final String[] ids;
+        private final Map<String, Integer> idToIndex;
+        private final int[] supply;
+
+        private MutableSupplyTracker(Map<String, Integer> counts) {
+            int n = counts.size();
+            ids = new String[n];
+            idToIndex = new HashMap<>(n * 2);
+            supply = new int[n];
+            int i = 0;
+            for (Map.Entry<String, Integer> e : counts.entrySet()) {
+                ids[i] = e.getKey();
+                idToIndex.put(e.getKey(), i);
+                supply[i] = e.getValue();
+                i++;
+            }
+        }
+
+        /** Returns true iff at least one copy remains. Landmarks always return false. */
+        public boolean canPurchase(String cardId) {
+            Integer idx = idToIndex.get(cardId);
+            return idx != null && supply[idx] > 0;
+        }
+
+        /** Returns remaining supply count, or 0 if unknown/landmark. */
+        public int getCount(String cardId) {
+            Integer idx = idToIndex.get(cardId);
+            return idx != null ? supply[idx] : 0;
+        }
+
+        /** Decrements supply for a purchase. No-op if unknown or already 0. */
+        public void purchase(String cardId) {
+            Integer idx = idToIndex.get(cardId);
+            if (idx != null && supply[idx] > 0) {
+                supply[idx]--;
+            }
+        }
+
+        /** Increments supply (undo a purchase). No-op if unknown. */
+        public void undoPurchase(String cardId) {
+            Integer idx = idToIndex.get(cardId);
+            if (idx != null) {
+                supply[idx]++;
+            }
+        }
+    }
 }

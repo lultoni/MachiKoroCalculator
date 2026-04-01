@@ -59,7 +59,7 @@ public final class BoltzmannRollout {
     static double simulate(GameState startState, SupplyTracker startSupply,
                            int startingPlayer, int playerPerspective, double temperature) {
         GameState state      = startState.copy();
-        SupplyTracker supply = startSupply;
+        SupplyTracker.MutableSupplyTracker supply = startSupply.toMutable();
         ThreadLocalRandom rng = ThreadLocalRandom.current();
         int n            = state.getPlayers().length;
         int activePlayer = startingPlayer;
@@ -108,7 +108,7 @@ public final class BoltzmannRollout {
             }
 
             // ---- Purchase: Boltzmann ----
-            supply = applyPurchaseBoltzmann(state, supply, activePlayer, temperature, rng);
+            applyPurchaseBoltzmann(state, supply, activePlayer, temperature, rng);
 
             // ---- Win check ----
             if (GameState.hasWon(state.getPlayers()[activePlayer])) {
@@ -118,7 +118,7 @@ public final class BoltzmannRollout {
             // ---- Freizeitpark bonus turn ----
             boolean hasFreizeit = state.getPlayers()[activePlayer].hasProject("freizeitpark");
             if (hasFreizeit && doubles) {
-                supply = playBonusTurn(state, supply, activePlayer, temperature, rng);
+                playBonusTurn(state, supply, activePlayer, temperature, rng);
                 if (GameState.hasWon(state.getPlayers()[activePlayer])) {
                     return activePlayer == playerPerspective ? 1.0 : 0.0;
                 }
@@ -135,7 +135,7 @@ public final class BoltzmannRollout {
     // Boltzmann purchase
     // -------------------------------------------------------------------------
 
-    private static SupplyTracker applyPurchaseBoltzmann(GameState state, SupplyTracker supply,
+    private static void applyPurchaseBoltzmann(GameState state, SupplyTracker.MutableSupplyTracker supply,
                                                          int activePlayer, double temperature,
                                                          ThreadLocalRandom rng) {
         Player active = state.getPlayers()[activePlayer];
@@ -156,7 +156,7 @@ public final class BoltzmannRollout {
         if (landmarkToBuy != null) {
             active.setCoins(coins - landmarkToBuy.getCost());
             active.getOwned_projects().add(landmarkToBuy);
-            return supply;
+            return;
         }
 
         // 2. Boltzmann sampling over non-landmark cards + save
@@ -201,12 +201,11 @@ public final class BoltzmannRollout {
         }
 
         Project card = candidates.get(chosen);
-        if (card == RankEntry.WAIT_SENTINEL) return supply; // save
+        if (card == RankEntry.WAIT_SENTINEL) return; // save
 
         active.setCoins(coins - card.getCost());
         active.getOwned_projects().add(card);
-        supply = supply.withPurchase(card.getId());
-        return supply;
+        supply.purchase(card.getId());
     }
 
     // -------------------------------------------------------------------------
@@ -237,7 +236,7 @@ public final class BoltzmannRollout {
         return ev;
     }
 
-    private static SupplyTracker playBonusTurn(GameState state, SupplyTracker supply,
+    private static void playBonusTurn(GameState state, SupplyTracker.MutableSupplyTracker supply,
                                                 int activePlayer, double temperature,
                                                 ThreadLocalRandom rng) {
         Player active   = state.getPlayers()[activePlayer];
@@ -258,6 +257,6 @@ public final class BoltzmannRollout {
             state.getPlayers()[i].setCoins(Math.max(0, state.getPlayers()[i].getCoins() + deltas[i]));
         }
         if (active.hasProject("bürohaus") && roll == 6) core.BürohausLogic.executeSwap(state, activePlayer);
-        return applyPurchaseBoltzmann(state, supply, activePlayer, temperature, rng);
+        applyPurchaseBoltzmann(state, supply, activePlayer, temperature, rng);
     }
 }

@@ -48,7 +48,7 @@ public final class GreedyRollout {
     public static double simulate(GameState startState, SupplyTracker startSupply,
                                   int startingPlayer, int playerPerspective) {
         GameState state      = startState.copy();
-        SupplyTracker supply = startSupply;
+        SupplyTracker.MutableSupplyTracker supply = startSupply.toMutable();
         ThreadLocalRandom rng = ThreadLocalRandom.current();
         int n            = state.getPlayers().length;
         int activePlayer = startingPlayer;
@@ -103,7 +103,7 @@ public final class GreedyRollout {
             }
 
             // ---- Purchase: greedy ----
-            supply = applyPurchaseGreedy(state, supply, activePlayer);
+            applyPurchaseGreedy(state, supply, activePlayer);
 
             // ---- Win check ----
             if (GameState.hasWon(state.getPlayers()[activePlayer])) {
@@ -113,7 +113,7 @@ public final class GreedyRollout {
             // ---- Freizeitpark bonus turn ----
             boolean hasFreizeit = state.getPlayers()[activePlayer].hasProject("freizeitpark");
             if (hasFreizeit && doubles) {
-                supply = playBonusTurn(state, supply, activePlayer, rng);
+                playBonusTurn(state, supply, activePlayer, rng);
                 if (GameState.hasWon(state.getPlayers()[activePlayer])) {
                     return activePlayer == playerPerspective ? 1.0 : 0.0;
                 }
@@ -161,7 +161,7 @@ public final class GreedyRollout {
     /**
      * Greedy purchase: landmark priority, then best net EV, else save.
      */
-    private static SupplyTracker applyPurchaseGreedy(GameState state, SupplyTracker supply,
+    private static void applyPurchaseGreedy(GameState state, SupplyTracker.MutableSupplyTracker supply,
                                                       int activePlayer) {
         Player active = state.getPlayers()[activePlayer];
         int coins = active.getCoins();
@@ -181,7 +181,7 @@ public final class GreedyRollout {
         if (landmarkToBuy != null) {
             active.setCoins(coins - landmarkToBuy.getCost());
             active.getOwned_projects().add(landmarkToBuy);
-            return supply; // landmarks don't use supply
+            return; // landmarks don't use supply
         }
 
         // 2. Best non-landmark card by net EV: evPerRound × geometricSum − cost
@@ -202,13 +202,12 @@ public final class GreedyRollout {
         if (bestCard != null) {
             active.setCoins(coins - bestCard.getCost());
             active.getOwned_projects().add(bestCard);
-            supply = supply.withPurchase(bestCard.getId());
+            supply.purchase(bestCard.getId());
         }
         // else: save (no-op)
-        return supply;
     }
 
-    private static SupplyTracker playBonusTurn(GameState state, SupplyTracker supply,
+    private static void playBonusTurn(GameState state, SupplyTracker.MutableSupplyTracker supply,
                                                 int activePlayer, ThreadLocalRandom rng) {
         Player active   = state.getPlayers()[activePlayer];
         boolean hasBahnhof = active.hasProject("bahnhof");
@@ -239,6 +238,6 @@ public final class GreedyRollout {
             core.BürohausLogic.executeSwap(state, activePlayer);
         }
 
-        return applyPurchaseGreedy(state, supply, activePlayer);
+        applyPurchaseGreedy(state, supply, activePlayer);
     }
 }

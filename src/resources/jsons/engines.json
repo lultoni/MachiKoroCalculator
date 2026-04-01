@@ -283,5 +283,15 @@
     "config": {
       "iterations": "20000"
     }
+  },
+  {
+    "id": "heuristic-ev-default",
+    "engineClass": "heuristic-ev",
+    "description": "Heuristic EV — instant formula-based ranking, no search",
+    "default": false,
+    "tier": "fast",
+    "config": {
+      "iterations": "0"
+    }
   }
 ]

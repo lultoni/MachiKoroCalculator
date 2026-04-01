@@ -368,6 +368,7 @@ public class RuntimeTester {
             orch.register(new engine.MctsDepthLimitedEngine());
             orch.register(new engine.MctsAdaptiveEngine());
             orch.register(new engine.FlatMcEngine());
+            orch.register(new engine.HeuristicEvEngine());
 
             // Group registry entries by engineClass to avoid running the same engine multiple times
             Map<String, List<EngineRegistryEntry>> byClass = new HashMap<>();

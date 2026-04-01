@@ -253,5 +253,35 @@
     "config": {
       "iterations": "50000"
     }
+  },
+  {
+    "id": "flat-mc-fast",
+    "engineClass": "flat-mc",
+    "description": "Flat Monte Carlo — fast mode (~500 samples)",
+    "default": false,
+    "tier": "fast",
+    "config": {
+      "iterations": "500"
+    }
+  },
+  {
+    "id": "flat-mc-balanced",
+    "engineClass": "flat-mc",
+    "description": "Flat Monte Carlo — balanced mode (~5000 samples)",
+    "default": false,
+    "tier": "balanced",
+    "config": {
+      "iterations": "5000"
+    }
+  },
+  {
+    "id": "flat-mc-deep",
+    "engineClass": "flat-mc",
+    "description": "Flat Monte Carlo — deep mode (~20000 samples)",
+    "default": false,
+    "tier": "deep",
+    "config": {
+      "iterations": "20000"
+    }
   }
 ]

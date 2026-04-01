@@ -1,5 +1,6 @@
 package server;
 
+import engine.FlatMcEngine;
 import engine.MctsAdaptiveEngine;
 import engine.MctsBoltzmannRolloutEngine;
 import engine.MctsDepthLimitedEngine;
@@ -34,11 +35,12 @@ public final class ServerMain {
         orchestrator.register(new MctsGreedyTreeEngine());
         orchestrator.register(new MctsDepthLimitedEngine());
         orchestrator.register(new MctsAdaptiveEngine());
+        orchestrator.register(new FlatMcEngine());
 
         ApiServer server = new ApiServer(orchestrator);
         server.start();
 
-        System.out.println("[ServerMain] MCTS v1 + Variants A-E registered. Server running.");
+        System.out.println("[ServerMain] MCTS v1 + Variants A-E + Flat MC registered. Server running.");
         System.out.println("[ServerMain] Press Ctrl+C to stop.");
 
         // Keep the main thread alive until interrupted

@@ -79,7 +79,16 @@ final class SessionTurnHandler implements HttpHandler {
                     null, null, null, -1, diceCount);
             session.applyTurn(record);
 
-            ApiUtils.sendJson(exchange, 200, SessionSerializer.toJson(session));
+            // Store engine snapshot if provided (user's turns only; null for opponent turns)
+            JsonObject snapshot = null;
+            if (body.has("engineSnapshot") && !body.get("engineSnapshot").isJsonNull()) {
+                snapshot = body.getAsJsonObject("engineSnapshot");
+            }
+            sessionManager.addEngineSnapshot(snapshot);
+
+            JsonObject response = SessionSerializer.toJson(session);
+            SessionSerializer.addEngineSnapshots(response, sessionManager.getEngineSnapshots());
+            ApiUtils.sendJson(exchange, 200, response);
 
         } catch (IllegalArgumentException e) {
             ApiUtils.sendError(exchange, 400, e.getMessage());

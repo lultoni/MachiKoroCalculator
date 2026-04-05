@@ -84,7 +84,9 @@ final class SessionCreateHandler implements HttpHandler {
             GameSession session = new GameSession(initialState, playerNames);
             sessionManager.setSession(session);
 
-            ApiUtils.sendJson(exchange, 200, SessionSerializer.toJson(session));
+            JsonObject response = SessionSerializer.toJson(session);
+            SessionSerializer.addEngineSnapshots(response, sessionManager.getEngineSnapshots());
+            ApiUtils.sendJson(exchange, 200, response);
 
         } catch (Exception e) {
             ApiUtils.sendError(exchange, 500, "Internal error: " + e.getMessage());

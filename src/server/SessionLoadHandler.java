@@ -60,7 +60,9 @@ final class SessionLoadHandler implements HttpHandler {
             GameSession session = GameSession.load(savePath);
             sessionManager.setSession(session);
 
-            ApiUtils.sendJson(exchange, 200, SessionSerializer.toJson(session));
+            JsonObject response = SessionSerializer.toJson(session);
+            SessionSerializer.addEngineSnapshots(response, sessionManager.getEngineSnapshots());
+            ApiUtils.sendJson(exchange, 200, response);
 
         } catch (IllegalArgumentException e) {
             ApiUtils.sendError(exchange, 400, e.getMessage());

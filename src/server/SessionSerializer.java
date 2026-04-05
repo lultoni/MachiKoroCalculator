@@ -20,7 +20,8 @@ import java.util.List;
  *   "bonusTurnPending":   false,
  *   "finished":           false,
  *   "winnerIndex":        -1,
- *   "history":            [ ...TurnRecord JSON... ]
+ *   "history":            [ ...TurnRecord JSON... ],
+ *   "engineSnapshots":    [ ...snapshot JSON or null... ]  (optional)
  * }
  * </pre>
  */
@@ -75,5 +76,22 @@ public final class SessionSerializer {
             arr.add(turn);
         }
         return arr;
+    }
+
+    /**
+     * Appends an {@code "engineSnapshots"} array to an existing session JSON object.
+     * Each element is either a snapshot {@link JsonObject} or {@link JsonNull} for turns
+     * without engine evaluation (e.g. opponent turns).
+     *
+     * <p>Call this after {@link #toJson(GameSession)} to enrich the response with review data.
+     * If the list is empty (no snapshots recorded), the key is still added as an empty array
+     * for consistent client handling.
+     */
+    public static void addEngineSnapshots(JsonObject root, List<JsonObject> snapshots) {
+        JsonArray arr = new JsonArray();
+        for (JsonObject s : snapshots) {
+            arr.add(s != null ? s : JsonNull.INSTANCE);
+        }
+        root.add("engineSnapshots", arr);
     }
 }

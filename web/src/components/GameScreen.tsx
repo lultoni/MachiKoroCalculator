@@ -18,6 +18,7 @@ import { InsightsPanel } from './InsightsPanel';
 import { BürohausModal } from './BürohausModal';
 import { SettingsScreen } from './SettingsScreen';
 import { SaveLoadMenu } from './SaveLoadMenu';
+import { DecisionReview } from './DecisionReview';
 
 interface Props {
   session: UseSessionReturn;
@@ -40,6 +41,7 @@ export function GameScreen({ session, settings, updateSettings, projects, hover 
   // Modal states
   const [showSettings, setShowSettings] = useState(false);
   const [showSaveLoad, setShowSaveLoad] = useState(false);
+  const [gameOverView, setGameOverView] = useState<'results' | 'review'>('results');
 
   const activePlayer = s.state.players[s.nextPlayerIndex];
   const isUserTurn = s.nextPlayerIndex === settings.userPlayerIndex;
@@ -114,13 +116,26 @@ export function GameScreen({ session, settings, updateSettings, projects, hover 
   const handleBuy = useCallback((projectId: string | null) => {
     if (rollTotal === 0) return;
     const isDoubles = diceCount === 2 && die1 === die2;
+    // Build compact engine snapshot for post-game decision review
+    const engineSnapshot = engine.result ? {
+      engineId: engine.result.engineId,
+      iterationsUsed: engine.result.iterationsUsed,
+      computeTimeMs: engine.result.computeTimeMs,
+      options: engine.result.rankedOptions.map(o => ({
+        projectId: o.projectId,
+        score: o.score,
+        affordable: o.affordable,
+        summarySentence: o.summarySentence,
+      })),
+    } : undefined;
     session.applyTurn({
       roll: rollTotal,
       boughtId: projectId === '_wait_' ? null : projectId,
       isDoubles,
       diceCount,
+      engineSnapshot,
     });
-  }, [rollTotal, diceCount, die1, die2, session]);
+  }, [rollTotal, diceCount, die1, die2, session, engine.result]);
 
   const handleOpponentConfirm = useCallback((req: ApplyTurnRequest) => {
     session.applyTurn(req);
@@ -142,27 +157,51 @@ export function GameScreen({ session, settings, updateSettings, projects, hover 
   // Game over check
   if (s.finished) {
     const winner = s.state.players[s.winnerIndex];
+    const hasSnapshots = s.engineSnapshots && s.engineSnapshots.some(snap => snap != null);
+
     return (
       <div className="min-h-screen bg-machi-bg flex items-center justify-center">
-        <div className="bg-machi-surface rounded-xl border border-machi-border p-8 text-center space-y-4 max-w-sm">
-          <h2 className="text-2xl font-bold text-machi-yellow">
-            {t('gameOver.title', { name: winner?.name ?? '?' })}
-          </h2>
-          <div className="space-y-2">
-            <h3 className="text-sm text-machi-text-dim">{t('gameOver.standings')}</h3>
-            {s.state.players.map((p, i) => (
-              <div key={i} className={`flex justify-between px-3 py-1 rounded ${i === s.winnerIndex ? 'bg-machi-yellow/10' : ''}`}>
-                <span className="text-machi-text">{p.name}</span>
-                <span className="text-machi-text-dim">{p.coins}c</span>
+        <div className="bg-machi-surface rounded-xl border border-machi-border p-8 space-y-4 max-w-lg w-full">
+          {gameOverView === 'results' ? (
+            <div className="text-center space-y-4">
+              <h2 className="text-2xl font-bold text-machi-yellow">
+                {t('gameOver.title', { name: winner?.name ?? '?' })}
+              </h2>
+              <div className="space-y-2">
+                <h3 className="text-sm text-machi-text-dim">{t('gameOver.standings')}</h3>
+                {s.state.players.map((p, i) => (
+                  <div key={i} className={`flex justify-between px-3 py-1 rounded ${i === s.winnerIndex ? 'bg-machi-yellow/10' : ''}`}>
+                    <span className="text-machi-text">{p.name}</span>
+                    <span className="text-machi-text-dim">{p.coins}c</span>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-          <button
-            className="w-full py-2 rounded-lg font-semibold bg-machi-accent text-machi-bg hover:brightness-110 transition-all"
-            onClick={() => session.clearSession()}
-          >
-            {t('btn.newGame')}
-          </button>
+              <div className="flex gap-2">
+                {hasSnapshots && (
+                  <button
+                    className="flex-1 py-2 rounded-lg font-semibold bg-machi-surface border border-machi-accent text-machi-accent hover:bg-machi-accent/10 transition-all"
+                    onClick={() => setGameOverView('review')}
+                  >
+                    {t('btn.review')}
+                  </button>
+                )}
+                <button
+                  className="flex-1 py-2 rounded-lg font-semibold bg-machi-accent text-machi-bg hover:brightness-110 transition-all"
+                  onClick={() => session.clearSession()}
+                >
+                  {t('btn.newGame')}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <DecisionReview
+              session={s}
+              userPlayerIndex={settings.userPlayerIndex}
+              projects={projects}
+              language={settings.language}
+              onBack={() => setGameOverView('results')}
+            />
+          )}
         </div>
       </div>
     );

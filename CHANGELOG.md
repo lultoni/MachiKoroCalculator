@@ -6,6 +6,53 @@ Implementation history: what was built, why, and which design decisions were mad
 
 ## Phase 7: Iteration
 
+### 7.23 — Post-Game Decision Review
+
+New game-over screen feature that compares player choices vs engine recommendations throughout a completed game.
+
+**Backend (server layer):**
+- `SessionManager` stores engine snapshots in a parallel list alongside `GameSession.history`
+- `SessionTurnHandler` accepts optional `engineSnapshot` field in turn requests
+- `SessionSerializer.addEngineSnapshots()` attaches snapshot array to all session JSON responses
+- `SessionUndoHandler` removes last snapshot on undo to keep lists in sync
+- All session endpoint handlers updated to include `engineSnapshots` in responses
+
+**Frontend:**
+- `ApplyTurnRequest` extended with optional `engineSnapshot` field
+- `handleBuy` builds compact snapshot from `engine.result` (projectId, score, affordable, summarySentence per option) and sends it with each turn
+- New `DecisionReview` component: turn-by-turn navigator with summary bar (agreement count, avg rank), per-turn detail card (your choice vs engine #1, rank badge, top 5 options)
+- Game-over screen now has two views: results (winner + standings + "Review" button) and review (DecisionReview)
+- DE/EN i18n keys for all review screen strings
+
+**Design decisions:**
+- Snapshots stored in server layer (not Core) to respect layer boundaries — TurnRecord unchanged
+- Compact snapshot format (~500-800 bytes/turn) excludes explanation factors and full metrics
+- Only user's turns get snapshots; opponent turns store null
+- Backwards-compatible: old save files and sessions without snapshots work fine (review button hidden)
+
+### 7.22 — UI Bug Sweep: 18 Bugs Fixed
+
+Resolved 18 of 21 tracked UI bugs across all 4 priority waves. Key fixes:
+
+**Backend (MctsV1Engine):**
+- B09: Duplicate "winRate" factor — folded winProbDelta into factor #1's detail text
+- B19b: Unaffordable cards (purples + landmarks) now appear in ranked options
+
+**Frontend:**
+- B23: Autosave implemented — fires `session.save()` on each turn when enabled
+- B07: Opponent coin deltas shown on user's turn
+- B13: Client-side metric ranges for all columns — full color gradient support
+- B14: Manual buy buttons sorted by engine ranking
+- B08: Factor badge alignment with `min-w-16` + weight percentage label
+- B15: ETW bars sorted ascending (closest to winning first) + tooltips
+- B12: "See all options" now shows all cards (unaffordable dimmed at opacity-40)
+- B18: Round counter in TurnIndicator
+- B19: Visual divider before New Game button
+- B21: Undo tooltip with last turn context
+
+**Already fixed (confirmed):** B01, B05, B06, B16, B17.
+**Deferred:** B11 (custom tooltips), B20 (percentile detail), B24/B25 (H2H/settings cosmetic).
+
 ### 7.21 — B19b: Unaffordable Cards in MCTS Ranked List
 
 MCTS engines now include all purchasable cards in the ranked options list, not just cards affordable in at least one roll branch. Previously, purple cards (Stadion, Fernsehsender, Bürohaus) and expensive landmarks were invisible in the "See all options" table because `BuyDecisionNode.expand()` only adds children for affordable cards.

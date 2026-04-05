@@ -36,6 +36,23 @@ export interface SessionJson {
   finished: boolean;
   winnerIndex: number;
   history: TurnRecordJson[];
+  engineSnapshots?: (EngineSnapshotJson | null)[];
+}
+
+// ─── Engine Snapshot (stored per turn for post-game review) ─────────
+
+export interface EngineSnapshotOption {
+  projectId: string;
+  score: number;
+  affordable: boolean;
+  summarySentence?: string;
+}
+
+export interface EngineSnapshotJson {
+  engineId: string;
+  iterationsUsed: number;
+  computeTimeMs: number;
+  options: EngineSnapshotOption[];
 }
 
 // ─── Project (card definition) ───────────────────────────────────────────
@@ -149,6 +166,7 @@ export interface ApplyTurnRequest {
   boughtId: string | null;
   isDoubles: boolean;
   diceCount: number;
+  engineSnapshot?: EngineSnapshotJson;
 }
 
 export interface BürohausRequest {

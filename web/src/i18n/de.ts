@@ -75,6 +75,20 @@ const de: Record<string, string> = {
   'gameOver.standings': 'Endstand',
   'gameOver.landmarks': 'Wahrzeichen',
 
+  // Decision review
+  'review.title': 'Entscheidungsrückblick',
+  'review.agreed': 'Engine-Empfehlung gefolgt',
+  'review.avgRank': 'Ø Rangplatz',
+  'review.youBought': 'Du kauftest',
+  'review.enginePick': 'Engine #1',
+  'review.rank': 'Rang #{n}',
+  'review.noEval': 'Keine Auswertung',
+  'review.saved': 'Gespart',
+  'review.match': 'Übereinstimmung!',
+  'review.ofTurns': 'von {n} Zügen',
+  'review.noData': 'Keine Engine-Daten für dieses Spiel verfügbar.',
+  'review.backToResults': 'Zurück zum Ergebnis',
+
   // Card colors
   'color.blau': 'Blau',
   'color.rot': 'Rot',

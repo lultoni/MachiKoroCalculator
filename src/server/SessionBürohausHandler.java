@@ -62,7 +62,9 @@ final class SessionBürohausHandler implements HttpHandler {
         try {
             // If the user declines the swap, return current state unchanged
             if (body.has("decline") && body.get("decline").getAsBoolean()) {
-                ApiUtils.sendJson(exchange, 200, SessionSerializer.toJson(session));
+                JsonObject response = SessionSerializer.toJson(session);
+                SessionSerializer.addEngineSnapshots(response, sessionManager.getEngineSnapshots());
+                ApiUtils.sendJson(exchange, 200, response);
                 return;
             }
 
@@ -86,7 +88,9 @@ final class SessionBürohausHandler implements HttpHandler {
 
             session.applyBürohausSwap(lastTurnPlayer, ownCard, oppPlayerIndex, oppCard);
 
-            ApiUtils.sendJson(exchange, 200, SessionSerializer.toJson(session));
+            JsonObject response = SessionSerializer.toJson(session);
+            SessionSerializer.addEngineSnapshots(response, sessionManager.getEngineSnapshots());
+            ApiUtils.sendJson(exchange, 200, response);
 
         } catch (IllegalArgumentException e) {
             ApiUtils.sendError(exchange, 400, e.getMessage());

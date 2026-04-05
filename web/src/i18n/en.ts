@@ -75,6 +75,20 @@ const en: Record<string, string> = {
   'gameOver.standings': 'Final Standings',
   'gameOver.landmarks': 'Landmarks',
 
+  // Decision review
+  'review.title': 'Decision Review',
+  'review.agreed': 'Agreed with Engine',
+  'review.avgRank': 'Avg Choice Rank',
+  'review.youBought': 'You bought',
+  'review.enginePick': 'Engine #1',
+  'review.rank': 'Rank #{n}',
+  'review.noEval': 'No evaluation',
+  'review.saved': 'Saved',
+  'review.match': 'Match!',
+  'review.ofTurns': 'of {n} turns',
+  'review.noData': 'No engine data available for this game.',
+  'review.backToResults': 'Back to Results',
+
   // Card colors
   'color.blau': 'Blue',
   'color.rot': 'Red',

@@ -1,5 +1,6 @@
 package server;
 
+import com.google.gson.JsonObject;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import core.GameSession;
@@ -41,8 +42,11 @@ final class SessionUndoHandler implements HttpHandler {
         }
 
         try {
+            sessionManager.removeLastSnapshot();
             session.undoLastTurn();
-            ApiUtils.sendJson(exchange, 200, SessionSerializer.toJson(session));
+            JsonObject response = SessionSerializer.toJson(session);
+            SessionSerializer.addEngineSnapshots(response, sessionManager.getEngineSnapshots());
+            ApiUtils.sendJson(exchange, 200, response);
         } catch (IllegalStateException e) {
             ApiUtils.sendError(exchange, 400, e.getMessage());
         } catch (Exception e) {

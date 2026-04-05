@@ -20,7 +20,7 @@ import java.util.List;
  */
 public final class H2hResultStore {
 
-    private static final String DEFAULT_PATH = "h2h-results.json";
+    private static final String DEFAULT_PATH = "data/h2h-results.json";
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final Type LIST_TYPE = new TypeToken<List<MatchResult>>() {}.getType();
 

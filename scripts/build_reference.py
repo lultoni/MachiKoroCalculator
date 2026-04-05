@@ -2,7 +2,7 @@
 """
 Generate a clean card reference JSON from scraped wiki data + RULES.md knowledge.
 
-Reads scraped_cards.json and produces scraped_cards_reference.json with:
+Reads scripts/scraped_cards.json and produces scripts/scraped_cards_reference.json with:
 - All base game cards with complete, verified data
 - All expansion cards for future reference
 - German names where available (from projects.json)
@@ -11,7 +11,7 @@ Reads scraped_cards.json and produces scraped_cards_reference.json with:
 import json
 
 # Load scraped data
-with open("scraped_cards.json") as f:
+with open("scripts/scraped_cards.json") as f:
     scraped = json.load(f)
 
 # Load existing projects.json for German names
@@ -166,7 +166,7 @@ def build_reference():
         "expansion_cards": expansion_cards,
     }
 
-    outpath = "scraped_cards_reference.json"
+    outpath = "scripts/scraped_cards_reference.json"
     with open(outpath, "w", encoding="utf-8") as f:
         json.dump(output, f, ensure_ascii=False, indent=2)
 

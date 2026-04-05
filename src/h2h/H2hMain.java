@@ -88,7 +88,7 @@ public final class H2hMain {
         // Save
         H2hResultStore store = new H2hResultStore();
         store.save(result);
-        System.out.printf("[H2H] Results saved to h2h-results.json (match id: %s)%n", result.id);
+        System.out.printf("[H2H] Results saved to data/h2h-results.json (match id: %s)%n", result.id);
     }
 
     private static void printUsage() {

@@ -1,0 +1,7416 @@
+[
+  {
+    "n_players": 2,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 10,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 3
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          },
+          {
+            "id": "markthalle",
+            "count": 3
+          },
+          {
+            "id": "bergwerk",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 18,
+        "gp_count": 4,
+        "gps": [
+          "bahnhof",
+          "einkaufszentrum",
+          "freizeitpark",
+          "funkturm"
+        ],
+        "non_gp_cards": 17,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 3
+          },
+          {
+            "id": "bäckerei",
+            "count": 4
+          },
+          {
+            "id": "mini-markt",
+            "count": 2
+          },
+          {
+            "id": "markthalle",
+            "count": 1
+          },
+          {
+            "id": "bergwerk",
+            "count": 2
+          },
+          {
+            "id": "möbelfabrik",
+            "count": 5
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 2.5,
+      "max_gps": 4,
+      "avg_cards": 13.5,
+      "avg_coins": 9.0
+    },
+    "labels": {
+      "early": 0.0,
+      "mid": 0.0,
+      "late": 1.0
+    }
+  },
+  {
+    "n_players": 2,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gp_count": 2,
+        "gps": [
+          "bahnhof",
+          "einkaufszentrum"
+        ],
+        "non_gp_cards": 12,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 3
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "mini-markt",
+            "count": 3
+          },
+          {
+            "id": "markthalle",
+            "count": 4
+          },
+          {
+            "id": "bergwerk",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 1,
+        "gp_count": 4,
+        "gps": [
+          "bahnhof",
+          "einkaufszentrum",
+          "freizeitpark",
+          "funkturm"
+        ],
+        "non_gp_cards": 15,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 5
+          },
+          {
+            "id": "mini-markt",
+            "count": 3
+          },
+          {
+            "id": "bergwerk",
+            "count": 2
+          },
+          {
+            "id": "möbelfabrik",
+            "count": 3
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 3.0,
+      "max_gps": 4,
+      "avg_cards": 13.5,
+      "avg_coins": 0.5
+    },
+    "labels": {
+      "early": 0.0,
+      "mid": 0.0,
+      "late": 1.0
+    }
+  },
+  {
+    "n_players": 2,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 10,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 4
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          },
+          {
+            "id": "markthalle",
+            "count": 4
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 3,
+        "gp_count": 2,
+        "gps": [
+          "bahnhof",
+          "einkaufszentrum"
+        ],
+        "non_gp_cards": 11,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 4
+          },
+          {
+            "id": "mini-markt",
+            "count": 5
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 1.5,
+      "max_gps": 2,
+      "avg_cards": 10.5,
+      "avg_coins": 1.5
+    },
+    "labels": {
+      "early": 0.02,
+      "mid": 0.98,
+      "late": 0.0
+    }
+  },
+  {
+    "n_players": 2,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 7,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 4
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "markthalle",
+            "count": 1
+          },
+          {
+            "id": "bergwerk",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 4,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "mini-markt",
+            "count": 1
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 1.0,
+      "max_gps": 1,
+      "avg_cards": 5.5,
+      "avg_coins": 0.0
+    },
+    "labels": {
+      "early": 0.64,
+      "mid": 0.36,
+      "late": 0.0
+    }
+  },
+  {
+    "n_players": 2,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 6,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 3
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          },
+          {
+            "id": "mini-markt",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 8,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 3
+          },
+          {
+            "id": "bäckerei",
+            "count": 3
+          },
+          {
+            "id": "mini-markt",
+            "count": 1
+          },
+          {
+            "id": "markthalle",
+            "count": 1
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 1.0,
+      "max_gps": 1,
+      "avg_cards": 7.0,
+      "avg_coins": 0.0
+    },
+    "labels": {
+      "early": 0.6,
+      "mid": 0.4,
+      "late": 0.0
+    }
+  },
+  {
+    "n_players": 2,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 3,
+        "gp_count": 4,
+        "gps": [
+          "bahnhof",
+          "einkaufszentrum",
+          "freizeitpark",
+          "funkturm"
+        ],
+        "non_gp_cards": 18,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 3
+          },
+          {
+            "id": "bäckerei",
+            "count": 3
+          },
+          {
+            "id": "mini-markt",
+            "count": 3
+          },
+          {
+            "id": "bergwerk",
+            "count": 2
+          },
+          {
+            "id": "markthalle",
+            "count": 1
+          },
+          {
+            "id": "möbelfabrik",
+            "count": 5
+          },
+          {
+            "id": "bauernhof",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 12,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 3
+          },
+          {
+            "id": "bäckerei",
+            "count": 3
+          },
+          {
+            "id": "mini-markt",
+            "count": 3
+          },
+          {
+            "id": "markthalle",
+            "count": 3
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 2.5,
+      "max_gps": 4,
+      "avg_cards": 15.0,
+      "avg_coins": 1.5
+    },
+    "labels": {
+      "early": 0.0,
+      "mid": 0.0,
+      "late": 1.0
+    }
+  },
+  {
+    "n_players": 2,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 9,
+        "gp_count": 2,
+        "gps": [
+          "bahnhof",
+          "einkaufszentrum"
+        ],
+        "non_gp_cards": 16,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 3
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          },
+          {
+            "id": "mini-markt",
+            "count": 3
+          },
+          {
+            "id": "markthalle",
+            "count": 2
+          },
+          {
+            "id": "bergwerk",
+            "count": 2
+          },
+          {
+            "id": "möbelfabrik",
+            "count": 4
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 2,
+        "gp_count": 2,
+        "gps": [
+          "bahnhof",
+          "einkaufszentrum"
+        ],
+        "non_gp_cards": 13,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 3
+          },
+          {
+            "id": "bäckerei",
+            "count": 4
+          },
+          {
+            "id": "mini-markt",
+            "count": 3
+          },
+          {
+            "id": "markthalle",
+            "count": 2
+          },
+          {
+            "id": "bergwerk",
+            "count": 1
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 2.0,
+      "max_gps": 2,
+      "avg_cards": 14.5,
+      "avg_coins": 5.5
+    },
+    "labels": {
+      "early": 0.0,
+      "mid": 0.72,
+      "late": 0.28
+    }
+  },
+  {
+    "n_players": 2,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gp_count": 3,
+        "gps": [
+          "bahnhof",
+          "einkaufszentrum",
+          "freizeitpark"
+        ],
+        "non_gp_cards": 13,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 4
+          },
+          {
+            "id": "mini-markt",
+            "count": 5
+          },
+          {
+            "id": "bergwerk",
+            "count": 2
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 8,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 4
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          },
+          {
+            "id": "markthalle",
+            "count": 2
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 2.0,
+      "max_gps": 3,
+      "avg_cards": 10.5,
+      "avg_coins": 0.0
+    },
+    "labels": {
+      "early": 0.0,
+      "mid": 0.3,
+      "late": 0.7
+    }
+  },
+  {
+    "n_players": 2,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 9,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 4
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          },
+          {
+            "id": "mini-markt",
+            "count": 2
+          },
+          {
+            "id": "markthalle",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 3,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 10,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 3
+          },
+          {
+            "id": "mini-markt",
+            "count": 2
+          },
+          {
+            "id": "bergwerk",
+            "count": 2
+          },
+          {
+            "id": "möbelfabrik",
+            "count": 1
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 1.0,
+      "max_gps": 1,
+      "avg_cards": 9.5,
+      "avg_coins": 1.5
+    },
+    "labels": {
+      "early": 0.36,
+      "mid": 0.64,
+      "late": 0.0
+    }
+  },
+  {
+    "n_players": 2,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 1,
+        "gp_count": 3,
+        "gps": [
+          "bahnhof",
+          "einkaufszentrum",
+          "freizeitpark"
+        ],
+        "non_gp_cards": 19,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 3
+          },
+          {
+            "id": "bäckerei",
+            "count": 4
+          },
+          {
+            "id": "mini-markt",
+            "count": 6
+          },
+          {
+            "id": "markthalle",
+            "count": 2
+          },
+          {
+            "id": "bergwerk",
+            "count": 2
+          },
+          {
+            "id": "möbelfabrik",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 3,
+        "gp_count": 3,
+        "gps": [
+          "bahnhof",
+          "einkaufszentrum",
+          "freizeitpark"
+        ],
+        "non_gp_cards": 11,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 3
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          },
+          {
+            "id": "markthalle",
+            "count": 4
+          },
+          {
+            "id": "bauernhof",
+            "count": 1
+          },
+          {
+            "id": "bergwerk",
+            "count": 1
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 3.0,
+      "max_gps": 3,
+      "avg_cards": 15.0,
+      "avg_coins": 2.0
+    },
+    "labels": {
+      "early": 0.0,
+      "mid": 0.0,
+      "late": 1.0
+    }
+  },
+  {
+    "n_players": 2,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 6,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 3
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          },
+          {
+            "id": "markthalle",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 8,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 3
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "mini-markt",
+            "count": 1
+          },
+          {
+            "id": "markthalle",
+            "count": 3
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 1.0,
+      "max_gps": 1,
+      "avg_cards": 7.0,
+      "avg_coins": 0.0
+    },
+    "labels": {
+      "early": 0.8,
+      "mid": 0.2,
+      "late": 0.0
+    }
+  },
+  {
+    "n_players": 2,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 7,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 3
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          },
+          {
+            "id": "mini-markt",
+            "count": 2
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gp_count": 0,
+        "gps": [],
+        "non_gp_cards": 7,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 3
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "mini-markt",
+            "count": 3
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 0.5,
+      "max_gps": 1,
+      "avg_cards": 7.0,
+      "avg_coins": 0.0
+    },
+    "labels": {
+      "early": 0.9,
+      "mid": 0.1,
+      "late": 0.0
+    }
+  },
+  {
+    "n_players": 2,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 6,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 3
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          },
+          {
+            "id": "markthalle",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 6,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 3
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          },
+          {
+            "id": "markthalle",
+            "count": 1
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 1.0,
+      "max_gps": 1,
+      "avg_cards": 6.0,
+      "avg_coins": 0.0
+    },
+    "labels": {
+      "early": 0.86,
+      "mid": 0.14,
+      "late": 0.0
+    }
+  },
+  {
+    "n_players": 2,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 7,
+        "gp_count": 2,
+        "gps": [
+          "bahnhof",
+          "einkaufszentrum"
+        ],
+        "non_gp_cards": 13,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 3
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          },
+          {
+            "id": "mini-markt",
+            "count": 3
+          },
+          {
+            "id": "markthalle",
+            "count": 2
+          },
+          {
+            "id": "bergwerk",
+            "count": 2
+          },
+          {
+            "id": "möbelfabrik",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 14,
+        "gp_count": 3,
+        "gps": [
+          "bahnhof",
+          "einkaufszentrum",
+          "freizeitpark"
+        ],
+        "non_gp_cards": 15,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 3
+          },
+          {
+            "id": "bäckerei",
+            "count": 4
+          },
+          {
+            "id": "mini-markt",
+            "count": 3
+          },
+          {
+            "id": "bergwerk",
+            "count": 2
+          },
+          {
+            "id": "markthalle",
+            "count": 3
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 2.5,
+      "max_gps": 3,
+      "avg_cards": 14.0,
+      "avg_coins": 10.5
+    },
+    "labels": {
+      "early": 0.0,
+      "mid": 0.1,
+      "late": 0.9
+    }
+  },
+  {
+    "n_players": 2,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 8,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 3
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "mini-markt",
+            "count": 3
+          },
+          {
+            "id": "markthalle",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 8,
+        "gp_count": 4,
+        "gps": [
+          "bahnhof",
+          "einkaufszentrum",
+          "freizeitpark",
+          "funkturm"
+        ],
+        "non_gp_cards": 16,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 5
+          },
+          {
+            "id": "mini-markt",
+            "count": 3
+          },
+          {
+            "id": "bergwerk",
+            "count": 2
+          },
+          {
+            "id": "möbelfabrik",
+            "count": 4
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 2.5,
+      "max_gps": 4,
+      "avg_cards": 12.0,
+      "avg_coins": 4.0
+    },
+    "labels": {
+      "early": 0.0,
+      "mid": 0.0,
+      "late": 1.0
+    }
+  },
+  {
+    "n_players": 2,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 2,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 5,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 3
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "markthalle",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 1,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 5,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 3
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "markthalle",
+            "count": 1
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 1.0,
+      "max_gps": 1,
+      "avg_cards": 5.0,
+      "avg_coins": 1.5
+    },
+    "labels": {
+      "early": 1.0,
+      "mid": 0.0,
+      "late": 0.0
+    }
+  },
+  {
+    "n_players": 2,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 8,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 3
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "mini-markt",
+            "count": 2
+          },
+          {
+            "id": "markthalle",
+            "count": 1
+          },
+          {
+            "id": "bergwerk",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 3,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 7,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "mini-markt",
+            "count": 3
+          },
+          {
+            "id": "bergwerk",
+            "count": 1
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 1.0,
+      "max_gps": 1,
+      "avg_cards": 7.5,
+      "avg_coins": 1.5
+    },
+    "labels": {
+      "early": 0.86,
+      "mid": 0.14,
+      "late": 0.0
+    }
+  },
+  {
+    "n_players": 2,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 1,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 11,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 4
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          },
+          {
+            "id": "mini-markt",
+            "count": 1
+          },
+          {
+            "id": "markthalle",
+            "count": 4
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 4,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 14,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 4
+          },
+          {
+            "id": "mini-markt",
+            "count": 5
+          },
+          {
+            "id": "bergwerk",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 1.0,
+      "max_gps": 1,
+      "avg_cards": 12.5,
+      "avg_coins": 2.5
+    },
+    "labels": {
+      "early": 0.54,
+      "mid": 0.46,
+      "late": 0.0
+    }
+  },
+  {
+    "n_players": 2,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 1,
+        "gp_count": 3,
+        "gps": [
+          "bahnhof",
+          "einkaufszentrum",
+          "freizeitpark"
+        ],
+        "non_gp_cards": 18,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 4
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          },
+          {
+            "id": "mini-markt",
+            "count": 2
+          },
+          {
+            "id": "markthalle",
+            "count": 6
+          },
+          {
+            "id": "bergwerk",
+            "count": 2
+          },
+          {
+            "id": "möbelfabrik",
+            "count": 2
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 2,
+        "gp_count": 4,
+        "gps": [
+          "bahnhof",
+          "einkaufszentrum",
+          "freizeitpark",
+          "funkturm"
+        ],
+        "non_gp_cards": 17,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 4
+          },
+          {
+            "id": "mini-markt",
+            "count": 4
+          },
+          {
+            "id": "bauernhof",
+            "count": 1
+          },
+          {
+            "id": "bergwerk",
+            "count": 2
+          },
+          {
+            "id": "möbelfabrik",
+            "count": 4
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 3.5,
+      "max_gps": 4,
+      "avg_cards": 17.5,
+      "avg_coins": 1.5
+    },
+    "labels": {
+      "early": 0.0,
+      "mid": 0.0,
+      "late": 1.0
+    }
+  },
+  {
+    "n_players": 2,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gp_count": 2,
+        "gps": [
+          "bahnhof",
+          "einkaufszentrum"
+        ],
+        "non_gp_cards": 7,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 4
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "mini-markt",
+            "count": 1
+          },
+          {
+            "id": "bergwerk",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 1,
+        "gp_count": 4,
+        "gps": [
+          "bahnhof",
+          "einkaufszentrum",
+          "freizeitpark",
+          "funkturm"
+        ],
+        "non_gp_cards": 14,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 5
+          },
+          {
+            "id": "mini-markt",
+            "count": 5
+          },
+          {
+            "id": "bergwerk",
+            "count": 2
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 3.0,
+      "max_gps": 4,
+      "avg_cards": 10.5,
+      "avg_coins": 0.5
+    },
+    "labels": {
+      "early": 0.0,
+      "mid": 0.0,
+      "late": 1.0
+    }
+  },
+  {
+    "n_players": 2,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 4,
+        "gp_count": 4,
+        "gps": [
+          "bahnhof",
+          "einkaufszentrum",
+          "freizeitpark",
+          "funkturm"
+        ],
+        "non_gp_cards": 16,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 3
+          },
+          {
+            "id": "mini-markt",
+            "count": 5
+          },
+          {
+            "id": "bergwerk",
+            "count": 2
+          },
+          {
+            "id": "möbelfabrik",
+            "count": 3
+          },
+          {
+            "id": "bauernhof",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 14,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 4
+          },
+          {
+            "id": "bäckerei",
+            "count": 3
+          },
+          {
+            "id": "mini-markt",
+            "count": 1
+          },
+          {
+            "id": "markthalle",
+            "count": 6
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 2.5,
+      "max_gps": 4,
+      "avg_cards": 15.0,
+      "avg_coins": 2.0
+    },
+    "labels": {
+      "early": 0.0,
+      "mid": 0.0,
+      "late": 1.0
+    }
+  },
+  {
+    "n_players": 2,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gp_count": 0,
+        "gps": [],
+        "non_gp_cards": 7,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "mini-markt",
+            "count": 4
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 1,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 5,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "mini-markt",
+            "count": 2
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 0.5,
+      "max_gps": 1,
+      "avg_cards": 6.0,
+      "avg_coins": 0.5
+    },
+    "labels": {
+      "early": 0.5,
+      "mid": 0.5,
+      "late": 0.0
+    }
+  },
+  {
+    "n_players": 2,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 6,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "mini-markt",
+            "count": 3
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 2,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 7,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 3
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "mini-markt",
+            "count": 1
+          },
+          {
+            "id": "markthalle",
+            "count": 2
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 1.0,
+      "max_gps": 1,
+      "avg_cards": 6.5,
+      "avg_coins": 1.0
+    },
+    "labels": {
+      "early": 0.66,
+      "mid": 0.34,
+      "late": 0.0
+    }
+  },
+  {
+    "n_players": 2,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 11,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 3
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          },
+          {
+            "id": "markthalle",
+            "count": 1
+          },
+          {
+            "id": "bergwerk",
+            "count": 2
+          },
+          {
+            "id": "möbelfabrik",
+            "count": 2
+          },
+          {
+            "id": "mini-markt",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gp_count": 3,
+        "gps": [
+          "bahnhof",
+          "einkaufszentrum",
+          "freizeitpark"
+        ],
+        "non_gp_cards": 14,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 3
+          },
+          {
+            "id": "bäckerei",
+            "count": 4
+          },
+          {
+            "id": "markthalle",
+            "count": 5
+          },
+          {
+            "id": "mini-markt",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 1
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 2.0,
+      "max_gps": 3,
+      "avg_cards": 12.5,
+      "avg_coins": 0.0
+    },
+    "labels": {
+      "early": 0.0,
+      "mid": 0.52,
+      "late": 0.48
+    }
+  },
+  {
+    "n_players": 2,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 7,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 3
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          },
+          {
+            "id": "markthalle",
+            "count": 2
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 6,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 3
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "markthalle",
+            "count": 2
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 1.0,
+      "max_gps": 1,
+      "avg_cards": 6.5,
+      "avg_coins": 0.0
+    },
+    "labels": {
+      "early": 0.4,
+      "mid": 0.6,
+      "late": 0.0
+    }
+  },
+  {
+    "n_players": 2,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 6,
+        "gp_count": 4,
+        "gps": [
+          "bahnhof",
+          "einkaufszentrum",
+          "freizeitpark",
+          "funkturm"
+        ],
+        "non_gp_cards": 18,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 3
+          },
+          {
+            "id": "bäckerei",
+            "count": 5
+          },
+          {
+            "id": "mini-markt",
+            "count": 4
+          },
+          {
+            "id": "bergwerk",
+            "count": 2
+          },
+          {
+            "id": "markthalle",
+            "count": 1
+          },
+          {
+            "id": "möbelfabrik",
+            "count": 3
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 3,
+        "gp_count": 2,
+        "gps": [
+          "bahnhof",
+          "einkaufszentrum"
+        ],
+        "non_gp_cards": 14,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 3
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "mini-markt",
+            "count": 2
+          },
+          {
+            "id": "markthalle",
+            "count": 3
+          },
+          {
+            "id": "bergwerk",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          },
+          {
+            "id": "molkerei",
+            "count": 2
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 3.0,
+      "max_gps": 4,
+      "avg_cards": 16.0,
+      "avg_coins": 4.5
+    },
+    "labels": {
+      "early": 0.0,
+      "mid": 0.0,
+      "late": 1.0
+    }
+  },
+  {
+    "n_players": 3,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 9,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 3
+          },
+          {
+            "id": "apfelplantage",
+            "count": 2
+          },
+          {
+            "id": "markthalle",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 9,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 3
+          },
+          {
+            "id": "bäckerei",
+            "count": 3
+          },
+          {
+            "id": "bauernhof",
+            "count": 1
+          },
+          {
+            "id": "apfelplantage",
+            "count": 1
+          },
+          {
+            "id": "markthalle",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 3",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 7,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 1
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          },
+          {
+            "id": "apfelplantage",
+            "count": 2
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 1.0,
+      "max_gps": 1,
+      "avg_cards": 8.333333333333334,
+      "avg_coins": 0.0
+    },
+    "labels": {
+      "early": 0.34,
+      "mid": 0.66,
+      "late": 0.0
+    }
+  },
+  {
+    "n_players": 3,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 7,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          },
+          {
+            "id": "bergwerk",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 7,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          },
+          {
+            "id": "bergwerk",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 3",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 9,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          },
+          {
+            "id": "bergwerk",
+            "count": 1
+          },
+          {
+            "id": "mini-markt",
+            "count": 1
+          },
+          {
+            "id": "apfelplantage",
+            "count": 2
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 1.0,
+      "max_gps": 1,
+      "avg_cards": 7.666666666666667,
+      "avg_coins": 0.0
+    },
+    "labels": {
+      "early": 0.24,
+      "mid": 0.76,
+      "late": 0.0
+    }
+  },
+  {
+    "n_players": 3,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 13,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 3
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          },
+          {
+            "id": "bauernhof",
+            "count": 3
+          },
+          {
+            "id": "apfelplantage",
+            "count": 1
+          },
+          {
+            "id": "markthalle",
+            "count": 3
+          },
+          {
+            "id": "mini-markt",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 11,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 1
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          },
+          {
+            "id": "bauernhof",
+            "count": 1
+          },
+          {
+            "id": "mini-markt",
+            "count": 1
+          },
+          {
+            "id": "apfelplantage",
+            "count": 3
+          },
+          {
+            "id": "markthalle",
+            "count": 2
+          },
+          {
+            "id": "bergwerk",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 3",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 11,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          },
+          {
+            "id": "apfelplantage",
+            "count": 2
+          },
+          {
+            "id": "markthalle",
+            "count": 1
+          },
+          {
+            "id": "bergwerk",
+            "count": 2
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 1.0,
+      "max_gps": 1,
+      "avg_cards": 11.666666666666666,
+      "avg_coins": 0.0
+    },
+    "labels": {
+      "early": 0.0,
+      "mid": 0.86,
+      "late": 0.14
+    }
+  },
+  {
+    "n_players": 3,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 8,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          },
+          {
+            "id": "bergwerk",
+            "count": 1
+          },
+          {
+            "id": "mini-markt",
+            "count": 2
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 6,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          },
+          {
+            "id": "bergwerk",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 3",
+        "coins": 1,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 9,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          },
+          {
+            "id": "apfelplantage",
+            "count": 2
+          },
+          {
+            "id": "bergwerk",
+            "count": 2
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 1.0,
+      "max_gps": 1,
+      "avg_cards": 7.666666666666667,
+      "avg_coins": 0.3333333333333333
+    },
+    "labels": {
+      "early": 0.16,
+      "mid": 0.84,
+      "late": 0.0
+    }
+  },
+  {
+    "n_players": 3,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 5,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 1
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 1
+          },
+          {
+            "id": "apfelplantage",
+            "count": 2
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 8,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 4
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 1
+          },
+          {
+            "id": "markthalle",
+            "count": 2
+          }
+        ]
+      },
+      {
+        "name": "Player 3",
+        "coins": 2,
+        "gp_count": 2,
+        "gps": [
+          "bahnhof",
+          "einkaufszentrum"
+        ],
+        "non_gp_cards": 10,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 1
+          },
+          {
+            "id": "bäckerei",
+            "count": 4
+          },
+          {
+            "id": "bauernhof",
+            "count": 4
+          },
+          {
+            "id": "molkerei",
+            "count": 1
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 1.3333333333333333,
+      "max_gps": 2,
+      "avg_cards": 7.666666666666667,
+      "avg_coins": 0.6666666666666666
+    },
+    "labels": {
+      "early": 0.0,
+      "mid": 0.94,
+      "late": 0.06
+    }
+  },
+  {
+    "n_players": 3,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 7,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          },
+          {
+            "id": "mini-markt",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 2,
+        "gp_count": 0,
+        "gps": [],
+        "non_gp_cards": 5,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          }
+        ]
+      },
+      {
+        "name": "Player 3",
+        "coins": 0,
+        "gp_count": 0,
+        "gps": [],
+        "non_gp_cards": 6,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          },
+          {
+            "id": "mini-markt",
+            "count": 1
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 0.3333333333333333,
+      "max_gps": 1,
+      "avg_cards": 6.0,
+      "avg_coins": 0.6666666666666666
+    },
+    "labels": {
+      "early": 0.56,
+      "mid": 0.44,
+      "late": 0.0
+    }
+  },
+  {
+    "n_players": 3,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 7,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 1
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 3
+          },
+          {
+            "id": "apfelplantage",
+            "count": 2
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 4,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 1
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          },
+          {
+            "id": "bauernhof",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 3",
+        "coins": 0,
+        "gp_count": 2,
+        "gps": [
+          "bahnhof",
+          "einkaufszentrum"
+        ],
+        "non_gp_cards": 11,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 4
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          },
+          {
+            "id": "markthalle",
+            "count": 2
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          },
+          {
+            "id": "bergwerk",
+            "count": 1
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 1.3333333333333333,
+      "max_gps": 2,
+      "avg_cards": 7.333333333333333,
+      "avg_coins": 0.0
+    },
+    "labels": {
+      "early": 0.1,
+      "mid": 0.9,
+      "late": 0.0
+    }
+  },
+  {
+    "n_players": 3,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 7,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 1
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 3
+          },
+          {
+            "id": "bergwerk",
+            "count": 1
+          },
+          {
+            "id": "molkerei",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 9,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 3
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          },
+          {
+            "id": "bergwerk",
+            "count": 2
+          }
+        ]
+      },
+      {
+        "name": "Player 3",
+        "coins": 3,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 9,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 3
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          },
+          {
+            "id": "bergwerk",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 1
+          },
+          {
+            "id": "apfelplantage",
+            "count": 1
+          },
+          {
+            "id": "markthalle",
+            "count": 1
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 1.0,
+      "max_gps": 1,
+      "avg_cards": 8.333333333333334,
+      "avg_coins": 1.0
+    },
+    "labels": {
+      "early": 0.24,
+      "mid": 0.76,
+      "late": 0.0
+    }
+  },
+  {
+    "n_players": 3,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 4,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 1,
+        "gp_count": 0,
+        "gps": [],
+        "non_gp_cards": 5,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          }
+        ]
+      },
+      {
+        "name": "Player 3",
+        "coins": 2,
+        "gp_count": 0,
+        "gps": [],
+        "non_gp_cards": 5,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 0.3333333333333333,
+      "max_gps": 1,
+      "avg_cards": 4.666666666666667,
+      "avg_coins": 1.0
+    },
+    "labels": {
+      "early": 0.74,
+      "mid": 0.26,
+      "late": 0.0
+    }
+  },
+  {
+    "n_players": 3,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 4,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 8,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          },
+          {
+            "id": "bergwerk",
+            "count": 1
+          },
+          {
+            "id": "apfelplantage",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 10,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 3
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          },
+          {
+            "id": "bergwerk",
+            "count": 2
+          },
+          {
+            "id": "apfelplantage",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 3",
+        "coins": 1,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 8,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 1
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          },
+          {
+            "id": "bergwerk",
+            "count": 2
+          },
+          {
+            "id": "mini-markt",
+            "count": 1
+          },
+          {
+            "id": "apfelplantage",
+            "count": 1
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 1.0,
+      "max_gps": 1,
+      "avg_cards": 8.666666666666666,
+      "avg_coins": 1.6666666666666667
+    },
+    "labels": {
+      "early": 0.2,
+      "mid": 0.8,
+      "late": 0.0
+    }
+  },
+  {
+    "n_players": 3,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 26,
+        "gp_count": 4,
+        "gps": [
+          "bahnhof",
+          "einkaufszentrum",
+          "freizeitpark",
+          "funkturm"
+        ],
+        "non_gp_cards": 14,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 1
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 3
+          },
+          {
+            "id": "molkerei",
+            "count": 5
+          },
+          {
+            "id": "bergwerk",
+            "count": 2
+          },
+          {
+            "id": "apfelplantage",
+            "count": 2
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 1,
+        "gp_count": 2,
+        "gps": [
+          "bahnhof",
+          "einkaufszentrum"
+        ],
+        "non_gp_cards": 14,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 3
+          },
+          {
+            "id": "bäckerei",
+            "count": 4
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          },
+          {
+            "id": "bergwerk",
+            "count": 2
+          },
+          {
+            "id": "möbelfabrik",
+            "count": 3
+          }
+        ]
+      },
+      {
+        "name": "Player 3",
+        "coins": 0,
+        "gp_count": 2,
+        "gps": [
+          "bahnhof",
+          "einkaufszentrum"
+        ],
+        "non_gp_cards": 6,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 1
+          },
+          {
+            "id": "bergwerk",
+            "count": 2
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 2.6666666666666665,
+      "max_gps": 4,
+      "avg_cards": 11.333333333333334,
+      "avg_coins": 9.0
+    },
+    "labels": {
+      "early": 0.0,
+      "mid": 0.0,
+      "late": 1.0
+    }
+  },
+  {
+    "n_players": 3,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 7,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 1
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 3
+          },
+          {
+            "id": "apfelplantage",
+            "count": 2
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 9,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 4
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          },
+          {
+            "id": "markthalle",
+            "count": 3
+          }
+        ]
+      },
+      {
+        "name": "Player 3",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 9,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 1
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          },
+          {
+            "id": "bauernhof",
+            "count": 3
+          },
+          {
+            "id": "apfelplantage",
+            "count": 2
+          },
+          {
+            "id": "mini-markt",
+            "count": 1
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 1.0,
+      "max_gps": 1,
+      "avg_cards": 8.333333333333334,
+      "avg_coins": 0.0
+    },
+    "labels": {
+      "early": 0.12,
+      "mid": 0.88,
+      "late": 0.0
+    }
+  },
+  {
+    "n_players": 3,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 2,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 13,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          },
+          {
+            "id": "mini-markt",
+            "count": 1
+          },
+          {
+            "id": "apfelplantage",
+            "count": 1
+          },
+          {
+            "id": "bergwerk",
+            "count": 2
+          },
+          {
+            "id": "markthalle",
+            "count": 2
+          },
+          {
+            "id": "möbelfabrik",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 2,
+        "gp_count": 2,
+        "gps": [
+          "bahnhof",
+          "einkaufszentrum"
+        ],
+        "non_gp_cards": 11,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          },
+          {
+            "id": "apfelplantage",
+            "count": 1
+          },
+          {
+            "id": "markthalle",
+            "count": 1
+          },
+          {
+            "id": "bergwerk",
+            "count": 2
+          },
+          {
+            "id": "möbelfabrik",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 3",
+        "coins": 1,
+        "gp_count": 2,
+        "gps": [
+          "bahnhof",
+          "einkaufszentrum"
+        ],
+        "non_gp_cards": 11,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          },
+          {
+            "id": "mini-markt",
+            "count": 1
+          },
+          {
+            "id": "apfelplantage",
+            "count": 2
+          },
+          {
+            "id": "markthalle",
+            "count": 2
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 1.6666666666666667,
+      "max_gps": 2,
+      "avg_cards": 11.666666666666666,
+      "avg_coins": 1.6666666666666667
+    },
+    "labels": {
+      "early": 0.0,
+      "mid": 0.64,
+      "late": 0.36
+    }
+  },
+  {
+    "n_players": 3,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gp_count": 2,
+        "gps": [
+          "bahnhof",
+          "einkaufszentrum"
+        ],
+        "non_gp_cards": 8,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 3
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          },
+          {
+            "id": "apfelplantage",
+            "count": 1
+          },
+          {
+            "id": "bergwerk",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 7,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 1
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          },
+          {
+            "id": "apfelplantage",
+            "count": 2
+          },
+          {
+            "id": "bergwerk",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 3",
+        "coins": 7,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 7,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          },
+          {
+            "id": "apfelplantage",
+            "count": 1
+          },
+          {
+            "id": "bergwerk",
+            "count": 1
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 1.3333333333333333,
+      "max_gps": 2,
+      "avg_cards": 7.333333333333333,
+      "avg_coins": 2.3333333333333335
+    },
+    "labels": {
+      "early": 0.28,
+      "mid": 0.72,
+      "late": 0.0
+    }
+  },
+  {
+    "n_players": 3,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 2,
+        "gp_count": 2,
+        "gps": [
+          "bahnhof",
+          "einkaufszentrum"
+        ],
+        "non_gp_cards": 8,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 3
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 3
+          },
+          {
+            "id": "bergwerk",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 2,
+        "gp_count": 2,
+        "gps": [
+          "bahnhof",
+          "einkaufszentrum"
+        ],
+        "non_gp_cards": 7,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          },
+          {
+            "id": "bauernhof",
+            "count": 3
+          }
+        ]
+      },
+      {
+        "name": "Player 3",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 3,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 1
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 1.6666666666666667,
+      "max_gps": 2,
+      "avg_cards": 6.0,
+      "avg_coins": 1.3333333333333333
+    },
+    "labels": {
+      "early": 0.5,
+      "mid": 0.5,
+      "late": 0.0
+    }
+  },
+  {
+    "n_players": 3,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 3,
+        "gp_count": 4,
+        "gps": [
+          "bahnhof",
+          "einkaufszentrum",
+          "freizeitpark",
+          "funkturm"
+        ],
+        "non_gp_cards": 15,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          },
+          {
+            "id": "apfelplantage",
+            "count": 2
+          },
+          {
+            "id": "bergwerk",
+            "count": 3
+          },
+          {
+            "id": "markthalle",
+            "count": 1
+          },
+          {
+            "id": "möbelfabrik",
+            "count": 4
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 7,
+        "gp_count": 3,
+        "gps": [
+          "bahnhof",
+          "einkaufszentrum",
+          "freizeitpark"
+        ],
+        "non_gp_cards": 14,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 3
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          },
+          {
+            "id": "apfelplantage",
+            "count": 2
+          },
+          {
+            "id": "markthalle",
+            "count": 2
+          },
+          {
+            "id": "bergwerk",
+            "count": 2
+          },
+          {
+            "id": "möbelfabrik",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 3",
+        "coins": 4,
+        "gp_count": 2,
+        "gps": [
+          "bahnhof",
+          "einkaufszentrum"
+        ],
+        "non_gp_cards": 12,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          },
+          {
+            "id": "mini-markt",
+            "count": 5
+          },
+          {
+            "id": "bergwerk",
+            "count": 1
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 3.0,
+      "max_gps": 4,
+      "avg_cards": 13.666666666666666,
+      "avg_coins": 4.666666666666667
+    },
+    "labels": {
+      "early": 0.0,
+      "mid": 0.0,
+      "late": 1.0
+    }
+  },
+  {
+    "n_players": 3,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 8,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 3
+          },
+          {
+            "id": "apfelplantage",
+            "count": 2
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 3,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 5,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 1
+          },
+          {
+            "id": "apfelplantage",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 3",
+        "coins": 1,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 7,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          },
+          {
+            "id": "apfelplantage",
+            "count": 2
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 1.0,
+      "max_gps": 1,
+      "avg_cards": 6.666666666666667,
+      "avg_coins": 1.3333333333333333
+    },
+    "labels": {
+      "early": 0.66,
+      "mid": 0.34,
+      "late": 0.0
+    }
+  },
+  {
+    "n_players": 3,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 7,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          },
+          {
+            "id": "apfelplantage",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 7,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          },
+          {
+            "id": "apfelplantage",
+            "count": 1
+          },
+          {
+            "id": "markthalle",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 3",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 7,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          },
+          {
+            "id": "apfelplantage",
+            "count": 2
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 1.0,
+      "max_gps": 1,
+      "avg_cards": 7.0,
+      "avg_coins": 0.0
+    },
+    "labels": {
+      "early": 0.64,
+      "mid": 0.36,
+      "late": 0.0
+    }
+  },
+  {
+    "n_players": 3,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 7,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          },
+          {
+            "id": "apfelplantage",
+            "count": 2
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 8,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          },
+          {
+            "id": "mini-markt",
+            "count": 1
+          },
+          {
+            "id": "apfelplantage",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 3",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 8,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          },
+          {
+            "id": "apfelplantage",
+            "count": 2
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 1.0,
+      "max_gps": 1,
+      "avg_cards": 7.666666666666667,
+      "avg_coins": 0.0
+    },
+    "labels": {
+      "early": 0.5,
+      "mid": 0.5,
+      "late": 0.0
+    }
+  },
+  {
+    "n_players": 3,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 8,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 3
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          },
+          {
+            "id": "markthalle",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 6,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 1
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          },
+          {
+            "id": "apfelplantage",
+            "count": 1
+          },
+          {
+            "id": "mini-markt",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 3",
+        "coins": 0,
+        "gp_count": 0,
+        "gps": [],
+        "non_gp_cards": 8,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          },
+          {
+            "id": "mini-markt",
+            "count": 3
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 0.6666666666666666,
+      "max_gps": 1,
+      "avg_cards": 7.333333333333333,
+      "avg_coins": 0.0
+    },
+    "labels": {
+      "early": 0.42,
+      "mid": 0.58,
+      "late": 0.0
+    }
+  },
+  {
+    "n_players": 3,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 2,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 1
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 4,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 3",
+        "coins": 2,
+        "gp_count": 0,
+        "gps": [],
+        "non_gp_cards": 4,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 3
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 0.6666666666666666,
+      "max_gps": 1,
+      "avg_cards": 3.3333333333333335,
+      "avg_coins": 0.6666666666666666
+    },
+    "labels": {
+      "early": 1.0,
+      "mid": 0.0,
+      "late": 0.0
+    }
+  },
+  {
+    "n_players": 3,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 5,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 5,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 5,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          }
+        ]
+      },
+      {
+        "name": "Player 3",
+        "coins": 2,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 5,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 1.0,
+      "max_gps": 1,
+      "avg_cards": 5.0,
+      "avg_coins": 2.3333333333333335
+    },
+    "labels": {
+      "early": 0.82,
+      "mid": 0.18,
+      "late": 0.0
+    }
+  },
+  {
+    "n_players": 3,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 3,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 3,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 1,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 3,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 3",
+        "coins": 2,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 3,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 1.0,
+      "max_gps": 1,
+      "avg_cards": 3.0,
+      "avg_coins": 2.0
+    },
+    "labels": {
+      "early": 1.0,
+      "mid": 0.0,
+      "late": 0.0
+    }
+  },
+  {
+    "n_players": 3,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 2,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 1
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 2,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 1
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 3",
+        "coins": 2,
+        "gp_count": 0,
+        "gps": [],
+        "non_gp_cards": 3,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 0.6666666666666666,
+      "max_gps": 1,
+      "avg_cards": 2.3333333333333335,
+      "avg_coins": 0.6666666666666666
+    },
+    "labels": {
+      "early": 1.0,
+      "mid": 0.0,
+      "late": 0.0
+    }
+  },
+  {
+    "n_players": 3,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 2,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 5,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 1
+          },
+          {
+            "id": "apfelplantage",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 1,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 6,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          },
+          {
+            "id": "apfelplantage",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 3",
+        "coins": 4,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 6,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 3
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 1.0,
+      "max_gps": 1,
+      "avg_cards": 5.666666666666667,
+      "avg_coins": 2.3333333333333335
+    },
+    "labels": {
+      "early": 0.64,
+      "mid": 0.36,
+      "late": 0.0
+    }
+  },
+  {
+    "n_players": 3,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 7,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          },
+          {
+            "id": "bergwerk",
+            "count": 1
+          },
+          {
+            "id": "mini-markt",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 3,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 5,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          }
+        ]
+      },
+      {
+        "name": "Player 3",
+        "coins": 2,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 5,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 1.0,
+      "max_gps": 1,
+      "avg_cards": 5.666666666666667,
+      "avg_coins": 1.6666666666666667
+    },
+    "labels": {
+      "early": 0.42,
+      "mid": 0.58,
+      "late": 0.0
+    }
+  },
+  {
+    "n_players": 3,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 2,
+        "gp_count": 2,
+        "gps": [
+          "bahnhof",
+          "einkaufszentrum"
+        ],
+        "non_gp_cards": 9,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 3
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          },
+          {
+            "id": "bergwerk",
+            "count": 2
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 10,
+        "gp_count": 2,
+        "gps": [
+          "bahnhof",
+          "einkaufszentrum"
+        ],
+        "non_gp_cards": 8,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 1
+          },
+          {
+            "id": "bäckerei",
+            "count": 3
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          },
+          {
+            "id": "bergwerk",
+            "count": 1
+          },
+          {
+            "id": "mini-markt",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 3",
+        "coins": 0,
+        "gp_count": 2,
+        "gps": [
+          "bahnhof",
+          "einkaufszentrum"
+        ],
+        "non_gp_cards": 10,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          },
+          {
+            "id": "bergwerk",
+            "count": 3
+          },
+          {
+            "id": "möbelfabrik",
+            "count": 2
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 2.0,
+      "max_gps": 2,
+      "avg_cards": 9.0,
+      "avg_coins": 4.0
+    },
+    "labels": {
+      "early": 0.0,
+      "mid": 0.92,
+      "late": 0.08
+    }
+  },
+  {
+    "n_players": 4,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 7,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 1
+          },
+          {
+            "id": "bäckerei",
+            "count": 3
+          },
+          {
+            "id": "apfelplantage",
+            "count": 2
+          },
+          {
+            "id": "bauernhof",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 1,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 8,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          },
+          {
+            "id": "apfelplantage",
+            "count": 2
+          },
+          {
+            "id": "markthalle",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 3",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 6,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 1
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 1
+          },
+          {
+            "id": "apfelplantage",
+            "count": 1
+          },
+          {
+            "id": "mini-markt",
+            "count": 1
+          },
+          {
+            "id": "wald",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 4",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 8,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          },
+          {
+            "id": "apfelplantage",
+            "count": 1
+          },
+          {
+            "id": "markthalle",
+            "count": 1
+          },
+          {
+            "id": "wald",
+            "count": 1
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 1.0,
+      "max_gps": 1,
+      "avg_cards": 7.25,
+      "avg_coins": 0.25
+    },
+    "labels": {
+      "early": 0.12,
+      "mid": 0.88,
+      "late": 0.0
+    }
+  },
+  {
+    "n_players": 4,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gp_count": 0,
+        "gps": [],
+        "non_gp_cards": 5,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 1
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "apfelplantage",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 3,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 1
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 3",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 3,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 4",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 4,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 1
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 0.75,
+      "max_gps": 1,
+      "avg_cards": 3.75,
+      "avg_coins": 0.0
+    },
+    "labels": {
+      "early": 0.7,
+      "mid": 0.3,
+      "late": 0.0
+    }
+  },
+  {
+    "n_players": 4,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 1,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 4,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 1,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 4,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 3",
+        "coins": 2,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 3,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 1
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 4",
+        "coins": 1,
+        "gp_count": 0,
+        "gps": [],
+        "non_gp_cards": 4,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 1
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "apfelplantage",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 1
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 0.75,
+      "max_gps": 1,
+      "avg_cards": 3.75,
+      "avg_coins": 1.25
+    },
+    "labels": {
+      "early": 0.76,
+      "mid": 0.24,
+      "late": 0.0
+    }
+  },
+  {
+    "n_players": 4,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 7,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          },
+          {
+            "id": "apfelplantage",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 1
+          },
+          {
+            "id": "markthalle",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 5,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 1
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          },
+          {
+            "id": "bauernhof",
+            "count": 1
+          },
+          {
+            "id": "apfelplantage",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 3",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 5,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 1
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          },
+          {
+            "id": "apfelplantage",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 4",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 6,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "apfelplantage",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 1.0,
+      "max_gps": 1,
+      "avg_cards": 5.75,
+      "avg_coins": 0.0
+    },
+    "labels": {
+      "early": 0.5,
+      "mid": 0.5,
+      "late": 0.0
+    }
+  },
+  {
+    "n_players": 4,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 1,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 7,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "apfelplantage",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 1
+          },
+          {
+            "id": "markthalle",
+            "count": 1
+          },
+          {
+            "id": "wald",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 7,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "apfelplantage",
+            "count": 3
+          },
+          {
+            "id": "bergwerk",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 3",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 9,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 1
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          },
+          {
+            "id": "apfelplantage",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 4
+          },
+          {
+            "id": "wald",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 4",
+        "coins": 1,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 6,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 1
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          },
+          {
+            "id": "bauernhof",
+            "count": 1
+          },
+          {
+            "id": "apfelplantage",
+            "count": 1
+          },
+          {
+            "id": "wald",
+            "count": 1
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 1.0,
+      "max_gps": 1,
+      "avg_cards": 7.25,
+      "avg_coins": 0.5
+    },
+    "labels": {
+      "early": 0.24,
+      "mid": 0.76,
+      "late": 0.0
+    }
+  },
+  {
+    "n_players": 4,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 5,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "apfelplantage",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 6,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 1
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "apfelplantage",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 3
+          }
+        ]
+      },
+      {
+        "name": "Player 3",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 3,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 1
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "apfelplantage",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 4",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 5,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "apfelplantage",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 1
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 1.0,
+      "max_gps": 1,
+      "avg_cards": 4.75,
+      "avg_coins": 0.0
+    },
+    "labels": {
+      "early": 0.5,
+      "mid": 0.5,
+      "late": 0.0
+    }
+  },
+  {
+    "n_players": 4,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 9,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          },
+          {
+            "id": "apfelplantage",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          },
+          {
+            "id": "wald",
+            "count": 2
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 3,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 6,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 1
+          },
+          {
+            "id": "mini-markt",
+            "count": 1
+          },
+          {
+            "id": "apfelplantage",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 3",
+        "coins": 0,
+        "gp_count": 0,
+        "gps": [],
+        "non_gp_cards": 7,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 1
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          },
+          {
+            "id": "apfelplantage",
+            "count": 2
+          },
+          {
+            "id": "bauernhof",
+            "count": 1
+          },
+          {
+            "id": "markthalle",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 4",
+        "coins": 0,
+        "gp_count": 0,
+        "gps": [],
+        "non_gp_cards": 8,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 1
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "apfelplantage",
+            "count": 2
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          },
+          {
+            "id": "markthalle",
+            "count": 1
+          },
+          {
+            "id": "wald",
+            "count": 1
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 0.5,
+      "max_gps": 1,
+      "avg_cards": 7.5,
+      "avg_coins": 0.75
+    },
+    "labels": {
+      "early": 0.4,
+      "mid": 0.6,
+      "late": 0.0
+    }
+  },
+  {
+    "n_players": 4,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 2,
+        "gp_count": 2,
+        "gps": [
+          "bahnhof",
+          "einkaufszentrum"
+        ],
+        "non_gp_cards": 8,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          },
+          {
+            "id": "apfelplantage",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 1
+          },
+          {
+            "id": "bergwerk",
+            "count": 2
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 6,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 6,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 1
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 1
+          },
+          {
+            "id": "apfelplantage",
+            "count": 2
+          },
+          {
+            "id": "bergwerk",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 3",
+        "coins": 6,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 6,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 1
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          },
+          {
+            "id": "apfelplantage",
+            "count": 1
+          },
+          {
+            "id": "bergwerk",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 4",
+        "coins": 11,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 7,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "apfelplantage",
+            "count": 2
+          },
+          {
+            "id": "bergwerk",
+            "count": 2
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 1.25,
+      "max_gps": 2,
+      "avg_cards": 6.75,
+      "avg_coins": 6.25
+    },
+    "labels": {
+      "early": 0.0,
+      "mid": 0.9,
+      "late": 0.1
+    }
+  },
+  {
+    "n_players": 4,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 1,
+        "gp_count": 0,
+        "gps": [],
+        "non_gp_cards": 8,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "apfelplantage",
+            "count": 3
+          },
+          {
+            "id": "markthalle",
+            "count": 2
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 7,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          },
+          {
+            "id": "apfelplantage",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 1
+          },
+          {
+            "id": "markthalle",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 3",
+        "coins": 1,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 6,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 1
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "apfelplantage",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 3
+          }
+        ]
+      },
+      {
+        "name": "Player 4",
+        "coins": 1,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 6,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 1
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          },
+          {
+            "id": "apfelplantage",
+            "count": 1
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 0.75,
+      "max_gps": 1,
+      "avg_cards": 6.75,
+      "avg_coins": 0.75
+    },
+    "labels": {
+      "early": 0.24,
+      "mid": 0.76,
+      "late": 0.0
+    }
+  },
+  {
+    "n_players": 4,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 2,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 7,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 3
+          },
+          {
+            "id": "bauernhof",
+            "count": 1
+          },
+          {
+            "id": "wald",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 7,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 1
+          },
+          {
+            "id": "apfelplantage",
+            "count": 1
+          },
+          {
+            "id": "wald",
+            "count": 2
+          }
+        ]
+      },
+      {
+        "name": "Player 3",
+        "coins": 3,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 8,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 1
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          },
+          {
+            "id": "apfelplantage",
+            "count": 2
+          },
+          {
+            "id": "markthalle",
+            "count": 1
+          },
+          {
+            "id": "wald",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 4",
+        "coins": 2,
+        "gp_count": 0,
+        "gps": [],
+        "non_gp_cards": 10,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 1
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "apfelplantage",
+            "count": 3
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          },
+          {
+            "id": "markthalle",
+            "count": 3
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 0.75,
+      "max_gps": 1,
+      "avg_cards": 8.0,
+      "avg_coins": 1.75
+    },
+    "labels": {
+      "early": 0.42,
+      "mid": 0.58,
+      "late": 0.0
+    }
+  },
+  {
+    "n_players": 4,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gp_count": 0,
+        "gps": [],
+        "non_gp_cards": 6,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          },
+          {
+            "id": "apfelplantage",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gp_count": 0,
+        "gps": [],
+        "non_gp_cards": 5,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 1
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "apfelplantage",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          }
+        ]
+      },
+      {
+        "name": "Player 3",
+        "coins": 0,
+        "gp_count": 0,
+        "gps": [],
+        "non_gp_cards": 5,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 1
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "apfelplantage",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          }
+        ]
+      },
+      {
+        "name": "Player 4",
+        "coins": 1,
+        "gp_count": 0,
+        "gps": [],
+        "non_gp_cards": 5,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "apfelplantage",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 1
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 0.0,
+      "max_gps": 0,
+      "avg_cards": 5.25,
+      "avg_coins": 0.25
+    },
+    "labels": {
+      "early": 0.56,
+      "mid": 0.44,
+      "late": 0.0
+    }
+  },
+  {
+    "n_players": 4,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 1,
+        "gp_count": 0,
+        "gps": [],
+        "non_gp_cards": 7,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 1
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "apfelplantage",
+            "count": 2
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          },
+          {
+            "id": "mini-markt",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 7,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          },
+          {
+            "id": "bauernhof",
+            "count": 1
+          },
+          {
+            "id": "apfelplantage",
+            "count": 1
+          },
+          {
+            "id": "markthalle",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 3",
+        "coins": 1,
+        "gp_count": 0,
+        "gps": [],
+        "non_gp_cards": 6,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 1
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          },
+          {
+            "id": "apfelplantage",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          }
+        ]
+      },
+      {
+        "name": "Player 4",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 6,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 1
+          },
+          {
+            "id": "apfelplantage",
+            "count": 2
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 0.5,
+      "max_gps": 1,
+      "avg_cards": 6.5,
+      "avg_coins": 0.5
+    },
+    "labels": {
+      "early": 0.54,
+      "mid": 0.46,
+      "late": 0.0
+    }
+  },
+  {
+    "n_players": 4,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 1,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 4,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "apfelplantage",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 1,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 5,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "apfelplantage",
+            "count": 2
+          }
+        ]
+      },
+      {
+        "name": "Player 3",
+        "coins": 1,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 4,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 1
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          }
+        ]
+      },
+      {
+        "name": "Player 4",
+        "coins": 1,
+        "gp_count": 0,
+        "gps": [],
+        "non_gp_cards": 5,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 1
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "apfelplantage",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 0.75,
+      "max_gps": 1,
+      "avg_cards": 4.5,
+      "avg_coins": 1.0
+    },
+    "labels": {
+      "early": 0.64,
+      "mid": 0.36,
+      "late": 0.0
+    }
+  },
+  {
+    "n_players": 4,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 6,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 7,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 1
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          },
+          {
+            "id": "apfelplantage",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          },
+          {
+            "id": "mini-markt",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 6,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 9,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "apfelplantage",
+            "count": 2
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          },
+          {
+            "id": "markthalle",
+            "count": 2
+          }
+        ]
+      },
+      {
+        "name": "Player 3",
+        "coins": 3,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 8,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 1
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          },
+          {
+            "id": "apfelplantage",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          },
+          {
+            "id": "mini-markt",
+            "count": 2
+          }
+        ]
+      },
+      {
+        "name": "Player 4",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 5,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "apfelplantage",
+            "count": 2
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 1.0,
+      "max_gps": 1,
+      "avg_cards": 7.25,
+      "avg_coins": 3.75
+    },
+    "labels": {
+      "early": 0.04,
+      "mid": 0.96,
+      "late": 0.0
+    }
+  },
+  {
+    "n_players": 4,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gp_count": 0,
+        "gps": [],
+        "non_gp_cards": 9,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "apfelplantage",
+            "count": 2
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          },
+          {
+            "id": "markthalle",
+            "count": 2
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 1,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 5,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 1
+          },
+          {
+            "id": "bäckerei",
+            "count": 3
+          },
+          {
+            "id": "bauernhof",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 3",
+        "coins": 2,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 3,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 1
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 4",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 7,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          },
+          {
+            "id": "mini-markt",
+            "count": 1
+          },
+          {
+            "id": "apfelplantage",
+            "count": 1
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 0.75,
+      "max_gps": 1,
+      "avg_cards": 6.0,
+      "avg_coins": 0.75
+    },
+    "labels": {
+      "early": 0.04,
+      "mid": 0.96,
+      "late": 0.0
+    }
+  },
+  {
+    "n_players": 4,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 1,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 6,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "mini-markt",
+            "count": 2
+          },
+          {
+            "id": "wald",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 2,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 10,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          },
+          {
+            "id": "apfelplantage",
+            "count": 2
+          },
+          {
+            "id": "bauernhof",
+            "count": 1
+          },
+          {
+            "id": "markthalle",
+            "count": 3
+          }
+        ]
+      },
+      {
+        "name": "Player 3",
+        "coins": 3,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 10,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 1
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          },
+          {
+            "id": "apfelplantage",
+            "count": 2
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          },
+          {
+            "id": "markthalle",
+            "count": 2
+          },
+          {
+            "id": "wald",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 4",
+        "coins": 3,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 9,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 1
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "apfelplantage",
+            "count": 2
+          },
+          {
+            "id": "bauernhof",
+            "count": 3
+          },
+          {
+            "id": "bergwerk",
+            "count": 1
+          },
+          {
+            "id": "wald",
+            "count": 1
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 1.0,
+      "max_gps": 1,
+      "avg_cards": 8.75,
+      "avg_coins": 2.25
+    },
+    "labels": {
+      "early": 0.0,
+      "mid": 1.0,
+      "late": 0.0
+    }
+  },
+  {
+    "n_players": 4,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 4,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 1
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "apfelplantage",
+            "count": 2
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 4,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 1
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 1
+          },
+          {
+            "id": "apfelplantage",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 3",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 5,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          }
+        ]
+      },
+      {
+        "name": "Player 4",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 3,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 1.0,
+      "max_gps": 1,
+      "avg_cards": 4.0,
+      "avg_coins": 0.0
+    },
+    "labels": {
+      "early": 0.64,
+      "mid": 0.36,
+      "late": 0.0
+    }
+  },
+  {
+    "n_players": 4,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 5,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 1
+          },
+          {
+            "id": "apfelplantage",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 5,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 1
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          },
+          {
+            "id": "apfelplantage",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 3",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 5,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 1
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          }
+        ]
+      },
+      {
+        "name": "Player 4",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 5,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 1
+          },
+          {
+            "id": "apfelplantage",
+            "count": 1
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 1.0,
+      "max_gps": 1,
+      "avg_cards": 5.0,
+      "avg_coins": 0.0
+    },
+    "labels": {
+      "early": 0.6,
+      "mid": 0.4,
+      "late": 0.0
+    }
+  },
+  {
+    "n_players": 4,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 16,
+        "gp_count": 3,
+        "gps": [
+          "bahnhof",
+          "einkaufszentrum",
+          "freizeitpark"
+        ],
+        "non_gp_cards": 11,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 1
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          },
+          {
+            "id": "apfelplantage",
+            "count": 2
+          },
+          {
+            "id": "bergwerk",
+            "count": 2
+          },
+          {
+            "id": "möbelfabrik",
+            "count": 2
+          },
+          {
+            "id": "mini-markt",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 3,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 11,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 1
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          },
+          {
+            "id": "bauernhof",
+            "count": 3
+          },
+          {
+            "id": "apfelplantage",
+            "count": 1
+          },
+          {
+            "id": "wald",
+            "count": 4
+          }
+        ]
+      },
+      {
+        "name": "Player 3",
+        "coins": 14,
+        "gp_count": 3,
+        "gps": [
+          "bahnhof",
+          "einkaufszentrum",
+          "freizeitpark"
+        ],
+        "non_gp_cards": 11,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          },
+          {
+            "id": "apfelplantage",
+            "count": 1
+          },
+          {
+            "id": "bergwerk",
+            "count": 2
+          },
+          {
+            "id": "möbelfabrik",
+            "count": 2
+          },
+          {
+            "id": "mini-markt",
+            "count": 2
+          }
+        ]
+      },
+      {
+        "name": "Player 4",
+        "coins": 12,
+        "gp_count": 4,
+        "gps": [
+          "bahnhof",
+          "einkaufszentrum",
+          "freizeitpark",
+          "funkturm"
+        ],
+        "non_gp_cards": 12,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 1
+          },
+          {
+            "id": "bergwerk",
+            "count": 2
+          },
+          {
+            "id": "apfelplantage",
+            "count": 2
+          },
+          {
+            "id": "markthalle",
+            "count": 2
+          },
+          {
+            "id": "möbelfabrik",
+            "count": 2
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 2.75,
+      "max_gps": 4,
+      "avg_cards": 11.25,
+      "avg_coins": 11.25
+    },
+    "labels": {
+      "early": 0.0,
+      "mid": 0.0,
+      "late": 1.0
+    }
+  },
+  {
+    "n_players": 4,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 1,
+        "gp_count": 2,
+        "gps": [
+          "bahnhof",
+          "einkaufszentrum"
+        ],
+        "non_gp_cards": 8,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 1
+          },
+          {
+            "id": "apfelplantage",
+            "count": 2
+          },
+          {
+            "id": "bergwerk",
+            "count": 1
+          },
+          {
+            "id": "markthalle",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 1,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 6,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 1
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          },
+          {
+            "id": "apfelplantage",
+            "count": 1
+          },
+          {
+            "id": "wald",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 3",
+        "coins": 0,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 8,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 1
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          },
+          {
+            "id": "bauernhof",
+            "count": 3
+          },
+          {
+            "id": "apfelplantage",
+            "count": 1
+          },
+          {
+            "id": "wald",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 4",
+        "coins": 11,
+        "gp_count": 1,
+        "gps": [
+          "bahnhof"
+        ],
+        "non_gp_cards": 8,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          },
+          {
+            "id": "apfelplantage",
+            "count": 2
+          },
+          {
+            "id": "bergwerk",
+            "count": 2
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 1.25,
+      "max_gps": 2,
+      "avg_cards": 7.5,
+      "avg_coins": 3.25
+    },
+    "labels": {
+      "early": 0.0,
+      "mid": 0.6,
+      "late": 0.4
+    }
+  },
+  {
+    "n_players": 4,
+    "players": [
+      {
+        "name": "Player 1",
+        "coins": 11,
+        "gp_count": 3,
+        "gps": [
+          "bahnhof",
+          "einkaufszentrum",
+          "freizeitpark"
+        ],
+        "non_gp_cards": 15,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 1
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "apfelplantage",
+            "count": 2
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          },
+          {
+            "id": "bergwerk",
+            "count": 2
+          },
+          {
+            "id": "möbelfabrik",
+            "count": 3
+          },
+          {
+            "id": "mini-markt",
+            "count": 1
+          },
+          {
+            "id": "molkerei",
+            "count": 2
+          },
+          {
+            "id": "markthalle",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 2",
+        "coins": 1,
+        "gp_count": 3,
+        "gps": [
+          "bahnhof",
+          "einkaufszentrum",
+          "freizeitpark"
+        ],
+        "non_gp_cards": 14,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 1
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          },
+          {
+            "id": "bauernhof",
+            "count": 1
+          },
+          {
+            "id": "apfelplantage",
+            "count": 2
+          },
+          {
+            "id": "bergwerk",
+            "count": 1
+          },
+          {
+            "id": "mini-markt",
+            "count": 4
+          },
+          {
+            "id": "wald",
+            "count": 3
+          }
+        ]
+      },
+      {
+        "name": "Player 3",
+        "coins": 23,
+        "gp_count": 4,
+        "gps": [
+          "bahnhof",
+          "einkaufszentrum",
+          "freizeitpark",
+          "funkturm"
+        ],
+        "non_gp_cards": 13,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 1
+          },
+          {
+            "id": "apfelplantage",
+            "count": 1
+          },
+          {
+            "id": "bauernhof",
+            "count": 1
+          },
+          {
+            "id": "wald",
+            "count": 2
+          },
+          {
+            "id": "markthalle",
+            "count": 1
+          },
+          {
+            "id": "bergwerk",
+            "count": 2
+          },
+          {
+            "id": "möbelfabrik",
+            "count": 2
+          },
+          {
+            "id": "mini-markt",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "Player 4",
+        "coins": 10,
+        "gp_count": 2,
+        "gps": [
+          "bahnhof",
+          "einkaufszentrum"
+        ],
+        "non_gp_cards": 14,
+        "cards": [
+          {
+            "id": "weizenfeld",
+            "count": 2
+          },
+          {
+            "id": "bäckerei",
+            "count": 2
+          },
+          {
+            "id": "bauernhof",
+            "count": 2
+          },
+          {
+            "id": "apfelplantage",
+            "count": 1
+          },
+          {
+            "id": "wald",
+            "count": 1
+          },
+          {
+            "id": "markthalle",
+            "count": 1
+          },
+          {
+            "id": "bergwerk",
+            "count": 1
+          },
+          {
+            "id": "möbelfabrik",
+            "count": 1
+          },
+          {
+            "id": "molkerei",
+            "count": 3
+          }
+        ]
+      }
+    ],
+    "features": {
+      "avg_gps": 3.0,
+      "max_gps": 4,
+      "avg_cards": 14.0,
+      "avg_coins": 11.25
+    },
+    "labels": {
+      "early": 0.0,
+      "mid": 0.0,
+      "late": 1.0
+    }
+  }
+]

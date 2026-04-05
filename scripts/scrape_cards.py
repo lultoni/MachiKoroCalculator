@@ -334,7 +334,7 @@ def main():
         "list_table": table_cards,
     }
 
-    outpath = "scraped_cards.json"
+    outpath = "scripts/scraped_cards.json"
     with open(outpath, "w", encoding="utf-8") as f:
         json.dump(output, f, ensure_ascii=False, indent=2)
 

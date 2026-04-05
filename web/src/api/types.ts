@@ -189,12 +189,25 @@ export interface FromSnapshotRequest {
 
 // ─── H2H (Head-to-Head) ────────────────────────────────────────────────
 
+export interface EngineRating {
+  rating: number;
+  rd: number;
+  volatility: number;
+  matchCount: number;
+}
+
+export interface RatingsResponse {
+  ratings: Record<string, EngineRating>;
+}
+
 export interface H2hStartRequest {
   engineA: string;
   engineB: string;
   games: number;
-  iterations: number;
+  iterations?: number;
   maxTurns?: number;
+  configA?: Record<string, string>;
+  configB?: Record<string, string>;
 }
 
 export interface H2hStartResponse {

@@ -9,14 +9,7 @@
 
 ## Open Bugs
 
-### B24: H2H only has one iterations field for two engines
-**Status:** OPEN | **Layer:** DESIGN | **Priority:** P3
-**Problem:** Single "iterations/eval" field applies to both engines.
-**Files:** `web/src/components/H2hOverview.tsx`
-
-### B25: Engine selection in settings not sorted by performance
-**Status:** DESIGN_QUESTION | **Layer:** FE | **Priority:** P3
-**Files:** `web/src/components/SettingsScreen.tsx`
+(none)
 
 ---
 
@@ -45,3 +38,5 @@ All resolved bugs are documented in `CHANGELOG.md` under version 7.22 (UI Bug Sw
 | B20 | Factor detail enrichment | Deferred — numeric breakdowns already present |
 | B21 | Undo no context | Fixed — tooltip with last turn info |
 | B23 | Autosave not working | Fixed — useEffect on effectiveTurnCount |
+| B24 | H2H single iterations field | Fixed — per-engine inline config editors with all params |
+| B25 | Engines unsorted by performance | Fixed — Glicko-2 ratings from H2H results, sorted in Settings |

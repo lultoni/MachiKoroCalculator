@@ -19,7 +19,7 @@ Phases 1–6 complete. The app is a fully functional web-based Machi Koro purcha
 - Head-to-head engine testing: full games where all decisions (dice, Funkturm, Bürohaus, purchase) come from real MCTS tree search
 - H2H match runner with parallel game execution, mid-match seat swapping, CLI runner, round-robin tournament with leaderboard + matrix, REST API, and visual replay UI
 - Web SPA (React 19 + TypeScript + Vite 8 + Tailwind CSS 4) with full DE/EN localization
-- 20 REST API endpoints (game state, session management, engine evaluation, insights, pre-computation, H2H testing)
+- 21 REST API endpoints (game state, session management, engine evaluation, insights, pre-computation, H2H testing, Glicko-2 ratings)
 - 470+ test assertions across 30 test sections
 
 **What's next:**
@@ -83,7 +83,7 @@ UI (Web SPA) → Interface (orchestration) → Simulation Engines → Standard C
 - **Standard Calcs** — reusable math: EV, ROI, probability, variance, 11 advanced risk/tempo metrics
 - **Simulation Engines** — pluggable strategy: 9 engine classes with 32 configurations
 - **Interface** — engine registry (JSON), request routing, result formatting
-- **UI** — React 19 SPA (17 components, 8 hooks) with Java HTTP API backend (20 endpoints)
+- **UI** — React 19 SPA (17 components, 8 hooks) with Java HTTP API backend (21 endpoints)
 
 See `NORTH-STAR.md` for the complete specification.
 

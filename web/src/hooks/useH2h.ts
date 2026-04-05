@@ -34,11 +34,12 @@ export function useH2h() {
   }, []);
 
   const startMatch = useCallback(async (
-    engineA: string, engineB: string, games: number, iterations: number
+    engineA: string, engineB: string, games: number,
+    configA?: Record<string, string>, configB?: Record<string, string>
   ) => {
     setState(s => ({ ...s, loading: true, error: null }));
     try {
-      const res = await api.h2hStart({ engineA, engineB, games, iterations });
+      const res = await api.h2hStart({ engineA, engineB, games, configA, configB });
       setState(s => ({
         ...s,
         activeMatchId: res.matchId,

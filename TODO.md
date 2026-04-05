@@ -10,8 +10,8 @@ Priorisiere in deiner Abarbeitung die wichtigsten Features. Erkenne Abhänigkeit
 
 | # | Task | Notes |
 |---|------|-------|
-| 2 | Refine UI based on real gameplay usage. | UI Bugs stehen in UI-BUGS.md |
 | 5 | Expansion card support. | Out of scope until core is perfected. |
+| 9 | Custom engine builder screen. | UI to compose engine configs (base class + params), save to registry with duplicate detection. |
 
 ## Done
 
@@ -19,6 +19,7 @@ Moved here when completed. Full history in CHANGELOG.md.
 
 | # | Task |
 |---|------|
+| 2 | Refine UI based on real gameplay usage (B24 + B25). |
 | 7 | Project-Categorie-Icons in UI |
 | 3 | Game-over decision review |
 | 1 | Fix MCTS ChanceNode doubles bug |

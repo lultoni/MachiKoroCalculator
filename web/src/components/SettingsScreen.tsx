@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useLocale } from '../i18n/useLocale';
 import type { Settings } from '../hooks/useSettings';
-import type { EngineRegistryEntry, PlayerState } from '../api/types';
+import type { EngineRegistryEntry, PlayerState, EngineRating } from '../api/types';
 import * as api from '../api/client';
 
 interface Props {
@@ -16,19 +16,34 @@ interface Props {
 export function SettingsScreen({ settings, update, players, onClose }: Props) {
   const { t, locale, setLocale } = useLocale();
   const [engines, setEngines] = useState<EngineRegistryEntry[]>([]);
+  const [ratings, setRatings] = useState<Record<string, EngineRating>>({});
 
   useEffect(() => {
     api.getEngines().then(setEngines).catch(() => {});
+    api.h2hRatings().then(r => setRatings(r.ratings)).catch(() => {});
   }, []);
 
-  // Group engines by class
+  // Group engines by class, sort within each group by rating (rated first, desc)
   const grouped = engines.reduce<Record<string, EngineRegistryEntry[]>>((acc, e) => {
     (acc[e.engineClass] ??= []).push(e);
     return acc;
   }, {});
 
+  // Sort each group by rating (rated engines first, descending; unrated at bottom)
+  for (const list of Object.values(grouped)) {
+    list.sort((a, b) => {
+      const ra = ratings[a.id];
+      const rb = ratings[b.id];
+      if (ra && rb) return rb.rating - ra.rating;
+      if (ra) return -1;
+      if (rb) return 1;
+      return 0;
+    });
+  }
+
   // Selected engine details
   const selectedEngine = engines.find(e => e.id === settings.engineId);
+  const selectedRating = selectedEngine ? ratings[selectedEngine.id] : undefined;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
@@ -53,21 +68,29 @@ export function SettingsScreen({ settings, update, players, onClose }: Props) {
             <div key={cls}>
               <div className="text-xs text-machi-text-dim/60 uppercase tracking-wider mt-2 mb-1">{cls}</div>
               <div className="flex flex-wrap gap-1.5">
-                {list.map(e => (
-                  <button
-                    key={e.id}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                      settings.engineId === e.id
-                        ? 'bg-machi-accent text-machi-bg'
-                        : 'border border-machi-border text-machi-text-dim hover:text-machi-text hover:border-machi-text-dim'
-                    }`}
-                    onClick={() => update({ engineId: e.id })}
-                    title={e.description}
-                  >
-                    {e.id}
-                    {e.isDefault && ' ★'}
-                  </button>
-                ))}
+                {list.map(e => {
+                  const r = ratings[e.id];
+                  return (
+                    <button
+                      key={e.id}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                        settings.engineId === e.id
+                          ? 'bg-machi-accent text-machi-bg'
+                          : 'border border-machi-border text-machi-text-dim hover:text-machi-text hover:border-machi-text-dim'
+                      }`}
+                      onClick={() => update({ engineId: e.id })}
+                      title={`${e.description}${r ? `\nRating: ${Math.round(r.rating)} ±${Math.round(r.rd)} (${r.matchCount} matches)` : ''}`}
+                    >
+                      {e.id}
+                      {e.isDefault && ' ★'}
+                      {r && (
+                        <span className="ml-1 opacity-70 text-[10px]">
+                          {Math.round(r.rating)}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           ))}
@@ -92,6 +115,11 @@ export function SettingsScreen({ settings, update, players, onClose }: Props) {
                     {k}: {v}
                   </span>
                 ))}
+                {selectedRating && (
+                  <span className="px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 font-medium">
+                    {Math.round(selectedRating.rating)} ±{Math.round(selectedRating.rd)} ({selectedRating.matchCount} matches)
+                  </span>
+                )}
               </div>
             </div>
           )}

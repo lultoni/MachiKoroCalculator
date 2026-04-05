@@ -6,6 +6,22 @@ Implementation history: what was built, why, and which design decisions were mad
 
 ## Phase 7: Iteration
 
+### 7.25 — Per-Engine H2H Config + Glicko-2 Ratings + File Cleanup
+
+**File relocation:** Moved stray root files to proper locations — `h2h-results.json` → `data/`, scraped card JSONs → `scripts/`, removed `.iml` from tracking. Updated all references in `H2hResultStore`, `H2hMain`, Python scripts.
+
+**B24 — Per-engine config parameters (H2H):**
+- `MatchConfig` now supports per-seat `configOverrides` (nullable `Map<String,String>[]`). Legacy single `iterationsPerEval` preserved for CLI/tournament backward compat.
+- `buildSeatConfig()` merges override map onto registry defaults: iterations, timeBudgetMs, riskToleranceWeight, and all engine-specific extras (rolloutTemperature, maxRolloutDepth, leafEval, etc.).
+- `H2hHandler.handleStart` parses optional `configA`/`configB` JSON objects from request.
+- H2H UI: each engine dropdown now shows inline config fields below it, pre-filled with registry defaults and independently editable. Single "iterations override" field removed.
+
+**B25 — Glicko-2 engine rating system:**
+- `Glicko2Rating.java`: Pure Glicko-2 math (Glickman 2001). Rating (μ, starts 1500), RD (uncertainty, starts 350), volatility (σ, starts 0.06). Illinois method for volatility convergence.
+- `RatingCalculator.java`: Replays all H2H results chronologically to compute current ratings for every engine that appeared in any match.
+- `GET /api/h2h/ratings` endpoint: computes ratings on-demand from stored results.
+- Settings screen: engines sorted by Glicko-2 rating within each class group (rated first, descending). Rating badge (`1523 ±120`) shown on each button. Full tooltip with match count.
+
 ### 7.24 — Project Category Icons + cardDisplay Utility
 
 Added emoji-based category icons (🌾 food, 🐄 animal, ⛏ production, ☕ cafe, 🏪 store, 🏭 factory, 🛒 market, 🏛 office) to card names across the UI.

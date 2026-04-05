@@ -18,6 +18,7 @@ import type {
   H2hMatchSummary,
   H2hMatchResult,
   H2hGameLog,
+  RatingsResponse,
 } from './types';
 
 const BASE = '';  // same-origin; Vite proxy handles /api → :8080
@@ -123,3 +124,6 @@ export const h2hResult = (matchId: string) =>
 
 export const h2hGameLog = (matchId: string, gameIndex: number) =>
   json<H2hGameLog>(`/api/h2h/results/${matchId}/game/${gameIndex}`);
+
+export const h2hRatings = () =>
+  json<RatingsResponse>('/api/h2h/ratings');

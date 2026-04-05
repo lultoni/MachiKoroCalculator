@@ -130,7 +130,7 @@ public final class MatchRunner {
                         + " (from registry id: " + registryId + ")");
             }
             engines[i] = engine;
-            configs[i] = MatchConfig.buildEvalConfig(entry.config(), config.iterationsPerEval());
+            configs[i] = config.buildSeatConfig(entry.config(), i);
         }
         return new ResolvedMatch(engines, configs);
     }

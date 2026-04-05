@@ -37,8 +37,8 @@ UI (React 19 SPA) --HTTP--> Interface --> Engines --> Calcs --> Core
 | Calcs | `calcs/` | Reusable math: EV, ROI, variance, 11 advanced metrics. Stateless. |
 | Engines | `engine/` | 9 engine classes, 32 registry configs. Returns ranked options + explanations. |
 | Interface | `iface/` | Engine registry (JSON), routing, result formatting. |
-| Server | `server/` | Java HTTP API (20 endpoints), session management, pre-computation. |
-| H2H | `h2h/` | Engine comparison: match runner, tournament, game logging. |
+| Server | `server/` | Java HTTP API (21 endpoints), session management, pre-computation. |
+| H2H | `h2h/` | Engine comparison: match runner, tournament, Glicko-2 ratings, game logging. |
 | UI | `web/` | React 19 + TypeScript + Vite 8 + Tailwind CSS 4. 17 components, 8 hooks, DE/EN. |
 
 **Engine classes:** MctsV1 (base) + 5 variants (A-E), FlatMcEngine, HeuristicEvEngine, ExpectimaxEngine.

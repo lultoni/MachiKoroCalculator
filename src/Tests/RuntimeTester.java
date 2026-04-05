@@ -16,6 +16,8 @@ import engine.SimulationEngine;
 import engine.mcts.SupplyTracker;
 import h2h.MatchConfig;
 import h2h.MatchResult;
+import h2h.Glicko2Rating;
+import h2h.RatingCalculator;
 import h2h.TournamentResult;
 import h2h.TournamentRunner;
 
@@ -358,6 +360,9 @@ public class RuntimeTester {
             test_build_eval_config_preserves_extras();
             test_engine_registry_get_by_tier();
             test_abbreviate_engine_ids();
+            test_glicko2_initial_rating();
+            test_glicko2_winner_gains_rating();
+            test_glicko2_rating_calculator();
         });
 
         runSection("Engine Compliance", () -> {
@@ -3092,8 +3097,9 @@ public class RuntimeTester {
         extras.put("maxRolloutDepth", "7");
         EngineConfig registryConfig = new EngineConfig(2000, 0, 0.0, extras);
 
-        // Build eval config with iteration override
-        EngineConfig eval = MatchConfig.buildEvalConfig(registryConfig, 500);
+        // Build eval config with iteration override using per-seat config
+        MatchConfig matchCfg = new MatchConfig(new String[]{"a", "b"}, 1, 200, 500, true);
+        EngineConfig eval = matchCfg.buildSeatConfig(registryConfig, 0);
 
         assertEq("iterations overridden to 500", 500, eval.iterations);
         assertEq("rolloutTemperature preserved", "0.3", eval.getExtra("rolloutTemperature", "missing"));
@@ -3101,7 +3107,8 @@ public class RuntimeTester {
         assertEq("skipEnrichment added", "true", eval.getExtra("skipEnrichment", "false"));
 
         // Build eval config without iteration override (0 = use registry)
-        EngineConfig evalDefault = MatchConfig.buildEvalConfig(registryConfig, 0);
+        MatchConfig matchCfgNoOverride = new MatchConfig(new String[]{"a", "b"}, 1, 200, 0, true);
+        EngineConfig evalDefault = matchCfgNoOverride.buildSeatConfig(registryConfig, 0);
         assertEq("iterations default from registry", 2000, evalDefault.iterations);
     }
 
@@ -3134,6 +3141,57 @@ public class RuntimeTester {
                 h2h.TournamentMain.abbreviate("mcts-v1-boltzmann-t07-balanced"));
         assertEq("adaptive deep", "adapt-d",
                 h2h.TournamentMain.abbreviate("mcts-v1-adaptive-deep"));
+    }
+
+    private static void test_glicko2_initial_rating() {
+        Glicko2Rating r = Glicko2Rating.initial();
+        assertEq("initial rating = 1500", 1500, (int) r.rating);
+        assertEq("initial RD = 350", 350, (int) r.rd);
+        assertEq("initial matchCount = 0", 0, r.matchCount);
+        assertTrue("initial volatility = 0.06", Math.abs(r.volatility - 0.06) < 0.001);
+    }
+
+    private static void test_glicko2_winner_gains_rating() {
+        Glicko2Rating a = Glicko2Rating.initial();
+        Glicko2Rating b = Glicko2Rating.initial();
+
+        // A beats B decisively (100% win rate)
+        Glicko2Rating[] result = Glicko2Rating.update(a, b, 1.0);
+        assertTrue("Winner rating increases", result[0].rating > 1500);
+        assertTrue("Loser rating decreases", result[1].rating < 1500);
+        assertTrue("Winner RD decreases from 350", result[0].rd < 350);
+        assertTrue("Loser RD decreases from 350", result[1].rd < 350);
+        assertEq("Winner matchCount = 1", 1, result[0].matchCount);
+        assertEq("Loser matchCount = 1", 1, result[1].matchCount);
+
+        // Symmetric: if B beats A 100%, same magnitude
+        Glicko2Rating[] result2 = Glicko2Rating.update(a, b, 0.0);
+        assertTrue("Ratings are symmetric",
+                Math.abs((result[0].rating - 1500) - (1500 - result2[0].rating)) < 1.0);
+    }
+
+    private static void test_glicko2_rating_calculator() {
+        // A beats B 70%, A beats C 60%, B beats C 80%
+        MatchResult ab = mockMatchResult("A", "B", 7, 3);
+        MatchResult ac = mockMatchResult("A", "C", 6, 4);
+        MatchResult bc = mockMatchResult("B", "C", 8, 2);
+
+        Map<String, Glicko2Rating> ratings = RatingCalculator.computeRatings(List.of(ab, ac, bc));
+
+        assertEq("3 engines rated", 3, ratings.size());
+        assertTrue("A has rating", ratings.containsKey("A"));
+        assertTrue("B has rating", ratings.containsKey("B"));
+        assertTrue("C has rating", ratings.containsKey("C"));
+
+        // A should be highest: won both matchups
+        assertTrue("A > B (A won 70%)", ratings.get("A").rating > ratings.get("B").rating);
+        // C should be lowest: lost both matchups
+        assertTrue("B > C (B won 80% vs C)", ratings.get("B").rating > ratings.get("C").rating);
+
+        // All should have matchCount >= 1
+        assertTrue("A played 2 matches", ratings.get("A").matchCount >= 2);
+        assertTrue("B played 2 matches", ratings.get("B").matchCount >= 2);
+        assertTrue("C played 2 matches", ratings.get("C").matchCount >= 2);
     }
 
     /**

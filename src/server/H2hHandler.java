@@ -25,6 +25,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  *   <li>{@code GET  /api/h2h/results}              — all completed matches (summary, no game logs)</li>
  *   <li>{@code GET  /api/h2h/results/{matchId}}    — full result with game logs</li>
  *   <li>{@code GET  /api/h2h/results/{matchId}/game/{gameIndex}} — single game log</li>
+ *   <li>{@code GET  /api/h2h/ratings}              — Glicko-2 ratings computed from all match history</li>
  * </ul>
  */
 final class H2hHandler implements HttpHandler {
@@ -65,6 +66,8 @@ final class H2hHandler implements HttpHandler {
                 handleMatchResult(exchange, matchId);
             } else if (path.equals("/api/h2h/results") && "GET".equals(method)) {
                 handleAllResults(exchange);
+            } else if (path.equals("/api/h2h/ratings") && "GET".equals(method)) {
+                handleRatings(exchange);
             } else {
                 ApiUtils.sendError(exchange, 404, "Not found: " + path);
             }
@@ -83,11 +86,22 @@ final class H2hHandler implements HttpHandler {
         String engineA = body.has("engineA") ? body.get("engineA").getAsString() : "mcts-v1-fast";
         String engineB = body.has("engineB") ? body.get("engineB").getAsString() : "mcts-v1-fast";
         int games = body.has("games") ? body.get("games").getAsInt() : 100;
-        int iterations = body.has("iterations") ? body.get("iterations").getAsInt() : 500;
         int maxTurns = body.has("maxTurns") ? body.get("maxTurns").getAsInt() : 200;
 
+        // Per-engine config overrides (new API)
+        @SuppressWarnings("unchecked")
+        java.util.Map<String, String>[] configOverrides = null;
+        if (body.has("configA") || body.has("configB")) {
+            configOverrides = new java.util.Map[2];
+            if (body.has("configA")) configOverrides[0] = parseConfigMap(body.getAsJsonObject("configA"));
+            if (body.has("configB")) configOverrides[1] = parseConfigMap(body.getAsJsonObject("configB"));
+        }
+
+        // Legacy: single iterations override (backward compat with CLI)
+        int iterations = body.has("iterations") ? body.get("iterations").getAsInt() : 0;
+
         MatchConfig config = new MatchConfig(
-                new String[]{engineA, engineB}, games, maxTurns, iterations, true);
+                new String[]{engineA, engineB}, games, maxTurns, iterations, true, configOverrides);
 
         String matchId = java.util.UUID.randomUUID().toString().substring(0, 8);
         MatchProgress progress = new MatchProgress(matchId, config);
@@ -225,6 +239,43 @@ final class H2hHandler implements HttpHandler {
         obj.add("winRates", winRates);
 
         return obj;
+    }
+
+    // -------------------------------------------------------------------------
+    // GET /api/h2h/ratings
+    // -------------------------------------------------------------------------
+
+    private void handleRatings(HttpExchange exchange) throws IOException {
+        java.util.List<MatchResult> all = store.loadAll();
+        java.util.Map<String, Glicko2Rating> ratings = RatingCalculator.computeRatings(all);
+
+        JsonObject response = new JsonObject();
+        JsonObject ratingsObj = new JsonObject();
+        for (var entry : ratings.entrySet()) {
+            JsonObject r = new JsonObject();
+            r.addProperty("rating", Math.round(entry.getValue().rating));
+            r.addProperty("rd", Math.round(entry.getValue().rd));
+            r.addProperty("volatility", Math.round(entry.getValue().volatility * 10000.0) / 10000.0);
+            r.addProperty("matchCount", entry.getValue().matchCount);
+            ratingsObj.add(entry.getKey(), r);
+        }
+        response.add("ratings", ratingsObj);
+        ApiUtils.sendJson(exchange, 200, response);
+    }
+
+    // -------------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------------
+
+    /**
+     * Parses a JSON object into a String→String map for engine config overrides.
+     */
+    private java.util.Map<String, String> parseConfigMap(JsonObject obj) {
+        java.util.Map<String, String> map = new java.util.HashMap<>();
+        for (String key : obj.keySet()) {
+            map.put(key, obj.get(key).getAsString());
+        }
+        return map;
     }
 
     // -------------------------------------------------------------------------

@@ -91,6 +91,13 @@ export function GameScreen({ session, settings, updateSettings, projects, hover 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [s.nextPlayerIndex, s.effectiveTurnCount]);
 
+  // Autosave after each turn if enabled (fire-and-forget, errors silently ignored)
+  useEffect(() => {
+    if (!settings.autosave || s.effectiveTurnCount === 0) return;
+    session.save().catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [s.effectiveTurnCount]);
+
   const handleRollSelect = useCallback((count: 1 | 2, d1: number, d2: number | null) => {
     setDiceCount(count);
     setDie1(d1 > 0 ? d1 : null);

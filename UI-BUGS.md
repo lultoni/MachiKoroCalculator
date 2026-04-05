@@ -9,10 +9,9 @@
 
 ## Open Bugs
 
-### B01: Supply panel shows wrong counts for Weizenfeld/Backerei
-**Status:** OPEN | **Layer:** FE | **Priority:** P1
-**Problem:** User reported seeing "4" for Weizenfeld at game start in a 2-player game, where 6 market copies should remain. Needs investigation: check what `ownedIds` contains after session creation, and whether `GameStateSerializer` includes starter cards.
-**Files:** `web/src/components/GameScreen.tsx:327-354`, `src/server/GameStateSerializer.java`
+### ~~B01: Supply panel shows wrong counts for Weizenfeld/Backerei~~ CANNOT REPRODUCE
+**Status:** CLOSED | **Layer:** FE | **Priority:** P1
+**Investigation:** Both backend (`GameStateBuilder.build()`, `GameState.starterCopies()`) and frontend (`GameScreen.tsx:348-353`) correctly subtract starter copies from the total owned count. Formula: `remaining = 6 - (totalOwned - starterCopies)`. In a 2-player game at start, this yields 6 for both weizenfeld and bäckerei. Unable to reproduce the reported "4" value.
 
 ### B05: Coin buy preview causes vertical jitter
 **Status:** OPEN | **Layer:** FE | **Priority:** P2
@@ -74,17 +73,13 @@
 **Depends on:** B16 (insights must update first)
 **Files:** `web/src/components/InsightsPanel.tsx`, `src/server/SessionInsightsHandler.java`
 
-### B16: Insights data doesn't update across rounds
-**Status:** OPEN | **Layer:** FE | **Priority:** P1
-**Problem:** useInsights caches data and only refetches when `playerIndex` changes. In a 2-player game, opponent turns always have the same playerIndex, so insights never refresh.
-**Fix:** Add `effectiveTurnCount` as dependency to force refetch.
-**Files:** `web/src/hooks/useInsights.ts:12-24`
+### ~~B16: Insights data doesn't update across rounds~~ ✅ FIXED
+**Status:** FIXED | **Layer:** FE | **Priority:** P1
+**Fix:** Already resolved — `useInsights` hook includes `turnCount` (= `effectiveTurnCount`) as a dependency, which changes every turn and triggers refetch.
 
-### B17: Opponent "what they can buy" uses pre-roll coins
-**Status:** OPEN | **Layer:** FE | **Priority:** P1
-**Problem:** Opponent purchase dropdown filters by current coins, not coins after roll. Component has `coinDeltas` state but doesn't use it for affordability.
-**Fix:** Use `coinsAvailable + coinDeltas[activePlayerIndex]` for filtering.
-**Files:** `web/src/components/OpponentTurnEntry.tsx:65`, `web/src/components/GameScreen.tsx:299`
+### ~~B17: Opponent "what they can buy" uses pre-roll coins~~ ✅ FIXED
+**Status:** FIXED | **Layer:** FE | **Priority:** P1
+**Fix:** Already resolved — `OpponentTurnEntry` computes `opponentCoinsAfterRoll` from `coinDeltas` and uses that for affordability filtering.
 
 ### B18: No round counter, only turn counter
 **Status:** OPEN | **Layer:** FE | **Priority:** P3
@@ -114,11 +109,9 @@
 **Fix:** Add tooltip or inline text showing last turn info.
 **Files:** `web/src/components/GameScreen.tsx:158-163`
 
-### B23: Saved games not visible / auto-save not working
-**Status:** OPEN | **Layer:** FE+BE | **Priority:** P1
-**Problem:** Saved games list shows empty even with autosave on.
-**Fix:** Check save file location, autosave implementation, saves list API.
-**Files:** `src/server/SessionSaveHandler.java`, `src/server/SessionSavesListHandler.java`
+### ~~B23: Saved games not visible / auto-save not working~~ ✅ FIXED
+**Status:** FIXED | **Layer:** FE | **Priority:** P1
+**Fix:** Autosave was unimplemented — the settings toggle existed but no code triggered saves. Added `useEffect` in `GameScreen` that fires `session.save()` when `effectiveTurnCount` changes and `settings.autosave` is enabled. Errors silently suppressed.
 
 ### B24: H2H only has one iterations field for two engines
 **Status:** OPEN | **Layer:** DESIGN | **Priority:** P3
@@ -145,10 +138,10 @@ B16 (insights update) → B15 (ETW display)
 1. ~~**B19b** — Purples/yellows missing from ranked list~~ ✅ FIXED
 
 ### Wave 2 — P1 Frontend
-3. **B16** — Insights not updating
-4. **B17** — Opponent buy uses pre-roll coins
-5. **B01** — Supply panel counts (needs investigation)
-6. **B23** — Save/load not working
+3. ~~**B16** — Insights not updating~~ ✅ FIXED
+4. ~~**B17** — Opponent buy uses pre-roll coins~~ ✅ FIXED
+5. ~~**B01** — Supply panel counts~~ CANNOT REPRODUCE
+6. ~~**B23** — Save/load not working~~ ✅ FIXED
 
 ### Wave 3 — P2 Polish
 7. **B05** → **B07** — Jitter fix, then all-player coin deltas

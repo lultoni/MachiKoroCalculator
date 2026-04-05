@@ -41,6 +41,16 @@ public final class SupplyTracker {
      * all players, subtracting starter copies (which are outside the market pool),
      * and computing remaining market supply.
      *
+     * <p><b>Supply logic (DO NOT CHANGE without understanding):</b>
+     * <ol>
+     *   <li>Start at 6 (SUPPLY_PER_CARD) for each non-landmark card.</li>
+     *   <li>Subtract ALL owned copies (including starters, since they're in owned_projects).</li>
+     *   <li>Add back starter copies (numPlayers for weizenfeld/bäckerei, 0 for others).</li>
+     * </ol>
+     * Net effect: only purchased (non-starter) copies reduce the market supply.
+     * Example (2 players, each owns 1 starter Weizenfeld + 1 purchased Weizenfeld):
+     * 6 − 4 (owned) + 2 (starters) = 4 remaining. Correct.
+     *
      * @param state current game state
      * @return supply tracker reflecting current market availability
      */

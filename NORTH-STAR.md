@@ -295,7 +295,7 @@ Everything determined by rules or card effects:
 - Income clamping (can't pay more than you have)
 - Counter-clockwise resolution order for multiple red claims
 - Card supply tracking (6 copies per non-landmark; 1 purple per player)
-  - Starting Cards tracking: Every Player starts with 1 Weizenfeld and 1 Bäckerei. These starting copies count against the 6-copy market supply (e.g., in a 2-player game, 4 copies of each remain purchasable).
+  - Starting Cards tracking: Starting cards (Weizenfeld, Bäckerei) are separate from the 6-copy market supply. Each player receives 1 copy at game start outside the market pool. In a 2-player game, all 6 market copies remain purchasable.
 - Card purchase validation (enough coins, card available, purple uniqueness)
 - Landmark effects that are purely mechanical:
   - Freizeitpark: doubles → bonus turn (the *rule*; whether to *aim* for doubles is engine territory)

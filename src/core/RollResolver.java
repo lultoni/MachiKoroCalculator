@@ -5,6 +5,13 @@ package core;
  *
  * <p>This is the single authoritative implementation of the Machi Koro income rules:
  * <b>Red → Blue/Green → Purple</b>, with counter-clockwise priority for multiple red claims.
+ *
+ * <p><b>CRITICAL INVARIANT — DO NOT CHANGE THE PROCESSING ORDER.</b>
+ * The order matters for game correctness: red payments must deduct from the roller's coins
+ * BEFORE blue/green income is added. This means a roller at 0 coins pays nothing to red
+ * card owners, even if they'd later receive blue/green income on the same roll.
+ * Counter-clockwise red payment order means earlier opponents get paid in full; later
+ * opponents may get nothing if the roller runs out of coins.
  */
 public final class RollResolver {
 

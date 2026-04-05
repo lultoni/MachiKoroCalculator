@@ -24,6 +24,13 @@ import core.RollResolver;
  * {@code isBonusTurn=true}. The bonus turn itself follows the normal turn sequence
  * but no further chaining is allowed even if it also rolls doubles.
  *
+ * <p><b>KNOWN BUG (UNFIXED):</b> {@link #isDoublesRoll(int)} treats ALL even 2d6 sums
+ * as 100% doubles. In reality, only 1 out of (6−|sum−7|) ways to make an even sum is
+ * doubles (e.g. roll=8 has P(doubles)=1/5, but this code assumes 1/1). This overestimates
+ * the value of Freizeitpark in the tree phase. The rollout phase ({@code MctsRollout})
+ * correctly uses d1==d2. The {@code ExpectimaxEngine} handles this correctly with 15-branch
+ * chance nodes. See ARCHITECTURE.md Section 7.1 for the full description of this bug.
+ *
  * <h2>Bürohaus on roll 6</h2>
  * If the active player owns Bürohaus on this branch and the roll is 6, the child
  * node is a {@link BürohausNode} rather than a {@link FunkturmNode} /
@@ -34,6 +41,12 @@ import core.RollResolver;
  * If the active player owns Funkturm on this branch, the child after applying the
  * roll is a {@link FunkturmNode} (keep or reroll). The Funkturm check comes before
  * the Bürohaus check in the sequence.
+ *
+ * <h2>Branch-Dependent Node Insertion</h2>
+ * INVARIANT: Which special nodes (Funkturm, Bürohaus, Freizeitpark bonus) appear
+ * depends on what the active player owns IN THAT BRANCH's GameState, not in the
+ * root state. Each branch may have different node structures because earlier
+ * purchases change the player's portfolio.
  */
 public final class ChanceNode extends MctsNode {
 
@@ -123,12 +136,17 @@ public final class ChanceNode extends MctsNode {
     // -------------------------------------------------------------------------
 
     /**
-     * Returns true iff the given 2d6 sum can only be made by equal dice (d1 == d2).
-     * For sums 2, 4, 6, 8, 10, 12 this is possible (d1 == d2 == sum/2).
-     * The Freizeitpark rule activates on ANY doubles, so we treat every even
-     * 2d6 sum as potentially a double. (In practice, some even sums — e.g. 8 —
-     * can be made with d1≠d2 as well. In the MCTS model we use a conservative
-     * approximation: a ChanceNode(2d6) child IS a doubles child iff roll % 2 == 0.)
+     * BUG: Treats every even 2d6 sum as a doubles roll. This is INCORRECT.
+     * Correct doubles probability for sum S is 1/(6−|S−7|). For example:
+     * - Roll 8 can be 2+6, 3+5, 4+4, 5+3, 6+2 (5 ways) → P(doubles) = 1/5
+     * - Roll 2 can only be 1+1 (1 way) → P(doubles) = 1/1
+     *
+     * The fix requires splitting even-sum branches into doubles/non-doubles children
+     * with weighted probabilities, similar to how ExpectimaxEngine does it with 15
+     * branches. See ARCHITECTURE.md Section 7.1 for the planned fix.
+     *
+     * DO NOT "fix" this by simply removing the doubles check — that would make
+     * Freizeitpark bonus turns never trigger in the tree, which is worse.
      */
     private static boolean isDoublesRoll(int roll) {
         // Doubles: d1 == d2, so roll must be even and roll/2 must be in [1,6].

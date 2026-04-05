@@ -244,7 +244,7 @@ Six engine variants are implemented:
 - **Variant D (depth-limited)**: Stop rollout after N turns, evaluate position via `WinProbability.computeBaselineWinProb`. Faster, quality depends on heuristic.
 - **Variant E (adaptive budget)**: Survey phase (iterations/5), then concentrate remaining budget on close races. Focused subtree exploration via `MctsTree.runIterationsFromNode`.
 
-Each variant has fast/balanced/deep configurations. Total: 33 registry entries across 6 engine classes.
+Each variant has fast/balanced/deep configurations. Total: 32 registry entries across 9 engine classes (6 MCTS + FlatMc + HeuristicEv + Expectimax).
 
 ### 6.4 Expectimax Engine
 
@@ -302,22 +302,22 @@ These are deliberate simplifications in the Calcs and WinProbability layers. Eac
 
 5. **CVaR assumes fixed dice strategy** (`Calcs.java`): Risk metrics use the same dice choice for the tail distribution as for the expected case. **Effect:** may understate downside risk when switching dice count would be better in bad scenarios. Only affects UI risk explanations, not engine ranking.
 
-### 6.3 Safety Valve
+### 7.3 Safety Valve
 
 Maximum turn limit for rollouts. Games rarely exceed 60–70 turns with reasonable play — the limit must account for unlucky edge cases while preventing infinite loops.
 
 ---
 
-## 7. Structured Explanation System
+## 8. Structured Explanation System
 
-### 7.1 ExplanationFactor Model
+### 8.1 ExplanationFactor Model
 
 Each purchase option carries structured explanation data:
 - `ExplanationFactor`: `category` (9 types), `weight` [0,1], `summary` (one-line), `detail` (expandable)
 - `Option.structuredFactors`: sorted by weight descending
 - `Option.summarySentence`: "Buy {cardName} — {highestWeightFactor.summary}"
 
-### 7.2 Weight Computation (Two-Pass Enrichment)
+### 8.2 Weight Computation (Two-Pass Enrichment)
 
 1. **Pass 1**: Build all options with metrics (existing flow)
 2. **Pass 2**: Compute cross-option means and ranges per metric, then for each option generate weighted factors
@@ -326,6 +326,6 @@ Weight formula: `|value - mean| / range` normalized to [0,1]. Weight = 0 when ra
 
 9 factor categories: `winRate`, `income`, `synergy`, `risk`, `tempo`, `landmark`, `cost`, `coverage`, `scarcity`.
 
-### 7.3 Pre-computation
+### 8.3 Pre-computation
 
 `PrecomputeCache`: single-entry thread-safe cache with daemon `ExecutorService`. Key = `(structuralHash, playerIndex, engineId)`. New request cancels in-flight computation. `GameState.structuralHash()` provides a deterministic hash of player coins and sorted owned card IDs.

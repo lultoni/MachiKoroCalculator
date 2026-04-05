@@ -3,6 +3,20 @@ package core;
 import java.util.ArrayList;
 import java.util.Objects;
 
+/**
+ * Complete snapshot of a Machi Koro game: players (coins + owned cards) and available market cards.
+ *
+ * <h2>Mutability</h2>
+ * GameState is mutable — player coins, owned projects, and the unbuilt list can all change.
+ * Use {@link #copy()} before mutating in hypothetical scenarios (MCTS tree, engine evaluation).
+ * The original GameState passed to an engine must NOT be modified by the engine.
+ *
+ * <h2>Supply Rule (CRITICAL INVARIANT)</h2>
+ * Starting cards (Weizenfeld, Bäckerei) are given to each player OUTSIDE the 6-copy market
+ * supply pool. In a 2-player game, all 6 market copies of each card remain purchasable.
+ * See {@link #starterCopies(String, int)} for the supply calculation.
+ * <b>This was a bug source — do not change supply logic without verifying this invariant.</b>
+ */
 public class GameState {
 
     /** Market supply copies per non-landmark card in the base game. */

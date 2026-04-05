@@ -11,7 +11,7 @@ Phases 1–6 complete. The app is a fully functional web-based Machi Koro purcha
 **What works today:**
 - All 19 base-game cards with correct income rules
 - Turn-by-turn game tracking with undo and session persistence
-- 6 MCTS engine variants with 33 configurations (v1, greedy rollout, Boltzmann, greedy tree, depth-limited, adaptive budget)
+- 9 engine classes with 32 configurations (6 MCTS variants, Flat Monte Carlo, Heuristic EV, Expectimax)
 - 11 advanced statistical metrics (Sharpe, Sortino, Kelly, VaR/CVaR, HHI, entropy, IG, ETW, tempo, urgency, roll correlation)
 - Weighted structured explanations with expandable detail per purchase option (9 factor categories)
 - Passive-turn insights panel with ETW bars, tempo, supply warnings, narrative guidance
@@ -20,11 +20,12 @@ Phases 1–6 complete. The app is a fully functional web-based Machi Koro purcha
 - H2H match runner with parallel game execution, mid-match seat swapping, CLI runner, round-robin tournament with leaderboard + matrix, REST API, and visual replay UI
 - Web SPA (React 19 + TypeScript + Vite 8 + Tailwind CSS 4) with full DE/EN localization
 - 20 REST API endpoints (game state, session management, engine evaluation, insights, pre-computation, H2H testing)
-- 400+ test assertions across 29 test sections
+- 470+ test assertions across 30 test sections
 
 **What's next:**
-- Phase 6.4: Establish H2H baseline results across all engine variants
-- Phase 7: Performance optimization, game-over review, expansion support
+- Fix MCTS ChanceNode doubles bug (see ARCHITECTURE.md Section 7.1)
+- UI refinement based on real gameplay
+- Expansion card support (deferred until core is perfected)
 
 ## Documentation
 
@@ -67,11 +68,8 @@ java -cp "out:src:gson-2.11.0.jar" h2h.TournamentMain --tier fast --games 50
 java -cp "out:src:gson-2.11.0.jar" h2h.TournamentMain \
   --engines mcts-v1-fast,mcts-v1-depth3,mcts-v1-greedy-tree-fast --games 20
 
-# Tournament with ALL 24 engines (warning: may take hours)
+# Tournament with ALL 32 engines (warning: may take hours)
 java -cp "out:src:gson-2.11.0.jar" h2h.TournamentMain --unleashed --games 30
-
-# Run (legacy Swing UI — deprecated, kept for reference)
-java -cp "out:src:gson-2.11.0.jar" logic.Main
 ```
 
 Note: `src` must be on the runtime classpath for resource loading.
@@ -84,7 +82,7 @@ UI (Web SPA) → Interface (orchestration) → Simulation Engines → Standard C
 
 - **Core** — game rules only: state, cards, dice, income, turn order, win condition
 - **Standard Calcs** — reusable math: EV, ROI, probability, variance, 11 advanced risk/tempo metrics
-- **Simulation Engines** — pluggable strategy: 6 MCTS variants with 33 configurations
+- **Simulation Engines** — pluggable strategy: 9 engine classes with 32 configurations
 - **Interface** — engine registry (JSON), request routing, result formatting
 - **UI** — React 19 SPA (17 components, 8 hooks) with Java HTTP API backend (20 endpoints)
 
@@ -135,7 +133,7 @@ java -cp "out:src:gson-2.11.0.jar" h2h.TournamentMain --tier deep --games 20
 
 ### All Engines — The Full Run (~days)
 
-All 24 engines across all tiers. 276 matchups. Only for when you really want the complete picture:
+All 32 engines across all tiers. 496 matchups. Only for when you really want the complete picture:
 ```bash
 java -cp "out:src:gson-2.11.0.jar" h2h.TournamentMain --unleashed --games 30
 ```
@@ -146,7 +144,7 @@ java -cp "out:src:gson-2.11.0.jar" h2h.TournamentMain --unleashed --games 30
 |------|---------|-------------|
 | `--tier <fast\|balanced\|deep>` | `fast` | Select engines by performance tier |
 | `--engines <id1,id2,...>` | — | Select specific engines by ID |
-| `--unleashed` | — | All 24 engines |
+| `--unleashed` | — | All 32 engines |
 | `--games <n>` | 50 | Games per matchup (split across seat swap) |
 | `--iterations <n>` | 0 | Override MCTS iterations (0 = registry default) |
 | `--maxTurns <n>` | 200 | Max turns per game |

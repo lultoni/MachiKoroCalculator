@@ -32,6 +32,11 @@ public final class BürohausLogic {
      * Identifies the best swap candidates: the active player's lowest-EV card
      * (excluding bürohaus itself and landmarks) and each opponent's highest-EV card,
      * both evaluated in the active player's real context (synergy-aware).
+     *
+     * <p><b>INVARIANT: Purple (lila) cards are EXCLUDED from both own and opponent
+     * candidate lists.</b> Purple cards are unique per player (max 1 copy); swapping
+     * would violate that rule. This exclusion was a bug fix — do not remove the
+     * {@code "lila".equals(p.getColor())} checks below.
      */
     static SwapCandidates findCandidates(GameState state, int playerIndex) {
         Player active = state.getPlayers()[playerIndex];

@@ -23,6 +23,17 @@ import java.util.List;
  *       {@link #navigateReroll}</li>
  *   <li>Match runner reads {@link #bürohausOwnCard}, {@link #purchase}, etc.</li>
  * </ol>
+ *
+ * <h2>Key invariants</h2>
+ * <ul>
+ *   <li><b>Funkturm once per turn:</b> After a reroll ({@link #navigateReroll}), if the tree
+ *       creates another FunkturmNode on the reroll branch, it is forced to "keep" (child 0).
+ *       The official rule allows only one Funkturm reroll per turn.</li>
+ *   <li><b>Defensive fallback:</b> If MCTS didn't explore a branch (node unexpanded or null child),
+ *       the plan falls back to saving ({@code RankEntry.WAIT_SENTINEL}). This is safe but suboptimal.</li>
+ *   <li><b>Static plans:</b> Non-MCTS engines use {@link #staticPlan} where navigateRoll/navigateReroll
+ *       are no-ops — all decisions are pre-populated.</li>
+ * </ul>
  */
 public final class TurnPlan {
 
@@ -187,8 +198,10 @@ public final class TurnPlan {
             }
 
             if (afterReroll) {
-                // After a reroll, the tree may create another FunkturmNode on the reroll
-                // branch. Funkturm can only be used once per turn — force "keep".
+                // INVARIANT: Funkturm can only be used ONCE per turn. After a reroll,
+                // the tree may create another FunkturmNode on the reroll branch — we
+                // must force "keep" (child 0) to prevent a second reroll. DO NOT
+                // change this to allow recursive Funkturm usage.
                 currentNode = fn.getChildren().get(0);
             } else {
                 hasFunkturmChoice = true;

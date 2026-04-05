@@ -6,6 +6,20 @@ Implementation history: what was built, why, and which design decisions were mad
 
 ## Phase 7: Iteration
 
+### 7.20 — MCTS ChanceNode Doubles Fix
+
+Fixed the critical doubles probability bug in `ChanceNode.expand()`. Previously, all even 2d6 sums were treated as 100% doubles (overestimating Freizeitpark bonus turn probability). Now, when doubles are relevant (Freizeitpark owned + not bonus turn), even rolls are split into separate doubles and non-doubles child branches with exact probabilities:
+
+- Rolls 2 and 12: 1 child each (always doubles, 1/36)
+- Rolls 4, 6, 8, 10: 2 children each (doubles at 1/36, non-doubles at (totalWays−1)/36)
+- Odd rolls: 1 child each (never doubles)
+
+This produces up to 15 children (matching ExpectimaxEngine), vs. the old 11 where every even roll was a guaranteed bonus turn.
+
+Per-child metadata (`childRollValues`, `childIsDoubles`) supports tree navigation. `navigateToRoll(ChanceNode, roll, isDoubles)` added; `TurnPlan.navigateRoll/navigateReroll` and `MatchRunner` updated to pass actual `d1==d2` status.
+
+Files changed: `ChanceNode.java` (core fix), `MctsTree.java` (navigation), `TurnPlan.java` (API), `MatchRunner.java` (caller).
+
 ### 7.19 — Legacy Code Removal & Dead Code Cleanup
 
 Deleted 31 legacy files: `gui/` (13 files, unused Swing UI) and `logic/` (18 files, superseded by Core/Calcs layers). Ported 2 classes still needed:

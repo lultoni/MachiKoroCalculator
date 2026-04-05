@@ -100,7 +100,7 @@ These have caused bugs before. Read the Javadoc before touching these areas.
 1. **Starter cards are separate from market supply.** Weizenfeld/Backerei given at game start do NOT reduce the 6-copy market pool. See `GameState.starterCopies()`, `SupplyTracker.fromGameState()`.
 2. **Purple cards excluded from Burohaus swap candidates.** Both own and opponent sides. See `BurohausLogic.findCandidates()`.
 3. **Income order: Red -> Blue & Green -> Purple.** Counter-clockwise for multiple red claims. See `RollResolver.computeAllDeltasForRoll()`.
-4. **MCTS ChanceNode doubles bug (UNFIXED).** All even 2d6 sums treated as 100% doubles. Affects tree phase only; rollouts correctly use `d1==d2`. See ARCHITECTURE.md Section 7.1.
+4. **MCTS ChanceNode doubles splitting.** Even 2d6 sums are split into doubles/non-doubles branches with exact probabilities when Freizeitpark is relevant. Up to 15 children per ChanceNode. `navigateToRoll` requires `isDoubles` parameter for doubles-relevant nodes. See ARCHITECTURE.md Section 7.1.
 5. **Purple card uniqueness.** Max 1 copy per player per purple card type. Enforced in all rollouts, BuyDecisionNode, and GameSession.
 6. **Funkturm once per turn.** TurnPlan forces "keep" on FunkturmNode after reroll.
 7. **Score convention.** MCTS scores are always from the perspective of the root `playerIndex` (1.0 = win, 0.0 = loss).

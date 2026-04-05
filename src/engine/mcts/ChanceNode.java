@@ -4,32 +4,36 @@ import core.GameState;
 import core.Player;
 import core.RollResolver;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * Chance node representing all possible outcomes of a dice roll.
  *
  * <h2>Children</h2>
  * <ul>
  *   <li><b>1d6</b> ({@code twoDice=false}): 6 children for rolls 1–6.</li>
- *   <li><b>2d6</b> ({@code twoDice=true}): 11 children for rolls 2–12.</li>
+ *   <li><b>2d6, doubles irrelevant</b> ({@code twoDice=true}, no Freizeitpark or bonus turn):
+ *       11 children for rolls 2–12.</li>
+ *   <li><b>2d6, doubles relevant</b> ({@code twoDice=true}, Freizeitpark owned, not bonus turn):
+ *       up to 15 children. Odd rolls get 1 child (never doubles). Rolls 2 and 12 get 1 child
+ *       each (always doubles, since there's only one way to make them: 1+1 and 6+6). Even
+ *       rolls 4, 6, 8, 10 get 2 children each: one doubles branch (1/36 probability) and one
+ *       non-doubles branch ((totalWays−1)/36 probability).</li>
  * </ul>
  * For each outcome, the child's {@code GameState} has all coin deltas applied
  * via {@link RollResolver#computeAllDeltasForRoll}.
  *
  * <h2>Doubles and Freizeitpark</h2>
- * When rolling 2d6, outcomes 2, 4, 6, 8, 10, 12 are doubles (d1 == d2 for exactly
- * those sums). If the active player owns Freizeitpark on this branch AND the roll
- * is doubles AND this is NOT already a bonus turn, the child is not a
- * {@link BuyDecisionNode} directly — instead it inserts a {@link DiceChoiceNode}
- * (or plain {@link ChanceNode} if no Bahnhof) for the <em>same player</em> with
- * {@code isBonusTurn=true}. The bonus turn itself follows the normal turn sequence
- * but no further chaining is allowed even if it also rolls doubles.
+ * When rolling 2d6 and doubles are relevant, even roll totals are split into two
+ * children with exact probabilities. For example, roll=8 has 5 ways total: 1 doubles
+ * (4+4, P=1/36) and 4 non-doubles (P=4/36). The doubles branch triggers a bonus turn;
+ * the non-doubles branch proceeds normally.
  *
- * <p><b>KNOWN BUG (UNFIXED):</b> {@link #isDoublesRoll(int)} treats ALL even 2d6 sums
- * as 100% doubles. In reality, only 1 out of (6−|sum−7|) ways to make an even sum is
- * doubles (e.g. roll=8 has P(doubles)=1/5, but this code assumes 1/1). This overestimates
- * the value of Freizeitpark in the tree phase. The rollout phase ({@code MctsRollout})
- * correctly uses d1==d2. The {@code ExpectimaxEngine} handles this correctly with 15-branch
- * chance nodes. See ARCHITECTURE.md Section 7.1 for the full description of this bug.
+ * <h2>Child metadata</h2>
+ * When doubles are relevant, {@link #childRollValues} and {@link #childIsDoubles} store
+ * per-child metadata to support {@link MctsTree#navigateToRoll(ChanceNode, int, boolean)}.
+ * When doubles are irrelevant, these lists are null and children map 1:1 to roll values.
  *
  * <h2>Bürohaus on roll 6</h2>
  * If the active player owns Bürohaus on this branch and the roll is 6, the child
@@ -60,6 +64,19 @@ public final class ChanceNode extends MctsNode {
     public final boolean isBonusTurn;
 
     /**
+     * Per-child roll values. Non-null only when doubles are relevant (2d6 + Freizeitpark + not bonus).
+     * In that case, children may not map 1:1 to roll sums (even rolls have 2 children).
+     * When null, children[i] corresponds to roll (minRoll + i).
+     */
+    List<Integer> childRollValues;
+
+    /**
+     * Per-child doubles flag. Non-null only when {@link #childRollValues} is non-null.
+     * {@code childIsDoubles.get(i)} is true if child i is the doubles branch for that roll.
+     */
+    List<Boolean> childIsDoubles;
+
+    /**
      * @param state        game state BEFORE the roll is applied (coins still pre-roll)
      * @param supply       supply tracker matching state
      * @param parent       parent node
@@ -78,21 +95,64 @@ public final class ChanceNode extends MctsNode {
     /**
      * Creates one child per possible roll outcome, applies coin deltas, and hooks
      * up Funkturm, Bürohaus, and Freizeitpark bonus-turn nodes as required.
-     * No-ops if already expanded.
+     *
+     * <p>When doubles are relevant (2d6 + Freizeitpark + not bonus turn), even rolls
+     * are split into doubles/non-doubles branches with exact probabilities. This produces
+     * up to 15 children instead of 11. Metadata lists ({@link #childRollValues},
+     * {@link #childIsDoubles}) are populated to support tree navigation.
+     *
+     * <p>No-ops if already expanded.
      */
     public void expand() {
         if (expanded) return;
 
-        int minRoll = twoDice ? 2 : 1;
-        int maxRoll = twoDice ? 12 : 6;
+        boolean doublesRelevant = twoDice
+                && state.getPlayers()[activePlayer].hasProject("freizeitpark")
+                && !isBonusTurn;
 
-        for (int roll = minRoll; roll <= maxRoll; roll++) {
-            buildChild(roll);
+        if (!twoDice) {
+            // 1d6: 6 children, rolls 1-6
+            for (int roll = 1; roll <= 6; roll++) {
+                buildChild(roll, false);
+            }
+        } else if (!doublesRelevant) {
+            // 2d6, no doubles splitting: 11 children, rolls 2-12
+            for (int roll = 2; roll <= 12; roll++) {
+                buildChild(roll, false);
+            }
+        } else {
+            // 2d6 with doubles splitting: up to 15 children
+            childRollValues = new ArrayList<>(15);
+            childIsDoubles  = new ArrayList<>(15);
+            for (int roll = 2; roll <= 12; roll++) {
+                boolean canBeDoubles = (roll % 2 == 0) && (roll / 2 >= 1) && (roll / 2 <= 6);
+                if (canBeDoubles) {
+                    int totalWays = 6 - Math.abs(roll - 7);
+                    int nonDoublesWays = totalWays - 1; // 1 way is always doubles
+
+                    // Non-doubles branch first (if any non-doubles ways exist)
+                    if (nonDoublesWays > 0) {
+                        buildChild(roll, false);
+                        childRollValues.add(roll);
+                        childIsDoubles.add(false);
+                    }
+
+                    // Doubles branch (always exactly 1 way)
+                    buildChild(roll, true);
+                    childRollValues.add(roll);
+                    childIsDoubles.add(true);
+                } else {
+                    // Odd roll: never doubles
+                    buildChild(roll, false);
+                    childRollValues.add(roll);
+                    childIsDoubles.add(false);
+                }
+            }
         }
         expanded = true;
     }
 
-    private void buildChild(int roll) {
+    private void buildChild(int roll, boolean isDoubles) {
         // 1. Apply roll to a copy of the game state
         GameState childState = state.copy();
         int[] deltas = RollResolver.computeAllDeltasForRoll(childState, activePlayer, roll);
@@ -105,8 +165,6 @@ public final class ChanceNode extends MctsNode {
         boolean hasFunkturm  = players[activePlayer].hasProject("funkturm");
         boolean hasBürohaus  = players[activePlayer].hasProject("bürohaus");
         boolean hasFreizeit  = players[activePlayer].hasProject("freizeitpark");
-        boolean isDoubles    = twoDice && (roll % 2 == 0) && (roll >= 2) && (roll <= 12)
-                               && isDoublesRoll(roll);
 
         // 2. Determine next node in sequence:
         //    Funkturm → Bürohaus (on roll 6) → Buy; or bonus turn on doubles+Freizeitpark
@@ -129,28 +187,6 @@ public final class ChanceNode extends MctsNode {
         }
 
         children.add(nextNode);
-    }
-
-    // -------------------------------------------------------------------------
-    // Helpers
-    // -------------------------------------------------------------------------
-
-    /**
-     * BUG: Treats every even 2d6 sum as a doubles roll. This is INCORRECT.
-     * Correct doubles probability for sum S is 1/(6−|S−7|). For example:
-     * - Roll 8 can be 2+6, 3+5, 4+4, 5+3, 6+2 (5 ways) → P(doubles) = 1/5
-     * - Roll 2 can only be 1+1 (1 way) → P(doubles) = 1/1
-     *
-     * The fix requires splitting even-sum branches into doubles/non-doubles children
-     * with weighted probabilities, similar to how ExpectimaxEngine does it with 15
-     * branches. See ARCHITECTURE.md Section 7.1 for the planned fix.
-     *
-     * DO NOT "fix" this by simply removing the doubles check — that would make
-     * Freizeitpark bonus turns never trigger in the tree, which is worse.
-     */
-    private static boolean isDoublesRoll(int roll) {
-        // Doubles: d1 == d2, so roll must be even and roll/2 must be in [1,6].
-        return (roll % 2 == 0) && (roll / 2 >= 1) && (roll / 2 <= 6);
     }
 
     /**

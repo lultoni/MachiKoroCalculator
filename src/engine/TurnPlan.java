@@ -119,9 +119,10 @@ public final class TurnPlan {
      * After the match runner rolls the dice, navigate the tree to the roll outcome
      * and extract Funkturm, Bürohaus, and purchase decisions.
      *
-     * @param roll    actual dice total
+     * @param roll      actual dice total
+     * @param isDoubles true if the individual dice were equal (d1 == d2)
      */
-    public void navigateRoll(int roll) {
+    public void navigateRoll(int roll, boolean isDoubles) {
         // Static plans have decisions pre-populated — nothing to navigate
         if (tree == null) return;
 
@@ -140,7 +141,7 @@ public final class TurnPlan {
         }
 
         // Navigate to the specific roll child
-        MctsNode rollChild = MctsTree.navigateToRoll((ChanceNode) chanceNode, roll);
+        MctsNode rollChild = MctsTree.navigateToRoll((ChanceNode) chanceNode, roll, isDoubles);
         if (rollChild == null) {
             purchase = RankEntry.WAIT_SENTINEL;
             return;
@@ -153,9 +154,10 @@ public final class TurnPlan {
     /**
      * After a Funkturm reroll, navigate to the new roll outcome and extract remaining decisions.
      *
-     * @param newRoll the reroll dice total
+     * @param newRoll    the reroll dice total
+     * @param isDoubles  true if the reroll dice were equal (d1 == d2)
      */
-    public void navigateReroll(int newRoll) {
+    public void navigateReroll(int newRoll, boolean isDoubles) {
         // Static plans have decisions pre-populated — nothing to navigate
         if (tree == null) return;
 
@@ -167,7 +169,7 @@ public final class TurnPlan {
             }
             MctsNode rerollChance = fn.getChildren().get(1);
             if (rerollChance instanceof ChanceNode rerollCN) {
-                MctsNode rollChild = MctsTree.navigateToRoll(rerollCN, newRoll);
+                MctsNode rollChild = MctsTree.navigateToRoll(rerollCN, newRoll, isDoubles);
                 if (rollChild != null) {
                     currentNode = rollChild;
                     extractRemainingDecisions(true);

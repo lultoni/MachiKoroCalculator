@@ -276,17 +276,13 @@ Deterministic minimax engine with probability-weighted chance nodes. No random r
 
 ## 7. Known Engine Issues & Heuristic Choices
 
-### 7.1 Critical Bug: MCTS Doubles Probability (ChanceNode)
+### 7.1 MCTS Doubles Probability (ChanceNode) — FIXED
 
-**Severity:** High — affects all 6 MCTS engine variants (tree phase only; rollouts are correct).
+**Fixed in:** 7.18
 
-**Issue:** `ChanceNode` (in `engine/mcts/ChanceNode.java`) treats ALL even 2d6 sums as 100% doubles. For example, roll=8 is classified as always being doubles, but only 1 out of 5 ways to make 8 is actually doubles (4+4). The correct doubles probability for each even sum is 1/(6−|sum−7|).
+`ChanceNode` now splits even 2d6 rolls into doubles/non-doubles branches with exact probabilities, matching the Expectimax engine's 15-branch model. When Freizeitpark is owned and it's not a bonus turn, even rolls 4/6/8/10 produce two children each (doubles at 1/36 and non-doubles at (totalWays−1)/36). Rolls 2 and 12 produce one child each (always doubles). Odd rolls produce one child (never doubles). Total: up to 15 children.
 
-**Impact:** When a player owns Freizeitpark, the MCTS tree overestimates the probability of bonus turns for even rolls. Roll 8 has P(doubles)=1/5 but MCTS assumes P(doubles)=1. This inflates the value of Freizeitpark-related strategies in the tree phase.
-
-**Note:** The Expectimax engine handles this correctly with 15-branch chance nodes (see Section 6.4). MctsRollout (used in rollouts) also correctly uses `d1 == d2` to detect doubles.
-
-**Status:** Deferred — will be fixed after docs cleanup.
+`navigateToRoll(ChanceNode, roll, isDoubles)` uses per-child metadata to find the correct branch during H2H tree navigation.
 
 ### 7.2 Heuristic Choices (Documented for Discussion)
 

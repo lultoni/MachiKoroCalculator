@@ -435,18 +435,53 @@ public final class MctsTree {
 
     /**
      * Navigates to the child of a ChanceNode that corresponds to a specific roll value.
-     * ChanceNode children are created in order: for 1d6 → children[0]=roll 1, children[1]=roll 2, ...;
-     * for 2d6 → children[0]=roll 2, children[1]=roll 3, ....
+     *
+     * <p>When doubles are irrelevant (no metadata), children map 1:1 to roll values:
+     * for 1d6 → children[0]=roll 1, ...; for 2d6 → children[0]=roll 2, ....
+     *
+     * <p>When doubles are relevant (metadata present), searches metadata for the matching
+     * (roll, isDoubles=false) child. This overload defaults isDoubles to false, which is
+     * correct for 1d6 and for callers that don't track individual dice.
      *
      * @param chanceNode an expanded ChanceNode
      * @param roll       the actual dice roll total
-     * @return the child node for that roll, or null if the ChanceNode is not expanded
+     * @return the child node for that roll, or null if not found / not expanded
      */
     public static MctsNode navigateToRoll(ChanceNode chanceNode, int roll) {
+        return navigateToRoll(chanceNode, roll, false);
+    }
+
+    /**
+     * Navigates to the child of a ChanceNode that corresponds to a specific roll value
+     * and doubles status.
+     *
+     * <p>When the ChanceNode has doubles-split children (metadata lists are non-null),
+     * searches for the child matching both {@code roll} and {@code isDoubles}. When
+     * metadata is null (doubles irrelevant), falls back to simple index arithmetic.
+     *
+     * @param chanceNode an expanded ChanceNode
+     * @param roll       the actual dice roll total
+     * @param isDoubles  true if the roll was doubles (d1 == d2)
+     * @return the child node for that roll, or null if not found / not expanded
+     */
+    public static MctsNode navigateToRoll(ChanceNode chanceNode, int roll, boolean isDoubles) {
         if (!chanceNode.expanded) return null;
+        List<MctsNode> children = chanceNode.getChildren();
+
+        if (chanceNode.childRollValues != null) {
+            // Doubles-relevant ChanceNode: search metadata
+            for (int i = 0; i < chanceNode.childRollValues.size(); i++) {
+                if (chanceNode.childRollValues.get(i) == roll
+                        && chanceNode.childIsDoubles.get(i) == isDoubles) {
+                    return children.get(i);
+                }
+            }
+            return null;
+        }
+
+        // Simple layout: children[roll - minRoll]
         int minRoll = chanceNode.twoDice ? 2 : 1;
         int index = roll - minRoll;
-        List<MctsNode> children = chanceNode.getChildren();
         if (index < 0 || index >= children.size()) return null;
         return children.get(index);
     }

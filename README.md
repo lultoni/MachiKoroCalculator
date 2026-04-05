@@ -23,7 +23,6 @@ Phases 1–6 complete. The app is a fully functional web-based Machi Koro purcha
 - 470+ test assertions across 30 test sections
 
 **What's next:**
-- Fix MCTS ChanceNode doubles bug (see ARCHITECTURE.md Section 7.1)
 - UI refinement based on real gameplay
 - Expansion card support (deferred until core is perfected)
 

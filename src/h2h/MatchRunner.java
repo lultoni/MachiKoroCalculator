@@ -30,7 +30,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * <ol>
  *   <li>Engine evaluates full turn → TurnPlan with diceCount</li>
  *   <li>Roll actual dice</li>
- *   <li>Navigate tree: TurnPlan.navigateRoll(roll)</li>
+ *   <li>Navigate tree: TurnPlan.navigateRoll(roll, doubles)</li>
  *   <li>If Funkturm decision = reroll: roll again, navigateReroll(newRoll)</li>
  *   <li>Apply final roll income to state</li>
  *   <li>If Bürohaus swap: apply to state</li>
@@ -230,7 +230,7 @@ public final class MatchRunner {
         }
 
         // 3. Navigate tree with actual roll
-        plan.navigateRoll(roll);
+        plan.navigateRoll(roll, doubles);
 
         // 4. Funkturm reroll decision
         boolean funkturmRerolled = false;
@@ -248,7 +248,7 @@ public final class MatchRunner {
                 d2 = 0;
                 doubles = false;
             }
-            plan.navigateReroll(roll);
+            plan.navigateReroll(roll, doubles);
         }
 
         // 5. Apply roll income

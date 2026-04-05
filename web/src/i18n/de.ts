@@ -5,7 +5,7 @@ const de: Record<string, string> = {
   'btn.start': 'Spiel starten',
   'btn.skip': 'Überspringen',
   'btn.undo': 'Rückgängig',
-  'btn.save': 'Speichern',
+  'btn.save': 'Speichern / Laden',
   'btn.load': 'Laden',
   'btn.settings': 'Einstellungen',
   'btn.newGame': 'Neues Spiel',

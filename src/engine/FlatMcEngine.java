@@ -88,7 +88,7 @@ public final class FlatMcEngine implements SimulationEngine {
         int perOptionSurvey = Math.max(1, surveyBudget / candidates.size());
 
         for (CandidateOption c : candidates) {
-            runSamples(c, perOptionSurvey, nextPlayer, playerIndex);
+            if (!c.unaffordable) runSamples(c, perOptionSurvey, nextPlayer, playerIndex);
         }
 
         int usedIterations = perOptionSurvey * candidates.size();
@@ -124,38 +124,46 @@ public final class FlatMcEngine implements SimulationEngine {
         // Save option
         candidates.add(new CandidateOption(RankEntry.WAIT_SENTINEL, state, supply, false));
 
-        // Non-landmark cards
+        // Non-landmark cards — include all valid cards (affordable or not)
         for (Project p : state.getUnbuilt_projects()) {
             if (!supply.canPurchase(p.getId())) continue;
-            if (coins < p.getCost()) continue;
             if ("lila".equals(p.getColor()) && active.hasProject(p.getId())) continue;
-            // Apply purchase to get post-purchase state
+            boolean canAfford = coins >= p.getCost();
             GameState childState = state.copy();
             Player childActive = childState.getPlayers()[playerIndex];
-            childActive.setCoins(childActive.getCoins() - p.getCost());
+            if (canAfford) {
+                childActive.setCoins(childActive.getCoins() - p.getCost());
+            }
             childActive.addProject(p);
             SupplyTracker childSupply = supply.withPurchase(p.getId());
-            candidates.add(new CandidateOption(p, childState, childSupply, false));
+            CandidateOption opt = new CandidateOption(p, childState, childSupply, false);
+            opt.unaffordable = !canAfford;
+            candidates.add(opt);
         }
 
-        // Landmarks
+        // Landmarks — include all unowned landmarks (affordable or not)
         for (String lmId : LANDMARK_IDS) {
             if (active.hasProject(lmId)) continue;
             Project lm = ProjectLoader.getProject(lmId).orElse(null);
-            if (lm == null || coins < lm.getCost()) continue;
+            if (lm == null) continue;
+            boolean canAfford = coins >= lm.getCost();
             GameState childState = state.copy();
             Player childActive = childState.getPlayers()[playerIndex];
-            childActive.setCoins(childActive.getCoins() - lm.getCost());
+            if (canAfford) {
+                childActive.setCoins(childActive.getCoins() - lm.getCost());
+            }
             childActive.addProject(lm);
-            // Check instant win
-            if (GameState.hasWon(childActive)) {
+            // Check instant win (only relevant if affordable)
+            if (canAfford && GameState.hasWon(childActive)) {
                 CandidateOption winOpt = new CandidateOption(lm, childState, supply, true);
                 winOpt.wins = 1;
                 winOpt.samples = 1;
                 candidates.add(winOpt);
                 continue;
             }
-            candidates.add(new CandidateOption(lm, childState, supply, false));
+            CandidateOption opt = new CandidateOption(lm, childState, supply, false);
+            opt.unaffordable = !canAfford;
+            candidates.add(opt);
         }
 
         return candidates;
@@ -222,6 +230,7 @@ public final class FlatMcEngine implements SimulationEngine {
         final GameState postState;
         final SupplyTracker postSupply;
         final boolean isInstantWin;
+        boolean unaffordable = false;
         int samples = 0;
         double wins = 0.0;
 

@@ -27,11 +27,29 @@ export function RankedList({ options, metricRanges, projects, language, onHover,
     const firstMetrics = options[0].metrics;
     return COLUMNS.filter(c => {
       if (c.key === 'rank' || c.key === 'projectId') return true;
-      if (c.key === 'score' || c.key === 'affordable') return true;
+      if (c.key === 'score') return true;
       if (c.key === 'cost') return true;
       return firstMetrics != null && c.key in firstMetrics;
     });
   }, [options]);
+
+  // Extend metricRanges with client-computed ranges for built-in fields
+  const extendedRanges = useMemo(() => {
+    const ranges: Record<string, { min: string; max: string }> = { ...metricRanges };
+    if (options.length > 0) {
+      // winRate range (from score field)
+      const scores = options.map(o => o.score);
+      ranges['winRate'] = { min: String(Math.min(...scores)), max: String(Math.max(...scores)) };
+      // cost range
+      const costs = options
+        .filter(o => o.projectId !== '_wait_')
+        .map(o => projects.byId(o.projectId)?.cost ?? 0);
+      if (costs.length > 0) {
+        ranges['cost'] = { min: String(Math.min(...costs)), max: String(Math.max(...costs)) };
+      }
+    }
+    return ranges;
+  }, [options, metricRanges, projects]);
 
   // Deduplicate _wait_ entries (backend may return multiple)
   const dedupedOptions = useMemo(() => {
@@ -100,7 +118,7 @@ export function RankedList({ options, metricRanges, projects, language, onHover,
                 key={isWait ? `_wait_${idx}` : opt.projectId}
                 className={`border-b border-machi-border/50 transition-colors cursor-pointer ${
                   isSelected ? 'bg-machi-accent/10' : 'hover:bg-machi-surface/50'
-                } ${!opt.affordable ? 'opacity-50' : ''}`}
+                }`}
                 onClick={() => {
                   onSelect(isSelected ? null : opt.projectId);
                   setExpandedRow(isExpanded ? null : opt.projectId);
@@ -112,11 +130,11 @@ export function RankedList({ options, metricRanges, projects, language, onHover,
                   const raw = getCellValue(opt, col.key, proj, language);
                   const formatted = formatMetric(raw, col.format);
                   const rk = col.rangeKey ?? col.key;
-                  const cellStyle = col.colorGradient && metricRanges && rk in (metricRanges ?? {})
+                  const cellStyle = col.colorGradient && extendedRanges && rk in (extendedRanges ?? {})
                     ? metricBgStyle(
                         parseFloat(String(raw)),
-                        parseFloat(metricRanges[rk].min),
-                        parseFloat(metricRanges[rk].max),
+                        parseFloat(extendedRanges[rk].min),
+                        parseFloat(extendedRanges[rk].max),
                         col.invertColor,
                       )
                     : {};

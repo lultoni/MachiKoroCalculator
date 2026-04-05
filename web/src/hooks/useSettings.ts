@@ -21,7 +21,13 @@ const DEFAULTS: Settings = {
 function loadSettings(): Settings {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return { ...DEFAULTS, ...JSON.parse(raw) };
+    const parsed = raw ? { ...DEFAULTS, ...JSON.parse(raw) } : { ...DEFAULTS };
+    // Sync language with locale provider's storage (single source of truth)
+    const storedLocale = localStorage.getItem('machi-locale') as 'de' | 'en' | null;
+    if (storedLocale && (storedLocale === 'de' || storedLocale === 'en')) {
+      parsed.language = storedLocale;
+    }
+    return parsed;
   } catch { /* ignore corrupt data */ }
   return { ...DEFAULTS };
 }

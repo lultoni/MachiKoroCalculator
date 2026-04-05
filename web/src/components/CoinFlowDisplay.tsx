@@ -9,12 +9,19 @@ interface Props {
   hovered: HoverCard | null;
   language: 'de' | 'en';
   projectName?: string;           // name of hovered card
+  recommendedName?: string;       // name of top recommended card (fallback)
+  recommendedCost?: number;       // cost of top recommended card
 }
 
-export function CoinFlowDisplay({ coinsNow, coinDelta, hovered, projectName }: Props) {
+export function CoinFlowDisplay({ coinsNow, coinDelta, hovered, projectName, recommendedName, recommendedCost }: Props) {
   const { t } = useLocale();
   const coinsAfterRoll = coinDelta != null ? coinsNow + coinDelta : null;
   const coinsAfterBuy = coinsAfterRoll != null && hovered ? coinsAfterRoll - hovered.cost : null;
+
+  // Fallback: show recommended card when nothing is hovered
+  const showRecommended = !hovered && recommendedName && recommendedCost != null && coinsAfterRoll != null;
+  const displayCost = showRecommended ? coinsAfterRoll! - recommendedCost! : coinsAfterBuy;
+  const displayName = showRecommended ? recommendedName : projectName;
 
   return (
     <div className="grid grid-cols-3 gap-4 text-center">
@@ -22,6 +29,7 @@ export function CoinFlowDisplay({ coinsNow, coinDelta, hovered, projectName }: P
       <div>
         <div className="text-xs text-machi-text-dim uppercase tracking-wider mb-1">{t('coins.now')}</div>
         <div className="text-2xl font-bold text-machi-yellow">{coinsNow}</div>
+        <div className="h-4" />
       </div>
 
       {/* Roll */}
@@ -39,26 +47,31 @@ export function CoinFlowDisplay({ coinsNow, coinDelta, hovered, projectName }: P
         ) : (
           <div className="text-2xl font-bold text-machi-text-dim">—</div>
         )}
+        <div className="h-4" />
       </div>
 
       {/* Buy */}
       <div>
         <div className="text-xs text-machi-text-dim uppercase tracking-wider mb-1">{t('coins.buy')}</div>
-        {coinsAfterBuy != null ? (
-          <>
-            <div className={`text-2xl font-bold ${coinsAfterBuy < 0 ? 'text-machi-red' : 'text-machi-text'}`}>
-              {coinsAfterBuy}
-            </div>
-            <div className="text-xs text-machi-text-dim mt-0.5 truncate h-4">
-              {projectName ?? '\u00A0'}
-            </div>
-          </>
+        {displayCost != null ? (
+          <div className={`text-2xl font-bold ${
+            showRecommended ? 'text-machi-text-dim/30' : displayCost < 0 ? 'text-machi-red' : 'text-machi-text'
+          }`}>
+            {displayCost}
+          </div>
         ) : (
-          <>
-            <div className="text-2xl font-bold text-machi-text-dim">—</div>
-            <div className="h-4" />
-          </>
+          <div className="text-2xl font-bold text-machi-text-dim">—</div>
         )}
+        {/* Always-visible project name line (fixed height prevents jitter) */}
+        <div className="text-xs mt-0.5 truncate h-4">
+          {displayName ? (
+            <span className={showRecommended ? 'text-machi-text-dim/40' : 'text-machi-text-dim'}>
+              {displayName}
+            </span>
+          ) : (
+            '\u00A0'
+          )}
+        </div>
       </div>
     </div>
   );

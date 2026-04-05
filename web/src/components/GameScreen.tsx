@@ -46,7 +46,7 @@ export function GameScreen({ session, settings, updateSettings, projects, hover 
   const canUse2d6 = activePlayer.ownedIds.includes('bahnhof');
 
   // Insights for opponent turns
-  const insights = useInsights(settings.userPlayerIndex, isUserTurn);
+  const insights = useInsights(settings.userPlayerIndex, isUserTurn, s.effectiveTurnCount);
   const ownsBürohaus = activePlayer.ownedIds.includes('bürohaus');
 
   // Bürohaus modal state
@@ -68,16 +68,28 @@ export function GameScreen({ session, settings, updateSettings, projects, hover 
     ? hoveredProj[`name_${settings.language}` as 'name_de' | 'name_en'] ?? hoveredProj.name_de
     : undefined;
 
+  // Top recommended card for coin flow fallback
+  const topOption = engine.result?.rankedOptions?.find(o => o.projectId !== '_wait_' && o.affordable);
+  const topProj = topOption ? projects.byId(topOption.projectId) : null;
+  const recommendedName = topProj
+    ? topProj[`name_${settings.language}` as 'name_de' | 'name_en'] ?? topProj.name_de
+    : undefined;
+  const recommendedCost = topProj?.cost;
+
   // Trigger engine evaluation when turn starts or engine changes
   useEffect(() => {
     if (s.finished) return;
     engine.evaluate(s.state, s.nextPlayerIndex, settings.engineId, s.state);
-    // Reset dice on turn change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [s.nextPlayerIndex, s.effectiveTurnCount, settings.engineId]);
+
+  // Reset dice only on actual turn changes (not engine switches)
+  useEffect(() => {
     setDie1(null);
     setDie2(null);
     setDiceCount(canUse2d6 ? 1 : 1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [s.nextPlayerIndex, s.effectiveTurnCount, settings.engineId]);
+  }, [s.nextPlayerIndex, s.effectiveTurnCount]);
 
   const handleRollSelect = useCallback((count: 1 | 2, d1: number, d2: number | null) => {
     setDiceCount(count);
@@ -267,6 +279,8 @@ export function GameScreen({ session, settings, updateSettings, projects, hover 
                   hovered={hover.hovered}
                   language={settings.language}
                   projectName={hoveredName}
+                  recommendedName={recommendedName}
+                  recommendedCost={recommendedCost}
                 />
               </div>
 
@@ -279,6 +293,7 @@ export function GameScreen({ session, settings, updateSettings, projects, hover 
                   projects={projects}
                   language={settings.language}
                   coinsAfterRoll={coinsAfterRoll}
+                  ownedIds={activePlayer.ownedIds}
                   onHover={hover.onHover}
                   onBuy={handleBuy}
                   engineId={engine.result?.engineId}
@@ -302,6 +317,7 @@ export function GameScreen({ session, settings, updateSettings, projects, hover 
                   state={s.state}
                   activePlayerIndex={s.nextPlayerIndex}
                   players={s.state.players}
+                  ownedIds={activePlayer.ownedIds}
                 />
               </div>
               <InsightsPanel
@@ -322,36 +338,124 @@ export function GameScreen({ session, settings, updateSettings, projects, hover 
         </main>
 
         {/* Right — Card market */}
-        <aside className="w-72 border-l border-machi-border p-4 overflow-y-auto space-y-2">
-          <h3 className="text-sm font-semibold text-machi-text-dim mb-3">{t('insights.supply')}</h3>
-          {projects.projects
-            .filter(p => !p.is_grossprojekt)
-            .map(p => {
-              const totalOwned = s.state.players.reduce(
-                (sum, pl) => sum + pl.ownedIds.filter(id => id === p.id).length, 0
-              );
-              // Starter cards (weizenfeld, bäckerei) are outside the 6-copy market pool
-              const starterCopies = (p.id === 'weizenfeld' || p.id === 'bäckerei')
-                ? s.state.players.length : 0;
-              const remaining = 6 - (totalOwned - starterCopies);
-              return (
-                <div
-                  key={p.id}
-                  className={`flex items-center justify-between px-2 py-1 rounded text-sm transition-colors cursor-default ${
-                    remaining === 0 ? 'opacity-30 line-through' : 'hover:bg-machi-surface'
-                  }`}
-                  onMouseEnter={() => hover.onHover({ projectId: p.id, cost: p.cost })}
-                  onMouseLeave={() => hover.onHover(null)}
-                >
-                  <span className={cardTextClass(p.color)}>
-                    {p[`name_${settings.language}` as 'name_de' | 'name_en'] ?? p.name_de}
-                  </span>
-                  <span className={`font-mono text-xs ${remaining <= 2 && remaining > 0 ? 'text-machi-yellow' : 'text-machi-text-dim'}`}>
-                    {remaining} / {p.cost}c
-                  </span>
-                </div>
-              );
-            })}
+        <aside className="w-72 border-l border-machi-border p-4 overflow-y-auto space-y-4">
+          {/* Market supply — regular cards (blau, rot, grün) */}
+          <div className="space-y-2">
+            <h3 className="text-sm font-semibold text-machi-text-dim">{t('insights.supply')}</h3>
+            {projects.projects
+              .filter(p => !p.is_grossprojekt && p.color !== 'lila')
+              .map(p => {
+                const totalOwned = s.state.players.reduce(
+                  (sum, pl) => sum + pl.ownedIds.filter(id => id === p.id).length, 0
+                );
+                const starterCopies = (p.id === 'weizenfeld' || p.id === 'bäckerei')
+                  ? s.state.players.length : 0;
+                const remaining = 6 - (totalOwned - starterCopies);
+                return (
+                  <div
+                    key={p.id}
+                    className={`flex items-center justify-between px-2 py-1 rounded text-sm transition-colors cursor-default ${
+                      remaining === 0 ? 'opacity-30 line-through' : 'hover:bg-machi-surface'
+                    }`}
+                    onMouseEnter={() => hover.onHover({ projectId: p.id, cost: p.cost })}
+                    onMouseLeave={() => hover.onHover(null)}
+                  >
+                    <span className={cardTextClass(p.color)}>
+                      {p[`name_${settings.language}` as 'name_de' | 'name_en'] ?? p.name_de}
+                    </span>
+                    <span className={`font-mono text-xs ${remaining <= 2 && remaining > 0 ? 'text-machi-yellow' : 'text-machi-text-dim'}`}>
+                      {remaining} / {p.cost}c
+                    </span>
+                  </div>
+                );
+              })}
+          </div>
+
+          {/* Purple cards — per-player ownership */}
+          <div className="space-y-1">
+            <h3 className="text-sm font-semibold text-machi-text-dim">
+              {settings.language === 'de' ? 'Sondergebäude' : 'Special Buildings'}
+            </h3>
+            {projects.projects
+              .filter(p => p.color === 'lila' && !p.is_grossprojekt)
+              .map(p => {
+                const name = p[`name_${settings.language}` as 'name_de' | 'name_en'] ?? p.name_de;
+                return (
+                  <div
+                    key={p.id}
+                    className="flex items-center justify-between px-2 py-1 rounded text-sm cursor-default hover:bg-machi-surface transition-colors"
+                    onMouseEnter={() => hover.onHover({ projectId: p.id, cost: p.cost })}
+                    onMouseLeave={() => hover.onHover(null)}
+                  >
+                    <span className={cardTextClass(p.color)}>{name}</span>
+                    <div className="flex items-center gap-1.5">
+                      <div className="flex gap-0.5">
+                        {s.state.players.map((pl, i) => {
+                          const owns = pl.ownedIds.includes(p.id);
+                          return (
+                            <span
+                              key={i}
+                              className={`text-[10px] w-4 h-4 flex items-center justify-center rounded ${
+                                owns
+                                  ? 'bg-machi-accent/20 text-machi-accent'
+                                  : 'bg-machi-border/20 text-machi-text-dim/30'
+                              }`}
+                              title={pl.name}
+                            >
+                              {pl.name.charAt(0)}
+                            </span>
+                          );
+                        })}
+                      </div>
+                      <span className="font-mono text-xs text-machi-text-dim">{p.cost}c</span>
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
+
+          {/* Landmarks — per-player ownership */}
+          <div className="space-y-1">
+            <h3 className="text-sm font-semibold text-machi-text-dim">
+              {settings.language === 'de' ? 'Großprojekte' : 'Landmarks'}
+            </h3>
+            {projects.projects
+              .filter(p => p.is_grossprojekt)
+              .map(p => {
+                const name = p[`name_${settings.language}` as 'name_de' | 'name_en'] ?? p.name_de;
+                return (
+                  <div
+                    key={p.id}
+                    className="flex items-center justify-between px-2 py-1 rounded text-sm cursor-default hover:bg-machi-surface transition-colors"
+                    onMouseEnter={() => hover.onHover({ projectId: p.id, cost: p.cost })}
+                    onMouseLeave={() => hover.onHover(null)}
+                  >
+                    <span className={cardTextClass(p.color)}>{name}</span>
+                    <div className="flex items-center gap-1.5">
+                      <div className="flex gap-0.5">
+                        {s.state.players.map((pl, i) => {
+                          const owns = pl.ownedIds.includes(p.id);
+                          return (
+                            <span
+                              key={i}
+                              className={`text-[10px] w-4 h-4 flex items-center justify-center rounded ${
+                                owns
+                                  ? 'bg-machi-accent/20 text-machi-accent'
+                                  : 'bg-machi-border/20 text-machi-text-dim/30'
+                              }`}
+                              title={pl.name}
+                            >
+                              {pl.name.charAt(0)}
+                            </span>
+                          );
+                        })}
+                      </div>
+                      <span className="font-mono text-xs text-machi-text-dim">{p.cost}c</span>
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
         </aside>
       </div>
 

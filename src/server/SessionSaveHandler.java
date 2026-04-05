@@ -21,7 +21,7 @@ import java.time.format.DateTimeFormatter;
  *
  * <h2>Response (200)</h2>
  * <pre>
- * { "saved": true, "filename": "my-game.mkoro" }
+ * { "path": "my-game.mkoro" }
  * </pre>
  */
 final class SessionSaveHandler implements HttpHandler {
@@ -75,8 +75,7 @@ final class SessionSaveHandler implements HttpHandler {
             session.save(savePath);
 
             JsonObject response = new JsonObject();
-            response.addProperty("saved", true);
-            response.addProperty("filename", filename);
+            response.addProperty("path", filename);
             ApiUtils.sendJson(exchange, 200, response);
 
         } catch (Exception e) {

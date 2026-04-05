@@ -127,8 +127,8 @@ export function SettingsScreen({ settings, update, players, onClose }: Props) {
             onClick={() => update({ autosave: !settings.autosave })}
           >
             <span
-              className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform ${
-                settings.autosave ? 'translate-x-6' : 'translate-x-0.5'
+              className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all duration-200 ${
+                settings.autosave ? 'left-[1.625rem]' : 'left-0.5'
               }`}
             />
           </button>

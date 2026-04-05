@@ -11,6 +11,7 @@ interface Props {
   projects: { projects: ProjectDef[]; byId: (id: string) => ProjectDef | undefined };
   language: 'de' | 'en';
   coinsAfterRoll: number | null;
+  ownedIds: string[];
   onHover: (card: { projectId: string; cost: number } | null) => void;
   onBuy: (projectId: string | null) => void;
   engineId?: string;
@@ -20,14 +21,21 @@ interface Props {
 
 export function PurchaseArea({
   options, metricRanges, evaluating,
-  projects, language, coinsAfterRoll,
+  projects, language, coinsAfterRoll, ownedIds,
   onHover, onBuy, engineId, iterationsUsed, computeTimeMs,
 }: Props) {
   const { t } = useLocale();
 
-  // Manual buy: list affordable cards from market
+  // Manual buy: list affordable cards (exclude already-owned purples and landmarks)
   const affordable = coinsAfterRoll != null
-    ? projects.projects.filter(p => !p.is_grossprojekt && p.cost <= coinsAfterRoll)
+    ? projects.projects.filter(p => {
+        if (p.cost > coinsAfterRoll) return false;
+        // Purple cards: max 1 per player
+        if (p.color === 'lila' && ownedIds.includes(p.id)) return false;
+        // Landmarks: only if not already owned
+        if (p.is_grossprojekt && ownedIds.includes(p.id)) return false;
+        return true;
+      })
     : [];
 
   return (
@@ -44,6 +52,7 @@ export function PurchaseArea({
         engineId={engineId}
         iterationsUsed={iterationsUsed}
         computeTimeMs={computeTimeMs}
+        coinsAfterRoll={coinsAfterRoll}
       />
 
       {/* Manual buy fallback */}

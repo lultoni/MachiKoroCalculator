@@ -1,27 +1,24 @@
-/** Fetches session insights during opponent turns, caching until player changes. */
+/** Fetches session insights during opponent turns, refreshing each turn. */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import type { InsightsResponse } from '../api/types';
 import { getInsights } from '../api/client';
 
-export function useInsights(playerIndex: number, isUserTurn: boolean) {
+export function useInsights(playerIndex: number, isUserTurn: boolean, turnCount?: number) {
   const [data, setData] = useState<InsightsResponse | null>(null);
   const [loading, setLoading] = useState(false);
-  const lastPlayerRef = useRef<number>(-1);
 
   useEffect(() => {
-    // Only fetch on opponent turns; invalidate cache when player changes
+    // Only fetch on opponent turns
     if (isUserTurn) return;
-    if (lastPlayerRef.current === playerIndex && data != null) return;
 
-    lastPlayerRef.current = playerIndex;
     setLoading(true);
 
     getInsights(playerIndex)
       .then(setData)
       .catch(() => setData(null))
       .finally(() => setLoading(false));
-  }, [playerIndex, isUserTurn]);
+  }, [playerIndex, isUserTurn, turnCount]);
 
   return { data, loading };
 }

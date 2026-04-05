@@ -77,9 +77,8 @@ final class SessionSavesListHandler implements HttpHandler {
                 }
             }
 
-            JsonObject response = new JsonObject();
-            response.add("saves", saves);
-            ApiUtils.sendJson(exchange, 200, response);
+            // Return the saves array directly (frontend expects SaveEntry[])
+            ApiUtils.sendJson(exchange, 200, saves);
 
         } catch (Exception e) {
             ApiUtils.sendError(exchange, 500, "Internal error: " + e.getMessage());

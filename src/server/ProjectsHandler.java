@@ -37,10 +37,12 @@ final class ProjectsHandler implements HttpHandler {
             obj.addProperty("color", p.getColor());
             obj.addProperty("category", p.getCategory());
             obj.addProperty("cost", p.getCost());
-            obj.addProperty("isGrossprojekt", p.isIs_grossprojekt());
+            obj.addProperty("is_grossprojekt", p.isIs_grossprojekt());
+            obj.addProperty("description_de", p.getDescription());
+            obj.addProperty("description_en", p.getDescriptionEn());
             JsonArray rolls = new JsonArray();
             for (int r : p.getDice_activation()) rolls.add(r);
-            obj.add("activationRolls", rolls);
+            obj.add("dice_activation", rolls);
             arr.add(obj);
         }
 

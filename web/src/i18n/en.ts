@@ -5,7 +5,7 @@ const en: Record<string, string> = {
   'btn.start': 'Start Game',
   'btn.skip': 'Skip',
   'btn.undo': 'Undo',
-  'btn.save': 'Save',
+  'btn.save': 'Save / Load',
   'btn.load': 'Load',
   'btn.settings': 'Settings',
   'btn.newGame': 'New Game',

@@ -49,24 +49,18 @@ public final class MctsAdaptiveEngine extends MctsV1Engine {
         long startMs = System.currentTimeMillis();
         double explorationConstant = Double.parseDouble(
                 config.getExtra("explorationConstant", "1.4142"));
-        double closeMargin    = Double.parseDouble(config.getExtra("closeMargin",    "0.03"));
-        double splitThreshold = Double.parseDouble(config.getExtra("splitThreshold", "0.06"));
 
         SupplyTracker supply = SupplyTracker.fromGameState(state);
-        MctsTree tree = buildTree(state, supply, playerIndex, playerIndex, explorationConstant);
+        MctsTree tree = buildFullTurnTree(state, supply, playerIndex, playerIndex, explorationConstant);
 
         int totalBudget     = config.iterations > 0 ? config.iterations : 100;
-        int surveyBudget    = Math.max(1, totalBudget / 5);
-        int remainingBudget = totalBudget - surveyBudget;
 
-        // ---- Phase 1: survey ----
-        tree.runIterations(surveyBudget);
-
-        // ---- Phase 2: identify top-2 root children by win rate ----
-        runAdaptiveFocusedPhase(tree, tree.root, closeMargin, splitThreshold, remainingBudget);
+        // For full-turn trees, run all iterations uniformly (adaptive focus on buy decisions
+        // doesn't apply cleanly since BuyDecisionNodes are spread across roll branches)
+        tree.runIterations(totalBudget);
 
         long computeTimeMs = System.currentTimeMillis() - startMs;
-        return buildResult(state, playerIndex, tree, tree.getIterationsPerformed(), computeTimeMs);
+        return buildResult(state, playerIndex, tree, tree.getIterationsPerformed(), computeTimeMs, config);
     }
 
     @Override

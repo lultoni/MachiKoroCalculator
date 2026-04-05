@@ -23,10 +23,14 @@ export function SaveLoadMenu({ onSave, onLoad, loading, onClose }: Props) {
   }, []);
 
   const handleSave = async () => {
-    const path = await onSave(filename || undefined);
-    setSavedPath(path);
-    // Refresh saves list
-    api.listSaves().then(setSaves).catch(() => {});
+    try {
+      const path = await onSave(filename || undefined);
+      setSavedPath(path);
+      // Refresh saves list
+      api.listSaves().then(setSaves).catch(() => {});
+    } catch {
+      // Error is shown via session.error in parent
+    }
   };
 
   const handleLoad = async (fn: string) => {

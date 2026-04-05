@@ -17,9 +17,10 @@ interface Props {
   engineId?: string;
   iterationsUsed?: number;
   computeTimeMs?: number;
+  coinsAfterRoll?: number | null;
 }
 
-export function AssistantPanel({ options, metricRanges, loading, projects, language, onHover, onBuy, engineId, iterationsUsed, computeTimeMs }: Props) {
+export function AssistantPanel({ options, metricRanges, loading, projects, language, onHover, onBuy, engineId, iterationsUsed, computeTimeMs, coinsAfterRoll }: Props) {
   const { t } = useLocale();
   const [showAll, setShowAll] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -52,7 +53,20 @@ export function AssistantPanel({ options, metricRanges, loading, projects, langu
     });
   })();
 
-  const top = dedupedOptions[0];
+  // Override affordable flag with post-roll coins when available
+  const liveOptions = coinsAfterRoll != null
+    ? dedupedOptions.map(o => {
+        if (o.projectId === '_wait_') return o;
+        const proj = projects.byId(o.projectId);
+        const cost = proj?.cost ?? 0;
+        return { ...o, affordable: coinsAfterRoll >= cost };
+      })
+    : dedupedOptions;
+
+  // Show only affordable options — list updates dynamically per dice selection
+  const visibleOptions = liveOptions.filter(o => o.affordable);
+
+  const top = visibleOptions[0] ?? liveOptions[0];
   const isWait = top.projectId === '_wait_';
   const topProj = projects.byId(top.projectId);
   const topName = isWait
@@ -63,7 +77,11 @@ export function AssistantPanel({ options, metricRanges, loading, projects, langu
   return (
     <div className="space-y-3">
       {/* Top recommendation */}
-      <div className="bg-machi-surface rounded-xl border border-machi-border p-4 space-y-3">
+      <div
+        className="bg-machi-surface rounded-xl border border-machi-border p-4 space-y-3"
+        onMouseEnter={() => !isWait && topProj && onHover({ projectId: top.projectId, cost: topProj.cost })}
+        onMouseLeave={() => onHover(null)}
+      >
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="text-xs text-machi-text-dim uppercase tracking-wider mb-1">
@@ -97,20 +115,31 @@ export function AssistantPanel({ options, metricRanges, loading, projects, langu
 
         {/* Action buttons */}
         <div className="flex gap-2">
-          <button
-            className="flex-1 py-2 rounded-lg font-semibold bg-machi-accent text-machi-bg hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-50"
-            onClick={() => onBuy(top.projectId)}
-            disabled={!top.affordable}
-          >
-            {t('coins.buy')} {topName}
-            {topProj && <span className="ml-1 text-sm opacity-75">({topProj.cost}c)</span>}
-          </button>
-          <button
-            className="px-3 py-2 rounded-lg text-sm text-machi-text-dim hover:text-machi-text border border-machi-border hover:border-machi-text-dim transition-all"
-            onClick={() => onBuy(null)}
-          >
-            {t('btn.skip')}
-          </button>
+          {isWait ? (
+            <button
+              className="flex-1 py-2 rounded-lg font-semibold bg-machi-accent text-machi-bg hover:brightness-110 active:scale-[0.98] transition-all"
+              onClick={() => onBuy(null)}
+            >
+              {t('btn.skip')}
+            </button>
+          ) : (
+            <>
+              <button
+                className="flex-1 py-2 rounded-lg font-semibold bg-machi-accent text-machi-bg hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-50"
+                onClick={() => onBuy(top.projectId)}
+                disabled={!top.affordable}
+              >
+                {t('coins.buy')} {topName}
+                {topProj && <span className="ml-1 text-sm opacity-75">({topProj.cost}c)</span>}
+              </button>
+              <button
+                className="px-3 py-2 rounded-lg text-sm text-machi-text-dim hover:text-machi-text border border-machi-border hover:border-machi-text-dim transition-all"
+                onClick={() => onBuy(null)}
+              >
+                {t('btn.skip')}
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -126,7 +155,7 @@ export function AssistantPanel({ options, metricRanges, loading, projects, langu
       {showAll && (
         <div className="bg-machi-surface rounded-xl border border-machi-border p-3">
           <RankedList
-            options={dedupedOptions}
+            options={visibleOptions}
             metricRanges={metricRanges}
             projects={projects}
             language={language}

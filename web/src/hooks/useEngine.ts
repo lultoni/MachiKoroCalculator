@@ -32,6 +32,8 @@ export function useEngine(): UseEngineReturn {
 
     setLoading(true);
     setError(null);
+    // Clear engine-specific rankings but keep perRollDeltas for manual buy
+    setResult(prev => prev ? { ...prev, rankedOptions: [], metricRanges: undefined } : null);
     try {
       const req: EvaluateRequest = { state, playerIndex, engineId, preRollState };
       const res = await api.evaluate(req);

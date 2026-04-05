@@ -16,6 +16,7 @@ import engine.mcts.SupplyTracker;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -69,7 +70,7 @@ public class MctsV1Engine implements SimulationEngine {
         boolean profile = "true".equals(config.getExtra("profile", "false"));
 
         SupplyTracker supply = SupplyTracker.fromGameState(state);
-        MctsTree tree = buildTree(state, supply, playerIndex, playerIndex, explorationConstant);
+        MctsTree tree = buildFullTurnTree(state, supply, playerIndex, playerIndex, explorationConstant);
         if (profile) tree.enableProfiling();
 
         // Run iterations or time budget
@@ -231,20 +232,23 @@ public class MctsV1Engine implements SimulationEngine {
 
     private List<EngineResult.Option> buildOptions(
             GameState state, int playerIndex, MctsTree tree, int iterationsUsed) {
-        List<EngineResult.Option> options = new ArrayList<>();
         Player active = state.getPlayers()[playerIndex];
         int coins = active.getCoins();
         int n = state.getPlayers().length;
 
-        // Root must be expanded to have children
+        // When using a full-turn tree, aggregate purchase options across all roll branches
+        if (tree.fullTurnRoot != null) {
+            return buildOptionsFromFullTurnTree(state, playerIndex, tree, iterationsUsed, coins, n);
+        }
+
+        // Legacy path: root is a BuyDecisionNode with pre-roll coins
+        List<EngineResult.Option> options = new ArrayList<>();
+
         if (!tree.root.expanded) {
             tree.root.expand();
         }
 
         for (MctsNode child : tree.root.getChildren()) {
-            // Each child of the root BuyDecisionNode is the next player's turn node,
-            // with the purchase for activePlayer already applied to child.state.
-            // We infer which card was purchased by diffing root vs child owned lists.
             Project purchased = inferPurchasedCard(state, playerIndex, child.state, playerIndex);
             if (purchased == null) continue;
 
@@ -255,7 +259,6 @@ public class MctsV1Engine implements SimulationEngine {
             boolean affordable = (purchased == RankEntry.WAIT_SENTINEL)
                     || (coins >= purchased.getCost());
 
-            // Build metrics and explanation using Calcs
             Map<String, String> metrics = buildMetrics(state, playerIndex, purchased,
                     winRate, child.visitCount, iterationsUsed, coins, n);
             List<String> factors = buildExplanationFactors(state, playerIndex, purchased,
@@ -265,13 +268,93 @@ public class MctsV1Engine implements SimulationEngine {
                     purchased, winRate, factors, metrics, affordable));
         }
 
-        // Ensure save sentinel is present even if root had no wait child
         boolean hasSave = options.stream().anyMatch(o -> "_wait_".equals(o.project.getId()));
         if (!hasSave) {
             options.add(buildSaveOption(state, playerIndex, coins, n, iterationsUsed));
         }
 
         return options;
+    }
+
+    /**
+     * Aggregates purchase options across all BuyDecisionNodes in a full-turn tree.
+     * Walks the tree from fullTurnRoot, finds all BuyDecisionNode instances, and merges
+     * per-card statistics (visit count, total score) across all roll branches.
+     */
+    private List<EngineResult.Option> buildOptionsFromFullTurnTree(
+            GameState state, int playerIndex, MctsTree tree,
+            int iterationsUsed, int preRollCoins, int n) {
+
+        // Collect per-card aggregated stats across all BuyDecisionNodes
+        Map<String, AggregatedOption> agg = new HashMap<>();
+        collectBuyDecisionStats(tree.fullTurnRoot, playerIndex, agg);
+
+        List<EngineResult.Option> options = new ArrayList<>();
+        for (AggregatedOption ao : agg.values()) {
+            double winRate = ao.totalVisits > 0 ? ao.totalScore / ao.totalVisits : 0.0;
+            // Affordable if affordable in ANY roll branch (user may roll well enough)
+            boolean affordable = ao.card == RankEntry.WAIT_SENTINEL || ao.affordableInAnyBranch;
+
+            Map<String, String> metrics = buildMetrics(state, playerIndex, ao.card,
+                    winRate, ao.totalVisits, iterationsUsed, preRollCoins, n);
+            List<String> factors = buildExplanationFactors(state, playerIndex, ao.card,
+                    winRate, ao.totalVisits, iterationsUsed, metrics, preRollCoins, n);
+
+            options.add(new EngineResult.Option(
+                    ao.card, winRate, factors, metrics, affordable));
+        }
+
+        boolean hasSave = options.stream().anyMatch(o -> "_wait_".equals(o.project.getId()));
+        if (!hasSave) {
+            options.add(buildSaveOption(state, playerIndex, preRollCoins, n, iterationsUsed));
+        }
+
+        return options;
+    }
+
+    /** Mutable accumulator for aggregating stats across BuyDecisionNode branches. */
+    private static final class AggregatedOption {
+        final Project card;
+        int totalVisits;
+        double totalScore;
+        boolean affordableInAnyBranch;
+
+        AggregatedOption(Project card) {
+            this.card = card;
+        }
+    }
+
+    /**
+     * Recursively walks the full-turn tree to find all BuyDecisionNodes and
+     * aggregates per-card visit counts and scores.
+     */
+    private void collectBuyDecisionStats(MctsNode node, int playerIndex,
+                                          Map<String, AggregatedOption> agg) {
+        if (node == null || !node.expanded) return;
+
+        if (node instanceof BuyDecisionNode buyNode) {
+            GameState buyState = buyNode.state;
+            int coins = buyState.getPlayers()[playerIndex].getCoins();
+
+            for (MctsNode child : buyNode.getChildren()) {
+                Project purchased = inferPurchasedCard(buyState, playerIndex,
+                        child.state, playerIndex);
+                if (purchased == null) continue;
+
+                String id = purchased.getId();
+                AggregatedOption ao = agg.computeIfAbsent(id, k -> new AggregatedOption(purchased));
+                ao.totalVisits += child.visitCount;
+                ao.totalScore += child.totalScore;
+                if (purchased == RankEntry.WAIT_SENTINEL || coins >= purchased.getCost()) {
+                    ao.affordableInAnyBranch = true;
+                }
+            }
+        } else {
+            // Not a BuyDecisionNode — recurse into children
+            for (MctsNode child : node.getChildren()) {
+                collectBuyDecisionStats(child, playerIndex, agg);
+            }
+        }
     }
 
     /**
@@ -408,8 +491,8 @@ public class MctsV1Engine implements SimulationEngine {
             }
         }
 
-        m.put("turnsToWin",     estimateTurnsToWin(state, playerIndex));
-        m.put("tempoAdvantage", estimateTempoAdvantage(state, playerIndex));
+        m.put("turnsToWin",     estimateTurnsToWin(hypothetical, playerIndex));
+        m.put("tempoAdvantage", estimateTempoAdvantage(hypothetical, playerIndex));
         return m;
     }
 

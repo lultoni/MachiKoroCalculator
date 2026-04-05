@@ -37,8 +37,6 @@ export const COLUMNS: ColumnDef[] = [
     tooltip: 'Turns ahead (+) or behind (-) compared to nearest opponent' },
   { key: 'variance',        label: 'Variance',       sortable: true,  format: 'decimal', colorGradient: true, invertColor: true,
     tooltip: 'Income volatility — higher variance means more unpredictable income' },
-  { key: 'affordable',      label: 'Affordable',     sortable: false, format: 'boolean',
-    tooltip: 'Whether you have enough coins to buy this card after the roll' },
 ];
 
 /**

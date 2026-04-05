@@ -17,9 +17,10 @@ interface Props {
   state: GameStateJson;
   activePlayerIndex: number;
   players: PlayerState[];
+  ownedIds: string[];
 }
 
-export function OpponentTurnEntry({ opponentName, canUse2d6, projects, language, coinsAvailable, onConfirm, loading, state, activePlayerIndex, players }: Props) {
+export function OpponentTurnEntry({ opponentName, canUse2d6, projects, language, coinsAvailable, onConfirm, loading, state, activePlayerIndex, players, ownedIds }: Props) {
   const { t } = useLocale();
   const [die1, setDie1] = useState<number | null>(null);
   const [die2, setDie2] = useState<number | null>(null);
@@ -62,7 +63,17 @@ export function OpponentTurnEntry({ opponentName, canUse2d6, projects, language,
     setCoinDeltas(null);
   };
 
-  const affordable = projects.projects.filter(p => !p.is_grossprojekt && p.cost <= coinsAvailable);
+  // Use post-roll coins for affordability when available
+  const opponentCoinsAfterRoll = coinDeltas != null
+    ? coinsAvailable + (coinDeltas[activePlayerIndex] ?? 0)
+    : coinsAvailable;
+  const affordable = projects.projects.filter(p => {
+    if (p.is_grossprojekt) return false;
+    if (p.cost > opponentCoinsAfterRoll) return false;
+    // Purple cards: max 1 per player
+    if (p.color === 'lila' && ownedIds.includes(p.id)) return false;
+    return true;
+  });
 
   return (
     <div className="space-y-4">
@@ -98,24 +109,58 @@ export function OpponentTurnEntry({ opponentName, canUse2d6, projects, language,
         </div>
       )}
 
-      {/* Purchase selector */}
+      {/* Purchase selector — card buttons instead of dropdown for better UX */}
       {rollTotal > 0 && (
         <div className="space-y-2">
-          <select
-            className="w-full bg-machi-bg border border-machi-border rounded-lg px-3 py-2 text-sm text-machi-text focus:outline-none focus:border-machi-accent"
-            value={boughtId ?? ''}
-            onChange={e => setBoughtId(e.target.value || null)}
-          >
-            <option value="">{t('btn.skip')}</option>
+          <div className="text-xs text-machi-text-dim uppercase tracking-wider">{t('purchase.manual')}</div>
+          <div className="flex flex-wrap gap-1.5">
+            <button
+              className={`px-2 py-1 rounded-lg text-xs border transition-colors ${
+                boughtId === null
+                  ? 'border-machi-accent bg-machi-accent/10 text-machi-accent'
+                  : 'border-machi-border bg-machi-bg text-machi-text-dim hover:border-machi-text-dim'
+              }`}
+              onClick={() => setBoughtId(null)}
+            >
+              {t('btn.skip')}
+            </button>
             {affordable.map(p => {
               const name = p[`name_${language}` as 'name_de' | 'name_en'] ?? p.name_de;
+              const isSelected = boughtId === p.id;
               return (
-                <option key={p.id} value={p.id}>
-                  {name} ({p.cost}c)
-                </option>
+                <button
+                  key={p.id}
+                  className={`px-2 py-1 rounded-lg text-xs border transition-colors ${
+                    isSelected
+                      ? 'border-machi-accent bg-machi-accent/10'
+                      : 'border-machi-border bg-machi-bg hover:border-machi-text-dim'
+                  }`}
+                  onClick={() => setBoughtId(p.id)}
+                >
+                  <span className={cardTextClass(p.color)}>{name}</span>
+                  <span className="ml-1 text-machi-text-dim">{p.cost}c</span>
+                </button>
               );
             })}
-          </select>
+          </div>
+
+          {/* Opponent coins after roll + purchase summary */}
+          {coinDeltas && (
+            <div className="text-xs text-machi-text-dim">
+              {(() => {
+                const coinsAfter = coinsAvailable + (coinDeltas[activePlayerIndex] ?? 0);
+                const purchaseCost = boughtId ? (projects.byId(boughtId)?.cost ?? 0) : 0;
+                const final_ = coinsAfter - purchaseCost;
+                return (
+                  <span>
+                    {players[activePlayerIndex].name}: {coinsAvailable}c → {coinsAfter}c
+                    {boughtId && <span className="text-machi-red"> − {purchaseCost}c</span>}
+                    {boughtId && <span> = {final_}c</span>}
+                  </span>
+                );
+              })()}
+            </div>
+          )}
 
           <button
             className="w-full py-2 rounded-lg font-semibold bg-machi-accent text-machi-bg hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-50"
@@ -128,4 +173,15 @@ export function OpponentTurnEntry({ opponentName, canUse2d6, projects, language,
       )}
     </div>
   );
+}
+
+function cardTextClass(color?: string): string {
+  switch (color) {
+    case 'blau': return 'text-machi-blue';
+    case 'rot': return 'text-machi-red';
+    case 'grün': return 'text-machi-green';
+    case 'lila': return 'text-machi-purple';
+    case 'gelb': return 'text-machi-yellow';
+    default: return 'text-machi-text';
+  }
 }

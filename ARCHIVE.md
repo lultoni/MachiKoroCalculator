@@ -70,3 +70,5 @@ This file indexes concepts and components removed during the restructure. The ac
 ---
 
 *This file is updated whenever code is purged during the restructure.*
+
+**Physical deletion:** The `gui/` and `logic/` directories were physically removed in 7.19 (previously they remained in the tree as unused legacy code). `GameSimulator` and `RankingOptions` were ported to `calcs/` before deletion.

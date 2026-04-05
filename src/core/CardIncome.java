@@ -382,9 +382,9 @@ public class CardIncome {
      * Computes the per-round EV of a single card in the context of a specific player's
      * actual stats (Einkaufszentrum, food/animal/production counts, opponent coins).
      *
-     * <p>Unlike {@link #singleCardEvPerRound}, this method correctly reflects synergy
-     * multipliers: a Markthalle owned by a player with 3 food cards yields 3× the
-     * income of a Markthalle in a generic reference state.
+     * <p>This method correctly reflects synergy multipliers: a Markthalle owned by
+     * a player with 3 food cards yields 3× the income of a Markthalle in a generic
+     * reference state.
      */
     public static double contextualCardEvPerRound(Project card, PlayerStats stats,
                                             int numPlayers, int[] oppCoins) {
@@ -414,30 +414,4 @@ public class CardIncome {
         };
     }
 
-    // -------------------------------------------------------------------------
-    // singleCardEvPerRound — isolated card EV for scoring
-    // -------------------------------------------------------------------------
-
-    /**
-     * Approximates the per-round EV of a single card in isolation (no synergy),
-     * scaled by the number of players for blue cards.
-     */
-    public static double singleCardEvPerRound(Project card, int numPlayers) {
-        double ev = 0.0;
-        // Use 2d6 probabilities as the general case (most mid/late game play is 2d6)
-        for (int r = 2; r <= 12; r++) {
-            int income = get_I(r, card.getId(), true, false, 1, 1, 1, 99, new int[]{5, 5, 5});
-            if (income > 0) ev += P2[r] * income;
-        }
-        // Also cover 1-only rolls (weizenfeld, etc.) using 1d6
-        for (int r = 1; r <= 6; r++) {
-            int income = get_I(r, card.getId(), true, false, 1, 1, 1, 99, new int[]{5, 5, 5});
-            if (income > 0) ev = Math.max(ev, P1[r] * income * ("blau".equals(card.getColor()) ? numPlayers : 1));
-        }
-        // Correct blue card scaling: multiply by numPlayers
-        if ("blau".equals(card.getColor())) {
-            ev *= numPlayers;
-        }
-        return ev;
-    }
 }

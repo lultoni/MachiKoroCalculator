@@ -9,10 +9,8 @@ import java.util.List;
 /**
  * Manages a live game session: tracks the mutable {@link GameState} and the full turn history.
  *
- * <h2>Turn-by-turn ↔ snapshot duality</h2>
+ * <h2>Snapshot conversion</h2>
  * <ul>
- *   <li>{@link #toSnapshot()} returns the current state as a {@link GameStateBuilder} so the
- *       caller can inspect or export it.</li>
  *   <li>{@link #fromSnapshot(GameStateBuilder, String[])} creates a new session whose state is
  *       whatever the snapshot describes, with an empty history from that point forward.</li>
  * </ul>
@@ -113,7 +111,7 @@ public class GameSession {
                 }
             }
 
-            buyer.getOwned_projects().add(card);
+            buyer.addProject(card);
             buyer.setCoins(buyer.getCoins() - card.getCost());
 
             // Check win condition: owning all 4 landmarks ends the game immediately
@@ -229,22 +227,6 @@ public class GameSession {
     // -------------------------------------------------------------------------
     // Snapshot conversion
     // -------------------------------------------------------------------------
-
-    /**
-     * Returns a {@link GameStateBuilder} pre-populated with the current live state.
-     */
-    public GameStateBuilder toSnapshot() {
-        Player[] players = state.getPlayers();
-        GameStateBuilder b = new GameStateBuilder(players.length);
-        for (int i = 0; i < players.length; i++) {
-            b.setPlayerName(i, players[i].getName());
-            b.setCoins(i, players[i].getCoins());
-            for (Project p : players[i].getOwned_projects()) {
-                b.addProject(i, p.getId());
-            }
-        }
-        return b;
-    }
 
     /**
      * Creates a new {@link GameSession} starting from the state described by the given builder.

@@ -46,59 +46,7 @@ Implement MCTS with full-game rollouts as the first pluggable engine.
 
 Add engine variants A–E tested head-to-head against MCTS v1. Each variant changes exactly one thing from v1; a variant becomes the new default only if it beats all previous variants in H2H testing. Extend Standard Calcs with advanced statistical metrics before implementing variants.
 
-### 3.0 — Calcs Audit & New Metrics (pre-work)
-
-Add the following closed-form metrics to `calcs/Calcs.java`. All are computed over the discrete roll distribution (no simulation); they extend `roiOverHorizon` with richer risk and tempo information.
-
-| Metric | Description |
-|---|---|
-| Sharpe ratio | `(evPerRound - riskFreeRate) / sqrt(variance)` — reward per unit income volatility |
-| Sortino ratio | `(evPerRound - target) / sqrt(semiVariance)` — penalises only downside deviation |
-| Kelly fraction | Optimal bet fraction adapted to per-card purchasing decision |
-| VaR / CVaR | Worst-case floor income at configurable confidence levels (closed-form over discrete distribution) |
-| HHI concentration | `Σ(income_share_r)²` normalised [0,1] — identifies "feast or famine" income concentration |
-| Income entropy H | `-Σ P(r)×w(r)×log₂(w(r))` — roll coverage spread |
-| Information gain IG | `H(portfolio) − H(portfolio + card)` — how much the card reduces income uncertainty |
-| ETW | `max(0, landmarkCostRemaining − coins) / evPerRound` — estimated turns to win |
-| Tempo advantage | `ETW_best_opponent − ETW_player` — turns ahead/behind nearest opponent |
-| Purchase urgency | `portfolioDeltaEV × (1 − supplyFraction) × opponentDemand` — value × scarcity × competition |
-| Roll correlation ρ | `Cov(card, portfolio) / (σ_card × σ_portfolio)` — coverage gap vs. redundancy |
-
-### 3.A — Variant A: Greedy Rollout (`mcts-v1-greedy-rollout`)
-
-**Hypothesis:** Informed rollouts converge faster than uniform-random for the same iteration budget. Tree phase unchanged (full UCT). Only the rollout policy changes.
-
-**Rollout policy:**
-- **Purchase:** landmark priority first (bahnhof gate heuristic); else card with highest `contextualCardEvPerRound × geometricSum − cost`; else save
-- **Dice count:** 2d6 iff player owns a 7–12 activation card
-- **Funkturm:** keep if current-roll income > expected reroll income; else reroll
-- **Bürohaus:** execute `BürohausLogic.executeSwap()` (greedy best swap)
-
-Registry entries: `mcts-v1-greedy-rollout-fast`, `-balanced`, `-deep`.
-
-### 3.B — Variant B: Boltzmann Rollout (`mcts-v1-boltzmann-rollout`)
-
-**Hypothesis:** Stochastic-but-informed rollouts offer a better exploration/accuracy trade-off. Replicates the archived `GameSimulator` Boltzmann policy.
-
-**Rollout policy:** Boltzmann sampling from ROI scores with temperature T (`extra.rolloutTemperature`, default `"0.7"`); landmark priority deterministic. Dice/Funkturm/Bürohaus same as Variant A.
-
-Registry entries: one per temperature (`T=0.3`, `T=0.7`, `T=2.0`) × fast/balanced/deep.
-
-### 3.C — Variant C: Greedy Tree (`mcts-v1-greedy-tree`)
-
-**Hypothesis:** UCT exploration overhead not worth it; argmax over ROI suffices for `BuyDecisionNode`. All other nodes (ChanceNode, FunkturmNode, BürohausNode, DiceChoiceNode) keep UCT. Rollout = uniform random (same as v1).
-
-### 3.D — Variant D: Depth-Limited + Heuristic Eval (`mcts-v1-depth-limited`)
-
-**Hypothesis:** Shorter rollouts with a good heuristic outperform full-game rollouts for the same iteration budget.
-
-Rollouts stop after `extra.maxRolloutDepth` turns (default `"10"`). Score at cutoff = `WinProbability.computeBaselineWinProb(state, perspective)`. Tree phase unchanged. Registry entries: `mcts-v1-depth3`, `-depth7`, `-depth10`.
-
-### 3.E — Variant E: Adaptive Budget (`mcts-v1-adaptive`)
-
-**Hypothesis:** Concentrating iterations on close races improves recommendation quality within the same budget.
-
-After initial survey of `config.iterations / 5` iterations, identify top-2 candidates. If within `extra.closeMargin` (default `"0.03"`), split remaining budget evenly. If one leads by > `extra.splitThreshold` (default `"0.06"`), allocate 70% to second place. Tree and rollout unchanged (same as v1).
+Variants A-E each change one dimension from v1 base. See CHANGELOG.md Phase 3 for full specs.
 
 | Task | Description | Status |
 |------|-------------|--------|
@@ -179,23 +127,12 @@ Build the engine comparison and validation framework. Used both during Phase 3 v
 | 7.14 | Fix supply count: starter cards (Weizenfeld, Bäckerei) are separate from the 6-copy market pool. Added `GameState.starterCopies()`, fixed SupplyTracker, GameSession, GameStateBuilder, MatchRunner, and frontend sidebar. | done |
 | 7.15 | Expectimax engine: deterministic minimax with probability-weighted chance nodes, alpha-beta pruning, correct 15-branch doubles handling, two leaf evaluation variants (winprob/composite). 4 registry entries (d1/d2 × winprob/composite). | done |
 | 7.16 | Document known engine issues: MCTS ChanceNode doubles bug, 5 heuristic choices in Calcs/WinProbability. Added to ARCHITECTURE.md Section 7. | done |
-| 7.17 | Full documentation deep clean: cross-document accuracy audit of all docs (README, NORTH-STAR, PLAN, CLAUDE, ARCHITECTURE, CHANGELOG, ARCHIVE). | pending |
+| 7.17 | Full documentation deep clean: cross-document accuracy audit of all docs (README, NORTH-STAR, PLAN, CLAUDE, ARCHITECTURE, CHANGELOG, ARCHIVE). | done |
 | 7.18 | Fix MCTS ChanceNode doubles bug: split even 2d6 rolls into doubles/non-doubles branches with correct probabilities. | pending |
+| 7.19 | Remove legacy code: delete `gui/` (13 files) and `logic/` (18 files), migrate tests from `logic.probability.*` to `core.*`/`calcs.*`, port GameSimulator and RankingOptions to `calcs/`, fix `Player.addProject()` usage in GameSimulator and GameSession, remove 4 unused methods from active code. | done |
 
 ---
 
 ## Completed (Pre-Restructure)
 
-All items from the old codebase are documented in `CHANGELOG.md`. Key milestones:
-
-- All 19 base-game cards implemented in `get_I`
-- Full roll resolution with correct income order (red -> blue/green -> purple)
-- Analytical EV, ROI, variance, softmax win probability
-- Monte Carlo simulation with Boltzmann policy
-- Expectimax rollout tree (Stufe 1/2/3)
-- Swing UI with turn tracking, card details, ranking, assistant, rollout tabs
-- DE/EN localization
-- Game session persistence (.mkoro files)
-- 224 passing tests
-
-These components serve as the foundation. Game rules and core data model carry forward; strategy and UI layers are rebuilt.
+All pre-restructure work is documented in `CHANGELOG.md` and `ARCHIVE.md`. Key milestones: 19 cards, full income resolution, analytical EV/ROI/variance, MC simulation, Swing UI, DE/EN localization, session persistence. These components served as the foundation — game rules carried forward; strategy and UI were rebuilt.

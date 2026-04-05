@@ -1,209 +1,150 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Instructions for AI agents working on this codebase. Read this entire file before writing any code.
 
-## Vision
+## Core Principles
 
-See `NORTH-STAR.md` for the single source of truth on what this program is, how it should work, and why.
-See `PLAN.md` for the phased implementation backlog.
-See `CHANGELOG.md` for the history of what was built and why.
-See `ARCHITECTURE.md` for mathematical formulas, card rule conventions, and design rationales.
+These are non-negotiable. Every change must respect them.
 
-## Project Goal
+1. **Mathematical correctness over convenience.** No approximations unless the user explicitly approves. Every formula must be analytically verifiable.
+2. **Layer boundaries are sacred.** The 5-layer architecture exists to prevent coupling. Never violate import direction: Core <- Calcs <- Engines <- Interface <- UI (HTTP only).
+3. **Ask before deciding.** If a design choice is ambiguous (algorithm, layer placement, UI layout, engine behavior), stop and ask the user. Do not guess.
+4. **Code must compile and tests must pass.** Never commit broken code. Run relevant test sections before committing.
+5. **No dead code, no bloat.** No commented-out code, no unused methods, no speculative features. Do only what was asked.
+6. **Protect invariants.** Read Javadoc warnings before modifying any file. Many bugs have been fixed here — the comments explain why code works the way it does.
 
-A local desktop Machi Koro decision support tool. Given any game state, recommend the optimal purchase with a transparent explanation of why — powered by pluggable simulation engines (MCTS-based) and presented through a clean web UI.
+## Project
 
-The program answers one question: **"What should I buy right now, and why?"**
+Local desktop Machi Koro decision support tool. One question: **"What should I buy right now, and why?"**
 
-## Architecture Overview
+| Doc | Purpose |
+|-----|---------|
+| `NORTH-STAR.md` | Source of truth: vision, architecture, UI spec. Change only with user approval. |
+| `PLAN.md` | Backlog. Mark tasks done when completed. |
+| `ARCHITECTURE.md` | Formulas, card rules, data model rationales, known engine issues. |
+| `CHANGELOG.md` | What was built and why. |
+| `ARCHIVE.md` | Index of purged code with commit hashes. |
 
-The codebase follows a 5-layer architecture (see NORTH-STAR.md Section 6.1 for full detail):
+## Architecture
 
 ```
-UI (Web SPA) → Interface (orchestration) → Simulation Engines → Standard Calcs → Core (game rules)
+UI (React 19 SPA) --HTTP--> Interface --> Engines --> Calcs --> Core
 ```
 
-- **Core** — pure game rules: `GameState`, `Player`, `Project`, `ProjectLoader`, card income (`get_I`), dice resolution, turn order, win condition. No strategy, no opinions.
-- **Standard Calcs** — reusable, version-agnostic math: EV, ROI, probability distributions, variance, plus 11 advanced metrics (Sharpe, Sortino, Kelly, VaR/CVaR, HHI, entropy, IG, ETW, tempo, urgency, roll correlation). Any engine can call these.
-- **Simulation Engines** — pluggable strategy implementations (9 engine classes with 32 configurations: 6 MCTS variants, 1 Flat Monte Carlo, 1 Heuristic EV, 1 Expectimax). Each implements `SimulationEngine` interface and returns ranked purchase options with scores, structured explanations, and metrics.
-- **Interface** — orchestration layer: engine registry (JSON with 32 entries), request routing, result formatting, pre-computation cache.
-- **UI** — web SPA (React 19 + TypeScript + Vite 8 + Tailwind CSS 4) talking to a local Java HTTP API (20 endpoints). 17 components, 8 hooks, DE/EN localization.
+| Layer | Package | Responsibility |
+|-------|---------|----------------|
+| Core | `core/` | Game rules: state, cards, dice, income, turn order, win condition. No strategy. |
+| Calcs | `calcs/` | Reusable math: EV, ROI, variance, 11 advanced metrics. Stateless. |
+| Engines | `engine/` | 9 engine classes, 32 registry configs. Returns ranked options + explanations. |
+| Interface | `iface/` | Engine registry (JSON), routing, result formatting. |
+| Server | `server/` | Java HTTP API (20 endpoints), session management, pre-computation. |
+| H2H | `h2h/` | Engine comparison: match runner, tournament, game logging. |
+| UI | `web/` | React 19 + TypeScript + Vite 8 + Tailwind CSS 4. 17 components, 8 hooks, DE/EN. |
 
-### Current State
-
-The restructure is complete (Phases 1–6 done). The 5-layer architecture is fully implemented and operational:
-
-- **Core** layer (`core/` package): `GameState`, `Player`, `Project`, `ProjectLoader`, `CardIncome`, `RollResolver`, `BürohausLogic`, `GameSession`, `GameSessionPersistence`, `TurnRecord`
-- **Standard Calcs** layer (`calcs/` package): `Calcs` (all metrics), `WinProbability`, `RankEntry`
-- **Engines** layer (`engine/` package): `MctsV1Engine` (base) + 5 variants (A–E), `FlatMcEngine` (pure sampling), `HeuristicEvEngine` (formula-based), `ExpectimaxEngine` (deterministic minimax), `TurnPlan` (full-turn decision extraction + static plans for non-MCTS), `mcts/` subpackage with all tree node types, rollout policies, `SupplyTracker`, `MctsTree`
-- **Interface** layer (`iface/` package): `EngineOrchestrator`, `EngineRegistry`, `EngineRegistryEntry`
-- **H2H** layer (`h2h/` package): `MatchRunner` (parallel game execution, seat swapping), `MatchConfig`, `GameLog`/`TurnLog`/`MatchResult`, `H2hResultStore` (JSON persistence), `H2hMain` (single-match CLI), `TournamentRunner`/`TournamentResult`/`TournamentMain` (round-robin tournament with leaderboard + matrix)
-- **Server** layer (`server/` package): `ApiServer` with 20 endpoints, `SessionManager`, `PrecomputeCache`, `H2hHandler`, `EvaluateHandler`, `SessionInsightsHandler`, plus various session handlers
-- **UI** layer (`web/` directory): React 19 SPA with full game dashboard, structured explanation UI, insights panel, pre-computation integration
-
-**Legacy code** (`logic/`, `gui/`): The old Swing UI and probability calc code remain in the repo but are unused. The web SPA is the current app.
+**Engine classes:** MctsV1 (base) + 5 variants (A-E), FlatMcEngine, HeuristicEvEngine, ExpectimaxEngine.
 
 ## Build & Run
 
-Java 17+, `gson-2.11.0.jar` (bundled in repo root). Node.js 18+ for web frontend.
-
-**Manual compile (from repo root):**
 ```bash
+# Compile
 javac -cp "src:gson-2.11.0.jar" -d out $(find src -name "*.java")
-```
 
-**Run web server (serves API + built SPA on localhost:8080):**
-```bash
+# Web server (API + SPA on localhost:8080)
 java -cp "out:src:gson-2.11.0.jar" server.ServerMain
-```
 
-**Web frontend development:**
-```bash
-cd web && npm install && npm run dev    # Vite dev server (hot reload)
-cd web && npm run build                 # Production build → web/dist/
-```
+# Frontend dev
+cd web && npm install && npm run dev
 
-**Run legacy Swing UI (deprecated, kept for reference):**
-```bash
-java -cp "out:src:gson-2.11.0.jar" logic.Main
-```
-
-**Run tests:**
-```bash
-java -cp "out:src:gson-2.11.0.jar" Tests.RuntimeTester
-```
-
-**Run specific test section (preferred):**
-```bash
+# Tests (ALWAYS use --section, never run full suite)
 java -cp "out:src:gson-2.11.0.jar" Tests.RuntimeTester --section "Section Name"
-```
 
-**Testing rule: Never run the full test suite.** Always use `--section` to run only the section(s) relevant to the code you changed. The full suite includes slow MCTS engine tests and benchmarks that take minutes. Assume all unrelated sections pass. If you changed code in multiple areas, run each relevant section separately.
+# H2H match
+java -cp "out:src:gson-2.11.0.jar" h2h.H2hMain --engineA mcts-v1-fast --engineB mcts-v1-depth3 --games 100
 
-Note: `src` must be on the runtime classpath so `ClassLoader.getResourceAsStream` can locate `resources/jsons/projects.json`.
-
-**Run H2H engine match (CLI):**
-```bash
-java -cp "out:src:gson-2.11.0.jar" h2h.H2hMain --engineA mcts-v1-fast --engineB mcts-v1-depth3 --games 100 --iterations 500
-```
-
-**Run round-robin tournament (CLI):**
-```bash
+# Tournament
 java -cp "out:src:gson-2.11.0.jar" h2h.TournamentMain --tier fast --games 50
-java -cp "out:src:gson-2.11.0.jar" h2h.TournamentMain --engines mcts-v1-fast,mcts-v1-depth3 --games 20
-java -cp "out:src:gson-2.11.0.jar" h2h.TournamentMain --unleashed --games 30  # all 24 engines
 ```
 
-## Committing Changes
+**`src` must be on the runtime classpath** for `ClassLoader.getResourceAsStream` to find `resources/jsons/projects.json`.
 
-Commit at logical boundaries — not after every single edit, and not only at the very end of a large session. A good commit represents one coherent, self-contained improvement.
+## Testing Rules
 
-**Commit when:**
-- A new method or class is fully implemented and working
-- A bug is fixed (fix + any related test/doc update in one commit)
-- A refactor is complete and the code still compiles/runs correctly
-- A set of related small changes form a meaningful unit
-- Documentation is updated as a follow-up to a prior code commit
+- **Never run the full test suite.** It takes minutes. Always use `--section "Name"` for only the sections relevant to your change.
+- 470+ assertions across 30 sections. Supports `--section` (substring, case-insensitive) and `--test` filters.
+- After changing code, compile and run the relevant section(s). Assume unrelated sections pass.
+- If you changed code in multiple areas, run each relevant section separately.
 
-**Do not commit:**
-- After changing only one line or fixing a typo, unless it fixes a real bug
-- Mid-implementation when the code is broken or stubs are unfinished
-- Everything at once at the end of a long session — split by logical unit first
-
-**Commit message style:** one concise imperative sentence describing *what* changed and *why*. No bullet lists, no "misc changes".
-
-Always ask the user before pushing to remote.
-
-## Working with the User
-
-**Always ask before making design decisions.** If the intended behavior, algorithm choice, or architecture is unclear, stop and ask rather than guessing. This applies to:
-- Which layer a new piece of code belongs in
-- How to model opponent behavior in MCTS rollouts
-- Any trade-off between calculation speed and accuracy
-- Whether to add a new engine version or modify an existing one
-- UI layout and interaction design choices
-
-## Coding Practices
-
-**Mathematical correctness first.** Every formula must be analytically verified — no approximations unless explicitly approved.
+## Coding Standards
 
 **Performance:**
-- Prefer closed-form expressions over loops where possible (precompute dice probabilities as constants).
-- Cache repeated sub-computations (e.g. `PlayerStats` per player per `GameState`).
-- Avoid object allocation in hot paths.
-- Deep-copy `GameState` only when the simulation mutates it; pass read-only state directly otherwise.
+- Closed-form over loops. Precompute dice probabilities as constants.
+- Cache sub-computations (`PlayerStats`, `RolloutEvCache`).
+- No object allocation in hot paths. Reuse arrays.
+- `gs.copy()` only when mutation is needed; pass read-only state otherwise.
 
-**Immutability:** `Project` is immutable — keep it that way. `Player` and `GameState` are mutable for simulation; always use `gs.copy()` before mutating in hypothetical scenarios.
+**Immutability:** `Project` is immutable (id-based equals). `Player`/`GameState` are mutable for simulation — always copy before hypothetical mutation.
 
-**Naming:** Use descriptive names. Short abbreviations like `f_c`, `a_c`, `p_c` in `get_I` are acceptable only because it's a dense math function — everywhere else use full names.
+**Naming:** Descriptive names everywhere. Abbreviations (`f_c`, `a_c`, `p_c`) allowed only in `get_I` (dense math function).
 
-**No dead code:** Don't leave commented-out code or unused methods.
+**Layer imports:**
+- Core: no imports from calcs, engines, or UI.
+- Calcs: may import Core only.
+- Engines: may import Calcs and Core.
+- Interface/Server: may import Engines, Calcs, and Core.
+- UI: communicates via HTTP only.
 
-**Layer boundaries:** Respect the 5-layer separation. Core must not import from engines or UI. Standard Calcs must not import from engines or UI. Engines may import from Standard Calcs and Core. Interface may import from Engines, Standard Calcs, and Core. UI communicates with Interface via HTTP only.
+## Critical Invariants
 
-## After Every Completed Task
+These have caused bugs before. Read the Javadoc before touching these areas.
 
-After finishing any task, update all of the following that are affected by the change:
+1. **Starter cards are separate from market supply.** Weizenfeld/Backerei given at game start do NOT reduce the 6-copy market pool. See `GameState.starterCopies()`, `SupplyTracker.fromGameState()`.
+2. **Purple cards excluded from Burohaus swap candidates.** Both own and opponent sides. See `BurohausLogic.findCandidates()`.
+3. **Income order: Red -> Blue & Green -> Purple.** Counter-clockwise for multiple red claims. See `RollResolver.computeAllDeltasForRoll()`.
+4. **MCTS ChanceNode doubles bug (UNFIXED).** All even 2d6 sums treated as 100% doubles. Affects tree phase only; rollouts correctly use `d1==d2`. See ARCHITECTURE.md Section 7.1.
+5. **Purple card uniqueness.** Max 1 copy per player per purple card type. Enforced in all rollouts, BuyDecisionNode, and GameSession.
+6. **Funkturm once per turn.** TurnPlan forces "keep" on FunkturmNode after reroll.
+7. **Score convention.** MCTS scores are always from the perspective of the root `playerIndex` (1.0 = win, 0.0 = loss).
 
-**`NORTH-STAR.md`** — Update if:
-- A fundamental design decision changes (architecture, UI model, engine contract)
-- Only with user approval — this is the source of truth
+## Committing
 
-**`PLAN.md`** — Update if:
-- A task is completed (mark it done)
-- A new task is discovered (add it to the appropriate phase)
-- A task's scope changes
+Commit at logical boundaries. One coherent, self-contained improvement per commit.
 
-**`README.md`** — Update if:
-- New features are added or removed
-- The build/run instructions change
-- The project structure changes meaningfully
+- Imperative sentence describing *what* and *why*. No bullet lists.
+- Never commit broken code or incomplete stubs.
+- Always ask the user before pushing to remote.
 
-**`CLAUDE.md`** (this file) — Update if:
-- The architecture changes (new layers, new patterns)
-- New coding conventions are established
-- The status of preserved vs. replaced components changes
+## After Every Task
 
-**`ARCHITECTURE.md`** — Update if:
-- A formula changes or a new one is added
-- A card rule convention changes
-- A new data model design decision is made
+Update all docs affected by your change, in the same commit:
 
-**`CHANGELOG.md`** — Update when:
-- A meaningful feature or fix is shipped
+- `PLAN.md` — mark tasks done, add discovered tasks.
+- `CHANGELOG.md` — if a meaningful feature or fix was shipped.
+- `README.md` — if features, build instructions, or structure changed.
+- `CLAUDE.md` — if architecture or conventions changed.
+- `ARCHITECTURE.md` — if formulas, card rules, or data model changed.
+- `ARCHIVE.md` — if code was purged.
+- **Javadoc** — if a method's signature, behavior, or contract changed.
+- **Verify accuracy** — ensure counts, versions, and descriptions in docs match code.
 
-**`ARCHIVE.md`** — Update when:
-- Code is purged (add entry with description + commit hash)
+## Self-Improvement Protocol
 
-**Javadoc in source files** — Update if:
-- A method's parameters, return value, or behavior changes
-- A new public/package-private method is added
+After each interaction, reflect on whether your approach was optimal:
 
-**`projects.json`** — Update if:
-- A new card is added or an existing card's data is corrected
+- **If the user corrects you**, understand the root cause. Was it a doc gap, a wrong assumption, or ignoring an invariant? Fix the source (doc/comment/Javadoc) so it doesn't recur.
+- **If a test fails unexpectedly**, investigate the invariant you violated before trying to fix the symptom.
+- **If you're unsure**, ask. The cost of asking is always lower than the cost of a wrong change.
+- **Track patterns.** If you notice a recurring issue, add a comment/Javadoc warning at the source.
 
-Do not batch documentation updates — apply them as part of the same change that modifies the code.
+## Card Rules (Quick Reference)
 
-### Documentation Accuracy Audit
+19 base-game cards in `src/resources/jsons/projects.json`. German IDs.
 
-At the end of each phase (or when the user requests it), perform a cross-document accuracy audit:
+| Color | Triggers | Key rule |
+|-------|----------|----------|
+| `blau` | All turns | Bank pays owner |
+| `grun` | Own turn | Bank pays owner |
+| `rot` | Others' turns | Roller pays owner (clamped to roller's coins) |
+| `lila` | Own turn, unique | Special effects (Stadion, Fernsehsender, Burohaus) |
+| `gelb` | Landmarks | Bahnhof (dice choice), EKZ (+1 store), FZP (doubles bonus), FT (reroll choice) |
 
-1. **Read every doc file** — README.md, NORTH-STAR.md, PLAN.md, CLAUDE.md, ARCHITECTURE.md, CHANGELOG.md, ARCHIVE.md
-2. **Verify against the codebase** — Check that version numbers, file counts, component lists, API endpoint counts, test counts, tech stack versions, and behavioral descriptions match the actual code
-3. **Fix contradictions** — When code and docs disagree, determine the ground truth from tests and source code, then fix the docs
-4. **Check task statuses** — Ensure completed work is marked done in PLAN.md
-5. **Update MEMORY.md** — Ensure session memory reflects the current state
-
-## Card Rules Reference
-
-All 19 base-game cards are in `src/resources/jsons/projects.json`.
-
-**Colors:** `blau` (triggers all turns), `rot` (triggers on others' turns), `grün` (own turn only), `lila` (own turn only, unique), `gelb` (Großprojekte/landmarks).
-
-**Categories for synergy:** `food` (Markthalle), `animal` (Molkerei), `production` (Möbelfabrik).
-
-**Großprojekte:** Bahnhof (1d6/2d6 choice — engine decision), Einkaufszentrum (+1 coin per green/red store), Freizeitpark (doubles bonus turn — game rule), Funkturm (re-roll choice — engine decision).
-
-**`get_I` convention:** Uses German string IDs matching `projects.json` keys. `bürohaus` returns 0 (swap is non-monetary; EV handled separately).
-
-**Income order:** Red → Blue & Green → Purple. Counter-clockwise for multiple red claims.
+Categories: `food` (Markthalle synergy), `animal` (Molkerei), `production` (Mobelfabrik).

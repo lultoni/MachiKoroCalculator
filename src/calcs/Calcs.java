@@ -1,5 +1,6 @@
 package calcs;
 
+import core.BürohausLogic;
 import core.CardIncome;
 import core.GameState;
 import core.Player;
@@ -9,6 +10,8 @@ import core.RollResolver;
 
 import engine.mcts.SupplyTracker;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.function.IntToDoubleFunction;
 
 /**
@@ -689,71 +692,82 @@ public final class Calcs {
         return WinProbability.estimateWinProbDelta(gs, playerIndex, candidate, 0);
     }
 
-    // -------------------------------------------------------------------------
-    // values_per_r_per_p — income matrix
-    // -------------------------------------------------------------------------
-
     /**
-     * Returns a matrix of per-roll income values for each player/color combination.
-     * Used for the income matrix display.
-     *
-     * @param playerProjects list of project arrays per player (2–4 players)
-     * @param playerCoins    current coin counts indexed by player
-     * @return (players×4) × 12 matrix of income values per roll per player-color combination
+     * Estimates win-probability delta using MC simulations when mcSimulations > 0,
+     * otherwise uses analytical softmax.
      */
-    public static int[][] values_per_r_per_p(java.util.ArrayList<Project[]> playerProjects,
-                                              int[] playerCoins) {
-        if (playerProjects == null || playerProjects.size() < 2 || playerProjects.size() > 4) {
-            throw new IllegalArgumentException("Player count must be between 2 and 4.");
+    public static double estimateWinProbDelta(GameState gs, int playerIndex,
+                                               Project candidate, int searchDepth, int mcSimulations) {
+        if (mcSimulations > 0) {
+            double baseline = GameSimulator.mcWinRate(gs, playerIndex, mcSimulations);
+            GameState stateAfter = gs.copy();
+            stateAfter.getPlayers()[playerIndex].getOwned_projects().add(candidate);
+            double afterBuy = GameSimulator.mcWinRate(stateAfter, playerIndex, mcSimulations);
+            return afterBuy - baseline;
         }
-
-        final int PROJECT_COLORS = 4;
-        final int ROWS_PER_COLOR = playerProjects.size();
-        final int ROLL_COUNT = 12;
-
-        int[][] valueMatrix = new int[PROJECT_COLORS * ROWS_PER_COLOR][ROLL_COUNT];
-
-        for (int playerIndex = 0; playerIndex < playerProjects.size(); playerIndex++) {
-            Project[] projects = playerProjects.get(playerIndex);
-            int ownCoins = playerCoins[playerIndex];
-            int[] otherCoins = CardIncome.buildOpponentCoins(playerCoins, playerIndex);
-
-            boolean hasEB = false;
-            int fCount = 0, aCount = 0, pCount = 0;
-            for (Project p : projects) {
-                if ("einkaufszentrum".equals(p.getId())) hasEB = true;
-                switch (p.getCategory()) {
-                    case "food"       -> fCount++;
-                    case "animal"     -> aCount++;
-                    case "production" -> pCount++;
-                }
-            }
-
-            for (Project project : projects) {
-                int colorIdx = getProjectColorIndex(project.getColor());
-                if (colorIdx < 0 || colorIdx >= PROJECT_COLORS) continue;
-                int vmRow = colorIdx * ROWS_PER_COLOR + playerIndex;
-                if (vmRow >= valueMatrix.length) continue;
-
-                for (int roll = 1; roll <= ROLL_COUNT; roll++) {
-                    valueMatrix[vmRow][roll - 1] += CardIncome.get_I(
-                            roll, project.getId(), true, hasEB,
-                            fCount, aCount, pCount, ownCoins, otherCoins);
-                }
-            }
-        }
-        return valueMatrix;
+        return WinProbability.estimateWinProbDelta(gs, playerIndex, candidate, 0);
     }
 
-    private static int getProjectColorIndex(String color) {
-        return switch (color) {
-            case "blau" -> 0;
-            case "rot"  -> 1;
-            case "grün" -> 2;
-            case "lila" -> 3;
-            case "gelb" -> 4;
-            default     -> -1;
-        };
+    /**
+     * Runs numSims Monte Carlo simulations and returns player's win rate.
+     * Delegates to {@link GameSimulator#mcWinRate}.
+     */
+    public static double mcWinRate(GameState state, int playerIndex, int numSims) {
+        return GameSimulator.mcWinRate(state, playerIndex, numSims);
+    }
+
+    /** Delegates to {@link BürohausLogic#executeSwap}. */
+    public static void executeBürohausSwap(GameState state, int playerIndex) {
+        BürohausLogic.executeSwap(state, playerIndex);
+    }
+
+    /**
+     * Ranks all affordable purchase candidates by discounted ROI, sorted descending.
+     * Includes landmarks and excludes already-owned purple cards.
+     *
+     * @param gs          current game state
+     * @param playerIndex the buying player
+     * @param opts        ranking options (horizon, discount, MC, win-prob flags)
+     * @return sorted list, best purchase first; empty if nothing affordable
+     */
+    public static ArrayList<RankEntry> rankPurchasableProjects(GameState gs, int playerIndex,
+                                                                RankingOptions opts) {
+        Player player = gs.getPlayers()[playerIndex];
+        int coins = player.getCoins();
+
+        ArrayList<Project> candidates = new ArrayList<>(gs.getUnbuilt_projects());
+        for (Project p : ProjectLoader.getAllProjects()) {
+            if (p.isIs_grossprojekt() && !player.hasProject(p.getId())) {
+                candidates.add(p);
+            }
+        }
+
+        ArrayList<RankEntry> results = new ArrayList<>();
+        for (Project candidate : candidates) {
+            if (candidate.getCost() > coins) continue;
+            if (candidate.isIs_grossprojekt() && player.hasProject(candidate.getId())) continue;
+            if ("lila".equals(candidate.getColor()) && player.hasProject(candidate.getId())) continue;
+
+            RankEntry entry = roiOverHorizon(gs, playerIndex, candidate,
+                    opts.horizonTurns, opts.discountFactor);
+
+            if ("bürohaus".equals(candidate.getId())) {
+                GameState stateWithBuerohaus = gs.copy();
+                stateWithBuerohaus.getPlayers()[playerIndex].getOwned_projects().add(candidate);
+                String note = BürohausLogic.swapNote(stateWithBuerohaus, playerIndex);
+                entry.notes = note;
+            }
+
+            if (opts.includeWinProbDelta) {
+                entry.winProbDelta = WinProbability.estimateWinProbDelta(
+                        gs, playerIndex, candidate, opts.turnsElapsed);
+            }
+
+            results.add(entry);
+        }
+
+        results.sort(Comparator.comparingDouble((RankEntry e) -> e.roiOverHorizon).reversed());
+        return results;
     }
 
     // =========================================================================

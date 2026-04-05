@@ -83,15 +83,6 @@ public class GameStateBuilder {
     }
 
     /**
-     * Removes a project from a player's owned list (no-op if not owned).
-     */
-    public GameStateBuilder removeProject(int playerIndex, String projectId) {
-        checkIndex(playerIndex);
-        owned.get(playerIndex).removeIf(p -> p.getId().equals(projectId));
-        return this;
-    }
-
-    /**
      * Builds and returns the {@link GameState}.
      * The unbuilt_projects pool is all non-landmark card types where purchased copies
      * (total owned minus starter copies) is less than {@link GameState#SUPPLY_PER_CARD}.

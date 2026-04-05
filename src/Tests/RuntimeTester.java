@@ -1,7 +1,10 @@
 package Tests;
 
-import logic.probability.*;
+import core.*;
 import calcs.Calcs;
+import calcs.GameSimulator;
+import calcs.RankEntry;
+import calcs.RankingOptions;
 import iface.EngineRegistry;
 import iface.EngineRegistryEntry;
 import iface.EngineOrchestrator;
@@ -416,10 +419,10 @@ public class RuntimeTester {
         GameState gs4 = GameState.initial(4);
         RankingOptions opts = new RankingOptions();
         // Warm-up
-        ProbabilityCalc.rankPurchasableProjects(gs4, 0, opts);
+        Calcs.rankPurchasableProjects(gs4, 0, opts);
         long start = System.currentTimeMillis();
         int BENCH_RUNS = 200;
-        for (int i = 0; i < BENCH_RUNS; i++) ProbabilityCalc.rankPurchasableProjects(gs4, 0, opts);
+        for (int i = 0; i < BENCH_RUNS; i++) Calcs.rankPurchasableProjects(gs4, 0, opts);
         long elapsed = System.currentTimeMillis() - start;
         System.out.println(" - " + BENCH_RUNS + " runs: " + elapsed + " ms total, "
                 + String.format("%.2f", (double) elapsed / BENCH_RUNS) + " ms/call");
@@ -429,9 +432,9 @@ public class RuntimeTester {
         System.out.println("\nBenchmark: MC simulation (1000 sims, 4-player starting state)");
         GameState gs4mc = GameState.initial(4);
         // Warm-up
-        ProbabilityCalc.mcWinRate(gs4mc, 0, 10);
+        Calcs.mcWinRate(gs4mc, 0, 10);
         long mcStart = System.currentTimeMillis();
-        ProbabilityCalc.mcWinRate(gs4mc, 0, 1000);
+        Calcs.mcWinRate(gs4mc, 0, 1000);
         long mcElapsed = System.currentTimeMillis() - mcStart;
         System.out.println(" - 1000 sims: " + mcElapsed + " ms");
         assertTrue("1000 MC sims < 2000 ms (was " + mcElapsed + " ms)", mcElapsed < 2000);
@@ -441,9 +444,9 @@ public class RuntimeTester {
         gsMcDelta.getPlayers()[0].setCoins(10);
         Project benchCard = ProjectLoader.getProject("bergwerk").orElseThrow();
         // Warm-up
-        ProbabilityCalc.estimateWinProbDelta(gsMcDelta, 0, benchCard, 0, 10);
+        Calcs.estimateWinProbDelta(gsMcDelta, 0, benchCard, 0, 10);
         long mcDeltaStart = System.currentTimeMillis();
-        ProbabilityCalc.estimateWinProbDelta(gsMcDelta, 0, benchCard, 0, 500);
+        Calcs.estimateWinProbDelta(gsMcDelta, 0, benchCard, 0, 500);
         long mcDeltaElapsed = System.currentTimeMillis() - mcDeltaStart;
         System.out.println(" - 500 sims: " + mcDeltaElapsed + " ms");
         assertTrue("estimateWinProbDelta 500 MC sims < 2000 ms (was " + mcDeltaElapsed + " ms)",
@@ -547,130 +550,130 @@ public class RuntimeTester {
 
     private static void test_probability_tables_sum_to_1() {
         double sum1 = 0.0;
-        for (int r = 1; r <= 6; r++) sum1 += ProbabilityCalc.get_P1(r);
+        for (int r = 1; r <= 6; r++) sum1 += Calcs.get_P1(r);
         assertDoubleEq("P1 sums to 1.0", 1.0, sum1, 1e-12);
 
         double sum2 = 0.0;
-        for (int r = 2; r <= 12; r++) sum2 += ProbabilityCalc.get_P2(r);
+        for (int r = 2; r <= 12; r++) sum2 += Calcs.get_P2(r);
         assertDoubleEq("P2 sums to 1.0", 1.0, sum2, 1e-12);
 
-        assertDoubleEq("P1 out-of-range returns 0", 0.0, ProbabilityCalc.get_P1(7), 1e-12);
-        assertDoubleEq("P2 out-of-range returns 0", 0.0, ProbabilityCalc.get_P2(1), 1e-12);
+        assertDoubleEq("P1 out-of-range returns 0", 0.0, Calcs.get_P1(7), 1e-12);
+        assertDoubleEq("P2 out-of-range returns 0", 0.0, Calcs.get_P2(1), 1e-12);
     }
 
     private static void test_get_I_weizenfeld() {
         // Blue: activates on roll 1, pays 1 regardless of oop
         assertEq("weizenfeld roll=1 pays 1", 1,
-                ProbabilityCalc.get_I(1, "weizenfeld", false, false, 0, 0, 0, 5, new int[]{5}));
+                Calcs.get_I(1, "weizenfeld", false, false, 0, 0, 0, 5, new int[]{5}));
         assertEq("weizenfeld roll=1 oop=true pays 1", 1,
-                ProbabilityCalc.get_I(1, "weizenfeld", true, false, 0, 0, 0, 5, new int[]{5}));
+                Calcs.get_I(1, "weizenfeld", true, false, 0, 0, 0, 5, new int[]{5}));
         assertEq("weizenfeld roll=2 pays 0", 0,
-                ProbabilityCalc.get_I(2, "weizenfeld", true, false, 0, 0, 0, 5, new int[]{5}));
+                Calcs.get_I(2, "weizenfeld", true, false, 0, 0, 0, 5, new int[]{5}));
     }
 
     private static void test_get_I_baeckerei_green() {
         // Green: only activates when oop=true (owner's turn); roll 2 or 3
         assertEq("bäckerei roll=2 oop=true pays 1", 1,
-                ProbabilityCalc.get_I(2, "bäckerei", true, false, 0, 0, 0, 5, new int[]{}));
+                Calcs.get_I(2, "bäckerei", true, false, 0, 0, 0, 5, new int[]{}));
         assertEq("bäckerei roll=3 oop=true pays 1", 1,
-                ProbabilityCalc.get_I(3, "bäckerei", true, false, 0, 0, 0, 5, new int[]{}));
+                Calcs.get_I(3, "bäckerei", true, false, 0, 0, 0, 5, new int[]{}));
         assertEq("bäckerei roll=2 oop=false pays 0", 0,
-                ProbabilityCalc.get_I(2, "bäckerei", false, false, 0, 0, 0, 5, new int[]{}));
+                Calcs.get_I(2, "bäckerei", false, false, 0, 0, 0, 5, new int[]{}));
         assertEq("bäckerei roll=2 eb=true pays 2", 2,
-                ProbabilityCalc.get_I(2, "bäckerei", true, true, 0, 0, 0, 5, new int[]{}));
+                Calcs.get_I(2, "bäckerei", true, true, 0, 0, 0, 5, new int[]{}));
     }
 
     private static void test_get_I_bauernhof_blue() {
         // Blue: activates on roll 2 for everyone
         assertEq("bauernhof roll=2 oop=false pays 1", 1,
-                ProbabilityCalc.get_I(2, "bauernhof", false, false, 0, 0, 0, 5, new int[]{}));
+                Calcs.get_I(2, "bauernhof", false, false, 0, 0, 0, 5, new int[]{}));
         assertEq("bauernhof roll=3 pays 0", 0,
-                ProbabilityCalc.get_I(3, "bauernhof", true, false, 0, 0, 0, 5, new int[]{}));
+                Calcs.get_I(3, "bauernhof", true, false, 0, 0, 0, 5, new int[]{}));
     }
 
     private static void test_get_I_cafe_red_inability_to_pay() {
         // Red: oop=false (roller pays), returns negative. Clamped to available coins.
         assertEq("café roll=3 oop=false costs -1", -1,
-                ProbabilityCalc.get_I(3, "café", false, false, 0, 0, 0, 5, new int[]{}));
+                Calcs.get_I(3, "café", false, false, 0, 0, 0, 5, new int[]{}));
         assertEq("café roll=3 eb=true costs -2", -2,
-                ProbabilityCalc.get_I(3, "café", false, true, 0, 0, 0, 5, new int[]{}));
+                Calcs.get_I(3, "café", false, true, 0, 0, 0, 5, new int[]{}));
         assertEq("café roll=3 only 0 coins pays 0", 0,
-                ProbabilityCalc.get_I(3, "café", false, false, 0, 0, 0, 0, new int[]{}));
+                Calcs.get_I(3, "café", false, false, 0, 0, 0, 0, new int[]{}));
         assertEq("café oop=true returns 0 (owner doesn't pay self)", 0,
-                ProbabilityCalc.get_I(3, "café", true, false, 0, 0, 0, 5, new int[]{}));
+                Calcs.get_I(3, "café", true, false, 0, 0, 0, 5, new int[]{}));
         // Inability to pay full: has 1 coin, owes 2 (with eb) → pays 1
         assertEq("café roll=3 eb=true 1 coin pays -1 (capped)", -1,
-                ProbabilityCalc.get_I(3, "café", false, true, 0, 0, 0, 1, new int[]{}));
+                Calcs.get_I(3, "café", false, true, 0, 0, 0, 1, new int[]{}));
     }
 
     private static void test_get_I_familienrestaurant_red() {
         assertEq("familienrestaurant roll=9 costs -2", -2,
-                ProbabilityCalc.get_I(9, "familienrestaurant", false, false, 0, 0, 0, 5, new int[]{}));
+                Calcs.get_I(9, "familienrestaurant", false, false, 0, 0, 0, 5, new int[]{}));
         assertEq("familienrestaurant roll=10 costs -2", -2,
-                ProbabilityCalc.get_I(10, "familienrestaurant", false, false, 0, 0, 0, 5, new int[]{}));
+                Calcs.get_I(10, "familienrestaurant", false, false, 0, 0, 0, 5, new int[]{}));
         assertEq("familienrestaurant roll=9 eb=true costs -3", -3,
-                ProbabilityCalc.get_I(9, "familienrestaurant", false, true, 0, 0, 0, 5, new int[]{}));
+                Calcs.get_I(9, "familienrestaurant", false, true, 0, 0, 0, 5, new int[]{}));
         assertEq("familienrestaurant roll=8 pays 0", 0,
-                ProbabilityCalc.get_I(8, "familienrestaurant", false, false, 0, 0, 0, 5, new int[]{}));
+                Calcs.get_I(8, "familienrestaurant", false, false, 0, 0, 0, 5, new int[]{}));
     }
 
     private static void test_get_I_stadion_all_opponents() {
         // Stadion: takes 2 from EACH opponent (no total cap)
         // 3 opponents with 5 coins each → 3×2 = 6
         assertEq("stadion 3 opponents 5 coins each → 6", 6,
-                ProbabilityCalc.get_I(6, "stadion", true, false, 0, 0, 0, 0,
+                Calcs.get_I(6, "stadion", true, false, 0, 0, 0, 0,
                         new int[]{5, 5, 5}));
         // 1 opponent with 1 coin → min(2,1) = 1
         assertEq("stadion 1 opponent 1 coin → 1", 1,
-                ProbabilityCalc.get_I(6, "stadion", true, false, 0, 0, 0, 0,
+                Calcs.get_I(6, "stadion", true, false, 0, 0, 0, 0,
                         new int[]{1}));
         // 2 opponents: one has 0, one has 5 → 0+2 = 2
         assertEq("stadion 2 opponents 0+5 coins → 2", 2,
-                ProbabilityCalc.get_I(6, "stadion", true, false, 0, 0, 0, 0,
+                Calcs.get_I(6, "stadion", true, false, 0, 0, 0, 0,
                         new int[]{0, 5}));
         // oop=false: not owner, returns 0
         assertEq("stadion oop=false returns 0", 0,
-                ProbabilityCalc.get_I(6, "stadion", false, false, 0, 0, 0, 0,
+                Calcs.get_I(6, "stadion", false, false, 0, 0, 0, 0,
                         new int[]{5, 5}));
     }
 
     private static void test_get_I_fernsehsender_richest_only() {
         // Fernsehsender: takes min(5, richest_opponent_coins) from ONE opponent
         assertEq("fernsehsender richest has 10 coins → 5", 5,
-                ProbabilityCalc.get_I(6, "fernsehsender", true, false, 0, 0, 0, 0,
+                Calcs.get_I(6, "fernsehsender", true, false, 0, 0, 0, 0,
                         new int[]{10, 3}));
         assertEq("fernsehsender richest has 3 coins → 3", 3,
-                ProbabilityCalc.get_I(6, "fernsehsender", true, false, 0, 0, 0, 0,
+                Calcs.get_I(6, "fernsehsender", true, false, 0, 0, 0, 0,
                         new int[]{3, 1}));
         assertEq("fernsehsender all opponents have 0 → 0", 0,
-                ProbabilityCalc.get_I(6, "fernsehsender", true, false, 0, 0, 0, 0,
+                Calcs.get_I(6, "fernsehsender", true, false, 0, 0, 0, 0,
                         new int[]{0, 0}));
     }
 
     private static void test_get_I_molkerei_synergy() {
         // Molkerei: roll 7, oop=true, pays 3 per animal card
         assertEq("molkerei 2 animal cards → 6", 6,
-                ProbabilityCalc.get_I(7, "molkerei", true, false, 0, 2, 0, 5, new int[]{}));
+                Calcs.get_I(7, "molkerei", true, false, 0, 2, 0, 5, new int[]{}));
         assertEq("molkerei 0 animal cards → 0", 0,
-                ProbabilityCalc.get_I(7, "molkerei", true, false, 0, 0, 0, 5, new int[]{}));
+                Calcs.get_I(7, "molkerei", true, false, 0, 0, 0, 5, new int[]{}));
         assertEq("molkerei roll=8 → 0", 0,
-                ProbabilityCalc.get_I(8, "molkerei", true, false, 0, 2, 0, 5, new int[]{}));
+                Calcs.get_I(8, "molkerei", true, false, 0, 2, 0, 5, new int[]{}));
     }
 
     private static void test_get_I_markthalle_synergy() {
         // Markthalle: roll 11 or 12, oop=true, pays 2 per food card
         assertEq("markthalle 3 food cards roll=11 → 6", 6,
-                ProbabilityCalc.get_I(11, "markthalle", true, false, 3, 0, 0, 5, new int[]{}));
+                Calcs.get_I(11, "markthalle", true, false, 3, 0, 0, 5, new int[]{}));
         assertEq("markthalle 3 food cards roll=12 → 6", 6,
-                ProbabilityCalc.get_I(12, "markthalle", true, false, 3, 0, 0, 5, new int[]{}));
+                Calcs.get_I(12, "markthalle", true, false, 3, 0, 0, 5, new int[]{}));
         assertEq("markthalle roll=10 → 0", 0,
-                ProbabilityCalc.get_I(10, "markthalle", true, false, 3, 0, 0, 5, new int[]{}));
+                Calcs.get_I(10, "markthalle", true, false, 3, 0, 0, 5, new int[]{}));
     }
 
     private static void test_get_I_moebelfabrik_synergy() {
         // Möbelfabrik: roll 8, oop=true, pays 3 per production card
         assertEq("möbelfabrik 2 production cards → 6", 6,
-                ProbabilityCalc.get_I(8, "möbelfabrik", true, false, 0, 0, 2, 5, new int[]{}));
+                Calcs.get_I(8, "möbelfabrik", true, false, 0, 0, 2, 5, new int[]{}));
     }
 
     private static void test_immediate_ev_weizenfeld_only() {
@@ -684,7 +687,7 @@ public class RuntimeTester {
         // Candidate: buy weizenfeld again (blue card, always available in pool conceptually)
         // For this test we just use a second weizenfeld as candidate
         Project weizenfeld = ProjectLoader.getProject("weizenfeld").orElseThrow();
-        double ev = ProbabilityCalc.immediateEV(gs, 0, weizenfeld, false);
+        double ev = Calcs.immediateEV(gs, 0, weizenfeld, false);
         // With 2 weizenfelds: EV_own_turn = 2*(1/6) = 0.333
         // But from player 1's weizenfeld: not included (own-turn only for blue is correct — wait,
         // blue triggers from the OWNER's perspective on own turn)
@@ -702,7 +705,7 @@ public class RuntimeTester {
         gs.getPlayers()[0].getOwned_projects().removeIf(p -> p.getId().equals("weizenfeld"));
 
         Project weizenfeld = ProjectLoader.getProject("weizenfeld").orElseThrow();
-        double ev = ProbabilityCalc.evPerRound(gs, 0, weizenfeld);
+        double ev = Calcs.evPerRound(gs, 0, weizenfeld);
         // Candidate is added: player 0 has 1 weizenfeld
         // Own turn: roll 1 → 1 coin (blue). EV = 1/6
         // Opponent turn: player 1 rolls, weizenfeld activates for player 0 too. EV = 1/6
@@ -716,7 +719,7 @@ public class RuntimeTester {
         gs.getPlayers()[0].getOwned_projects().clear();
 
         Project baeckerei = ProjectLoader.getProject("bäckerei").orElseThrow();
-        double ev = ProbabilityCalc.evPerRound(gs, 0, baeckerei);
+        double ev = Calcs.evPerRound(gs, 0, baeckerei);
         // Only own turn contributes: P(2)*1 + P(3)*1 = 1/6 + 1/6 = 1/3
         assertDoubleEq("evPerRound bäckerei (green) 2-player ≈ 0.333", 2.0 / 6.0, ev, 0.005);
     }
@@ -730,7 +733,7 @@ public class RuntimeTester {
         gs.getPlayers()[1].setCoins(10); // ensure opponent can always pay
 
         Project cafe = ProjectLoader.getProject("café").orElseThrow();
-        double ev = ProbabilityCalc.evPerRound(gs, 0, cafe);
+        double ev = Calcs.evPerRound(gs, 0, cafe);
         // Red only fires on opponent's turn: 1 turn in 2-player, P=1/6 → ≈ 0.167
         // Own turn: red does NOT fire → 0 from own turn
         assertDoubleEq("evPerRound café (red) 2-player ≈ 0.167", 1.0 / 6.0, ev, 0.005);
@@ -741,7 +744,7 @@ public class RuntimeTester {
         GameState gs = GameState.initial(4);
         gs.getPlayers()[0].setCoins(10);
         Project weizenfeld = ProjectLoader.getProject("weizenfeld").orElseThrow();
-        RankEntry entry = ProbabilityCalc.roiOverHorizon(gs, 0, weizenfeld, 10, 0.95);
+        RankEntry entry = Calcs.roiOverHorizon(gs, 0, weizenfeld, 10, 0.95);
         assertTrue("weizenfeld ROI > 0 over 10 turns", entry.roiOverHorizon > 0);
         assertTrue("weizenfeld evPerRound > 0", entry.evPerRound > 0);
         assertTrue("weizenfeld immediateEV >= 0", entry.immediateEV >= 0);
@@ -752,7 +755,7 @@ public class RuntimeTester {
         gs.getPlayers()[0].setCoins(10);
         for (Project p : ProjectLoader.getAllProjects()) {
             if (p.isIs_grossprojekt()) continue;
-            RankEntry entry = ProbabilityCalc.roiOverHorizon(gs, 0, p, 10, 0.95);
+            RankEntry entry = Calcs.roiOverHorizon(gs, 0, p, 10, 0.95);
             assertTrue("variance >= 0 for " + p.getId(), entry.variance >= -1e-9);
         }
     }
@@ -761,7 +764,7 @@ public class RuntimeTester {
         GameState gs = GameState.initial(4);
         gs.getPlayers()[0].setCoins(10);
         Project weizenfeld = ProjectLoader.getProject("weizenfeld").orElseThrow();
-        RankEntry entry = ProbabilityCalc.roiOverHorizon(gs, 0, weizenfeld, 10, 0.95);
+        RankEntry entry = Calcs.roiOverHorizon(gs, 0, weizenfeld, 10, 0.95);
         assertTrue("probNoIncomeOwnTurn in [0,1]",
                 entry.probNoIncomeOwnTurn >= 0 && entry.probNoIncomeOwnTurn <= 1.0);
         assertTrue("probNoIncomeRound in [0,1]",
@@ -773,7 +776,7 @@ public class RuntimeTester {
         // Give player enough coins to buy something
         gs.getPlayers()[0].setCoins(10);
         RankingOptions opts = new RankingOptions();
-        ArrayList<RankEntry> ranking = ProbabilityCalc.rankPurchasableProjects(gs, 0, opts);
+        ArrayList<RankEntry> ranking = Calcs.rankPurchasableProjects(gs, 0, opts);
         assertTrue("ranking is non-empty with 10 coins", !ranking.isEmpty());
     }
 
@@ -781,7 +784,7 @@ public class RuntimeTester {
         GameState gs = GameState.initial(4);
         gs.getPlayers()[0].setCoins(20);
         RankingOptions opts = new RankingOptions();
-        ArrayList<RankEntry> ranking = ProbabilityCalc.rankPurchasableProjects(gs, 0, opts);
+        ArrayList<RankEntry> ranking = Calcs.rankPurchasableProjects(gs, 0, opts);
         for (int i = 1; i < ranking.size(); i++) {
             assertTrue("ranking is sorted descending at index " + i,
                     ranking.get(i - 1).roiOverHorizon >= ranking.get(i).roiOverHorizon);
@@ -792,7 +795,7 @@ public class RuntimeTester {
         GameState gs = GameState.initial(4);
         gs.getPlayers()[0].setCoins(1); // can only afford cost-1 cards
         RankingOptions opts = new RankingOptions();
-        ArrayList<RankEntry> ranking = ProbabilityCalc.rankPurchasableProjects(gs, 0, opts);
+        ArrayList<RankEntry> ranking = Calcs.rankPurchasableProjects(gs, 0, opts);
         for (RankEntry e : ranking) {
             assertTrue("all ranked cards cost ≤ 1 coin: " + e.project.getId(),
                     e.project.getCost() <= 1);
@@ -806,7 +809,7 @@ public class RuntimeTester {
         Project weizenfeld = ProjectLoader.getProject("weizenfeld").orElseThrow();
         RankingOptions opts = new RankingOptions();
         opts.includeWinProbDelta = true;
-        ArrayList<RankEntry> ranking = ProbabilityCalc.rankPurchasableProjects(gs, 0, opts);
+        ArrayList<RankEntry> ranking = Calcs.rankPurchasableProjects(gs, 0, opts);
         // At least one card should have a non-negative winProbDelta
         boolean anyPositive = ranking.stream().anyMatch(e -> e.winProbDelta >= -0.01);
         assertTrue("at least one card has non-negative winProbDelta", anyPositive);
@@ -817,11 +820,11 @@ public class RuntimeTester {
         GameState gs = GameState.initial(4);
         double sum = 0.0;
         for (int i = 0; i < 4; i++) {
-            sum += ProbabilityCalc.computeBaselineWinProb(gs, i);
+            sum += Calcs.computeBaselineWinProb(gs, i);
         }
         assertDoubleEq("baseline win probs sum to 1.0 over 4 players", 1.0, sum, 1e-9);
         // In a symmetric state each player should have equal probability (~0.25)
-        double p0 = ProbabilityCalc.computeBaselineWinProb(gs, 0);
+        double p0 = Calcs.computeBaselineWinProb(gs, 0);
         assertTrue("each player in symmetric state has ~0.25 win prob (was " + p0 + ")",
                 Math.abs(p0 - 0.25) < 0.01);
     }
@@ -840,7 +843,7 @@ public class RuntimeTester {
         b.setPlayerName(2, "P2").setCoins(2, 5).addProject(2, "bergwerk");
         GameState gs = b.build();
         Project buerohaus = ProjectLoader.getProject("bürohaus").orElseThrow();
-        double ev = ProbabilityCalc.evPerRound(gs, 0, buerohaus);
+        double ev = Calcs.evPerRound(gs, 0, buerohaus);
         assertTrue("bürohaus evPerRound > 0 when opponents own high-EV cards (was " + ev + ")",
                 ev > 0);
     }
@@ -854,7 +857,7 @@ public class RuntimeTester {
         b.setPlayerName(1, "P1").setCoins(1, 5); // P1 owns nothing
         GameState gs = b.build();
         Project buerohaus = ProjectLoader.getProject("bürohaus").orElseThrow();
-        double ev = ProbabilityCalc.evPerRound(gs, 0, buerohaus);
+        double ev = Calcs.evPerRound(gs, 0, buerohaus);
         // Bürohaus swap = max(0, 0 - weizenfeld_EV) = 0 (clamped)
         // Weizenfeld blue EV (already owned) contributes; candidate itself (bürohaus) adds 0 coin-delta rolls.
         // The ev here will equal weizenfeld's evPerRound (since P0 already owns it and candidate adds bürohaus with 0 coin income).
@@ -872,7 +875,7 @@ public class RuntimeTester {
         GameState gs = b.build();
 
         RankingOptions opts = new RankingOptions();
-        ArrayList<RankEntry> ranking = ProbabilityCalc.rankPurchasableProjects(gs, 0, opts);
+        ArrayList<RankEntry> ranking = Calcs.rankPurchasableProjects(gs, 0, opts);
 
         RankEntry buerohausEntry = null;
         for (RankEntry e : ranking) {
@@ -895,7 +898,7 @@ public class RuntimeTester {
         b.setPlayerName(1, "P1").setCoins(1, 5).addProject(1, "bergwerk");
         GameState gs = b.build();
 
-        ProbabilityCalc.executeBürohausSwap(gs, 0);
+        Calcs.executeBürohausSwap(gs, 0);
 
         assertTrue("P0 now owns bergwerk after swap", gs.getPlayers()[0].hasProject("bergwerk"));
         assertTrue("P0 no longer owns weizenfeld after swap",
@@ -942,7 +945,7 @@ public class RuntimeTester {
         int sims = 300;
         double total = 0.0;
         for (int p = 0; p < 3; p++) {
-            total += ProbabilityCalc.mcWinRate(gs, p, sims);
+            total += Calcs.mcWinRate(gs, p, sims);
         }
         // Allow generous tolerance because timeouts (returned -1) are excluded from all players
         assertTrue("sum of mcWinRate over all players ≈ 1.0 (was " + total + ")",
@@ -955,7 +958,7 @@ public class RuntimeTester {
         RankingOptions opts = new RankingOptions();
         opts.includeWinProbDelta = true;
         opts.mcSimulations = 200;
-        ArrayList<RankEntry> ranking = ProbabilityCalc.rankPurchasableProjects(gs, 0, opts);
+        ArrayList<RankEntry> ranking = Calcs.rankPurchasableProjects(gs, 0, opts);
         assertTrue("MC ranking is non-empty", !ranking.isEmpty());
         for (RankEntry e : ranking) {
             assertTrue("winProbDelta in [-1, 1] for " + e.project.getId(),
@@ -1002,7 +1005,7 @@ public class RuntimeTester {
         b.setPlayerName(1, "P1").setCoins(1, 3).addProject(1, "weizenfeld");
         GameState gs = b.build();
         RankingOptions opts = new RankingOptions();
-        ArrayList<RankEntry> ranks = ProbabilityCalc.rankPurchasableProjects(gs, 0, opts);
+        ArrayList<RankEntry> ranks = Calcs.rankPurchasableProjects(gs, 0, opts);
         boolean stadionOffered = ranks.stream()
                 .anyMatch(e -> e.project.getId().equals("stadion"));
         assertTrue("rankPurchasableProjects does not offer stadion to player who already owns it",
@@ -1017,7 +1020,7 @@ public class RuntimeTester {
         b.setPlayerName(1, "P1").setCoins(1, 3).addProject(1, "weizenfeld");
         GameState gs = b.build();
         RankingOptions opts = new RankingOptions();
-        ArrayList<RankEntry> ranks = ProbabilityCalc.rankPurchasableProjects(gs, 0, opts);
+        ArrayList<RankEntry> ranks = Calcs.rankPurchasableProjects(gs, 0, opts);
         boolean bahnhofOffered = ranks.stream()
                 .anyMatch(e -> e.project.getId().equals("bahnhof"));
         assertTrue("rankPurchasableProjects does not offer bahnhof to player who already owns it",
@@ -1111,10 +1114,10 @@ public class RuntimeTester {
         b.setPlayerName(1, "P1").setCoins(1, 3).addProject(1, "weizenfeld");
         GameState gs = b.build();
 
-        logic.probability.GameSession session =
-                new logic.probability.GameSession(gs, new String[]{"P0", "P1"});
+        core.GameSession session =
+                new core.GameSession(gs, new String[]{"P0", "P1"});
         Project funkturm = ProjectLoader.getProject("funkturm").orElseThrow();
-        logic.probability.TurnRecord turn = new logic.probability.TurnRecord(0, 7, funkturm);
+        core.TurnRecord turn = new core.TurnRecord(0, 7, funkturm);
         session.applyTurn(turn);
 
         assertTrue("session.isFinished() after 4th landmark", session.isFinished());
@@ -1131,10 +1134,10 @@ public class RuntimeTester {
         b.setPlayerName(1, "P1").setCoins(1, 3).addProject(1, "weizenfeld");
         GameState gs = b.build();
 
-        logic.probability.GameSession session =
-                new logic.probability.GameSession(gs, new String[]{"P0", "P1"});
+        core.GameSession session =
+                new core.GameSession(gs, new String[]{"P0", "P1"});
         Project freizeitpark = ProjectLoader.getProject("freizeitpark").orElseThrow();
-        logic.probability.TurnRecord turn = new logic.probability.TurnRecord(0, 7, freizeitpark);
+        core.TurnRecord turn = new core.TurnRecord(0, 7, freizeitpark);
         session.applyTurn(turn);
 
         assertTrue("session.isFinished() is false after only 3 landmarks", !session.isFinished());
@@ -1241,31 +1244,32 @@ public class RuntimeTester {
 
     private static void test_starter_cards_allow_7_copies_in_builder() {
         // Each player starts with 1 weizenfeld/bäckerei as a starter card (outside the market).
-        // The market supplies 6 more copies. So a single player could own 1+6=7 in total.
-        // GameStateBuilder must allow up to 7 copies of weizenfeld and bäckerei.
+        // The market supplies 6 more copies. In a 2-player game, total possible = 2 + 6 = 8.
+        // GameStateBuilder must allow up to 8 copies of weizenfeld for a 2-player game.
         boolean threw = false;
         try {
             GameStateBuilder b = new GameStateBuilder(2);
             b.setPlayerName(0, "P0").setCoins(0, 0);
-            for (int i = 0; i < 7; i++) b.addProject(0, "weizenfeld");
+            for (int i = 0; i < 8; i++) b.addProject(0, "weizenfeld");
             b.setPlayerName(1, "P1").setCoins(1, 0);
         } catch (Exception ex) {
             threw = true;
         }
-        assertTrue("GameStateBuilder allows 7 copies of weizenfeld (starter + 6 market)", !threw);
+        assertTrue("GameStateBuilder allows 8 copies of weizenfeld (2 starters + 6 market)", !threw);
     }
 
     private static void test_starter_cards_7_copies_exhausts_unbuilt_pool() {
-        // If one player owns 7 weizenfeld (all 6 market copies + 1 starter),
-        // weizenfeld must NOT appear in the unbuilt pool (market exhausted).
+        // In a 2-player game, starterCopies("weizenfeld", 2) = 2.
+        // The market supplies 6 copies. To exhaust the pool: 2 starters + 6 market = 8 total.
+        // With 8 copies owned, purchased = 8 - 2 = 6 = SUPPLY_PER_CARD → removed from pool.
         GameStateBuilder b = new GameStateBuilder(2);
         b.setPlayerName(0, "P0").setCoins(0, 0);
-        for (int i = 0; i < 7; i++) b.addProject(0, "weizenfeld");
+        for (int i = 0; i < 8; i++) b.addProject(0, "weizenfeld");
         b.setPlayerName(1, "P1").setCoins(1, 0);
         GameState gs = b.build();
         boolean weizenInPool = gs.getUnbuilt_projects().stream()
                 .anyMatch(p -> p.getId().equals("weizenfeld"));
-        assertTrue("Weizenfeld removed from unbuilt pool when 7 copies owned (all market copies gone)",
+        assertTrue("Weizenfeld removed from unbuilt pool when 8 copies owned (2 starters + 6 market)",
                 !weizenInPool);
     }
 
@@ -1294,7 +1298,7 @@ public class RuntimeTester {
         b.setPlayerName(1, "P1").setCoins(1, 3).addProject(1, "weizenfeld");
         GameState gs = b.build();
         RankingOptions opts = new RankingOptions();
-        ArrayList<RankEntry> ranking = ProbabilityCalc.rankPurchasableProjects(gs, 0, opts);
+        ArrayList<RankEntry> ranking = Calcs.rankPurchasableProjects(gs, 0, opts);
         boolean bahnhofOffered = ranking.stream()
                 .anyMatch(e -> e.project.getId().equals("bahnhof"));
         assertTrue("bahnhof (GP, cost 4) is offered in ranking when player has 10 coins",
@@ -1309,7 +1313,7 @@ public class RuntimeTester {
         b.setPlayerName(1, "P1").setCoins(1, 3).addProject(1, "weizenfeld");
         GameState gs = b.build();
         RankingOptions opts = new RankingOptions();
-        ArrayList<RankEntry> ranking = ProbabilityCalc.rankPurchasableProjects(gs, 0, opts);
+        ArrayList<RankEntry> ranking = Calcs.rankPurchasableProjects(gs, 0, opts);
         boolean bahnhofOffered = ranking.stream()
                 .anyMatch(e -> e.project.getId().equals("bahnhof"));
         assertTrue("bahnhof is not offered again when player already owns it", !bahnhofOffered);
@@ -1512,7 +1516,7 @@ public class RuntimeTester {
         b.setPlayerName(1, "P1").setCoins(1, 3).addProject(1, "weizenfeld");
         GameState gs = b.build();
         RankingOptions opts = new RankingOptions();
-        ArrayList<RankEntry> ranking = ProbabilityCalc.rankPurchasableProjects(gs, 0, opts);
+        ArrayList<RankEntry> ranking = Calcs.rankPurchasableProjects(gs, 0, opts);
         // All 4 GPs should be in the ranking (bahnhof=4, einkaufszentrum=10, freizeitpark=16, funkturm=22)
         long gpCount = ranking.stream().filter(e -> e.project.isIs_grossprojekt()).count();
         assertTrue("All 4 GPs appear in ranking when player has 25 coins (found " + gpCount + ")",

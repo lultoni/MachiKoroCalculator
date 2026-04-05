@@ -1,6 +1,6 @@
 /** Setup screen — new game creation + saved games list. */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocale } from '../i18n/useLocale';
 import type { CreateSessionRequest, FromSnapshotRequest } from '../api/types';
 import * as api from '../api/client';
@@ -24,6 +24,11 @@ export function SetupScreen({ onStart, onLoad, onFromSnapshot, loading, error, o
   const [savesLoaded, setSavesLoaded] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [snapshotJson, setSnapshotJson] = useState('');
+
+  // Fetch save count on mount so the counter shows immediately
+  useEffect(() => {
+    api.listSaves().then(list => { setSaves(list); setSavesLoaded(true); }).catch(() => {});
+  }, []);
 
   const loadSaves = async () => {
     if (savesLoaded) return;

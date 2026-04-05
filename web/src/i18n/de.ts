@@ -65,6 +65,10 @@ const de: Record<string, string> = {
   // Settings
   'settings.title': 'Einstellungen',
   'settings.engine': 'Engine',
+  'settings.groupBy': 'Gruppieren nach',
+  'settings.groupByClass': 'Engine-Klasse',
+  'settings.groupByTier': 'Tier',
+  'settings.groupByRating': 'Rating',
   'settings.mode': 'Modus',
   'settings.language': 'Sprache',
   'settings.autosave': 'Automatisch speichern',

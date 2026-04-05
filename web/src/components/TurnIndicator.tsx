@@ -1,4 +1,4 @@
-/** Turn indicator — shows active player, turn count, bonus turn badge. */
+/** Turn indicator — shows active player, turn/round count, bonus turn badge. */
 
 import { useLocale } from '../i18n/useLocale';
 import type { SessionJson } from '../api/types';
@@ -12,6 +12,7 @@ export function TurnIndicator({ session, userPlayerIndex }: Props) {
   const { t } = useLocale();
   const active = session.state.players[session.nextPlayerIndex];
   const isUserTurn = session.nextPlayerIndex === userPlayerIndex;
+  const round = Math.ceil(session.effectiveTurnCount / session.state.players.length) || 1;
 
   return (
     <div className="flex items-center gap-3 px-4 py-2 bg-machi-surface/50 border-b border-machi-border">
@@ -42,12 +43,17 @@ export function TurnIndicator({ session, userPlayerIndex }: Props) {
       {/* Spacer */}
       <div className="flex-1" />
 
-      {/* Turn + round label */}
-      <span className="text-sm text-machi-text-dim">
-        {t('turn.count', { n: session.effectiveTurnCount })}
-        {' · '}
-        {t('turn.round', { n: Math.ceil(session.effectiveTurnCount / session.state.players.length) || 1 })}
-      </span>
+      {/* Round + Turn counters */}
+      <div className="flex items-center gap-2 text-sm">
+        <span className="px-2 py-0.5 rounded bg-machi-accent/10 text-machi-text font-medium">
+          {t('turn.round', { n: round })}
+        </span>
+        <span className="text-machi-text-dim">
+          {t('turn.count', { n: session.effectiveTurnCount })}
+        </span>
+      </div>
+
+      {/* Active player label */}
       <span className="text-sm font-medium">
         {isUserTurn ? t('turn.your') : t('turn.opponent', { name: active.name })}
       </span>

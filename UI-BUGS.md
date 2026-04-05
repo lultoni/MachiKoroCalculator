@@ -40,3 +40,6 @@ All resolved bugs are documented in `CHANGELOG.md` under version 7.22 (UI Bug Sw
 | B23 | Autosave not working | Fixed — useEffect on effectiveTurnCount |
 | B24 | H2H single iterations field | Fixed — per-engine inline config editors with all params |
 | B25 | Engines unsorted by performance | Fixed — Glicko-2 ratings from H2H results, sorted in Settings |
+| B26 | Save counter shows 0 until clicked | Fixed — useEffect fetches saves on mount |
+| B27 | Round counter label not visible | Fixed — distinct badge styling for round counter |
+| B28 | Settings engine list crowded/unsorted | Fixed — collapsible groups with class/tier/rating grouping modes |

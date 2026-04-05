@@ -1,10 +1,12 @@
 /** Settings screen — engine, mode, language, autosave, user player selection. */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useLocale } from '../i18n/useLocale';
 import type { Settings } from '../hooks/useSettings';
 import type { EngineRegistryEntry, PlayerState, EngineRating } from '../api/types';
 import * as api from '../api/client';
+
+type GroupMode = 'class' | 'tier' | 'rating';
 
 interface Props {
   settings: Settings;
@@ -17,31 +19,66 @@ export function SettingsScreen({ settings, update, players, onClose }: Props) {
   const { t, locale, setLocale } = useLocale();
   const [engines, setEngines] = useState<EngineRegistryEntry[]>([]);
   const [ratings, setRatings] = useState<Record<string, EngineRating>>({});
+  const [groupMode, setGroupMode] = useState<GroupMode>('class');
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     api.getEngines().then(setEngines).catch(() => {});
     api.h2hRatings().then(r => setRatings(r.ratings)).catch(() => {});
   }, []);
 
-  // Group engines by class, sort within each group by rating (rated first, desc)
-  const grouped = engines.reduce<Record<string, EngineRegistryEntry[]>>((acc, e) => {
-    (acc[e.engineClass] ??= []).push(e);
-    return acc;
-  }, {});
+  // Auto-expand the group containing the selected engine
+  useEffect(() => {
+    if (engines.length === 0) return;
+    const selected = engines.find(e => e.id === settings.engineId);
+    if (selected) {
+      const groupKey = groupMode === 'class' ? selected.engineClass
+        : groupMode === 'tier' ? selected.tier
+        : ratingBucket(ratings[selected.id]);
+      setExpandedGroups(new Set([groupKey]));
+    }
+  }, [engines, groupMode, settings.engineId]);
 
-  // Sort each group by rating (rated engines first, descending; unrated at bottom)
-  for (const list of Object.values(grouped)) {
-    list.sort((a, b) => {
-      const ra = ratings[a.id];
-      const rb = ratings[b.id];
-      if (ra && rb) return rb.rating - ra.rating;
-      if (ra) return -1;
-      if (rb) return 1;
-      return 0;
+  // Group engines
+  const groups = useMemo(() => {
+    const map: Record<string, EngineRegistryEntry[]> = {};
+    for (const e of engines) {
+      const key = groupMode === 'class' ? e.engineClass
+        : groupMode === 'tier' ? e.tier
+        : ratingBucket(ratings[e.id]);
+      (map[key] ??= []).push(e);
+    }
+    // Sort within each group by rating descending (rated first)
+    for (const list of Object.values(map)) {
+      list.sort((a, b) => {
+        const ra = ratings[a.id];
+        const rb = ratings[b.id];
+        if (ra && rb) return rb.rating - ra.rating;
+        if (ra) return -1;
+        if (rb) return 1;
+        return 0;
+      });
+    }
+    // Sort group keys
+    const sorted = Object.entries(map);
+    if (groupMode === 'tier') {
+      const order: Record<string, number> = { fast: 0, balanced: 1, deep: 2 };
+      sorted.sort((a, b) => (order[a[0]] ?? 99) - (order[b[0]] ?? 99));
+    } else if (groupMode === 'rating') {
+      const order: Record<string, number> = { 'High (1600+)': 0, 'Mid (1400–1600)': 1, 'Low (<1400)': 2, 'Unrated': 3 };
+      sorted.sort((a, b) => (order[a[0]] ?? 99) - (order[b[0]] ?? 99));
+    }
+    return sorted;
+  }, [engines, ratings, groupMode]);
+
+  const toggleGroup = (key: string) => {
+    setExpandedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
     });
-  }
+  };
 
-  // Selected engine details
   const selectedEngine = engines.find(e => e.id === settings.engineId);
   const selectedRating = selectedEngine ? ratings[selectedEngine.id] : undefined;
 
@@ -62,45 +99,94 @@ export function SettingsScreen({ settings, update, players, onClose }: Props) {
         </div>
 
         {/* Engine */}
-        <div className="space-y-1.5">
-          <label className="text-sm text-machi-text-dim">{t('settings.engine')}</label>
-          {Object.entries(grouped).map(([cls, list]) => (
-            <div key={cls}>
-              <div className="text-xs text-machi-text-dim/60 uppercase tracking-wider mt-2 mb-1">{cls}</div>
-              <div className="flex flex-wrap gap-1.5">
-                {list.map(e => {
-                  const r = ratings[e.id];
-                  return (
-                    <button
-                      key={e.id}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                        settings.engineId === e.id
-                          ? 'bg-machi-accent text-machi-bg'
-                          : 'border border-machi-border text-machi-text-dim hover:text-machi-text hover:border-machi-text-dim'
-                      }`}
-                      onClick={() => update({ engineId: e.id })}
-                      title={`${e.description}${r ? `\nRating: ${Math.round(r.rating)} ±${Math.round(r.rd)} (${r.matchCount} matches)` : ''}`}
-                    >
-                      {e.id}
-                      {e.isDefault && ' ★'}
-                      {r && (
-                        <span className="ml-1 opacity-70 text-[10px]">
-                          {Math.round(r.rating)}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="text-sm text-machi-text-dim">{t('settings.engine')}</label>
+            {/* Group-by switcher */}
+            <div className="flex items-center gap-1 text-[10px]">
+              <span className="text-machi-text-dim/60 mr-1">{t('settings.groupBy')}:</span>
+              {(['class', 'tier', 'rating'] as const).map(mode => (
+                <button
+                  key={mode}
+                  className={`px-2 py-0.5 rounded transition-all ${
+                    groupMode === mode
+                      ? 'bg-machi-accent/20 text-machi-accent font-medium'
+                      : 'text-machi-text-dim hover:text-machi-text'
+                  }`}
+                  onClick={() => setGroupMode(mode)}
+                >
+                  {t(`settings.groupBy${mode.charAt(0).toUpperCase() + mode.slice(1)}`)}
+                </button>
+              ))}
             </div>
-          ))}
+          </div>
+
+          {/* Collapsible groups */}
+          {groups.map(([groupKey, list]) => {
+            const expanded = expandedGroups.has(groupKey);
+            const hasSelected = list.some(e => e.id === settings.engineId);
+            return (
+              <div key={groupKey} className="rounded-lg border border-machi-border/50 overflow-hidden">
+                <button
+                  className={`w-full px-3 py-2 flex items-center justify-between text-left transition-colors ${
+                    hasSelected ? 'bg-machi-accent/5' : 'hover:bg-machi-bg/50'
+                  }`}
+                  onClick={() => toggleGroup(groupKey)}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-machi-text-dim/60 w-4">
+                      {expanded ? '▾' : '▸'}
+                    </span>
+                    <span className="text-xs uppercase tracking-wider text-machi-text-dim font-medium">
+                      {groupKey}
+                    </span>
+                    <span className="text-[10px] text-machi-text-dim/50">
+                      ({list.length})
+                    </span>
+                  </div>
+                  {hasSelected && (
+                    <span className="text-[10px] text-machi-accent font-medium">
+                      {settings.engineId}
+                    </span>
+                  )}
+                </button>
+                {expanded && (
+                  <div className="px-3 pb-2 flex flex-wrap gap-1.5">
+                    {list.map(e => {
+                      const r = ratings[e.id];
+                      return (
+                        <button
+                          key={e.id}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                            settings.engineId === e.id
+                              ? 'bg-machi-accent text-machi-bg'
+                              : 'border border-machi-border text-machi-text-dim hover:text-machi-text hover:border-machi-text-dim'
+                          }`}
+                          onClick={() => update({ engineId: e.id })}
+                          title={`${e.description}${r ? `\nRating: ${Math.round(r.rating)} ±${Math.round(r.rd)} (${r.matchCount} matches)` : ''}`}
+                        >
+                          {e.id}
+                          {e.isDefault && ' ★'}
+                          {r && (
+                            <span className="ml-1 opacity-70 text-[10px]">
+                              {Math.round(r.rating)}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
           {engines.length === 0 && (
             <p className="text-xs text-machi-text-dim animate-pulse">Loading engines...</p>
           )}
 
           {/* Selected engine details */}
           {selectedEngine && (
-            <div className="mt-3 p-3 rounded-lg bg-machi-bg/50 border border-machi-border/50 space-y-1.5">
+            <div className="p-3 rounded-lg bg-machi-bg/50 border border-machi-border/50 space-y-1.5">
               <div className="text-xs font-medium text-machi-text">{selectedEngine.id}</div>
               <div className="text-xs text-machi-text-dim">{selectedEngine.description}</div>
               <div className="flex flex-wrap gap-2 text-[10px]">
@@ -184,4 +270,12 @@ export function SettingsScreen({ settings, update, players, onClose }: Props) {
       </div>
     </div>
   );
+}
+
+/** Bucket an engine's rating for the "rating" group mode. */
+function ratingBucket(r: EngineRating | undefined): string {
+  if (!r) return 'Unrated';
+  if (r.rating >= 1600) return 'High (1600+)';
+  if (r.rating >= 1400) return 'Mid (1400–1600)';
+  return 'Low (<1400)';
 }

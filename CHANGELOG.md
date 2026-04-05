@@ -6,6 +6,21 @@ Implementation history: what was built, why, and which design decisions were mad
 
 ## Phase 7: Iteration
 
+### 7.26 — UI Bug Fixes: Save Counter, Round Label, Settings Groups
+
+**B26 — Save counter shows 0 until clicked:** `SetupScreen` fetched saves lazily (on click only). Added `useEffect` on mount to fetch saves immediately, matching `SaveLoadMenu`'s pattern.
+
+**B27 — Round counter label not visible:** Round and turn counters were in a single dim span. Split into distinct elements: round gets its own badge with `bg-machi-accent/10` background, turn counter stays dim secondary text.
+
+**B28 — Settings engine selector rework:** Replaced flat 32-button grid with collapsible accordion groups. Three switchable grouping modes via `GroupMode` union type:
+- **Engine Class** — groups by engine class (MctsV1, FlatMc, etc.)
+- **Tier** — groups by fast/balanced/deep
+- **Rating** — groups by Glicko-2 bucket (High 1600+, Mid 1400–1600, Low <1400, Unrated)
+
+Auto-expands the group containing the currently selected engine. Within groups, engines sorted by rating descending (rated first). Group headers show count and selected engine indicator.
+
+New i18n keys: `settings.groupBy`, `settings.groupByClass`, `settings.groupByTier`, `settings.groupByRating` (DE+EN).
+
 ### 7.25 — Per-Engine H2H Config + Glicko-2 Ratings + File Cleanup
 
 **File relocation:** Moved stray root files to proper locations — `h2h-results.json` → `data/`, scraped card JSONs → `scripts/`, removed `.iml` from tracking. Updated all references in `H2hResultStore`, `H2hMain`, Python scripts.

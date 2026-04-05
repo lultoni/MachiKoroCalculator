@@ -65,6 +65,10 @@ const en: Record<string, string> = {
   // Settings
   'settings.title': 'Settings',
   'settings.engine': 'Engine',
+  'settings.groupBy': 'Group by',
+  'settings.groupByClass': 'Engine Class',
+  'settings.groupByTier': 'Tier',
+  'settings.groupByRating': 'Rating',
   'settings.mode': 'Mode',
   'settings.language': 'Language',
   'settings.autosave': 'Autosave',

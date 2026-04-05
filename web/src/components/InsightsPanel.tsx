@@ -23,14 +23,24 @@ export function InsightsPanel({ insights, loading, projects, language }: Props) 
 
   if (!insights) return null;
 
-  const maxEtw = Math.max(...insights.playerInsights.map(p => isFinite(p.etw) ? p.etw : 0), 1);
+  const sortedInsights = [...insights.playerInsights].sort((a, b) => {
+    const ae = isFinite(a.etw) ? a.etw : 999;
+    const be = isFinite(b.etw) ? b.etw : 999;
+    return ae - be; // closest to winning first
+  });
+  const maxEtw = Math.max(...sortedInsights.map(p => isFinite(p.etw) ? p.etw : 0), 1);
 
   return (
     <div className="bg-machi-surface rounded-xl border border-machi-border p-4 space-y-4">
       {/* ETW bars */}
       <div className="space-y-2">
-        <h4 className="text-xs text-machi-text-dim uppercase tracking-wider">{t('insights.etw')}</h4>
-        {insights.playerInsights.map((pi, i) => {
+        <h4
+          className="text-xs text-machi-text-dim uppercase tracking-wider cursor-help"
+          title="Estimated Turns to Win — how many turns until a player can buy all remaining landmarks at their current income rate"
+        >
+          {t('insights.etw')}
+        </h4>
+        {sortedInsights.map((pi, i) => {
           const barWidth = isFinite(pi.etw) && maxEtw > 0 ? Math.min(100, (pi.etw / maxEtw) * 100) : 0;
           return (
             <div key={i} className="flex items-center gap-2 text-xs">
@@ -51,13 +61,13 @@ export function InsightsPanel({ insights, loading, projects, language }: Props) 
 
       {/* Tempo + Portfolio EV */}
       <div className="flex gap-4 text-xs">
-        <div>
+        <div title="Turns ahead (+) or behind (-) compared to nearest opponent's ETW">
           <span className="text-machi-text-dim">{t('insights.tempo')}: </span>
           <span className={`font-mono font-medium ${insights.tempoAdvantage >= 0 ? 'text-machi-green' : 'text-machi-red'}`}>
             {insights.tempoAdvantage >= 0 ? '+' : ''}{insights.tempoAdvantage.toFixed(1)}
           </span>
         </div>
-        <div>
+        <div title="Expected coins per full round from your current card portfolio">
           <span className="text-machi-text-dim">{t('insights.portfolio')}: </span>
           <span className="font-mono font-medium text-machi-text">
             {insights.portfolioEV.toFixed(2)}/round

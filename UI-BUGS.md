@@ -34,11 +34,9 @@
 **Status:** FIXED | **Layer:** BE | **Priority:** P2
 **Fix:** Factor #8 (winProbDelta) was using category `"winRate"`, duplicating factor #1. Folded winProbDelta into factor #1's detail text instead.
 
-### B11: Ranked list columns not explained
-**Status:** OPEN | **Layer:** FE | **Priority:** P2
-**Problem:** Column headers have browser-native `title` tooltips but user may want more visible explanations.
-**Fix:** Add toggle-able legend or more visible tooltip styling.
-**Files:** `web/src/utils/columns.ts`, `web/src/components/RankedList.tsx`
+### ~~B11: Ranked list columns not explained~~ LOW PRIORITY
+**Status:** DEFERRED | **Layer:** FE | **Priority:** P2
+**Note:** Column headers already have `title` tooltips with descriptions. A custom tooltip component would be a nice-to-have but not blocking.
 
 ### ~~B12: "See all options" label is misleading~~ ✅ FIXED
 **Status:** FIXED | **Layer:** FE | **Priority:** P3
@@ -52,11 +50,9 @@
 **Status:** FIXED | **Layer:** FE | **Priority:** P2
 **Fix:** `PurchaseArea` affordable list now sorted by position in engine `options` array.
 
-### B15: Opponent view — ETW unclear, wrong sort order
-**Status:** OPEN | **Layer:** FE+BE | **Priority:** P2
-**Problem:** ETW calculation basis not explained in UI; ETW bars show furthest-from-winning at top; tempo/portfolio EV numbers not explained.
-**Depends on:** B16 (insights must update first)
-**Files:** `web/src/components/InsightsPanel.tsx`, `src/server/SessionInsightsHandler.java`
+### ~~B15: Opponent view — ETW unclear, wrong sort order~~ ✅ FIXED
+**Status:** FIXED | **Layer:** FE | **Priority:** P2
+**Fix:** ETW bars now sorted ascending (closest to winning first). Added tooltips explaining ETW, tempo, and portfolio EV calculations.
 
 ### ~~B16: Insights data doesn't update across rounds~~ ✅ FIXED
 **Status:** FIXED | **Layer:** FE | **Priority:** P1
@@ -78,11 +74,9 @@
 **Status:** FIXED | **Layer:** BE | **Priority:** P1
 **Fix:** MCTS `buildOptionsFromFullTurnTree` and legacy `buildOptions` now enrich results with unaffordable cards (non-landmarks + landmarks) not explored by the tree, using `WinProbability.computeBaselineWinProb` as the heuristic score. All 20 base-game cards now appear in the ranked list.
 
-### B20: Clicking factor category shows no useful extra info
-**Status:** OPEN | **Layer:** FE+BE | **Priority:** P2
-**Problem:** Expanding a factor shows `detail` text identical to summary — no additional context.
-**Fix:** Enrich detail with actual numbers, comparisons, percentile rankings.
-**Files:** `web/src/components/ExplanationFactors.tsx:70-73`, engine factor generation
+### ~~B20: Clicking factor category shows no useful extra info~~ LOW PRIORITY
+**Status:** DEFERRED | **Layer:** FE+BE | **Priority:** P2
+**Note:** Factor detail text now includes numeric breakdowns (rollout count, EV, variance, P(no income), tempo, etc.) after B09 fix. Further enrichment with percentile rankings deferred.
 
 ### ~~B21: Undo button doesn't say what it will undo~~ ✅ FIXED
 **Status:** FIXED | **Layer:** FE | **Priority:** P3

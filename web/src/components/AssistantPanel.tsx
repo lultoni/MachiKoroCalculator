@@ -155,7 +155,7 @@ export function AssistantPanel({ options, metricRanges, loading, projects, langu
       {showAll && (
         <div className="bg-machi-surface rounded-xl border border-machi-border p-3">
           <RankedList
-            options={visibleOptions}
+            options={liveOptions}
             metricRanges={metricRanges}
             projects={projects}
             language={language}

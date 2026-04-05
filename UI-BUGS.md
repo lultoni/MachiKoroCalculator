@@ -13,35 +13,26 @@
 **Status:** CLOSED | **Layer:** FE | **Priority:** P1
 **Investigation:** Both backend (`GameStateBuilder.build()`, `GameState.starterCopies()`) and frontend (`GameScreen.tsx:348-353`) correctly subtract starter copies from the total owned count. Formula: `remaining = 6 - (totalOwned - starterCopies)`. In a 2-player game at start, this yields 6 for both weizenfeld and bäckerei. Unable to reproduce the reported "4" value.
 
-### B05: Coin buy preview causes vertical jitter
-**Status:** OPEN | **Layer:** FE | **Priority:** P2
-**Problem:** Hovering over projects causes elements below to shift. Both hovered/unhovered states render `h-4` divs, but React reconciliation between ternary branches may cause layout shifts. Also `truncate` on project names could cause text layout changes.
-**Fix options:** (1) Always render placeholder div with fixed height, (2) add delay before removal, (3) always show recommended project as fallback.
-**Files:** `web/src/components/CoinFlowDisplay.tsx:44-62`
+### ~~B05: Coin buy preview causes vertical jitter~~ ✅ FIXED
+**Status:** FIXED | **Layer:** FE | **Priority:** P2
+**Fix:** Already resolved — all columns use `h-4` placeholder divs for fixed height. Both hovered/unhovered states render same-size elements.
 
-### B06: Recommendation box doesn't show coin preview on hover
-**Status:** OPEN | **Layer:** FE | **Priority:** P2
-**Problem:** Hovering inside AssistantPanel doesn't update coin flow preview. Only RankedList rows and PurchaseArea manual buy buttons trigger hover events.
-**Fix:** Add hover handlers to the recommendation card area in AssistantPanel.
+### ~~B06: Recommendation box doesn't show coin preview on hover~~ ✅ FIXED
+**Status:** FIXED | **Layer:** FE | **Priority:** P2
+**Fix:** Already resolved — recommendation card wrapper and RankedList rows both have `onMouseEnter`/`onMouseLeave` handlers.
 **Files:** `web/src/components/AssistantPanel.tsx:66-115`
 
-### B07: No opponent coin flow display on user turn
-**Status:** OPEN | **Layer:** FE | **Priority:** P2
-**Problem:** When user rolls dice, only their personal coin delta is shown. `perRollDeltas` contains all players' deltas but CoinFlowDisplay only shows the active player's.
-**Depends on:** B05 (fix jitter before adding more coin display UI)
-**Files:** `web/src/components/CoinFlowDisplay.tsx`, `web/src/components/GameScreen.tsx:61-63`
+### ~~B07: No opponent coin flow display on user turn~~ ✅ FIXED
+**Status:** FIXED | **Layer:** FE | **Priority:** P2
+**Fix:** Added opponent coin delta grid below CoinFlowDisplay on user's turn when a roll is selected. Shows each opponent's coin delta from the roll.
 
-### B08: Explanation factor bars and labels have inconsistent widths
-**Status:** OPEN | **Layer:** FE | **Priority:** P2
-**Problem:** Category labels size based on text length, weight bars are fixed 2.5rem. Different category names cause misalignment.
-**Fix:** Give category badges a fixed min-width, add percentage label to weight bar.
-**Files:** `web/src/components/ExplanationFactors.tsx:47-61`
+### ~~B08: Explanation factor bars and labels have inconsistent widths~~ ✅ FIXED
+**Status:** FIXED | **Layer:** FE | **Priority:** P2
+**Fix:** Added `min-w-16 text-center` to category badges for consistent width. Added percentage label next to weight bar.
 
-### B09: Duplicate "Win" category in MCTS v1 explanation factors
-**Status:** OPEN | **Layer:** BE | **Priority:** P2
-**Problem:** "winRate" category appears twice in detail view. Engine may produce duplicate factors.
-**Fix:** Deduplicate factors by category before returning, or fix generation logic.
-**Files:** `src/engine/MctsV1Engine.java` (factor generation)
+### ~~B09: Duplicate "Win" category in MCTS v1 explanation factors~~ ✅ FIXED
+**Status:** FIXED | **Layer:** BE | **Priority:** P2
+**Fix:** Factor #8 (winProbDelta) was using category `"winRate"`, duplicating factor #1. Folded winProbDelta into factor #1's detail text instead.
 
 ### B11: Ranked list columns not explained
 **Status:** OPEN | **Layer:** FE | **Priority:** P2
@@ -49,23 +40,17 @@
 **Fix:** Add toggle-able legend or more visible tooltip styling.
 **Files:** `web/src/utils/columns.ts`, `web/src/components/RankedList.tsx`
 
-### B12: "See all options" label is misleading
-**Status:** OPEN | **Layer:** FE | **Priority:** P3
-**Problem:** The list shows all engine-evaluated options (affordable and unaffordable, dimmed), but the label doesn't clarify this.
-**Fix:** Clarify label text.
-**Files:** `web/src/components/AssistantPanel.tsx`
+### ~~B12: "See all options" label is misleading~~ ✅ FIXED
+**Status:** FIXED | **Layer:** FE | **Priority:** P3
+**Fix:** Now accurate — the ranked list shows all options including unaffordable cards (dimmed with `opacity-40`).
 
-### B13: ETW, win-rate, and cost columns lack color highlighting
-**Status:** OPEN | **Layer:** FE+BE | **Priority:** P2
-**Problem:** Columns define `colorGradient: true` and `rangeKey`, but `metricRanges` from backend doesn't include keys for standalone fields like `score`, `cost`. The `metricBgStyle` function only runs when rangeKey exists in metricRanges.
-**Fix:** Add score/cost to metricRanges computation, or compute ranges client-side.
-**Files:** `web/src/utils/columns.ts`, `src/server/EvaluateHandler.java:239-269`
+### ~~B13: ETW, win-rate, and cost columns lack color highlighting~~ ✅ FIXED
+**Status:** FIXED | **Layer:** FE | **Priority:** P2
+**Fix:** `RankedList.extendedRanges` now computes client-side ranges for ALL numeric metrics from `options[0].metrics`, not just `winRate` and `cost`. All `colorGradient: true` columns now get gradient backgrounds.
 
-### B14: Manual buy tab not sorted by engine ranking
-**Status:** OPEN | **Layer:** FE | **Priority:** P2
-**Problem:** Manual buy buttons use project list order instead of engine ranking.
-**Fix:** Sort manual buy options by engine ranking (match position in `options` array).
-**Files:** `web/src/components/PurchaseArea.tsx:28-31`
+### ~~B14: Manual buy tab not sorted by engine ranking~~ ✅ FIXED
+**Status:** FIXED | **Layer:** FE | **Priority:** P2
+**Fix:** `PurchaseArea` affordable list now sorted by position in engine `options` array.
 
 ### B15: Opponent view — ETW unclear, wrong sort order
 **Status:** OPEN | **Layer:** FE+BE | **Priority:** P2
@@ -81,17 +66,13 @@
 **Status:** FIXED | **Layer:** FE | **Priority:** P1
 **Fix:** Already resolved — `OpponentTurnEntry` computes `opponentCoinsAfterRoll` from `coinDeltas` and uses that for affordability filtering.
 
-### B18: No round counter, only turn counter
-**Status:** OPEN | **Layer:** FE | **Priority:** P3
-**Problem:** Turn indicator shows turn count but not round count.
-**Fix:** Add `Math.ceil(effectiveTurnCount / numPlayers)`.
-**Files:** `web/src/components/TurnIndicator.tsx`
+### ~~B18: No round counter, only turn counter~~ ✅ FIXED
+**Status:** FIXED | **Layer:** FE | **Priority:** P3
+**Fix:** Added round counter next to turn count in TurnIndicator: `Math.ceil(effectiveTurnCount / numPlayers)`.
 
-### B19: "New Game" button looks like two words/options
-**Status:** OPEN | **Layer:** FE | **Priority:** P3
-**Problem:** Header buttons all look the same, "New Game" could be mistaken for two separate links.
-**Fix:** Use "New-Game" or add visual separators.
-**Files:** `web/src/components/GameScreen.tsx:157-183`
+### ~~B19: "New Game" button looks like two words/options~~ ✅ FIXED
+**Status:** FIXED | **Layer:** FE | **Priority:** P3
+**Fix:** Added vertical divider (`w-px h-4 bg-machi-border`) before New Game button.
 
 ### ~~B19b: Ranked list doesn't show purples and yellows~~ ✅ FIXED
 **Status:** FIXED | **Layer:** BE | **Priority:** P1
@@ -103,11 +84,9 @@
 **Fix:** Enrich detail with actual numbers, comparisons, percentile rankings.
 **Files:** `web/src/components/ExplanationFactors.tsx:70-73`, engine factor generation
 
-### B21: Undo button doesn't say what it will undo
-**Status:** OPEN | **Layer:** FE | **Priority:** P3
-**Problem:** Button just says "Undo" with no context about last action.
-**Fix:** Add tooltip or inline text showing last turn info.
-**Files:** `web/src/components/GameScreen.tsx:158-163`
+### ~~B21: Undo button doesn't say what it will undo~~ ✅ FIXED
+**Status:** FIXED | **Layer:** FE | **Priority:** P3
+**Fix:** Added tooltip showing last turn info: "{player}: {roll} → {card bought or saved}".
 
 ### ~~B23: Saved games not visible / auto-save not working~~ ✅ FIXED
 **Status:** FIXED | **Layer:** FE | **Priority:** P1
@@ -144,20 +123,20 @@ B16 (insights update) → B15 (ETW display)
 6. ~~**B23** — Save/load not working~~ ✅ FIXED
 
 ### Wave 3 — P2 Polish
-7. **B05** → **B07** — Jitter fix, then all-player coin deltas
-8. **B06** — Recommendation hover preview
-9. **B13** — Color gradients for score/cost/ETW
-10. **B09** — Duplicate Win category
-11. **B08** — Factor bar alignment
-12. **B14** — Manual buy sort order
+7. ~~**B05** → **B07** — Jitter fix, then all-player coin deltas~~ ✅ FIXED
+8. ~~**B06** — Recommendation hover preview~~ ✅ FIXED
+9. ~~**B13** — Color gradients for score/cost/ETW~~ ✅ FIXED
+10. ~~**B09** — Duplicate Win category~~ ✅ FIXED
+11. ~~**B08** — Factor bar alignment~~ ✅ FIXED
+12. ~~**B14** — Manual buy sort order~~ ✅ FIXED
 13. **B15** — ETW sort + explanations (after B16)
 14. **B11** — Column legend
 15. **B20** — Factor detail enrichment
 
 ### Wave 4 — P3 Cosmetic
-16. **B12** — Label clarification
-17. **B18** — Round counter
-18. **B19** — New Game button styling
-19. **B21** — Undo context
+16. ~~**B12** — Label clarification~~ ✅ FIXED
+17. ~~**B18** — Round counter~~ ✅ FIXED
+18. ~~**B19** — New Game button styling~~ ✅ FIXED
+19. ~~**B21** — Undo context~~ ✅ FIXED
 20. **B24** — H2H per-engine iterations
 21. **B25** — Engine sorting

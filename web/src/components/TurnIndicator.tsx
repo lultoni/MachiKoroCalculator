@@ -42,9 +42,11 @@ export function TurnIndicator({ session, userPlayerIndex }: Props) {
       {/* Spacer */}
       <div className="flex-1" />
 
-      {/* Turn label */}
+      {/* Turn + round label */}
       <span className="text-sm text-machi-text-dim">
         {t('turn.count', { n: session.effectiveTurnCount })}
+        {' · '}
+        {t('turn.round', { n: Math.ceil(session.effectiveTurnCount / session.state.players.length) || 1 })}
       </span>
       <span className="text-sm font-medium">
         {isUserTurn ? t('turn.your') : t('turn.opponent', { name: active.name })}

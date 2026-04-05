@@ -45,16 +45,21 @@ export function ExplanationFactors({ factors, fallback }: Props) {
             onClick={() => setExpanded(expanded === i ? null : i)}
           >
             {/* Category badge */}
-            <span className={`shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wider ${CATEGORY_COLORS[f.category] ?? 'bg-slate-500/20 text-slate-400'}`}>
+            <span className={`shrink-0 min-w-16 px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wider text-center ${CATEGORY_COLORS[f.category] ?? 'bg-slate-500/20 text-slate-400'}`}>
               {t(`factor.${f.category}`) || f.category}
             </span>
 
-            {/* Weight bar */}
-            <div className="shrink-0 w-10 h-1.5 rounded-full bg-machi-border/50 overflow-hidden">
-              <div
-                className="h-full rounded-full bg-machi-accent/70"
-                style={{ width: `${Math.round(f.weight * 100)}%` }}
-              />
+            {/* Weight bar + percentage */}
+            <div className="shrink-0 flex items-center gap-1">
+              <div className="w-10 h-1.5 rounded-full bg-machi-border/50 overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-machi-accent/70"
+                  style={{ width: `${Math.round(f.weight * 100)}%` }}
+                />
+              </div>
+              <span className="text-[9px] text-machi-text-dim/50 w-6 text-right font-mono">
+                {Math.round(f.weight * 100)}
+              </span>
             </div>
 
             {/* Summary */}

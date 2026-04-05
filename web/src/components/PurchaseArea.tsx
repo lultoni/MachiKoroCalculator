@@ -27,6 +27,7 @@ export function PurchaseArea({
   const { t } = useLocale();
 
   // Manual buy: list affordable cards (exclude already-owned purples and landmarks)
+  // Sorted by engine ranking when available (B14 fix)
   const affordable = coinsAfterRoll != null
     ? projects.projects.filter(p => {
         if (p.cost > coinsAfterRoll) return false;
@@ -35,6 +36,11 @@ export function PurchaseArea({
         // Landmarks: only if not already owned
         if (p.is_grossprojekt && ownedIds.includes(p.id)) return false;
         return true;
+      }).sort((a, b) => {
+        const idxA = options.findIndex(o => o.cardId === a.id);
+        const idxB = options.findIndex(o => o.cardId === b.id);
+        // Cards not in engine results sort to end
+        return (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB);
       })
     : [];
 

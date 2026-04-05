@@ -764,15 +764,19 @@ public class MctsV1Engine implements SimulationEngine {
         Project card = opt.project;
         boolean isSave = "_wait_".equals(card.getId());
 
-        // 1. Win rate factor (always present)
+        // 1. Win rate factor (always present; includes win probability delta if significant)
         {
             double val = parseMetricValue(opt.metrics, "winRate");
             double w = computeWeight(val, means.get("winRate"), ranges.get("winRate"));
             String visitStr = opt.metrics != null ? opt.metrics.getOrDefault("visitCount", "0") : "0";
+            double wpDelta = parseMetricValue(opt.metrics, "winProbDelta");
+            String wpDetail = !Double.isNaN(wpDelta) && Math.abs(wpDelta) > 1e-4
+                    ? String.format(" Heuristic win probability delta: %+.1f%%.", wpDelta * 100)
+                    : "";
             factors.add(new EngineResult.ExplanationFactor("winRate", w,
                     String.format("Win rate: %.1f%% (%s rollouts)", val * 100, visitStr),
                     String.format("MCTS simulation win rate across %s rollouts. "
-                            + "Mean across all options: %.1f%%.", visitStr, means.get("winRate") * 100)));
+                            + "Mean across all options: %.1f%%.%s", visitStr, means.get("winRate") * 100, wpDetail)));
         }
 
         // 2. Income factor (evPerRound)
@@ -853,16 +857,7 @@ public class MctsV1Engine implements SimulationEngine {
                             cost, coins, Math.max(0, coins - cost))));
         }
 
-        // 8. Win probability delta (winProbDelta)
-        {
-            double val = parseMetricValue(opt.metrics, "winProbDelta");
-            double w = computeWeight(val, means.get("winProbDelta"), ranges.get("winProbDelta"));
-            if (Math.abs(val) > 1e-4) {
-                factors.add(new EngineResult.ExplanationFactor("winRate", w,
-                        String.format("Win probability: %+.1f%%", val * 100),
-                        String.format("Heuristic win probability delta: %+.4f.", val)));
-            }
-        }
+        // 8. (Win probability delta now folded into factor #1 — B09 fix)
 
         // 9. Coverage factor (activation rolls + color)
         if (!isSave && !card.isIs_grossprojekt()) {

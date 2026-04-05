@@ -27,6 +27,7 @@ const en: Record<string, string> = {
   'turn.opponent': "{name}'s Turn",
   'turn.bonus': 'BONUS TURN!',
   'turn.count': 'Turn {n}',
+  'turn.round': 'Round {n}',
 
   // Dice
   'dice.1d6': '1 Die',

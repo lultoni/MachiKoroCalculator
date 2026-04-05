@@ -33,7 +33,7 @@ export function RankedList({ options, metricRanges, projects, language, onHover,
     });
   }, [options]);
 
-  // Extend metricRanges with client-computed ranges for built-in fields
+  // Extend metricRanges with client-computed ranges for all numeric metrics (B13 fix)
   const extendedRanges = useMemo(() => {
     const ranges: Record<string, { min: string; max: string }> = { ...metricRanges };
     if (options.length > 0) {
@@ -46,6 +46,19 @@ export function RankedList({ options, metricRanges, projects, language, onHover,
         .map(o => projects.byId(o.projectId)?.cost ?? 0);
       if (costs.length > 0) {
         ranges['cost'] = { min: String(Math.min(...costs)), max: String(Math.max(...costs)) };
+      }
+      // Compute ranges for all metric keys present in the first option
+      const firstMetrics = options[0].metrics;
+      if (firstMetrics) {
+        for (const key of Object.keys(firstMetrics)) {
+          if (key in ranges) continue; // already computed
+          const vals = options
+            .map(o => parseFloat(o.metrics?.[key] ?? ''))
+            .filter(v => !isNaN(v));
+          if (vals.length > 0) {
+            ranges[key] = { min: String(Math.min(...vals)), max: String(Math.max(...vals)) };
+          }
+        }
       }
     }
     return ranges;
@@ -118,7 +131,7 @@ export function RankedList({ options, metricRanges, projects, language, onHover,
                 key={isWait ? `_wait_${idx}` : opt.projectId}
                 className={`border-b border-machi-border/50 transition-colors cursor-pointer ${
                   isSelected ? 'bg-machi-accent/10' : 'hover:bg-machi-surface/50'
-                }`}
+                } ${!opt.affordable && !isWait ? 'opacity-40' : ''}`}
                 onClick={() => {
                   onSelect(isSelected ? null : opt.projectId);
                   setExpandedRow(isExpanded ? null : opt.projectId);

@@ -175,9 +175,17 @@ export function GameScreen({ session, settings, updateSettings, projects, hover 
         <h1 className="text-lg font-bold">{t('app.title')}</h1>
         <div className="flex items-center gap-3">
           <button
-            className="text-sm text-machi-text-dim hover:text-machi-accent transition-colors"
+            className="text-sm text-machi-text-dim hover:text-machi-accent transition-colors disabled:opacity-30"
             onClick={() => session.undo()}
             disabled={session.loading || s.history.length === 0}
+            title={s.history.length > 0 ? (() => {
+              const last = s.history[s.history.length - 1];
+              const name = s.state.players[last.playerIndex]?.name ?? '?';
+              const bought = last.boughtId
+                ? (projects.byId(last.boughtId)?.[`name_${settings.language}` as 'name_de' | 'name_en'] ?? last.boughtId)
+                : (settings.language === 'de' ? 'Gespart' : 'Saved');
+              return `${name}: ${last.roll} → ${bought}`;
+            })() : undefined}
           >
             {t('btn.undo')}
           </button>
@@ -193,6 +201,7 @@ export function GameScreen({ session, settings, updateSettings, projects, hover 
           >
             {t('btn.settings')}
           </button>
+          <span className="w-px h-4 bg-machi-border" />
           <button
             className="text-sm text-machi-text-dim hover:text-machi-accent transition-colors"
             onClick={() => session.clearSession()}
@@ -289,6 +298,25 @@ export function GameScreen({ session, settings, updateSettings, projects, hover 
                   recommendedName={recommendedName}
                   recommendedCost={recommendedCost}
                 />
+                {/* Opponent coin deltas from this roll (B07 fix) */}
+                {preview.coinDeltas && rollTotal > 0 && (
+                  <div className="mt-2 grid grid-cols-2 gap-1">
+                    {s.state.players.map((p, i) => {
+                      if (i === s.nextPlayerIndex) return null;
+                      const delta = preview.coinDeltas![i] ?? 0;
+                      return (
+                        <div key={i} className="flex items-center justify-between px-2 py-0.5 rounded bg-machi-bg/50 text-xs">
+                          <span className="text-machi-text-dim">{p.name}</span>
+                          <span className={`font-mono font-medium ${
+                            delta > 0 ? 'text-machi-green' : delta < 0 ? 'text-machi-red' : 'text-machi-text-dim'
+                          }`}>
+                            {delta > 0 ? `+${delta}` : delta < 0 ? String(delta) : '±0'}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               {/* Purchase area */}

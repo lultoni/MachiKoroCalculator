@@ -2,6 +2,7 @@
 
 import { useLocale } from '../i18n/useLocale';
 import type { RankedOption, MetricRange, ProjectDef } from '../api/types';
+import { cardTextClass, categoryIcon } from '../utils/cardDisplay';
 import { AssistantPanel } from './AssistantPanel';
 
 interface Props {
@@ -75,7 +76,12 @@ export function PurchaseArea({
                 onMouseEnter={() => onHover({ projectId: p.id, cost: p.cost })}
                 onMouseLeave={() => onHover(null)}
               >
-                <span className={cardTextClass(p.color)}>{name}</span>
+                <span className={cardTextClass(p.color)}>
+                  {p.category && (
+                    <span className="mr-0.5 text-[11px]">{categoryIcon(p.category)}</span>
+                  )}
+                  {name}
+                </span>
                 <span className="ml-1 text-machi-text-dim">{p.cost}c</span>
               </button>
             );
@@ -90,15 +96,4 @@ export function PurchaseArea({
       </div>
     </div>
   );
-}
-
-function cardTextClass(color?: string): string {
-  switch (color) {
-    case 'blau': return 'text-machi-blue';
-    case 'rot': return 'text-machi-red';
-    case 'grün': return 'text-machi-green';
-    case 'lila': return 'text-machi-purple';
-    case 'gelb': return 'text-machi-yellow';
-    default: return 'text-machi-text';
-  }
 }

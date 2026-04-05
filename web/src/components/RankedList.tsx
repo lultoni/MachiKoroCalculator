@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react';
 import type { RankedOption, MetricRange, ProjectDef } from '../api/types';
 import { COLUMNS, formatMetric, type ColumnDef } from '../utils/columns';
 import { metricBgStyle } from '../utils/metricColor';
+import { cardTextClass, categoryIcon } from '../utils/cardDisplay';
 import { ExplanationFactors } from './ExplanationFactors';
 
 interface Props {
@@ -155,6 +156,11 @@ export function RankedList({ options, metricRanges, projects, language, onHover,
                     <td key={col.key} className="px-2 py-1.5" style={cellStyle}>
                       {col.key === 'projectId' ? (
                         <span className={cardTextClass(proj?.color)}>
+                          {proj?.category && (
+                            <span className="mr-1 text-[11px]" title={proj.category}>
+                              {categoryIcon(proj.category)}
+                            </span>
+                          )}
                           {formatted}
                           <span className="ml-1 text-[10px] text-machi-text-dim/50">
                             {isExpanded ? '▾' : '▸'}
@@ -211,16 +217,5 @@ function getCellValue(
     case 'cost': return opt.projectId === '_wait_' ? 0 : (proj?.cost ?? 0);
     case 'affordable': return opt.affordable;
     default: return opt.metrics?.[key] ?? '—';
-  }
-}
-
-function cardTextClass(color?: string): string {
-  switch (color) {
-    case 'blau': return 'text-machi-blue';
-    case 'rot': return 'text-machi-red';
-    case 'grün': return 'text-machi-green';
-    case 'lila': return 'text-machi-purple';
-    case 'gelb': return 'text-machi-yellow';
-    default: return 'text-machi-text';
   }
 }

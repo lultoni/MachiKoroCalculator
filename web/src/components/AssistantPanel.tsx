@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useLocale } from '../i18n/useLocale';
 import type { RankedOption, MetricRange, ProjectDef } from '../api/types';
+import { cardTextClass } from '../utils/cardDisplay';
 import { RankedList } from './RankedList';
 import { ExplanationFactors } from './ExplanationFactors';
 
@@ -167,15 +168,4 @@ export function AssistantPanel({ options, metricRanges, loading, projects, langu
       )}
     </div>
   );
-}
-
-function cardTextClass(color?: string): string {
-  switch (color) {
-    case 'blau': return 'text-machi-blue';
-    case 'rot': return 'text-machi-red';
-    case 'grün': return 'text-machi-green';
-    case 'lila': return 'text-machi-purple';
-    case 'gelb': return 'text-machi-yellow';
-    default: return 'text-machi-text';
-  }
 }

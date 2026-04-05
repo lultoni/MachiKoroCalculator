@@ -12,7 +12,6 @@ Priorisiere in deiner Abarbeitung die wichtigsten Features. Erkenne Abhänigkeit
 |---|------|-------|
 | 2 | Refine UI based on real gameplay usage. | UI Bugs stehen in UI-BUGS.md |
 | 5 | Expansion card support. | Out of scope until core is perfected. |
-| 7 | Die Project-Categorie-Icons nutzen | Dies kann verwendet werden in Kombination mit dem "Card Detail Viewer" (sollte in UI-BUGS.md drin stehen irgendwo) |
 
 ## Done
 
@@ -20,6 +19,7 @@ Moved here when completed. Full history in CHANGELOG.md.
 
 | # | Task |
 |---|------|
+| 7 | Project-Categorie-Icons in UI |
 | 3 | Game-over decision review |
 | 1 | Fix MCTS ChanceNode doubles bug |
 | 6 | Die h2h-results.json pushen |

@@ -9,6 +9,7 @@ import type { UseSessionReturn } from '../hooks/useSession';
 import type { Settings } from '../hooks/useSettings';
 import type { UseHoverReturn } from '../hooks/useHover';
 import type { ProjectDef, ApplyTurnRequest } from '../api/types';
+import { cardTextClass } from '../utils/cardDisplay';
 import { TurnIndicator } from './TurnIndicator';
 import { DiceInterface } from './DiceInterface';
 import { CoinFlowDisplay } from './CoinFlowDisplay';
@@ -585,16 +586,5 @@ function cardColorClass(color: string): string {
     case 'lila':  return 'bg-machi-purple/20 text-machi-purple';
     case 'gelb':  return 'bg-machi-yellow/20 text-machi-yellow';
     default:      return 'bg-gray-500/20 text-gray-400';
-  }
-}
-
-function cardTextClass(color?: string): string {
-  switch (color) {
-    case 'blau': return 'text-machi-blue';
-    case 'rot': return 'text-machi-red';
-    case 'grün': return 'text-machi-green';
-    case 'lila': return 'text-machi-purple';
-    case 'gelb': return 'text-machi-yellow';
-    default: return 'text-machi-text';
   }
 }

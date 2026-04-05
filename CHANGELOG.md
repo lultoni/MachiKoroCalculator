@@ -6,6 +6,14 @@ Implementation history: what was built, why, and which design decisions were mad
 
 ## Phase 7: Iteration
 
+### 7.24 — Project Category Icons + cardDisplay Utility
+
+Added emoji-based category icons (🌾 food, 🐄 animal, ⛏ production, ☕ cafe, 🏪 store, 🏭 factory, 🛒 market, 🏛 office) to card names across the UI.
+
+- New shared `utils/cardDisplay.ts`: `cardTextClass()` and `categoryIcon()` — eliminates 5 duplicate `cardTextClass` functions from GameScreen, RankedList, PurchaseArea, AssistantPanel, and OpponentTurnEntry.
+- Icons appear in: RankedList rows, PurchaseArea manual buy chips, DecisionReview cards.
+- Hover tooltip on icons shows the category name.
+
 ### 7.23 — Post-Game Decision Review
 
 New game-over screen feature that compares player choices vs engine recommendations throughout a completed game.

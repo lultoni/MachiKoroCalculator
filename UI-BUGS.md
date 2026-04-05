@@ -98,10 +98,9 @@
 **Fix:** Use "New-Game" or add visual separators.
 **Files:** `web/src/components/GameScreen.tsx:157-183`
 
-### B19b: Ranked list doesn't show purples and yellows
-**Status:** OPEN | **Layer:** BE | **Priority:** P1
-**Problem:** "See all options" table doesn't include purple/yellow (landmark) cards. Engine evaluation may not include them as candidates.
-**Files:** Engine evaluation logic
+### ~~B19b: Ranked list doesn't show purples and yellows~~ ✅ FIXED
+**Status:** FIXED | **Layer:** BE | **Priority:** P1
+**Fix:** MCTS `buildOptionsFromFullTurnTree` and legacy `buildOptions` now enrich results with unaffordable cards (non-landmarks + landmarks) not explored by the tree, using `WinProbability.computeBaselineWinProb` as the heuristic score. All 20 base-game cards now appear in the ranked list.
 
 ### B20: Clicking factor category shows no useful extra info
 **Status:** OPEN | **Layer:** FE+BE | **Priority:** P2
@@ -143,7 +142,7 @@ B16 (insights update) → B15 (ETW display)
 ## Priority Waves
 
 ### Wave 1 — P1 Backend Correctness
-1. **B19b** — Purples/yellows missing from ranked list
+1. ~~**B19b** — Purples/yellows missing from ranked list~~ ✅ FIXED
 
 ### Wave 2 — P1 Frontend
 3. **B16** — Insights not updating

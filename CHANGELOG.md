@@ -6,6 +6,14 @@ Implementation history: what was built, why, and which design decisions were mad
 
 ## Phase 7: Iteration
 
+### 7.21 — B19b: Unaffordable Cards in MCTS Ranked List
+
+MCTS engines now include all purchasable cards in the ranked options list, not just cards affordable in at least one roll branch. Previously, purple cards (Stadion, Fernsehsender, Bürohaus) and expensive landmarks were invisible in the "See all options" table because `BuyDecisionNode.expand()` only adds children for affordable cards.
+
+Fix: `buildOptionsFromFullTurnTree()` and legacy `buildOptions()` now enumerate all available non-landmark cards (from `getUnbuilt_projects()`) and unowned landmarks that weren't explored by the tree. These unaffordable cards get a heuristic score via `WinProbability.computeBaselineWinProb()` on a hypothetical state, matching ExpectimaxEngine's approach. Marked `affordable=false` in the result.
+
+Files changed: `MctsV1Engine.java` (both option-building paths + new `heuristicScore()` helper).
+
 ### 7.20 — MCTS ChanceNode Doubles Fix + Bahnhof-Aware EV
 
 Fixed the critical doubles probability bug in `ChanceNode.expand()`. Previously, all even 2d6 sums were treated as 100% doubles (overestimating Freizeitpark bonus turn probability). Now, when doubles are relevant (Freizeitpark owned + not bonus turn), even rolls are split into separate doubles and non-doubles child branches with exact probabilities:

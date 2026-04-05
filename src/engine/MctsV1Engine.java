@@ -2,6 +2,7 @@ package engine;
 
 import calcs.Calcs;
 import calcs.RankEntry;
+import calcs.WinProbability;
 import core.BürohausLogic;
 import core.GameState;
 import core.Player;
@@ -17,9 +18,11 @@ import engine.mcts.SupplyTracker;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * MCTS v1 simulation engine — full UCT tree search with uniform-random full-game rollouts.
@@ -243,6 +246,7 @@ public class MctsV1Engine implements SimulationEngine {
 
         // Legacy path: root is a BuyDecisionNode with pre-roll coins
         List<EngineResult.Option> options = new ArrayList<>();
+        Set<String> seenIds = new HashSet<>();
 
         if (!tree.root.expanded) {
             tree.root.expand();
@@ -266,6 +270,35 @@ public class MctsV1Engine implements SimulationEngine {
 
             options.add(new EngineResult.Option(
                     purchased, winRate, factors, metrics, affordable));
+            seenIds.add(purchased.getId());
+        }
+
+        // Enrich with unaffordable cards not in the tree (B19b fix)
+        SupplyTracker supply = SupplyTracker.fromGameState(state);
+        for (Project p : state.getUnbuilt_projects()) {
+            if (seenIds.contains(p.getId())) continue;
+            if (!supply.canPurchase(p.getId())) continue;
+            if ("lila".equals(p.getColor()) && active.hasProject(p.getId())) continue;
+
+            double score = heuristicScore(state, playerIndex, p);
+            Map<String, String> metrics = buildMetrics(state, playerIndex, p,
+                    score, 0, iterationsUsed, coins, n);
+            List<String> factors = buildExplanationFactors(state, playerIndex, p,
+                    score, 0, iterationsUsed, metrics, coins, n);
+            options.add(new EngineResult.Option(p, score, factors, metrics, false));
+        }
+        for (String lmId : LANDMARK_IDS) {
+            if (seenIds.contains(lmId)) continue;
+            if (active.hasProject(lmId)) continue;
+            Project lm = ProjectLoader.getProject(lmId).orElse(null);
+            if (lm == null) continue;
+
+            double score = heuristicScore(state, playerIndex, lm);
+            Map<String, String> metrics = buildMetrics(state, playerIndex, lm,
+                    score, 0, iterationsUsed, coins, n);
+            List<String> factors = buildExplanationFactors(state, playerIndex, lm,
+                    score, 0, iterationsUsed, metrics, coins, n);
+            options.add(new EngineResult.Option(lm, score, factors, metrics, false));
         }
 
         boolean hasSave = options.stream().anyMatch(o -> "_wait_".equals(o.project.getId()));
@@ -290,6 +323,7 @@ public class MctsV1Engine implements SimulationEngine {
         collectBuyDecisionStats(tree.fullTurnRoot, playerIndex, agg);
 
         List<EngineResult.Option> options = new ArrayList<>();
+        Set<String> seenIds = new HashSet<>();
         for (AggregatedOption ao : agg.values()) {
             double winRate = ao.totalVisits > 0 ? ao.totalScore / ao.totalVisits : 0.0;
             // Affordable if affordable in ANY roll branch (user may roll well enough)
@@ -302,6 +336,41 @@ public class MctsV1Engine implements SimulationEngine {
 
             options.add(new EngineResult.Option(
                     ao.card, winRate, factors, metrics, affordable));
+            seenIds.add(ao.card.getId());
+        }
+
+        // Enrich with unaffordable cards not explored by the tree (B19b fix).
+        // Uses heuristic win-probability on a hypothetical state as the score.
+        Player active = state.getPlayers()[playerIndex];
+        SupplyTracker supply = SupplyTracker.fromGameState(state);
+
+        // Non-landmark cards
+        for (Project p : state.getUnbuilt_projects()) {
+            if (seenIds.contains(p.getId())) continue;
+            if (!supply.canPurchase(p.getId())) continue;
+            if ("lila".equals(p.getColor()) && active.hasProject(p.getId())) continue;
+
+            double score = heuristicScore(state, playerIndex, p);
+            Map<String, String> metrics = buildMetrics(state, playerIndex, p,
+                    score, 0, iterationsUsed, preRollCoins, n);
+            List<String> factors = buildExplanationFactors(state, playerIndex, p,
+                    score, 0, iterationsUsed, metrics, preRollCoins, n);
+            options.add(new EngineResult.Option(p, score, factors, metrics, false));
+        }
+
+        // Landmarks
+        for (String lmId : LANDMARK_IDS) {
+            if (seenIds.contains(lmId)) continue;
+            if (active.hasProject(lmId)) continue;
+            Project lm = ProjectLoader.getProject(lmId).orElse(null);
+            if (lm == null) continue;
+
+            double score = heuristicScore(state, playerIndex, lm);
+            Map<String, String> metrics = buildMetrics(state, playerIndex, lm,
+                    score, 0, iterationsUsed, preRollCoins, n);
+            List<String> factors = buildExplanationFactors(state, playerIndex, lm,
+                    score, 0, iterationsUsed, metrics, preRollCoins, n);
+            options.add(new EngineResult.Option(lm, score, factors, metrics, false));
         }
 
         boolean hasSave = options.stream().anyMatch(o -> "_wait_".equals(o.project.getId()));
@@ -310,6 +379,17 @@ public class MctsV1Engine implements SimulationEngine {
         }
 
         return options;
+    }
+
+    /**
+     * Computes a heuristic score for unaffordable cards not explored by the MCTS tree.
+     * Uses baseline win probability on a hypothetical state where the card is added
+     * (without paying, since it's unaffordable — models the "what if I had this" question).
+     */
+    private static double heuristicScore(GameState state, int playerIndex, Project card) {
+        GameState hypo = state.copy();
+        hypo.getPlayers()[playerIndex].addProject(card);
+        return WinProbability.computeBaselineWinProb(hypo, playerIndex);
     }
 
     /** Mutable accumulator for aggregating stats across BuyDecisionNode branches. */

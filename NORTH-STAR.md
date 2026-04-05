@@ -494,7 +494,7 @@ Git history preserves the actual code — the archive is a readable index.
 
 ## 11. Implementation Roadmap
 
-The phased implementation plan lives in `PLAN.md`. It is the active backlog derived from this document. This separation keeps the North Star focused on *what* and *why*, while the plan tracks *when* and *how*.
+The active task list lives in `TODO.md`. Implementation history is in `CHANGELOG.md`. This separation keeps the North Star focused on *what* and *why*.
 
 ---
 

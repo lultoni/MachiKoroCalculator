@@ -32,7 +32,7 @@ Phases 1–6 complete. The app is a fully functional web-based Machi Koro purcha
 | File | Purpose |
 |------|---------|
 | `NORTH-STAR.md` | Single source of truth: vision, architecture, UI spec, engine design |
-| `PLAN.md` | Phased implementation backlog |
+| `TODO.md` | Task list — open work items |
 | `CLAUDE.md` | Developer guidance: architecture, conventions, workflow |
 | `ARCHITECTURE.md` | Technical reference: formulas, card rules, data model |
 | `CHANGELOG.md` | Implementation history |

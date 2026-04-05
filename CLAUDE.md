@@ -20,7 +20,7 @@ Local desktop Machi Koro decision support tool. One question: **"What should I b
 | Doc | Purpose |
 |-----|---------|
 | `NORTH-STAR.md` | Source of truth: vision, architecture, UI spec. Change only with user approval. |
-| `PLAN.md` | Backlog. Mark tasks done when completed. |
+| `TODO.md` | User task list. Work items go here. |
 | `ARCHITECTURE.md` | Formulas, card rules, data model rationales, known engine issues. |
 | `CHANGELOG.md` | What was built and why. |
 | `ARCHIVE.md` | Index of purged code with commit hashes. |
@@ -117,7 +117,7 @@ Commit at logical boundaries. One coherent, self-contained improvement per commi
 
 Update all docs affected by your change, in the same commit:
 
-- `PLAN.md` — mark tasks done, add discovered tasks.
+- `TODO.md` — mark tasks done, add discovered tasks.
 - `CHANGELOG.md` — if a meaningful feature or fix was shipped.
 - `README.md` — if features, build instructions, or structure changed.
 - `CLAUDE.md` — if architecture or conventions changed.

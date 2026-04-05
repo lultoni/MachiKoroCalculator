@@ -38,8 +38,8 @@ export function PurchaseArea({
         if (p.is_grossprojekt && ownedIds.includes(p.id)) return false;
         return true;
       }).sort((a, b) => {
-        const idxA = options.findIndex(o => o.cardId === a.id);
-        const idxB = options.findIndex(o => o.cardId === b.id);
+        const idxA = options.findIndex(o => o.projectId === a.id);
+        const idxB = options.findIndex(o => o.projectId === b.id);
         // Cards not in engine results sort to end
         return (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB);
       })

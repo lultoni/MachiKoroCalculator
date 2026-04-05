@@ -6,7 +6,7 @@ Implementation history: what was built, why, and which design decisions were mad
 
 ## Phase 7: Iteration
 
-### 7.20 — MCTS ChanceNode Doubles Fix
+### 7.20 — MCTS ChanceNode Doubles Fix + Bahnhof-Aware EV
 
 Fixed the critical doubles probability bug in `ChanceNode.expand()`. Previously, all even 2d6 sums were treated as 100% doubles (overestimating Freizeitpark bonus turn probability). Now, when doubles are relevant (Freizeitpark owned + not bonus turn), even rolls are split into separate doubles and non-doubles child branches with exact probabilities:
 
@@ -19,6 +19,8 @@ This produces up to 15 children (matching ExpectimaxEngine), vs. the old 11 wher
 Per-child metadata (`childRollValues`, `childIsDoubles`) supports tree navigation. `navigateToRoll(ChanceNode, roll, isDoubles)` added; `TurnPlan.navigateRoll/navigateReroll` and `MatchRunner` updated to pass actual `d1==d2` status.
 
 Files changed: `ChanceNode.java` (core fix), `MctsTree.java` (navigation), `TurnPlan.java` (API), `MatchRunner.java` (caller).
+
+Also fixed B26: `CardIncome.playerEvPerRound()` and `contextualCardEvPerRound()` now respect Bahnhof ownership when choosing between 1d6 and 2d6 EV. Previously always assumed `max(1d6, 2d6)` for all players, overestimating income for players without Bahnhof. Affects ETW, tempo advantage, win probability heuristic, insights panel, and MCTS/Expectimax leaf evaluation.
 
 ### 7.19 — Legacy Code Removal & Dead Code Cleanup
 

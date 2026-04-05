@@ -288,7 +288,7 @@ Deterministic minimax engine with probability-weighted chance nodes. No random r
 
 These are deliberate simplifications in the Calcs and WinProbability layers. Each has a known directional effect on evaluation quality.
 
-1. **Blue card EV assumes opponent optimal dice** (`Calcs.evPerRound`): Takes `max(1d6_ev, 2d6_ev)` for opponent turns regardless of Bahnhof ownership. **Effect:** slightly overstates opponent income, making the perspective player's position appear marginally worse. Conservative bias — may slightly undervalue buying blue cards.
+1. **Blue card EV now Bahnhof-aware** (`CardIncome.playerEvPerRound`, `contextualCardEvPerRound`): Previously took `max(1d6_ev, 2d6_ev)` for all players regardless of Bahnhof ownership. Now correctly uses only 1d6 when the player doesn't own Bahnhof. **Fixed in 7.20.**
 
 2. **WinProbability endgame bonus is binary** (`WinProbability.java`): 2.5× score multiplier only when player has exactly 3 landmarks AND can afford the 4th right now. No gradient for "almost there" (e.g., 1-2 coins short). **Effect:** may undervalue endgame positions where the player is very close to winning but doesn't quite have enough coins.
 

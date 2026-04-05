@@ -329,10 +329,11 @@ public class CardIncome {
      * their actual card synergies (Einkaufszentrum bonuses, category multipliers, opponent
      * coin counts for purple cards).
      *
+     * <p>Dice strategy: if the player owns Bahnhof, takes {@code max(2d6_ev, 1d6_ev)} per card
+     * (player can choose the better dice count). Without Bahnhof, uses only 1d6.
+     *
      * <p>Assumptions:
      * <ul>
-     *   <li>Scoring uses 2d6 as the canonical distribution (representative of mid/late game)
-     *       plus a 1d6 pass to capture roll-1 cards (weizenfeld).</li>
      *   <li>Blue cards are multiplied by {@code numPlayers} (fire on every player's turn).</li>
      *   <li>Red cards contribute positively (income on each opponent's turn × (numPlayers−1)).</li>
      *   <li>Landmark cards ({@code gelb}) are excluded from this calculation.</li>
@@ -346,15 +347,7 @@ public class CardIncome {
         for (Project card : player.getOwned_projects()) {
             if ("gelb".equals(card.getColor())) continue; // landmarks scored separately
 
-            double cardEv = 0.0;
-            // 2d6 pass (rolls 2–12)
-            for (int r = 2; r <= 12; r++) {
-                int income = get_I(r, card.getId(), true, stats.hasEinkaufszentrum,
-                        stats.foodCount, stats.animalCount, stats.productionCount,
-                        99, opponentCoins);
-                if (income > 0) cardEv += P2[r] * income;
-            }
-            // 1d6 pass (rolls 1–6) to capture roll-1 activations (weizenfeld, etc.)
+            // 1d6 pass (always available — rolls 1–6)
             double cardEv1d6 = 0.0;
             for (int r = 1; r <= 6; r++) {
                 int income = get_I(r, card.getId(), true, stats.hasEinkaufszentrum,
@@ -362,7 +355,21 @@ public class CardIncome {
                         99, opponentCoins);
                 if (income > 0) cardEv1d6 += P1[r] * income;
             }
-            cardEv = Math.max(cardEv, cardEv1d6);
+
+            double cardEv;
+            if (stats.hasBahnhof) {
+                // 2d6 pass (rolls 2–12) — only relevant if player can choose 2 dice
+                double cardEv2d6 = 0.0;
+                for (int r = 2; r <= 12; r++) {
+                    int income = get_I(r, card.getId(), true, stats.hasEinkaufszentrum,
+                            stats.foodCount, stats.animalCount, stats.productionCount,
+                            99, opponentCoins);
+                    if (income > 0) cardEv2d6 += P2[r] * income;
+                }
+                cardEv = Math.max(cardEv2d6, cardEv1d6);
+            } else {
+                cardEv = cardEv1d6;
+            }
 
             // Scale by turn frequency
             switch (card.getColor()) {
@@ -382,21 +389,16 @@ public class CardIncome {
      * Computes the per-round EV of a single card in the context of a specific player's
      * actual stats (Einkaufszentrum, food/animal/production counts, opponent coins).
      *
+     * <p>Dice strategy: if {@code stats.hasBahnhof}, takes {@code max(2d6_ev, 1d6_ev)}.
+     * Without Bahnhof, uses only 1d6.
+     *
      * <p>This method correctly reflects synergy multipliers: a Markthalle owned by
      * a player with 3 food cards yields 3× the income of a Markthalle in a generic
      * reference state.
      */
     public static double contextualCardEvPerRound(Project card, PlayerStats stats,
                                             int numPlayers, int[] oppCoins) {
-        double ev = 0.0;
-        // 2d6 pass (main roll distribution)
-        for (int r = 2; r <= 12; r++) {
-            int income = get_I(r, card.getId(), true, stats.hasEinkaufszentrum,
-                    stats.foodCount, stats.animalCount, stats.productionCount,
-                    99, oppCoins);
-            if (income > 0) ev += P2[r] * income;
-        }
-        // 1d6 pass (captures roll-1 activations like weizenfeld)
+        // 1d6 pass (always available)
         double ev1d6 = 0.0;
         for (int r = 1; r <= 6; r++) {
             int income = get_I(r, card.getId(), true, stats.hasEinkaufszentrum,
@@ -404,7 +406,21 @@ public class CardIncome {
                     99, oppCoins);
             if (income > 0) ev1d6 += P1[r] * income;
         }
-        ev = Math.max(ev, ev1d6);
+
+        double ev;
+        if (stats.hasBahnhof) {
+            // 2d6 pass (rolls 2–12) — only if player can choose 2 dice
+            double ev2d6 = 0.0;
+            for (int r = 2; r <= 12; r++) {
+                int income = get_I(r, card.getId(), true, stats.hasEinkaufszentrum,
+                        stats.foodCount, stats.animalCount, stats.productionCount,
+                        99, oppCoins);
+                if (income > 0) ev2d6 += P2[r] * income;
+            }
+            ev = Math.max(ev2d6, ev1d6);
+        } else {
+            ev = ev1d6;
+        }
 
         // Scale by turn frequency
         return switch (card.getColor()) {

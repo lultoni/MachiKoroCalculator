@@ -6,6 +6,29 @@ Implementation history: what was built, why, and which design decisions were mad
 
 ## Phase 7: Iteration
 
+### 7.15 — Expectimax Engine
+
+New deterministic minimax engine (`ExpectimaxEngine`) that exhaustively evaluates the game tree to a configurable depth using exact dice probabilities at chance nodes and minimax at decision nodes. No random rollouts — all evaluation is deterministic.
+
+**Algorithm:** Recursive expectimax with alpha-beta pruning at all decision nodes (MAX for perspective player, MIN for opponents). Turn sequence: DiceChoice → ChanceNode → FunkturmNode → BürohausNode → BuyDecision → next player.
+
+**Correct doubles handling:** 2d6 with Freizeitpark creates 15 chance node branches — odd rolls (5 branches, never doubles), rolls 2 and 12 (always doubles), even rolls 4/6/8/10 (2 branches each: doubles vs non-doubles with exact split probabilities). This is mathematically correct, unlike the existing MCTS ChanceNode which treats all even sums as 100% doubles.
+
+**Leaf evaluation:** Two variants configurable via `leafEval` config key:
+- `"winprob"` — `WinProbability.computeBaselineWinProb()`, clamped to [0,1]
+- `"composite"` — position score differential through sigmoid normalization
+
+**Performance benchmarks (2-player initial state):**
+- depth-1: 8–60ms (fast tier)
+- depth-2: 1.3–1.5s (balanced tier)
+- depth-3: ~17 min (impractical — no deep tier)
+
+**Registry:** 4 entries — `expectimax-d1-winprob`, `expectimax-d1-composite` (fast), `expectimax-d2-winprob`, `expectimax-d2-composite` (balanced).
+
+**Bug fix during implementation:** WinProbability softmax with endgame bonus could return values slightly above 1.0 due to floating-point accumulation. Clamped all expectimax scores to [0,1] to ensure instant-win (score=1.0) always ranks highest.
+
+Engine compliance: 218 tests pass (all tiers including obvious Funkturm win).
+
 ### 7.14 — Fix Supply Count: Starter Cards Separate from Market
 
 Starting cards (Weizenfeld, Bäckerei) are given to each player at game start **outside** the 6-copy market supply pool, per official Machi Koro rules. Previously, the codebase incorrectly counted these starter copies against the supply, showing 4 remaining instead of 6 in a 2-player game.

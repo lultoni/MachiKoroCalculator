@@ -246,6 +246,62 @@ Six engine variants are implemented:
 
 Each variant has fast/balanced/deep configurations. Total: 33 registry entries across 6 engine classes.
 
+### 6.4 Expectimax Engine
+
+Deterministic minimax engine with probability-weighted chance nodes. No random rollouts — exhaustively evaluates the game tree to a configurable depth (in full rounds) using exact dice probabilities.
+
+**Algorithm:** Recursive expectimax with alpha-beta pruning at decision nodes:
+
+1. **DiceChoice** (if Bahnhof): MAX/MIN over {1d6, 2d6}.
+2. **ChanceNode**: probability-weighted sum over roll outcomes.
+   - 1d6: 6 branches (P = 1/6 each).
+   - 2d6 with Freizeitpark: **15 branches** — odd rolls (5 branches, never doubles), roll 2 and 12 (always doubles), even rolls 4/6/8/10 (2 branches each: doubles + non-doubles with correct split probabilities).
+   - 2d6 without Freizeitpark: standard 11 branches (2–12).
+3. **FunkturmNode** (if owned): MAX/MIN over {keep, reroll}. Reroll uses pre-roll state; Funkturm NOT offered on reroll.
+4. **BürohausNode** (if owned, roll=6): MAX/MIN over {skip + all valid swap pairs}. Deduplicated by card ID.
+5. **BuyDecision**: MAX/MIN over {save + all affordable cards}. Instant win check for landmarks.
+6. **Freizeitpark**: bonus turn on doubles (not chained — `isBonusTurn` flag prevents).
+
+**Depth:** measured in full rounds (all players complete one turn). Depth decrements when perspective player's turn comes around.
+
+**Leaf evaluation** (two variants):
+- `"winprob"`: `WinProbability.computeBaselineWinProb()`, clamped to [0,1].
+- `"composite"`: position score differential (evPerRound × 12 + landmarks × 15 + coins × 0.5) through sigmoid.
+
+**Config:** `maxDepthRounds` (default 2), `leafEval` ("winprob" or "composite").
+
+**Performance:** depth-1 ≈ 8–60ms, depth-2 ≈ 1.3–1.5s, depth-3 ≈ 17 min (impractical). Registry: 4 entries (d1/d2 × winprob/composite).
+
+---
+
+## 7. Known Engine Issues & Heuristic Choices
+
+### 7.1 Critical Bug: MCTS Doubles Probability (ChanceNode)
+
+**Severity:** High — affects all 6 MCTS engine variants (tree phase only; rollouts are correct).
+
+**Issue:** `ChanceNode` (in `engine/mcts/ChanceNode.java`) treats ALL even 2d6 sums as 100% doubles. For example, roll=8 is classified as always being doubles, but only 1 out of 5 ways to make 8 is actually doubles (4+4). The correct doubles probability for each even sum is 1/(6−|sum−7|).
+
+**Impact:** When a player owns Freizeitpark, the MCTS tree overestimates the probability of bonus turns for even rolls. Roll 8 has P(doubles)=1/5 but MCTS assumes P(doubles)=1. This inflates the value of Freizeitpark-related strategies in the tree phase.
+
+**Note:** The Expectimax engine handles this correctly with 15-branch chance nodes (see Section 6.4). MctsRollout (used in rollouts) also correctly uses `d1 == d2` to detect doubles.
+
+**Status:** Deferred — will be fixed after docs cleanup.
+
+### 7.2 Heuristic Choices (Documented for Discussion)
+
+These are deliberate simplifications in the Calcs and WinProbability layers. Each has a known directional effect on evaluation quality.
+
+1. **Blue card EV assumes opponent optimal dice** (`Calcs.evPerRound`): Takes `max(1d6_ev, 2d6_ev)` for opponent turns regardless of Bahnhof ownership. **Effect:** slightly overstates opponent income, making the perspective player's position appear marginally worse. Conservative bias — may slightly undervalue buying blue cards.
+
+2. **WinProbability endgame bonus is binary** (`WinProbability.java`): 2.5× score multiplier only when player has exactly 3 landmarks AND can afford the 4th right now. No gradient for "almost there" (e.g., 1-2 coins short). **Effect:** may undervalue endgame positions where the player is very close to winning but doesn't quite have enough coins.
+
+3. **Landmark weights are static constants** (`WinProbability.java`): Fixed coin-equivalent values (Bahnhof=24, Einkaufszentrum=36, Freizeitpark=24, Funkturm=48). Don't adapt to card synergies or game phase. **Effect:** softmax heuristic may mis-rank players in unusual board states where landmark value differs from the average case.
+
+4. **Linear turn projection in evPerRound** (`Calcs.java`): Assumes linear coin accumulation over opponent turns. **Effect:** overestimates opponent resource growth in high-variance portfolios. Matters more in late game with concentrated income distributions.
+
+5. **CVaR assumes fixed dice strategy** (`Calcs.java`): Risk metrics use the same dice choice for the tail distribution as for the expected case. **Effect:** may understate downside risk when switching dice count would be better in bad scenarios. Only affects UI risk explanations, not engine ranking.
+
 ### 6.3 Safety Valve
 
 Maximum turn limit for rollouts. Games rarely exceed 60–70 turns with reasonable play — the limit must account for unlucky edge cases while preventing infinite loops.

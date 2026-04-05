@@ -293,5 +293,53 @@
     "config": {
       "iterations": "0"
     }
+  },
+  {
+    "id": "expectimax-d1-winprob",
+    "engineClass": "expectimax",
+    "description": "Expectimax — depth 1, win-probability leaf eval",
+    "default": false,
+    "tier": "fast",
+    "config": {
+      "iterations": "0",
+      "maxDepthRounds": "1",
+      "leafEval": "winprob"
+    }
+  },
+  {
+    "id": "expectimax-d1-composite",
+    "engineClass": "expectimax",
+    "description": "Expectimax — depth 1, composite leaf eval",
+    "default": false,
+    "tier": "fast",
+    "config": {
+      "iterations": "0",
+      "maxDepthRounds": "1",
+      "leafEval": "composite"
+    }
+  },
+  {
+    "id": "expectimax-d2-winprob",
+    "engineClass": "expectimax",
+    "description": "Expectimax — depth 2, win-probability leaf eval",
+    "default": false,
+    "tier": "balanced",
+    "config": {
+      "iterations": "0",
+      "maxDepthRounds": "2",
+      "leafEval": "winprob"
+    }
+  },
+  {
+    "id": "expectimax-d2-composite",
+    "engineClass": "expectimax",
+    "description": "Expectimax — depth 2, composite leaf eval",
+    "default": false,
+    "tier": "balanced",
+    "config": {
+      "iterations": "0",
+      "maxDepthRounds": "2",
+      "leafEval": "composite"
+    }
   }
 ]

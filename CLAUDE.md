@@ -25,8 +25,8 @@ UI (Web SPA) → Interface (orchestration) → Simulation Engines → Standard C
 
 - **Core** — pure game rules: `GameState`, `Player`, `Project`, `ProjectLoader`, card income (`get_I`), dice resolution, turn order, win condition. No strategy, no opinions.
 - **Standard Calcs** — reusable, version-agnostic math: EV, ROI, probability distributions, variance, plus 11 advanced metrics (Sharpe, Sortino, Kelly, VaR/CVaR, HHI, entropy, IG, ETW, tempo, urgency, roll correlation). Any engine can call these.
-- **Simulation Engines** — pluggable strategy implementations (8 engine classes with 28 configurations: 6 MCTS variants, 1 Flat Monte Carlo, 1 Heuristic EV). Each implements `SimulationEngine` interface and returns ranked purchase options with scores, structured explanations, and metrics.
-- **Interface** — orchestration layer: engine registry (JSON with 28 entries), request routing, result formatting, pre-computation cache.
+- **Simulation Engines** — pluggable strategy implementations (9 engine classes with 32 configurations: 6 MCTS variants, 1 Flat Monte Carlo, 1 Heuristic EV, 1 Expectimax). Each implements `SimulationEngine` interface and returns ranked purchase options with scores, structured explanations, and metrics.
+- **Interface** — orchestration layer: engine registry (JSON with 32 entries), request routing, result formatting, pre-computation cache.
 - **UI** — web SPA (React 19 + TypeScript + Vite 8 + Tailwind CSS 4) talking to a local Java HTTP API (20 endpoints). 17 components, 8 hooks, DE/EN localization.
 
 ### Current State
@@ -35,7 +35,7 @@ The restructure is complete (Phases 1–6 done). The 5-layer architecture is ful
 
 - **Core** layer (`core/` package): `GameState`, `Player`, `Project`, `ProjectLoader`, `CardIncome`, `RollResolver`, `BürohausLogic`, `GameSession`, `GameSessionPersistence`, `TurnRecord`
 - **Standard Calcs** layer (`calcs/` package): `Calcs` (all metrics), `WinProbability`, `RankEntry`
-- **Engines** layer (`engine/` package): `MctsV1Engine` (base) + 5 variants (A–E), `FlatMcEngine` (pure sampling), `HeuristicEvEngine` (formula-based), `TurnPlan` (full-turn decision extraction + static plans for non-MCTS), `mcts/` subpackage with all tree node types, rollout policies, `SupplyTracker`, `MctsTree`
+- **Engines** layer (`engine/` package): `MctsV1Engine` (base) + 5 variants (A–E), `FlatMcEngine` (pure sampling), `HeuristicEvEngine` (formula-based), `ExpectimaxEngine` (deterministic minimax), `TurnPlan` (full-turn decision extraction + static plans for non-MCTS), `mcts/` subpackage with all tree node types, rollout policies, `SupplyTracker`, `MctsTree`
 - **Interface** layer (`iface/` package): `EngineOrchestrator`, `EngineRegistry`, `EngineRegistryEntry`
 - **H2H** layer (`h2h/` package): `MatchRunner` (parallel game execution, seat swapping), `MatchConfig`, `GameLog`/`TurnLog`/`MatchResult`, `H2hResultStore` (JSON persistence), `H2hMain` (single-match CLI), `TournamentRunner`/`TournamentResult`/`TournamentMain` (round-robin tournament with leaderboard + matrix)
 - **Server** layer (`server/` package): `ApiServer` with 20 endpoints, `SessionManager`, `PrecomputeCache`, `H2hHandler`, `EvaluateHandler`, `SessionInsightsHandler`, plus various session handlers

@@ -177,6 +177,10 @@ Build the engine comparison and validation framework. Used both during Phase 3 v
 | 7.12 | Web UI bug fixes: settings overflow, CoinFlowDisplay not updating, _wait_ display/duplicates, engine metadata, cost factor inversion, missing starter cards in ranked list, buy button, opponent coin flow. | done |
 | 7.13 | Web UI polish (round 2): column tooltips for all metrics, color gradients on score/cost/ETW columns, settings engine detail panel (description/tier/iterations/params), CoinFlowDisplay hover jitter fix, re-evaluate on engine switch, H2H per-engine iteration display with optional override, expose tier/description in engine API. | done |
 | 7.14 | Fix supply count: starter cards (Weizenfeld, Bäckerei) are separate from the 6-copy market pool. Added `GameState.starterCopies()`, fixed SupplyTracker, GameSession, GameStateBuilder, MatchRunner, and frontend sidebar. | done |
+| 7.15 | Expectimax engine: deterministic minimax with probability-weighted chance nodes, alpha-beta pruning, correct 15-branch doubles handling, two leaf evaluation variants (winprob/composite). 4 registry entries (d1/d2 × winprob/composite). | done |
+| 7.16 | Document known engine issues: MCTS ChanceNode doubles bug, 5 heuristic choices in Calcs/WinProbability. Added to ARCHITECTURE.md Section 7. | done |
+| 7.17 | Full documentation deep clean: cross-document accuracy audit of all docs (README, NORTH-STAR, PLAN, CLAUDE, ARCHITECTURE, CHANGELOG, ARCHIVE). | pending |
+| 7.18 | Fix MCTS ChanceNode doubles bug: split even 2d6 rolls into doubles/non-doubles branches with correct probabilities. | pending |
 
 ---
 

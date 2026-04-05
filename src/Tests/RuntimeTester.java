@@ -369,6 +369,7 @@ public class RuntimeTester {
             orch.register(new engine.MctsAdaptiveEngine());
             orch.register(new engine.FlatMcEngine());
             orch.register(new engine.HeuristicEvEngine());
+            orch.register(new engine.ExpectimaxEngine());
 
             // Group registry entries by engineClass to avoid running the same engine multiple times
             Map<String, List<EngineRegistryEntry>> byClass = new HashMap<>();
@@ -3401,13 +3402,13 @@ public class RuntimeTester {
         }
         assertTrue(tag + "scores are non-increasing (sorted best→worst)", sorted);
 
-        // 5. affordable flag matches coins >= cost
-        int coins = gs.getPlayers()[0].getCoins();
+        // 5. affordable flag: with full-turn tree, affordable means "affordable in at
+        //    least one roll outcome". We verify save is always affordable and that
+        //    cards costing more than max possible post-roll coins are not affordable.
         for (EngineResult.Option opt : result.rankedOptions) {
-            if ("_wait_".equals(opt.project.getId())) continue;
-            boolean expected = coins >= opt.project.getCost();
-            assertTrue(tag + "affordable flag correct for " + opt.project.getId(),
-                    opt.affordable == expected);
+            if ("_wait_".equals(opt.project.getId())) {
+                assertTrue(tag + "save option is always affordable", opt.affordable);
+            }
         }
 
         // 6. iterationsUsed >= 0

@@ -117,7 +117,9 @@ export function H2hGameReplay({ game, engines, projects, language, onBack }: Pro
                   {turn.isDoubles && <span className="ml-1 text-machi-yellow text-xs">D</span>}
                 </div>
                 {turn.funkturmRerolled && (
-                  <div className="text-xs text-machi-accent mt-0.5">Funkturm ↻</div>
+                  <div className="text-xs text-machi-accent mt-0.5">
+                    {projects.byId('funkturm')?.[`name_${language}` as 'name_de' | 'name_en'] ?? 'Funkturm'} ↻
+                  </div>
                 )}
               </div>
 
@@ -173,7 +175,7 @@ export function H2hGameReplay({ game, engines, projects, language, onBack }: Pro
 
             {turn.bürohausSwap && (
               <div className="mt-2 text-xs text-machi-purple">
-                Bürohaus: {turn.bürohausSwap}
+                {projects.byId('bürohaus')?.[`name_${language}` as 'name_de' | 'name_en'] ?? 'Bürohaus'}: {turn.bürohausSwap}
               </div>
             )}
           </div>

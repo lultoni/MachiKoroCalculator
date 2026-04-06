@@ -58,6 +58,8 @@ export function GameScreen({ session, settings, updateSettings, projects, hover 
   const [pendingBürohausSwap, setPendingBürohausSwap] = useState<BürohausRequest | null>(null);
   // Bürohaus popup (optional, controlled by settings)
   const [showBürohausPopup, setShowBürohausPopup] = useState(false);
+  // Opponent turn coin deltas (propagated from OpponentTurnEntry)
+  const [opponentCoinDeltas, setOpponentCoinDeltas] = useState<number[] | null>(null);
 
   // Compute roll total
   const rollTotal = die1 != null
@@ -98,6 +100,7 @@ export function GameScreen({ session, settings, updateSettings, projects, hover 
     hover.onHover(null);
     setPendingBürohausSwap(null);
     setShowBürohausPopup(false);
+    setOpponentCoinDeltas(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [s.nextPlayerIndex, s.effectiveTurnCount]);
 
@@ -290,7 +293,27 @@ export function GameScreen({ session, settings, updateSettings, projects, hover 
             >
               <div className="flex justify-between items-center mb-2">
                 <span className="font-medium text-sm">{p.name}</span>
-                <span className="text-machi-yellow text-sm font-mono">{p.coins}c</span>
+                <span className="text-sm font-mono flex items-center gap-1.5">
+                  <span className="text-machi-yellow">{p.coins}c</span>
+                  {isUserTurn && rollTotal > 0 && preview.coinDeltas && (() => {
+                    const delta = preview.coinDeltas![i] ?? 0;
+                    if (delta === 0) return <span className="text-machi-text-dim text-xs">±0</span>;
+                    return (
+                      <span className={`text-xs font-medium ${delta > 0 ? 'text-machi-green' : 'text-machi-red'}`}>
+                        {delta > 0 ? `+${delta}` : String(delta)}
+                      </span>
+                    );
+                  })()}
+                  {!isUserTurn && opponentCoinDeltas && (() => {
+                    const delta = opponentCoinDeltas[i] ?? 0;
+                    if (delta === 0) return <span className="text-machi-text-dim text-xs">±0</span>;
+                    return (
+                      <span className={`text-xs font-medium ${delta > 0 ? 'text-machi-green' : 'text-machi-red'}`}>
+                        {delta > 0 ? `+${delta}` : String(delta)}
+                      </span>
+                    );
+                  })()}
+                </span>
               </div>
               {/* Landmarks */}
               <div className="flex gap-1 mb-2">
@@ -437,6 +460,7 @@ export function GameScreen({ session, settings, updateSettings, projects, hover 
                   players={s.state.players}
                   ownedIds={activePlayer.ownedIds}
                   showBürohausPopupSetting={settings.showBürohausPanel}
+                  onCoinDeltasChange={setOpponentCoinDeltas}
                 />
               </div>
               <InsightsPanel

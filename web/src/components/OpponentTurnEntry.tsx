@@ -23,9 +23,10 @@ interface Props {
   players: PlayerState[];
   ownedIds: string[];
   showBürohausPopupSetting: boolean;
+  onCoinDeltasChange?: (deltas: number[] | null) => void;
 }
 
-export function OpponentTurnEntry({ opponentName, canUse2d6, projects, language, coinsAvailable, onConfirm, loading, state, activePlayerIndex, players, ownedIds, showBürohausPopupSetting }: Props) {
+export function OpponentTurnEntry({ opponentName, canUse2d6, projects, language, coinsAvailable, onConfirm, loading, state, activePlayerIndex, players, ownedIds, showBürohausPopupSetting, onCoinDeltasChange }: Props) {
   const { t } = useLocale();
   const [die1, setDie1] = useState<number | null>(null);
   const [die2, setDie2] = useState<number | null>(null);
@@ -44,12 +45,13 @@ export function OpponentTurnEntry({ opponentName, canUse2d6, projects, language,
   useEffect(() => {
     if (rollTotal <= 0) {
       setCoinDeltas(null);
+      onCoinDeltasChange?.(null);
       return;
     }
     api.previewRoll(state, activePlayerIndex, rollTotal)
-      .then(res => setCoinDeltas(res.coinDeltas))
-      .catch(() => setCoinDeltas(null));
-  }, [rollTotal, state, activePlayerIndex]);
+      .then(res => { setCoinDeltas(res.coinDeltas); onCoinDeltasChange?.(res.coinDeltas); })
+      .catch(() => { setCoinDeltas(null); onCoinDeltasChange?.(null); });
+  }, [rollTotal, state, activePlayerIndex, onCoinDeltasChange]);
 
   const handleRollSelect = useCallback((count: 1 | 2, d1: number, d2: number | null) => {
     setDiceCount(count);
@@ -78,6 +80,7 @@ export function OpponentTurnEntry({ opponentName, canUse2d6, projects, language,
     setDie2(null);
     setBoughtId(null);
     setCoinDeltas(null);
+    onCoinDeltasChange?.(null);
     setPendingBürohausSwap(null);
     setShowBürohausPopup(false);
   };

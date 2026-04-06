@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react';
 import { useLocale } from '../i18n/useLocale';
 import type { SessionJson, EngineSnapshotJson, ProjectDef } from '../api/types';
 import { cardTextClass, categoryIconPath } from '../utils/cardDisplay';
+import { CardTooltip } from './CardTooltip';
 
 interface Props {
   session: SessionJson;
@@ -199,8 +200,12 @@ export function DecisionReview({ session, userPlayerIndex, projects, language, o
           <div className="bg-machi-bg rounded-lg p-3">
             <div className="text-machi-text-dim text-xs mb-1">{t('review.youBought')}</div>
             <div className={`font-semibold inline-flex items-center ${cardClass(choiceId)}`}>
-              {cardIcon(choiceId) && <img src={cardIcon(choiceId)} alt="" className="w-4 h-4 mr-1" />}
-              {cardName(choiceId)}
+              <CardTooltip project={projects.byId(choiceId)} language={language}>
+                <span className="inline-flex items-center">
+                  {cardIcon(choiceId) && <img src={cardIcon(choiceId)} alt="" className="w-4 h-4 mr-1" />}
+                  {cardName(choiceId)}
+                </span>
+              </CardTooltip>
             </div>
             <div className="text-xs mt-1">
               {choiceRank === 1 ? (
@@ -219,8 +224,12 @@ export function DecisionReview({ session, userPlayerIndex, projects, language, o
             {engineTop ? (
               <>
                 <div className={`font-semibold inline-flex items-center ${cardClass(engineTop.projectId)}`}>
-                  {cardIcon(engineTop.projectId) && <img src={cardIcon(engineTop.projectId)} alt="" className="w-4 h-4 mr-1" />}
-                  {cardName(engineTop.projectId)}
+                  <CardTooltip project={projects.byId(engineTop.projectId)} language={language}>
+                    <span className="inline-flex items-center">
+                      {cardIcon(engineTop.projectId) && <img src={cardIcon(engineTop.projectId)} alt="" className="w-4 h-4 mr-1" />}
+                      {cardName(engineTop.projectId)}
+                    </span>
+                  </CardTooltip>
                 </div>
                 <div className="text-xs text-machi-text-dim mt-1">
                   {(engineTop.score * 100).toFixed(1)}%
@@ -244,10 +253,12 @@ export function DecisionReview({ session, userPlayerIndex, projects, language, o
                 }`}
               >
                 <span className="w-5 text-right font-mono text-machi-text-dim">#{i + 1}</span>
-                <span className={`flex-1 inline-flex items-center ${cardClass(opt.projectId)}`}>
-                  {cardIcon(opt.projectId) && <img src={cardIcon(opt.projectId)} alt="" className="w-3.5 h-3.5 mr-0.5" />}
-                  {cardName(opt.projectId)}
-                </span>
+                <CardTooltip project={projects.byId(opt.projectId)} language={language}>
+                  <span className={`flex-1 inline-flex items-center ${cardClass(opt.projectId)}`}>
+                    {cardIcon(opt.projectId) && <img src={cardIcon(opt.projectId)} alt="" className="w-3.5 h-3.5 mr-0.5" />}
+                    {cardName(opt.projectId)}
+                  </span>
+                </CardTooltip>
                 <span className="font-mono text-machi-text-dim w-14 text-right">
                   {(opt.score * 100).toFixed(1)}%
                 </span>

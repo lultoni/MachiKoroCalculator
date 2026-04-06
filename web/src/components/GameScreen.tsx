@@ -87,11 +87,12 @@ export function GameScreen({ session, settings, updateSettings, projects, hover 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [s.nextPlayerIndex, s.effectiveTurnCount, settings.engineId]);
 
-  // Reset dice only on actual turn changes (not engine switches)
+  // Reset dice and hover state only on actual turn changes (not engine switches)
   useEffect(() => {
     setDie1(null);
     setDie2(null);
     setDiceCount(canUse2d6 ? 1 : 1);
+    hover.onHover(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [s.nextPlayerIndex, s.effectiveTurnCount]);
 
@@ -279,15 +280,15 @@ export function GameScreen({ session, settings, updateSettings, projects, hover 
                   const proj = projects.byId(lid);
                   const name = proj?.[`name_${settings.language}` as 'name_de' | 'name_en'] ?? lid;
                   return (
-                    <span
-                      key={lid}
-                      className={`text-[10px] px-1 py-0.5 rounded ${
-                        owned ? 'bg-machi-yellow/20 text-machi-yellow' : 'bg-machi-border/30 text-machi-text-dim/40'
-                      }`}
-                      title={name}
-                    >
-                      {name.charAt(0).toUpperCase()}
-                    </span>
+                    <CardTooltip key={lid} project={proj} language={settings.language}>
+                      <span
+                        className={`text-[10px] px-1 py-0.5 rounded ${
+                          owned ? 'bg-machi-yellow/20 text-machi-yellow' : 'bg-machi-border/30 text-machi-text-dim/40'
+                        }`}
+                      >
+                        {name.charAt(0).toUpperCase()}
+                      </span>
+                    </CardTooltip>
                   );
                 })}
               </div>
@@ -303,6 +304,9 @@ export function GameScreen({ session, settings, updateSettings, projects, hover 
                         onMouseEnter={() => hover.onHover({ projectId: id, cost: proj.cost })}
                         onMouseLeave={() => hover.onHover(null)}
                       >
+                        {categoryIconPath(proj.category) && (
+                          <img src={categoryIconPath(proj.category)} alt="" className="w-3 h-3 mr-0.5" />
+                        )}
                         {proj[`name_${settings.language}` as 'name_de' | 'name_en'] ?? proj.name_de}
                         {count > 1 ? ` ×${count}` : ''}
                       </span>
@@ -337,8 +341,12 @@ export function GameScreen({ session, settings, updateSettings, projects, hover 
                   hovered={hover.hovered}
                   language={settings.language}
                   projectName={hoveredName}
+                  projectColor={hoveredProj?.color}
+                  projectCategory={hoveredProj?.category}
                   recommendedName={recommendedName}
                   recommendedCost={recommendedCost}
+                  recommendedColor={topProj?.color}
+                  recommendedCategory={topProj?.category}
                 />
                 {/* Opponent coin deltas from this roll (B07 fix) */}
                 {preview.coinDeltas && rollTotal > 0 && (

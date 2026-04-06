@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { useLocale } from '../i18n/useLocale';
 import type { ProjectDef, BürohausRequest, PlayerState } from '../api/types';
+import { cardTextClass, categoryIconPath } from '../utils/cardDisplay';
+import { CardTooltip } from './CardTooltip';
 
 interface SwapRanking {
   ownCardId: string | null;
@@ -73,7 +75,13 @@ export function BürohausModal({ activePlayer, opponents, projects, language, sw
           <div className="bg-machi-accent/10 border border-machi-accent/30 rounded-lg px-3 py-2 text-sm">
             <span className="text-machi-accent font-medium">{t('bürohaus.recommended')}: </span>
             <span className="text-machi-text">
-              {topRec.ownCardId ? getName(topRec.ownCardId) : '—'} ↔ {topRec.oppCardId ? getName(topRec.oppCardId) : '—'}
+              <span className={`inline-flex items-center ${cardTextClass(projects.byId(topRec.ownCardId ?? '')?.color)}`}>
+                {topRec.ownCardId ? getName(topRec.ownCardId) : '—'}
+              </span>
+              {' ↔ '}
+              <span className={`inline-flex items-center ${cardTextClass(projects.byId(topRec.oppCardId ?? '')?.color)}`}>
+                {topRec.oppCardId ? getName(topRec.oppCardId) : '—'}
+              </span>
             </span>
             <span className="ml-2 text-machi-text-dim text-xs">({(topRec.score * 100).toFixed(1)}%)</span>
           </div>
@@ -87,17 +95,23 @@ export function BürohausModal({ activePlayer, opponents, projects, language, sw
               const proj = projects.byId(id);
               const selected = ownCard === id;
               return (
-                <button
-                  key={id}
-                  className={`px-2 py-1 rounded-lg text-xs border transition-all ${
-                    selected
-                      ? 'border-machi-accent bg-machi-accent/10 ring-1 ring-machi-accent/50'
-                      : 'border-machi-border hover:border-machi-text-dim'
-                  } ${cardColorClass(proj?.color)}`}
-                  onClick={() => setOwnCard(id)}
-                >
-                  {getName(id)}
-                </button>
+                <CardTooltip key={id} project={proj} language={language}>
+                  <button
+                    className={`px-2 py-1 rounded-lg text-xs border transition-all ${
+                      selected
+                        ? 'border-machi-accent bg-machi-accent/10 ring-1 ring-machi-accent/50'
+                        : 'border-machi-border hover:border-machi-text-dim'
+                    } ${cardColorClass(proj?.color)}`}
+                    onClick={() => setOwnCard(id)}
+                  >
+                    <span className="inline-flex items-center">
+                      {categoryIconPath(proj?.category) && (
+                        <img src={categoryIconPath(proj?.category)} alt="" className="w-3 h-3 mr-0.5" />
+                      )}
+                      {getName(id)}
+                    </span>
+                  </button>
+                </CardTooltip>
               );
             })}
             {ownEligible.length === 0 && (
@@ -136,17 +150,23 @@ export function BürohausModal({ activePlayer, opponents, projects, language, sw
                 const proj = projects.byId(id);
                 const selected = oppCard === id;
                 return (
-                  <button
-                    key={id}
-                    className={`px-2 py-1 rounded-lg text-xs border transition-all ${
-                      selected
-                        ? 'border-machi-accent bg-machi-accent/10 ring-1 ring-machi-accent/50'
-                        : 'border-machi-border hover:border-machi-text-dim'
-                    } ${cardColorClass(proj?.color)}`}
-                    onClick={() => setOppCard(id)}
-                  >
-                    {getName(id)}
-                  </button>
+                  <CardTooltip key={id} project={proj} language={language}>
+                    <button
+                      className={`px-2 py-1 rounded-lg text-xs border transition-all ${
+                        selected
+                          ? 'border-machi-accent bg-machi-accent/10 ring-1 ring-machi-accent/50'
+                          : 'border-machi-border hover:border-machi-text-dim'
+                      } ${cardColorClass(proj?.color)}`}
+                      onClick={() => setOppCard(id)}
+                    >
+                      <span className="inline-flex items-center">
+                        {categoryIconPath(proj?.category) && (
+                          <img src={categoryIconPath(proj?.category)} alt="" className="w-3 h-3 mr-0.5" />
+                        )}
+                        {getName(id)}
+                      </span>
+                    </button>
+                  </CardTooltip>
                 );
               })}
               {oppEligible.length === 0 && (

@@ -2,12 +2,14 @@ import { useState, useEffect, useMemo } from 'react';
 import { useH2h } from '../hooks/useH2h';
 import { useLocale } from '../i18n/useLocale';
 import * as api from '../api/client';
-import type { EngineRegistryEntry } from '../api/types';
+import type { EngineRegistryEntry, ProjectDef } from '../api/types';
 import { H2hMatchDetail } from './H2hMatchDetail';
 import { H2hGameReplay } from './H2hGameReplay';
 
 interface Props {
   onBack: () => void;
+  projects: { projects: ProjectDef[]; byId: (id: string) => ProjectDef | undefined };
+  language: 'de' | 'en';
 }
 
 /** Derive editable config fields from a registry entry's config. */
@@ -36,7 +38,7 @@ function fieldsToConfigMap(fields: { key: string; value: string }[]): Record<str
   return map;
 }
 
-export function H2hOverview({ onBack }: Props) {
+export function H2hOverview({ onBack, projects, language }: Props) {
   const h2h = useH2h();
   const { t } = useLocale();
   const [engines, setEngines] = useState<EngineRegistryEntry[]>([]);
@@ -69,6 +71,8 @@ export function H2hOverview({ onBack }: Props) {
       <H2hGameReplay
         game={h2h.selectedGame}
         engines={h2h.selectedResult.config.engineIds}
+        projects={projects}
+        language={language}
         onBack={h2h.clearGame}
       />
     );

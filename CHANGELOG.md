@@ -6,6 +6,25 @@ Implementation history: what was built, why, and which design decisions were mad
 
 ## Phase 7: Iteration
 
+### 7.27 — Legacy Cleanup + Card Display Standardisation
+
+**Task 10 — Legacy code removal:**
+- Removed dead `runAdaptiveFocusedPhase()` method (44 lines) from `MctsAdaptiveEngine.java` — never called since full-turn trees replaced buy-decision-only trees. Updated Javadoc accordingly. Removed unused `java.util.List` import.
+- Removed misleading `rolloutPolicy: "greedy"` config entries from `engines.json` for all 3 mcts-v1 variants. The config was never read by any Java code — MctsV1Engine always uses uniform-random rollouts via `MctsRollout::simulate`. Variant A (MctsGreedyRolloutEngine) implements greedy rollouts through its own `buildTree`/`buildFullTurnTree` overrides.
+
+**Task 12 — Card display standardisation across 9 components:**
+- **GameScreen left panel landmarks**: Added `CardTooltip` wrapper for hover details on landmark badges.
+- **GameScreen left panel owned cards**: Added category PNG icons before card names.
+- **AssistantPanel top recommendation**: Wrapped card name with `CardTooltip` + category icon. Removed card name from buy button to avoid color clash on accent background.
+- **BürohausModal**: Added `CardTooltip` + category icons to own/opponent card selection buttons and recommendation badge (with card color).
+- **InsightsPanel supply warnings**: Replaced hardcoded `text-machi-yellow` with dynamic `cardTextClass()`, added `CardTooltip` + category icon.
+- **DecisionReview**: Wrapped all 3 card display locations (your choice, engine pick, option list) with `CardTooltip`.
+- **CoinFlowDisplay**: Added card color class + category icon to project name display. Added `projectColor`/`projectCategory`/`recommendedColor`/`recommendedCategory` props.
+- **H2hGameReplay**: Fixed critical bug — was showing raw card IDs (e.g. "markthalle") instead of localized names. Added `projects` and `language` props (threaded from App → H2hOverview → H2hGameReplay), with `CardTooltip` + color + icon.
+
+**Bug fixes:**
+- Fixed stale hover state in CoinFlowDisplay — hover state now resets on turn change, preventing previous turn's card from persisting in the Buy column.
+
 ### 7.26 — UI Bug Fixes: Save Counter, Round Label, Settings Groups
 
 **B26 — Save counter shows 0 until clicked:** `SetupScreen` fetched saves lazily (on click only). Added `useEffect` on mount to fetch saves immediately, matching `SaveLoadMenu`'s pattern.

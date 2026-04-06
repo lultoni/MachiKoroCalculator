@@ -1,14 +1,18 @@
 import { useState } from 'react';
 import { useLocale } from '../i18n/useLocale';
-import type { H2hGameLog, H2hTurnLog } from '../api/types';
+import type { H2hGameLog, H2hTurnLog, ProjectDef } from '../api/types';
+import { cardTextClass, categoryIconPath } from '../utils/cardDisplay';
+import { CardTooltip } from './CardTooltip';
 
 interface Props {
   game: H2hGameLog;
   engines: string[];
+  projects: { byId: (id: string) => ProjectDef | undefined };
+  language: 'de' | 'en';
   onBack: () => void;
 }
 
-export function H2hGameReplay({ game, engines, onBack }: Props) {
+export function H2hGameReplay({ game, engines, projects, language, onBack }: Props) {
   const { t } = useLocale();
   const [turnIdx, setTurnIdx] = useState(0);
 
@@ -136,7 +140,20 @@ export function H2hGameReplay({ game, engines, onBack }: Props) {
               <div className="bg-machi-bg rounded-lg p-3">
                 <div className="text-machi-text-dim text-xs mb-1">{t('h2h.purchase')}</div>
                 <div className="font-mono">
-                  {turn.purchasedCardId ?? t('h2h.save')}
+                  {turn.purchasedCardId ? (() => {
+                    const proj = projects.byId(turn.purchasedCardId);
+                    const name = proj?.[`name_${language}` as 'name_de' | 'name_en'] ?? proj?.name_de ?? turn.purchasedCardId;
+                    return (
+                      <CardTooltip project={proj} language={language}>
+                        <span className={`inline-flex items-center ${cardTextClass(proj?.color)}`}>
+                          {categoryIconPath(proj?.category) && (
+                            <img src={categoryIconPath(proj?.category)} alt="" className="w-3.5 h-3.5 mr-0.5" />
+                          )}
+                          {name}
+                        </span>
+                      </CardTooltip>
+                    );
+                  })() : t('h2h.save')}
                 </div>
                 <div className="text-xs text-machi-text-dim mt-0.5">
                   WR: {(turn.purchaseWinRate * 100).toFixed(1)}%

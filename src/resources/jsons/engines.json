@@ -6,8 +6,7 @@
     "default": false,
     "tier": "fast",
     "config": {
-      "iterations": "500",
-      "rolloutPolicy": "greedy"
+      "iterations": "500"
     }
   },
   {
@@ -17,8 +16,7 @@
     "default": true,
     "tier": "balanced",
     "config": {
-      "iterations": "5000",
-      "rolloutPolicy": "greedy"
+      "iterations": "5000"
     }
   },
   {
@@ -28,8 +26,7 @@
     "default": false,
     "tier": "deep",
     "config": {
-      "iterations": "50000",
-      "rolloutPolicy": "greedy"
+      "iterations": "50000"
     }
   },
   {

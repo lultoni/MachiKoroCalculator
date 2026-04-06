@@ -29,7 +29,7 @@ export default function App() {
 
   // H2H view
   if (view === 'h2h') {
-    return <H2hOverview onBack={() => setView('game')} />;
+    return <H2hOverview onBack={() => setView('game')} projects={projects} language={settings.language} />;
   }
 
   // No active session → setup screen

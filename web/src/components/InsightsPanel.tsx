@@ -2,6 +2,8 @@
 
 import { useLocale } from '../i18n/useLocale';
 import type { InsightsResponse, ProjectDef } from '../api/types';
+import { cardTextClass, categoryIconPath } from '../utils/cardDisplay';
+import { CardTooltip } from './CardTooltip';
 
 interface Props {
   insights: InsightsResponse | null;
@@ -84,7 +86,14 @@ export function InsightsPanel({ insights, loading, projects, language }: Props) 
             const name = proj?.[`name_${language}` as 'name_de' | 'name_en'] ?? w.cardId;
             return (
               <div key={w.cardId} className="text-xs flex justify-between">
-                <span className="text-machi-yellow">{name}</span>
+                <CardTooltip project={proj} language={language}>
+                  <span className={`inline-flex items-center ${cardTextClass(proj?.color)}`}>
+                    {categoryIconPath(proj?.category) && (
+                      <img src={categoryIconPath(proj?.category)} alt="" className="w-3 h-3 mr-0.5" />
+                    )}
+                    {name}
+                  </span>
+                </CardTooltip>
                 <span className="text-machi-text-dim font-mono">{w.remaining} left</span>
               </div>
             );

@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { useLocale } from '../i18n/useLocale';
 import type { RankedOption, MetricRange, ProjectDef } from '../api/types';
-import { cardTextClass } from '../utils/cardDisplay';
+import { cardTextClass, categoryIconPath } from '../utils/cardDisplay';
+import { CardTooltip } from './CardTooltip';
 import { RankedList } from './RankedList';
 import { ExplanationFactors } from './ExplanationFactors';
 
@@ -88,9 +89,14 @@ export function AssistantPanel({ options, metricRanges, loading, projects, langu
             <div className="text-xs text-machi-text-dim uppercase tracking-wider mb-1">
               {t('purchase.recommendation')}
             </div>
-            <div className={`text-lg font-bold ${isWait ? 'text-machi-text-dim' : cardTextClass(topProj?.color)}`}>
-              {topName}
-            </div>
+            <CardTooltip project={topProj} language={language}>
+              <span className={`text-lg font-bold inline-flex items-center ${isWait ? 'text-machi-text-dim' : cardTextClass(topProj?.color)}`}>
+                {!isWait && topProj?.category && categoryIconPath(topProj.category) && (
+                  <img src={categoryIconPath(topProj.category)} alt="" className="w-5 h-5 mr-1" />
+                )}
+                {topName}
+              </span>
+            </CardTooltip>
             {top.summarySentence ? (
               <p className="text-sm text-machi-text-dim mt-1">{top.summarySentence}</p>
             ) : top.explanationFactors.length > 0 ? (
@@ -130,7 +136,7 @@ export function AssistantPanel({ options, metricRanges, loading, projects, langu
                 onClick={() => onBuy(top.projectId)}
                 disabled={!top.affordable}
               >
-                {t('coins.buy')} {topName}
+                {t('coins.buy')}
                 {topProj && <span className="ml-1 text-sm opacity-75">({topProj.cost}c)</span>}
               </button>
               <button

@@ -1,6 +1,7 @@
 /** Coin flow display — Now / Roll / Buy columns with live updates. */
 
 import { useLocale } from '../i18n/useLocale';
+import { cardTextClass, categoryIconPath } from '../utils/cardDisplay';
 import type { HoverCard } from '../hooks/useHover';
 
 interface Props {
@@ -9,11 +10,15 @@ interface Props {
   hovered: HoverCard | null;
   language: 'de' | 'en';
   projectName?: string;           // name of hovered card
+  projectColor?: string;          // color of hovered card
+  projectCategory?: string;       // category of hovered card
   recommendedName?: string;       // name of top recommended card (fallback)
   recommendedCost?: number;       // cost of top recommended card
+  recommendedColor?: string;      // color of top recommended card
+  recommendedCategory?: string;   // category of top recommended card
 }
 
-export function CoinFlowDisplay({ coinsNow, coinDelta, hovered, projectName, recommendedName, recommendedCost }: Props) {
+export function CoinFlowDisplay({ coinsNow, coinDelta, hovered, projectName, projectColor, projectCategory, recommendedName, recommendedCost, recommendedColor, recommendedCategory }: Props) {
   const { t } = useLocale();
   const coinsAfterRoll = coinDelta != null ? coinsNow + coinDelta : null;
   const coinsAfterBuy = coinsAfterRoll != null && hovered ? coinsAfterRoll - hovered.cost : null;
@@ -22,6 +27,8 @@ export function CoinFlowDisplay({ coinsNow, coinDelta, hovered, projectName, rec
   const showRecommended = !hovered && recommendedName && recommendedCost != null && coinsAfterRoll != null;
   const displayCost = showRecommended ? coinsAfterRoll! - recommendedCost! : coinsAfterBuy;
   const displayName = showRecommended ? recommendedName : projectName;
+  const displayColor = showRecommended ? recommendedColor : projectColor;
+  const displayCategory = showRecommended ? recommendedCategory : projectCategory;
 
   return (
     <div className="grid grid-cols-3 gap-4 text-center">
@@ -65,7 +72,10 @@ export function CoinFlowDisplay({ coinsNow, coinDelta, hovered, projectName, rec
         {/* Always-visible project name line (fixed height prevents jitter) */}
         <div className="text-xs mt-0.5 truncate h-4">
           {displayName ? (
-            <span className={showRecommended ? 'text-machi-text-dim/40' : 'text-machi-text-dim'}>
+            <span className={`inline-flex items-center ${showRecommended ? 'opacity-30' : ''} ${cardTextClass(displayColor)}`}>
+              {categoryIconPath(displayCategory) && (
+                <img src={categoryIconPath(displayCategory)} alt="" className="w-3 h-3 mr-0.5" />
+              )}
               {displayName}
             </span>
           ) : (

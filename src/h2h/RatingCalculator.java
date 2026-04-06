@@ -21,7 +21,7 @@ public final class RatingCalculator {
      * Matches with fewer games still count as 1 period; larger matches
      * produce {@code max(1, gameCount / BASE_GAMES_PER_ROUND)} periods.
      */
-    static final int BASE_GAMES_PER_ROUND = 100;
+    static final int BASE_GAMES_PER_ROUND = 50;
 
     private RatingCalculator() {}
 

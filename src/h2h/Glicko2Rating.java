@@ -143,17 +143,17 @@ public final class Glicko2Rating {
             // Find B such that f(B) < 0
             int k = 1;
             B = a - k * TAU;
-            while (f.applyAsDouble(B) > 0) {
+            while (f.applyAsDouble(B) > 0 && k < 100) {
                 k++;
                 B = a - k * TAU;
             }
         }
 
-        // Illinois method to find root
+        // Illinois method to find root (max 100 iterations for safety)
         double fA = f.applyAsDouble(A);
         double fB = f.applyAsDouble(B);
 
-        while (Math.abs(B - A) > EPSILON) {
+        for (int iter = 0; iter < 100 && Math.abs(B - A) > EPSILON; iter++) {
             double C = A + (A - B) * fA / (fB - fA);
             double fC = f.applyAsDouble(C);
 

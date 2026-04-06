@@ -15,7 +15,7 @@ public final class MatchResult {
     public final double[] winRates;
     public double avgGameLength;
     public double avgEvalTimeMs;
-    public final List<GameLog> gameLogs;
+    public List<GameLog> gameLogs;
     public long totalTimeMs;
 
     public MatchResult(MatchConfig config, List<GameLog> gameLogs, long totalTimeMs) {

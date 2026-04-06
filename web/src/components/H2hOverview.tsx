@@ -5,6 +5,7 @@ import * as api from '../api/client';
 import type { EngineRegistryEntry, ProjectDef } from '../api/types';
 import { H2hMatchDetail } from './H2hMatchDetail';
 import { H2hGameReplay } from './H2hGameReplay';
+import { H2hRatings } from './H2hRatings';
 
 interface Props {
   onBack: () => void;
@@ -38,6 +39,17 @@ function fieldsToConfigMap(fields: { key: string; value: string }[]): Record<str
   return map;
 }
 
+/** Known parameter hints for engine config fields (#18). */
+const PARAM_HINTS: Record<string, { description: string; options?: string[] }> = {
+  iterations:           { description: 'MCTS iterations (0 = unlimited)' },
+  timeBudgetMs:         { description: 'Time budget in ms (0 = no limit)' },
+  riskToleranceWeight:  { description: 'Risk tolerance [0.0–1.0]' },
+  rolloutTemperature:   { description: 'Boltzmann temperature (e.g. 0.3, 0.7, 2.0)' },
+  maxRolloutDepth:      { description: 'Max rollout depth in turns (e.g. 3, 7, 10)' },
+  maxDepthRounds:       { description: 'Expectimax search depth (e.g. 1, 2)' },
+  leafEval:             { description: 'Leaf evaluator function', options: ['winprob', 'composite'] },
+};
+
 export function H2hOverview({ onBack, projects, language }: Props) {
   const h2h = useH2h();
   const { t } = useLocale();
@@ -45,8 +57,11 @@ export function H2hOverview({ onBack, projects, language }: Props) {
   const [engineA, setEngineA] = useState('mcts-v1-fast');
   const [engineB, setEngineB] = useState('mcts-v1-fast');
   const [games, setGames] = useState(100);
+  const [maxTurns, setMaxTurns] = useState(200);
+  const [seatSwap, setSeatSwap] = useState(true);
   const [fieldsA, setFieldsA] = useState<{ key: string; value: string }[]>([]);
   const [fieldsB, setFieldsB] = useState<{ key: string; value: string }[]>([]);
+  const [view, setView] = useState<'overview' | 'ratings'>('overview');
 
   useEffect(() => {
     h2h.loadResults();
@@ -64,6 +79,11 @@ export function H2hOverview({ onBack, projects, language }: Props) {
   useEffect(() => {
     if (engineBInfo) setFieldsB(buildConfigFields(engineBInfo));
   }, [engineBInfo]);
+
+  // Ratings view
+  if (view === 'ratings') {
+    return <H2hRatings onBack={() => setView('overview')} />;
+  }
 
   // Game replay view
   if (h2h.selectedGame && h2h.selectedResult) {
@@ -99,7 +119,9 @@ export function H2hOverview({ onBack, projects, language }: Props) {
   const handleStart = () => {
     const configA = fieldsA.length > 0 ? fieldsToConfigMap(fieldsA) : undefined;
     const configB = fieldsB.length > 0 ? fieldsToConfigMap(fieldsB) : undefined;
-    h2h.startMatch(engineA, engineB, games, configA, configB);
+    h2h.startMatch(engineA, engineB, games, configA, configB,
+      maxTurns !== 200 ? maxTurns : undefined,
+      seatSwap ? undefined : false);
   };
 
   // Overview
@@ -115,6 +137,12 @@ export function H2hOverview({ onBack, projects, language }: Props) {
             ← {t('btn.back')}
           </button>
           <h1 className="text-2xl font-bold">{t('h2h.title')}</h1>
+          <button
+            onClick={() => setView('ratings')}
+            className="ml-auto text-sm text-machi-text-dim hover:text-machi-accent transition-colors"
+          >
+            {t('h2h.ratingsNav')}
+          </button>
         </div>
 
         {/* Start Match Panel */}
@@ -141,17 +169,31 @@ export function H2hOverview({ onBack, projects, language }: Props) {
               {/* Per-engine config fields */}
               {fieldsA.length > 0 && (
                 <div className="mt-2 space-y-1.5">
-                  {fieldsA.map((f, i) => (
-                    <div key={f.key} className="flex items-center gap-2">
-                      <label className="text-[11px] text-machi-text-dim w-32 shrink-0 text-right">{f.key}</label>
-                      <input
-                        type="text"
-                        value={f.value}
-                        onChange={e => updateFieldA(i, e.target.value)}
-                        className="flex-1 bg-machi-bg border border-machi-border rounded px-2 py-1 text-xs font-mono"
-                      />
-                    </div>
-                  ))}
+                  {fieldsA.map((f, i) => {
+                    const hint = PARAM_HINTS[f.key];
+                    return (
+                      <div key={f.key} className="flex items-center gap-2">
+                        <label className="text-[11px] text-machi-text-dim w-32 shrink-0 text-right" title={hint?.description}>{f.key}</label>
+                        {hint?.options ? (
+                          <select
+                            value={f.value}
+                            onChange={e => updateFieldA(i, e.target.value)}
+                            className="flex-1 bg-machi-bg border border-machi-border rounded px-2 py-1 text-xs font-mono"
+                          >
+                            {hint.options.map(o => <option key={o} value={o}>{o}</option>)}
+                          </select>
+                        ) : (
+                          <input
+                            type="text"
+                            value={f.value}
+                            onChange={e => updateFieldA(i, e.target.value)}
+                            className="flex-1 bg-machi-bg border border-machi-border rounded px-2 py-1 text-xs font-mono"
+                            title={hint?.description}
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -175,33 +217,69 @@ export function H2hOverview({ onBack, projects, language }: Props) {
               {/* Per-engine config fields */}
               {fieldsB.length > 0 && (
                 <div className="mt-2 space-y-1.5">
-                  {fieldsB.map((f, i) => (
-                    <div key={f.key} className="flex items-center gap-2">
-                      <label className="text-[11px] text-machi-text-dim w-32 shrink-0 text-right">{f.key}</label>
-                      <input
-                        type="text"
-                        value={f.value}
-                        onChange={e => updateFieldB(i, e.target.value)}
-                        className="flex-1 bg-machi-bg border border-machi-border rounded px-2 py-1 text-xs font-mono"
-                      />
-                    </div>
-                  ))}
+                  {fieldsB.map((f, i) => {
+                    const hint = PARAM_HINTS[f.key];
+                    return (
+                      <div key={f.key} className="flex items-center gap-2">
+                        <label className="text-[11px] text-machi-text-dim w-32 shrink-0 text-right" title={hint?.description}>{f.key}</label>
+                        {hint?.options ? (
+                          <select
+                            value={f.value}
+                            onChange={e => updateFieldB(i, e.target.value)}
+                            className="flex-1 bg-machi-bg border border-machi-border rounded px-2 py-1 text-xs font-mono"
+                          >
+                            {hint.options.map(o => <option key={o} value={o}>{o}</option>)}
+                          </select>
+                        ) : (
+                          <input
+                            type="text"
+                            value={f.value}
+                            onChange={e => updateFieldB(i, e.target.value)}
+                            className="flex-1 bg-machi-bg border border-machi-border rounded px-2 py-1 text-xs font-mono"
+                            title={hint?.description}
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
           </div>
 
           {/* Games (full width row) */}
-          <div className="mb-4">
-            <label className="block text-sm text-machi-text-dim mb-1">{t('h2h.games')}</label>
-            <input
-              type="number"
-              value={games}
-              onChange={e => setGames(Number(e.target.value))}
-              min={1}
-              max={1000}
-              className="w-40 bg-machi-bg border border-machi-border rounded-lg px-3 py-2 text-sm"
-            />
+          <div className="mb-4 flex flex-wrap items-center gap-6">
+            <div>
+              <label className="block text-sm text-machi-text-dim mb-1">{t('h2h.games')}</label>
+              <input
+                type="number"
+                value={games}
+                onChange={e => setGames(Number(e.target.value))}
+                min={1}
+                max={1000}
+                className="w-40 bg-machi-bg border border-machi-border rounded-lg px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-sm text-machi-text-dim mb-1">{t('h2h.maxTurns')}</label>
+              <input
+                type="number"
+                value={maxTurns}
+                onChange={e => setMaxTurns(Number(e.target.value))}
+                min={10}
+                max={1000}
+                className="w-40 bg-machi-bg border border-machi-border rounded-lg px-3 py-2 text-sm"
+              />
+            </div>
+            <label className="flex items-center gap-2 cursor-pointer mt-5">
+              <input
+                type="checkbox"
+                checked={seatSwap}
+                onChange={e => setSeatSwap(e.target.checked)}
+                className="accent-machi-accent"
+              />
+              <span className="text-sm text-machi-text-dim">{t('h2h.seatSwap')}</span>
+            </label>
           </div>
 
           {h2h.progress ? (

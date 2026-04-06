@@ -41,9 +41,25 @@ final class H2hHandler implements HttpHandler {
     /** In-progress match tracking. */
     private final Map<String, MatchProgress> activeMatches = new ConcurrentHashMap<>();
 
+    /** Cached Glicko-2 ratings (recomputed when store version changes). */
+    private volatile java.util.Map<String, Glicko2Rating> cachedRatings;
+    private volatile int cachedRatingsVersion = -1;
+
     H2hHandler(EngineOrchestrator orchestrator, H2hResultStore store) {
         this.orchestrator = orchestrator;
         this.store = store;
+        // Pre-warm rating cache in background
+        Thread warmup = new Thread(() -> {
+            try {
+                java.util.List<MatchResult> all = store.loadAll();
+                cachedRatings = RatingCalculator.computeRatings(all);
+                cachedRatingsVersion = store.version();
+            } catch (Exception e) {
+                System.err.println("[H2hHandler] Failed to pre-warm rating cache: " + e.getMessage());
+            }
+        }, "h2h-rating-warmup");
+        warmup.setDaemon(true);
+        warmup.start();
     }
 
     @Override
@@ -87,6 +103,7 @@ final class H2hHandler implements HttpHandler {
         String engineB = body.has("engineB") ? body.get("engineB").getAsString() : "mcts-v1-fast";
         int games = body.has("games") ? body.get("games").getAsInt() : 100;
         int maxTurns = body.has("maxTurns") ? body.get("maxTurns").getAsInt() : 200;
+        boolean seatSwap = !body.has("seatSwap") || body.get("seatSwap").getAsBoolean();
 
         // Per-engine config overrides (new API)
         @SuppressWarnings("unchecked")
@@ -101,7 +118,7 @@ final class H2hHandler implements HttpHandler {
         int iterations = body.has("iterations") ? body.get("iterations").getAsInt() : 0;
 
         MatchConfig config = new MatchConfig(
-                new String[]{engineA, engineB}, games, maxTurns, iterations, true, configOverrides);
+                new String[]{engineA, engineB}, games, maxTurns, iterations, seatSwap, configOverrides);
 
         String matchId = java.util.UUID.randomUUID().toString().substring(0, 8);
         MatchProgress progress = new MatchProgress(matchId, config);
@@ -202,7 +219,7 @@ final class H2hHandler implements HttpHandler {
         }
 
         MatchResult result = store.findById(matchId);
-        if (result == null) {
+        if (result == null || result.gameLogs == null) {
             ApiUtils.sendError(exchange, 404, "No match result: " + matchId);
             return;
         }
@@ -224,7 +241,7 @@ final class H2hHandler implements HttpHandler {
         obj.addProperty("totalTimeMs", r.totalTimeMs);
         obj.addProperty("avgGameLength", r.avgGameLength);
         obj.addProperty("avgEvalTimeMs", r.avgEvalTimeMs);
-        obj.addProperty("gameCount", r.gameLogs.size());
+        obj.addProperty("gameCount", r.gameLogs != null ? r.gameLogs.size() : r.config.gameCount());
 
         JsonArray engines = new JsonArray();
         for (String eid : r.config.engineIds()) engines.add(eid);
@@ -246,8 +263,14 @@ final class H2hHandler implements HttpHandler {
     // -------------------------------------------------------------------------
 
     private void handleRatings(HttpExchange exchange) throws IOException {
-        java.util.List<MatchResult> all = store.loadAll();
-        java.util.Map<String, Glicko2Rating> ratings = RatingCalculator.computeRatings(all);
+        int storeVersion = store.version();
+        java.util.Map<String, Glicko2Rating> ratings = cachedRatings;
+        if (ratings == null || storeVersion != cachedRatingsVersion) {
+            java.util.List<MatchResult> all = store.loadAll();
+            ratings = RatingCalculator.computeRatings(all);
+            cachedRatings = ratings;
+            cachedRatingsVersion = storeVersion;
+        }
 
         JsonObject response = new JsonObject();
         JsonObject ratingsObj = new JsonObject();

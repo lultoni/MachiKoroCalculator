@@ -148,7 +148,22 @@ const en: Record<string, string> = {
   'h2h.purchase': 'Purchase',
   'h2h.save': 'Save',
   'h2h.finalState': 'Final State',
-  'h2h.nav': 'H2H Testing',
+  'h2h.nav': 'H2H-Testing',
+  'h2h.maxTurns': 'Max Turns',
+  'h2h.seatSwap': 'Seat Swap (mid-match)',
+  'h2h.ratingsNav': 'Ratings',
+  'h2h.ratingsTitle': 'Glicko-2 Engine Ratings',
+  'h2h.ratingsEngine': 'Engine',
+  'h2h.ratingsRating': 'Rating',
+  'h2h.ratingsRd': 'RD (±)',
+  'h2h.ratingsMatches': 'Matches',
+  'h2h.ratingsLoading': 'Computing ratings…',
+  'h2h.ratingsInfo': 'Glicko-2 ratings computed from all H2H matches. Lower RD = more reliable rating. Engines need more matches for accurate placement.',
+  'h2h.ratingsRatingTip': 'Skill estimate (Glicko-2). Starts at 1500. Higher = stronger engine.',
+  'h2h.ratingsRdTip': 'Rating Deviation — uncertainty of the rating. Lower = more confident. Decreases with more matches.',
+  'h2h.ratingsMatchesTip': 'Number of H2H matches this engine has participated in.',
+  'h2h.ratingsConf': 'Confidence',
+  'h2h.ratingsConfTip': 'Rating confidence based on RD: High (RD<100, many matches), Mid (RD 100–200), Low (RD>200, few matches).',
 };
 
 export default en;

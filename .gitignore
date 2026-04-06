@@ -30,6 +30,8 @@ bin/
 
 ### MachiKoro ###
 saves/
+data/h2h-summaries.json
+data/h2h-gamelogs/
 web/node_modules/
 web/dist/
 *.iml

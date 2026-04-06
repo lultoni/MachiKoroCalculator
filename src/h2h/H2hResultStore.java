@@ -43,6 +43,7 @@ public final class H2hResultStore {
         this.summaryPath = dataDir.resolve("h2h-summaries.json");
         this.gamelogDir = dataDir.resolve("h2h-gamelogs");
         migrateIfNeeded(dataDir);
+        enrichSummariesIfNeeded();
     }
 
     /**
@@ -150,6 +151,67 @@ public final class H2hResultStore {
         } catch (IOException e) {
             System.err.println("[H2hResultStore] Failed to read gamelogs for " + matchId + ": " + e.getMessage());
             return null;
+        }
+    }
+
+    /**
+     * One-time enrichment: backfills per-engine eval times and game extremes
+     * for old summaries that lack these fields. Loads gameLogs per match,
+     * computes the missing stats, and rewrites the summary file.
+     */
+    private void enrichSummariesIfNeeded() {
+        if (!Files.exists(summaryPath)) return;
+        List<MatchResult> all = loadAll();
+        boolean changed = false;
+
+        for (MatchResult r : all) {
+            if (r.avgEvalTimeMsPerEngine != null) continue; // already enriched
+
+            List<GameLog> logs = loadGameLogs(r.id);
+            if (logs == null || logs.isEmpty()) continue;
+
+            int n = r.config != null ? r.config.playerCount() : 2;
+            boolean hasSeatSwap = r.config != null && r.config.seatSwap() && n == 2;
+            int swapPoint = r.config != null ? r.config.gameCount() / 2 : logs.size() / 2;
+
+            double[] evalMs = new double[n];
+            int[] evalCount = new int[n];
+            int shortIdx = -1, longIdx = -1;
+            int shortTurns = Integer.MAX_VALUE, longTurns = Integer.MIN_VALUE;
+
+            for (GameLog log : logs) {
+                boolean swapped = hasSeatSwap && log.gameIndex >= swapPoint;
+                for (TurnLog turn : log.turns) {
+                    if (turn.playerIndex >= 0 && turn.playerIndex < n) {
+                        int engineIdx = swapped ? (1 - turn.playerIndex) : turn.playerIndex;
+                        evalMs[engineIdx] += turn.evaluateTimeMs;
+                        evalCount[engineIdx]++;
+                    }
+                }
+                if (log.totalTurns < shortTurns) {
+                    shortTurns = log.totalTurns;
+                    shortIdx = log.gameIndex;
+                }
+                if (log.totalTurns > longTurns) {
+                    longTurns = log.totalTurns;
+                    longIdx = log.gameIndex;
+                }
+            }
+
+            r.avgEvalTimeMsPerEngine = new double[n];
+            for (int i = 0; i < n; i++) {
+                r.avgEvalTimeMsPerEngine[i] = evalCount[i] > 0 ? evalMs[i] / evalCount[i] : 0.0;
+            }
+            r.shortestGameIndex = shortIdx;
+            r.longestGameIndex = longIdx;
+            r.shortestGameTurns = !logs.isEmpty() ? shortTurns : 0;
+            r.longestGameTurns = !logs.isEmpty() ? longTurns : 0;
+            changed = true;
+        }
+
+        if (changed) {
+            writeSummaries(all);
+            System.out.println("[H2hResultStore] Enriched " + all.size() + " summaries with per-engine stats.");
         }
     }
 

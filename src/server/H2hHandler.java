@@ -255,6 +255,19 @@ final class H2hHandler implements HttpHandler {
         for (double wr : r.winRates) winRates.add(Math.round(wr * 1000.0) / 1000.0);
         obj.add("winRates", winRates);
 
+        // Per-engine eval times
+        if (r.avgEvalTimeMsPerEngine != null) {
+            JsonArray evalPerEngine = new JsonArray();
+            for (double e : r.avgEvalTimeMsPerEngine) evalPerEngine.add(Math.round(e * 10.0) / 10.0);
+            obj.add("avgEvalTimeMsPerEngine", evalPerEngine);
+        }
+
+        // Game extremes
+        obj.addProperty("shortestGameIndex", r.shortestGameIndex);
+        obj.addProperty("longestGameIndex", r.longestGameIndex);
+        obj.addProperty("shortestGameTurns", r.shortestGameTurns);
+        obj.addProperty("longestGameTurns", r.longestGameTurns);
+
         return obj;
     }
 

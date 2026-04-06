@@ -256,6 +256,11 @@ export interface H2hMatchSummary {
   totalTimeMs: number;
   avgGameLength: number;
   avgEvalTimeMs: number;
+  avgEvalTimeMsPerEngine?: number[];
+  shortestGameIndex?: number;
+  longestGameIndex?: number;
+  shortestGameTurns?: number;
+  longestGameTurns?: number;
   gameCount: number;
   engines: string[];
   wins: number[];
@@ -269,5 +274,6 @@ export interface H2hMatchResult extends H2hMatchSummary {
     gameCount: number;
     maxTurnsPerGame: number;
     iterationsPerEval: number;
+    seatSwap?: boolean;
   };
 }

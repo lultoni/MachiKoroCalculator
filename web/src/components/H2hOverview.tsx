@@ -321,39 +321,51 @@ export function H2hOverview({ onBack, projects, language }: Props) {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-machi-text-dim border-b border-machi-border">
-                    <th className="text-left py-2 px-2">{t('h2h.matchup')}</th>
+                    <th className="text-right py-2 px-2">{t('h2h.avgEval')}</th>
+                    <th className="text-right py-2 px-2">{t('h2h.winRate')}</th>
+                    <th className="text-center py-2 px-2">{t('h2h.matchup')}</th>
+                    <th className="text-left py-2 px-2">{t('h2h.winRate')}</th>
+                    <th className="text-left py-2 px-2">{t('h2h.avgEval')}</th>
                     <th className="text-center py-2 px-2">{t('h2h.gamesCol')}</th>
-                    <th className="text-center py-2 px-2">P1 {t('h2h.winRate')}</th>
-                    <th className="text-center py-2 px-2">P2 {t('h2h.winRate')}</th>
                     <th className="text-center py-2 px-2">{t('h2h.avgTurns')}</th>
-                    <th className="text-center py-2 px-2">{t('h2h.time')}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {[...h2h.results].reverse().map(r => (
-                    <tr
-                      key={r.id}
-                      onClick={() => h2h.selectResult(r.id)}
-                      className="border-b border-machi-border/50 hover:bg-machi-bg/50 cursor-pointer transition"
-                    >
-                      <td className="py-2 px-2">
-                        <span className="font-mono text-xs">{r.engines[0]}</span>
-                        <span className="text-machi-text-dim mx-1">vs</span>
-                        <span className="font-mono text-xs">{r.engines[1]}</span>
-                      </td>
-                      <td className="text-center py-2 px-2">{r.gameCount}</td>
-                      <td className="text-center py-2 px-2 font-semibold">
-                        {(r.winRates[0] * 100).toFixed(1)}%
-                      </td>
-                      <td className="text-center py-2 px-2 font-semibold">
-                        {(r.winRates[1] * 100).toFixed(1)}%
-                      </td>
-                      <td className="text-center py-2 px-2">{r.avgGameLength.toFixed(0)}</td>
-                      <td className="text-center py-2 px-2 text-machi-text-dim">
-                        {(r.totalTimeMs / 1000).toFixed(1)}s
-                      </td>
-                    </tr>
-                  ))}
+                  {[...h2h.results].reverse().map(r => {
+                    const evalA = r.avgEvalTimeMsPerEngine?.[0] ?? r.avgEvalTimeMs;
+                    const evalB = r.avgEvalTimeMsPerEngine?.[1] ?? r.avgEvalTimeMs;
+                    const winA = r.winRates[0] * 100;
+                    const winB = r.winRates[1] * 100;
+                    const aWins = winA > winB;
+                    const bWins = winB > winA;
+                    return (
+                      <tr
+                        key={r.id}
+                        onClick={() => h2h.selectResult(r.id)}
+                        className="border-b border-machi-border/50 hover:bg-machi-bg/50 cursor-pointer transition"
+                      >
+                        <td className="text-right py-2 px-2 text-machi-text-dim text-xs tabular-nums">
+                          {evalA.toFixed(0)}<span className="text-[10px]">ms</span>
+                        </td>
+                        <td className={`text-right py-2 px-2 font-semibold tabular-nums ${aWins ? 'text-machi-accent' : ''}`}>
+                          {winA.toFixed(1)}%
+                        </td>
+                        <td className="text-center py-2 px-2">
+                          <span className={`font-mono text-xs ${aWins ? 'text-machi-accent font-bold' : ''}`}>{r.engines[0]}</span>
+                          <span className="text-machi-text-dim mx-1.5">vs</span>
+                          <span className={`font-mono text-xs ${bWins ? 'text-machi-accent font-bold' : ''}`}>{r.engines[1]}</span>
+                        </td>
+                        <td className={`text-left py-2 px-2 font-semibold tabular-nums ${bWins ? 'text-machi-accent' : ''}`}>
+                          {winB.toFixed(1)}%
+                        </td>
+                        <td className="text-left py-2 px-2 text-machi-text-dim text-xs tabular-nums">
+                          {evalB.toFixed(0)}<span className="text-[10px]">ms</span>
+                        </td>
+                        <td className="text-center py-2 px-2 text-machi-text-dim">{r.gameCount}</td>
+                        <td className="text-center py-2 px-2 text-machi-text-dim">{r.avgGameLength.toFixed(0)}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

@@ -27,18 +27,6 @@ export function SettingsScreen({ settings, update, players, onClose }: Props) {
     api.h2hRatings().then(r => setRatings(r.ratings)).catch(() => {});
   }, []);
 
-  // Auto-expand the group containing the selected engine
-  useEffect(() => {
-    if (engines.length === 0) return;
-    const selected = engines.find(e => e.id === settings.engineId);
-    if (selected) {
-      const groupKey = groupMode === 'class' ? selected.engineClass
-        : groupMode === 'tier' ? selected.tier
-        : ratingBucket(ratings[selected.id]);
-      setExpandedGroups(new Set([groupKey]));
-    }
-  }, [engines, groupMode, settings.engineId]);
-
   // Group engines
   const groups = useMemo(() => {
     const map: Record<string, EngineRegistryEntry[]> = {};
@@ -71,6 +59,12 @@ export function SettingsScreen({ settings, update, players, onClose }: Props) {
     return sorted;
   }, [engines, ratings, groupMode]);
 
+  // Expand all groups by default, keep collapsible for user control
+  useEffect(() => {
+    if (groups.length === 0) return;
+    setExpandedGroups(new Set(groups.map(([key]) => key)));
+  }, [groups]);
+
   const toggleGroup = (key: string) => {
     setExpandedGroups(prev => {
       const next = new Set(prev);
@@ -81,6 +75,16 @@ export function SettingsScreen({ settings, update, players, onClose }: Props) {
 
   const selectedEngine = engines.find(e => e.id === settings.engineId);
   const selectedRating = selectedEngine ? ratings[selectedEngine.id] : undefined;
+
+  // Best-rated engine gets the star badge
+  const bestRatedId = useMemo(() => {
+    let bestId = '';
+    let bestRating = -Infinity;
+    for (const [id, r] of Object.entries(ratings)) {
+      if (r.rating > bestRating) { bestRating = r.rating; bestId = id; }
+    }
+    return bestId;
+  }, [ratings]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
@@ -166,7 +170,7 @@ export function SettingsScreen({ settings, update, players, onClose }: Props) {
                           title={`${e.description}${r ? `\nRating: ${Math.round(r.rating)} ±${Math.round(r.rd)} (${r.matchCount} matches)` : ''}`}
                         >
                           {e.id}
-                          {e.isDefault && ' ★'}
+                          {e.id === bestRatedId && ' ★'}
                           {r && (
                             <span className="ml-1 opacity-70 text-[10px]">
                               {Math.round(r.rating)}

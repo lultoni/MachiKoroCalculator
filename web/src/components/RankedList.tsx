@@ -4,7 +4,8 @@ import { useState, useMemo } from 'react';
 import type { RankedOption, MetricRange, ProjectDef } from '../api/types';
 import { COLUMNS, formatMetric, type ColumnDef } from '../utils/columns';
 import { metricBgStyle } from '../utils/metricColor';
-import { cardTextClass, categoryIcon } from '../utils/cardDisplay';
+import { cardTextClass, categoryIconPath } from '../utils/cardDisplay';
+import { CardTooltip } from './CardTooltip';
 import { ExplanationFactors } from './ExplanationFactors';
 
 interface Props {
@@ -122,7 +123,8 @@ export function RankedList({ options, metricRanges, projects, language, onHover,
           </tr>
         </thead>
         <tbody>
-          {sorted.map((opt, idx) => {
+          {/* IMPORTANT: Only show affordable options + save. Never show unaffordable cards. */}
+          {sorted.filter(opt => opt.affordable || opt.projectId === '_wait_').map((opt, idx) => {
             const proj = projects.byId(opt.projectId);
             const isWait = opt.projectId === '_wait_';
             const isSelected = opt.projectId === selectedId;
@@ -132,7 +134,7 @@ export function RankedList({ options, metricRanges, projects, language, onHover,
                 key={isWait ? `_wait_${idx}` : opt.projectId}
                 className={`border-b border-machi-border/50 transition-colors cursor-pointer ${
                   isSelected ? 'bg-machi-accent/10' : 'hover:bg-machi-surface/50'
-                } ${!opt.affordable && !isWait ? 'opacity-40' : ''}`}
+                }`}
                 onClick={() => {
                   onSelect(isSelected ? null : opt.projectId);
                   setExpandedRow(isExpanded ? null : opt.projectId);
@@ -155,17 +157,22 @@ export function RankedList({ options, metricRanges, projects, language, onHover,
                   return (
                     <td key={col.key} className="px-2 py-1.5" style={cellStyle}>
                       {col.key === 'projectId' ? (
-                        <span className={cardTextClass(proj?.color)}>
-                          {proj?.category && (
-                            <span className="mr-1 text-[11px]" title={proj.category}>
-                              {categoryIcon(proj.category)}
+                        <CardTooltip project={proj} language={language}>
+                          <span className={`inline-flex items-center ${cardTextClass(proj?.color)}`}>
+                            {proj?.category && categoryIconPath(proj.category) && (
+                              <img
+                                src={categoryIconPath(proj.category)}
+                                alt={proj.category}
+                                title={proj.category}
+                                className="w-4 h-4 mr-1 inline-block"
+                              />
+                            )}
+                            {formatted}
+                            <span className="ml-1 text-[10px] text-machi-text-dim/50">
+                              {isExpanded ? '▾' : '▸'}
                             </span>
-                          )}
-                          {formatted}
-                          <span className="ml-1 text-[10px] text-machi-text-dim/50">
-                            {isExpanded ? '▾' : '▸'}
                           </span>
-                        </span>
+                        </CardTooltip>
                       ) : formatted}
                     </td>
                   );

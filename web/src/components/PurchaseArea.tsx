@@ -2,7 +2,8 @@
 
 import { useLocale } from '../i18n/useLocale';
 import type { RankedOption, MetricRange, ProjectDef } from '../api/types';
-import { cardTextClass, categoryIcon } from '../utils/cardDisplay';
+import { cardTextClass, categoryIconPath } from '../utils/cardDisplay';
+import { CardTooltip } from './CardTooltip';
 import { AssistantPanel } from './AssistantPanel';
 
 interface Props {
@@ -76,12 +77,14 @@ export function PurchaseArea({
                 onMouseEnter={() => onHover({ projectId: p.id, cost: p.cost })}
                 onMouseLeave={() => onHover(null)}
               >
-                <span className={cardTextClass(p.color)}>
-                  {p.category && (
-                    <span className="mr-0.5 text-[11px]">{categoryIcon(p.category)}</span>
-                  )}
-                  {name}
-                </span>
+                <CardTooltip project={p} language={language}>
+                  <span className={`inline-flex items-center ${cardTextClass(p.color)}`}>
+                    {p.category && categoryIconPath(p.category) && (
+                      <img src={categoryIconPath(p.category)} alt={p.category} className="w-3.5 h-3.5 mr-0.5 inline-block" />
+                    )}
+                    {name}
+                  </span>
+                </CardTooltip>
                 <span className="ml-1 text-machi-text-dim">{p.cost}c</span>
               </button>
             );

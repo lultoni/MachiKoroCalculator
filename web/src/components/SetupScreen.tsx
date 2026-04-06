@@ -21,23 +21,14 @@ export function SetupScreen({ onStart, onLoad, onFromSnapshot, loading, error, o
   const [playerCount, setPlayerCount] = useState(2);
   const [names, setNames] = useState<string[]>([...DEFAULT_NAMES]);
   const [saves, setSaves] = useState<{ filename: string; lastModified: string }[]>([]);
-  const [savesLoaded, setSavesLoaded] = useState(false);
+  const [showSaves, setShowSaves] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [snapshotJson, setSnapshotJson] = useState('');
 
   // Fetch save count on mount so the counter shows immediately
   useEffect(() => {
-    api.listSaves().then(list => { setSaves(list); setSavesLoaded(true); }).catch(() => {});
+    api.listSaves().then(setSaves).catch(() => {});
   }, []);
-
-  const loadSaves = async () => {
-    if (savesLoaded) return;
-    try {
-      const list = await api.listSaves();
-      setSaves(list);
-    } catch { /* ignore */ }
-    setSavesLoaded(true);
-  };
 
   const handleStart = () => {
     onStart({ playerCount, playerNames: names.slice(0, playerCount) });
@@ -132,31 +123,36 @@ export function SetupScreen({ onStart, onLoad, onFromSnapshot, loading, error, o
           </button>
         </div>
 
-        {/* Saved games */}
-        <div className="bg-machi-surface rounded-xl p-6 border border-machi-border space-y-3">
+        {/* Saved games — collapsible */}
+        <div className="bg-machi-surface rounded-xl border border-machi-border overflow-hidden">
           <button
-            className="flex items-center gap-2 text-machi-text-dim hover:text-machi-text transition-colors text-sm w-full"
-            onClick={loadSaves}
+            className="w-full px-6 py-3 flex items-center gap-2 text-left text-sm text-machi-text-dim hover:text-machi-text transition-colors"
+            onClick={() => setShowSaves(!showSaves)}
           >
             <span className="font-medium">{t('setup.savedGames')}</span>
             <span className="text-xs">({saves.length})</span>
+            <span className="ml-auto">{showSaves ? '▾' : '▸'}</span>
           </button>
-          {savesLoaded && saves.length === 0 && (
-            <p className="text-xs text-machi-text-dim">—</p>
+          {showSaves && (
+            <div className="px-6 pb-4 space-y-2">
+              {saves.length === 0 && (
+                <p className="text-xs text-machi-text-dim">—</p>
+              )}
+              {saves.map(s => (
+                <button
+                  key={s.filename}
+                  className="w-full text-left bg-machi-bg border border-machi-border rounded-lg px-3 py-2 hover:border-machi-accent transition-colors group"
+                  onClick={() => onLoad(s.filename)}
+                  disabled={loading}
+                >
+                  <span className="text-sm text-machi-text group-hover:text-machi-accent transition-colors">
+                    {s.filename}
+                  </span>
+                  <span className="block text-xs text-machi-text-dim">{s.lastModified}</span>
+                </button>
+              ))}
+            </div>
           )}
-          {saves.map(s => (
-            <button
-              key={s.filename}
-              className="w-full text-left bg-machi-bg border border-machi-border rounded-lg px-3 py-2 hover:border-machi-accent transition-colors group"
-              onClick={() => onLoad(s.filename)}
-              disabled={loading}
-            >
-              <span className="text-sm text-machi-text group-hover:text-machi-accent transition-colors">
-                {s.filename}
-              </span>
-              <span className="block text-xs text-machi-text-dim">{s.lastModified}</span>
-            </button>
-          ))}
         </div>
 
         {/* Advanced — from snapshot */}

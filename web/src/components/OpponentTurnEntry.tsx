@@ -4,7 +4,8 @@ import { useState, useCallback, useEffect } from 'react';
 import { useLocale } from '../i18n/useLocale';
 import { DiceInterface } from './DiceInterface';
 import type { ProjectDef, ApplyTurnRequest, GameStateJson, PlayerState } from '../api/types';
-import { cardTextClass } from '../utils/cardDisplay';
+import { cardTextClass, categoryIconPath } from '../utils/cardDisplay';
+import { CardTooltip } from './CardTooltip';
 import * as api from '../api/client';
 
 interface Props {
@@ -138,7 +139,14 @@ export function OpponentTurnEntry({ opponentName, canUse2d6, projects, language,
                   }`}
                   onClick={() => setBoughtId(p.id)}
                 >
-                  <span className={cardTextClass(p.color)}>{name}</span>
+                  <CardTooltip project={p} language={language}>
+                    <span className={`inline-flex items-center ${cardTextClass(p.color)}`}>
+                      {categoryIconPath(p.category) && (
+                        <img src={categoryIconPath(p.category)} alt="" className="w-3.5 h-3.5 mr-0.5" />
+                      )}
+                      {name}
+                    </span>
+                  </CardTooltip>
                   <span className="ml-1 text-machi-text-dim">{p.cost}c</span>
                 </button>
               );

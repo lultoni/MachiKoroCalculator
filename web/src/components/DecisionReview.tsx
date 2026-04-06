@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import { useLocale } from '../i18n/useLocale';
 import type { SessionJson, EngineSnapshotJson, ProjectDef } from '../api/types';
-import { cardTextClass, categoryIcon } from '../utils/cardDisplay';
+import { cardTextClass, categoryIconPath } from '../utils/cardDisplay';
 
 interface Props {
   session: SessionJson;
@@ -99,8 +99,8 @@ export function DecisionReview({ session, userPlayerIndex, projects, language, o
     return cardTextClass(projects.byId(id)?.color);
   };
 
-  const cardIcon = (id: string) => {
-    return categoryIcon(projects.byId(id)?.category);
+  const cardIcon = (id: string): string => {
+    return categoryIconPath(projects.byId(id)?.category);
   };
 
   return (
@@ -198,8 +198,8 @@ export function DecisionReview({ session, userPlayerIndex, projects, language, o
           {/* Your choice */}
           <div className="bg-machi-bg rounded-lg p-3">
             <div className="text-machi-text-dim text-xs mb-1">{t('review.youBought')}</div>
-            <div className={`font-semibold ${cardClass(choiceId)}`}>
-              {cardIcon(choiceId) && <span className="mr-1 text-[12px]">{cardIcon(choiceId)}</span>}
+            <div className={`font-semibold inline-flex items-center ${cardClass(choiceId)}`}>
+              {cardIcon(choiceId) && <img src={cardIcon(choiceId)} alt="" className="w-4 h-4 mr-1" />}
               {cardName(choiceId)}
             </div>
             <div className="text-xs mt-1">
@@ -218,8 +218,8 @@ export function DecisionReview({ session, userPlayerIndex, projects, language, o
             <div className="text-machi-text-dim text-xs mb-1">{t('review.enginePick')}</div>
             {engineTop ? (
               <>
-                <div className={`font-semibold ${cardClass(engineTop.projectId)}`}>
-                  {cardIcon(engineTop.projectId) && <span className="mr-1 text-[12px]">{cardIcon(engineTop.projectId)}</span>}
+                <div className={`font-semibold inline-flex items-center ${cardClass(engineTop.projectId)}`}>
+                  {cardIcon(engineTop.projectId) && <img src={cardIcon(engineTop.projectId)} alt="" className="w-4 h-4 mr-1" />}
                   {cardName(engineTop.projectId)}
                 </div>
                 <div className="text-xs text-machi-text-dim mt-1">
@@ -244,8 +244,8 @@ export function DecisionReview({ session, userPlayerIndex, projects, language, o
                 }`}
               >
                 <span className="w-5 text-right font-mono text-machi-text-dim">#{i + 1}</span>
-                <span className={`flex-1 ${cardClass(opt.projectId)}`}>
-                  {cardIcon(opt.projectId) && <span className="mr-0.5 text-[11px]">{cardIcon(opt.projectId)}</span>}
+                <span className={`flex-1 inline-flex items-center ${cardClass(opt.projectId)}`}>
+                  {cardIcon(opt.projectId) && <img src={cardIcon(opt.projectId)} alt="" className="w-3.5 h-3.5 mr-0.5" />}
                   {cardName(opt.projectId)}
                 </span>
                 <span className="font-mono text-machi-text-dim w-14 text-right">

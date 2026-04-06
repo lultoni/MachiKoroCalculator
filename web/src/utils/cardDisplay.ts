@@ -12,17 +12,17 @@ export function cardTextClass(color?: string): string {
   }
 }
 
-/** Small emoji icon for a card's category (synergy type). */
-export function categoryIcon(category?: string): string {
+/** PNG icon path for a card's category (synergy type). Returns empty string if unknown. */
+export function categoryIconPath(category?: string): string {
   switch (category) {
-    case 'food':       return '🌾';
-    case 'animal':     return '🐄';
-    case 'production': return '⛏';
-    case 'cafe':       return '☕';
-    case 'store':      return '🏪';
-    case 'factory':    return '🏭';
-    case 'market':     return '🛒';
-    case 'office':     return '🏛';
+    case 'food':       return '/icons/FOOD.png';
+    case 'animal':     return '/icons/ANIMAL.png';
+    case 'production': return '/icons/PRODUCTION.png';
+    case 'cafe':       return '/icons/CAFE.png';
+    case 'store':      return '/icons/STORE.png';
+    case 'factory':    return '/icons/FACTORY.png';
+    case 'market':     return '/icons/MARKET.png';
+    case 'office':     return '/icons/OFFICE.png';
     default:           return '';
   }
 }

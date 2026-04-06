@@ -9,13 +9,14 @@ import type { UseSessionReturn } from '../hooks/useSession';
 import type { Settings } from '../hooks/useSettings';
 import type { UseHoverReturn } from '../hooks/useHover';
 import type { ProjectDef, ApplyTurnRequest } from '../api/types';
-import { cardTextClass } from '../utils/cardDisplay';
+import { cardTextClass, categoryIconPath } from '../utils/cardDisplay';
 import { TurnIndicator } from './TurnIndicator';
 import { DiceInterface } from './DiceInterface';
 import { CoinFlowDisplay } from './CoinFlowDisplay';
 import { PurchaseArea } from './PurchaseArea';
 import { OpponentTurnEntry } from './OpponentTurnEntry';
 import { InsightsPanel } from './InsightsPanel';
+import { CardTooltip } from './CardTooltip';
 import { BürohausModal } from './BürohausModal';
 import { SettingsScreen } from './SettingsScreen';
 import { SaveLoadMenu } from './SaveLoadMenu';
@@ -296,15 +297,16 @@ export function GameScreen({ session, settings, updateSettings, projects, hover 
                   const proj = projects.byId(id);
                   if (!proj) return null;
                   return (
-                    <span
-                      key={id}
-                      className={`text-xs px-1.5 py-0.5 rounded cursor-default ${cardColorClass(proj.color)}`}
-                      onMouseEnter={() => hover.onHover({ projectId: id, cost: proj.cost })}
-                      onMouseLeave={() => hover.onHover(null)}
-                    >
-                      {proj[`name_${settings.language}` as 'name_de' | 'name_en'] ?? proj.name_de}
-                      {count > 1 ? ` ×${count}` : ''}
-                    </span>
+                    <CardTooltip key={id} project={proj} language={settings.language}>
+                      <span
+                        className={`text-xs px-1.5 py-0.5 rounded cursor-default inline-flex items-center ${cardColorClass(proj.color)}`}
+                        onMouseEnter={() => hover.onHover({ projectId: id, cost: proj.cost })}
+                        onMouseLeave={() => hover.onHover(null)}
+                      >
+                        {proj[`name_${settings.language}` as 'name_de' | 'name_en'] ?? proj.name_de}
+                        {count > 1 ? ` ×${count}` : ''}
+                      </span>
+                    </CardTooltip>
                   );
                 })}
               </div>
@@ -435,9 +437,14 @@ export function GameScreen({ session, settings, updateSettings, projects, hover 
                     onMouseEnter={() => hover.onHover({ projectId: p.id, cost: p.cost })}
                     onMouseLeave={() => hover.onHover(null)}
                   >
-                    <span className={cardTextClass(p.color)}>
-                      {p[`name_${settings.language}` as 'name_de' | 'name_en'] ?? p.name_de}
-                    </span>
+                    <CardTooltip project={p} language={settings.language}>
+                      <span className={`inline-flex items-center ${cardTextClass(p.color)}`}>
+                        {categoryIconPath(p.category) && (
+                          <img src={categoryIconPath(p.category)} alt="" className="w-3.5 h-3.5 mr-1" />
+                        )}
+                        {p[`name_${settings.language}` as 'name_de' | 'name_en'] ?? p.name_de}
+                      </span>
+                    </CardTooltip>
                     <span className={`font-mono text-xs ${remaining <= 2 && remaining > 0 ? 'text-machi-yellow' : 'text-machi-text-dim'}`}>
                       {remaining} / {p.cost}c
                     </span>
@@ -462,7 +469,14 @@ export function GameScreen({ session, settings, updateSettings, projects, hover 
                     onMouseEnter={() => hover.onHover({ projectId: p.id, cost: p.cost })}
                     onMouseLeave={() => hover.onHover(null)}
                   >
-                    <span className={cardTextClass(p.color)}>{name}</span>
+                    <CardTooltip project={p} language={settings.language}>
+                      <span className={`inline-flex items-center ${cardTextClass(p.color)}`}>
+                        {categoryIconPath(p.category) && (
+                          <img src={categoryIconPath(p.category)} alt="" className="w-3.5 h-3.5 mr-1" />
+                        )}
+                        {name}
+                      </span>
+                    </CardTooltip>
                     <div className="flex items-center gap-1.5">
                       <div className="flex gap-0.5">
                         {s.state.players.map((pl, i) => {
@@ -505,7 +519,14 @@ export function GameScreen({ session, settings, updateSettings, projects, hover 
                     onMouseEnter={() => hover.onHover({ projectId: p.id, cost: p.cost })}
                     onMouseLeave={() => hover.onHover(null)}
                   >
-                    <span className={cardTextClass(p.color)}>{name}</span>
+                    <CardTooltip project={p} language={settings.language}>
+                      <span className={`inline-flex items-center ${cardTextClass(p.color)}`}>
+                        {categoryIconPath(p.category) && (
+                          <img src={categoryIconPath(p.category)} alt="" className="w-3.5 h-3.5 mr-1" />
+                        )}
+                        {name}
+                      </span>
+                    </CardTooltip>
                     <div className="flex items-center gap-1.5">
                       <div className="flex gap-0.5">
                         {s.state.players.map((pl, i) => {

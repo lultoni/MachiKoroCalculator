@@ -50,6 +50,17 @@ const PARAM_HINTS: Record<string, { description: string; options?: string[] }> =
   leafEval:             { description: 'Leaf evaluator function', options: ['winprob', 'composite'] },
 };
 
+/** Format milliseconds as human-readable elapsed time. */
+function formatElapsed(ms: number): string {
+  const totalSec = Math.floor(ms / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m ${s}s`;
+  return `${s}s`;
+}
+
 export function H2hOverview({ onBack, projects, language }: Props) {
   const h2h = useH2h();
   const { t } = useLocale();
@@ -67,7 +78,9 @@ export function H2hOverview({ onBack, projects, language }: Props) {
   const [autoStatus, setAutoStatus] = useState<api.AutoBattleStatusResponse | null>(null);
   const [autoGames, setAutoGames] = useState(50);
   const [autoMaxRounds, setAutoMaxRounds] = useState(20);
+  const [autoEndless, setAutoEndless] = useState(true);
   const [autoTier, setAutoTier] = useState('');
+  const [autoStopping, setAutoStopping] = useState(false);
   const autoPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastSeenRoundsRef = useRef<number>(-1);
   const loadResultsRef = useRef(h2h.loadResults);
@@ -89,6 +102,7 @@ export function H2hOverview({ onBack, projects, language }: Props) {
         if (!status.running) {
           if (autoPollRef.current) clearInterval(autoPollRef.current);
           autoPollRef.current = null;
+          setAutoStopping(false);
           loadResultsRef.current();
         }
       } catch { /* ignore */ }
@@ -112,12 +126,13 @@ export function H2hOverview({ onBack, projects, language }: Props) {
 
   const handleAutoStart = async () => {
     try {
+      const rounds = autoEndless ? 0 : autoMaxRounds;
       await api.h2hAutoStart({
         gamesPerMatch: autoGames,
-        maxRounds: autoMaxRounds,
+        maxRounds: rounds,
         tier: autoTier || undefined,
       });
-      setAutoStatus({ running: true, roundsCompleted: 0, maxRounds: autoMaxRounds });
+      setAutoStatus({ running: true, roundsCompleted: 0, maxRounds: rounds, endless: autoEndless });
       pollAutoStatus();
     } catch (e: unknown) {
       setAutoStatus({ running: false, error: (e as Error).message });
@@ -125,6 +140,7 @@ export function H2hOverview({ onBack, projects, language }: Props) {
   };
 
   const handleAutoStop = async () => {
+    setAutoStopping(true);
     try {
       await api.h2hAutoStop();
     } catch { /* ignore */ }
@@ -390,7 +406,10 @@ export function H2hOverview({ onBack, projects, language }: Props) {
                 <span className="tabular-nums">
                   {t('h2h.game')} {autoStatus.gamesCompletedInMatch ?? 0}/{autoStatus.gamesPerMatch ?? '?'}
                   {' · '}
-                  Round {(autoStatus.roundsCompleted ?? 0) + 1}/{autoStatus.maxRounds ?? '?'}
+                  {autoStatus.endless
+                    ? `${t('h2h.autoMatches')} ${autoStatus.roundsCompleted ?? 0}`
+                    : `Round ${(autoStatus.roundsCompleted ?? 0) + 1}/${autoStatus.maxRounds ?? '?'}`
+                  }
                 </span>
               </div>
               {autoStatus.currentMatchup && (
@@ -405,20 +424,30 @@ export function H2hOverview({ onBack, projects, language }: Props) {
                   style={{ width: `${((autoStatus.gamesCompletedInMatch ?? 0) / (autoStatus.gamesPerMatch ?? 1)) * 100}%` }}
                 />
               </div>
-              {/* Overall round progress */}
-              <div className="w-full bg-machi-bg rounded-full h-3 overflow-hidden mb-3">
-                <div
-                  className="bg-machi-purple h-full transition-all duration-500 rounded-full"
-                  style={{ width: `${((autoStatus.roundsCompleted ?? 0) / (autoStatus.maxRounds ?? 1)) * 100}%` }}
-                />
+              {/* Overall round progress (only for finite mode) */}
+              {!autoStatus.endless && (
+                <div className="w-full bg-machi-bg rounded-full h-3 overflow-hidden mb-1">
+                  <div
+                    className="bg-machi-purple h-full transition-all duration-500 rounded-full"
+                    style={{ width: `${((autoStatus.roundsCompleted ?? 0) / (autoStatus.maxRounds ?? 1)) * 100}%` }}
+                  />
+                </div>
+              )}
+              {/* Session stats */}
+              <div className="flex flex-wrap gap-4 text-xs text-machi-text-dim mt-2 mb-3 tabular-nums">
+                <span>{t('h2h.autoMatches')}: <span className="text-machi-text">{autoStatus.roundsCompleted ?? 0}</span></span>
+                <span>{t('h2h.autoTotalGames')}: <span className="text-machi-text">{autoStatus.totalGamesPlayed ?? 0}</span></span>
+                <span>{t('h2h.autoElapsed')}: <span className="text-machi-text">{formatElapsed(autoStatus.elapsedMs ?? 0)}</span></span>
               </div>
               <button
                 onClick={handleAutoStop}
+                disabled={autoStopping}
                 className="w-full bg-red-500/80 text-white font-semibold py-2 rounded-lg
-                           hover:bg-red-500 transition"
+                           hover:bg-red-500 transition disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                {t('h2h.autoStop')}
+                {autoStopping ? `${t('h2h.autoStop')}...` : t('h2h.autoStop')}
               </button>
+              <p className="text-center text-[10px] text-machi-text-dim/60 mt-1">{t('h2h.autoStopHint')}</p>
             </div>
           ) : (
             <div>
@@ -436,14 +465,27 @@ export function H2hOverview({ onBack, projects, language }: Props) {
                 </div>
                 <div>
                   <label className="block text-[11px] text-machi-text-dim mb-1">{t('h2h.autoMaxRounds')}</label>
-                  <input
-                    type="number"
-                    value={autoMaxRounds}
-                    onChange={e => setAutoMaxRounds(Number(e.target.value))}
-                    min={1}
-                    max={100}
-                    className="w-24 bg-machi-bg border border-machi-border rounded px-2 py-1 text-sm"
-                  />
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      value={autoMaxRounds}
+                      onChange={e => setAutoMaxRounds(Number(e.target.value))}
+                      min={1}
+                      max={9999}
+                      disabled={autoEndless}
+                      className="w-24 bg-machi-bg border border-machi-border rounded px-2 py-1 text-sm
+                                 disabled:opacity-40"
+                    />
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={autoEndless}
+                        onChange={e => setAutoEndless(e.target.checked)}
+                        className="accent-machi-purple"
+                      />
+                      <span className="text-xs text-machi-text-dim">{t('h2h.autoEndless')}</span>
+                    </label>
+                  </div>
                 </div>
                 <div>
                   <label className="block text-[11px] text-machi-text-dim mb-1">{t('h2h.autoTier')}</label>

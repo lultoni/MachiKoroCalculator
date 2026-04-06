@@ -14,6 +14,7 @@ Priorisiere in deiner Abarbeitung die wichtigsten Features. Erkenne Abhänigkeit
 | 9 | Custom engine builder screen. | UI to compose engine configs (base class + params), save to registry with duplicate detection. |
 | 11 | Discuss 5 heuristic choices in ARCHITECTURE.md Section 7.2 | Especially static landmark weights (#3) and binary endgame bonus (#2). Decide which to fix, which to keep as accepted approximations. |
 | 21 | Creator Engine Brainstorm | The Creator of the Calc want to make his own engine that does what he thinks are the best decision. He want to Brainstorm the exact decisions that this engine should do, the way it works, the params it has and so on and so forth. |
+| 23 | Engine performance analysis & optimization | Profile all engines to find performance bottlenecks. Some "fast" tier engines are too slow. Deep analysis of each engine class needed. |
 
 ## Done
 

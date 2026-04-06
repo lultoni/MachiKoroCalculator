@@ -303,8 +303,13 @@ final class H2hHandler implements HttpHandler {
             response.addProperty("running", autoBattle.isRunning());
             response.addProperty("roundsCompleted", autoBattle.getRoundsCompleted());
             response.addProperty("maxRounds", autoBattle.getMaxRounds());
+            response.addProperty("endless", autoBattle.isEndless());
             response.addProperty("gamesPerMatch", autoBattle.getGamesPerMatch());
             response.addProperty("gamesCompletedInMatch", autoBattle.getGamesCompletedInMatch());
+            response.addProperty("totalGamesPlayed", autoBattle.getTotalGamesPlayed());
+            if (autoBattle.isRunning()) {
+                response.addProperty("elapsedMs", System.currentTimeMillis() - autoBattle.getStartTimeMs());
+            }
             if (autoBattle.getCurrentMatchup() != null) {
                 response.addProperty("currentMatchup", autoBattle.getCurrentMatchup());
             }
@@ -326,7 +331,9 @@ final class H2hHandler implements HttpHandler {
         obj.addProperty("totalTimeMs", r.totalTimeMs);
         obj.addProperty("avgGameLength", r.avgGameLength);
         obj.addProperty("avgEvalTimeMs", r.avgEvalTimeMs);
-        obj.addProperty("gameCount", r.gameLogs != null ? r.gameLogs.size() : r.config.gameCount());
+        int actualGameCount = 0;
+        for (int w : r.wins) actualGameCount += w;
+        obj.addProperty("gameCount", actualGameCount > 0 ? actualGameCount : r.config.gameCount());
 
         JsonArray engines = new JsonArray();
         for (String eid : r.config.engineIds()) engines.add(eid);

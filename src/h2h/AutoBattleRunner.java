@@ -14,6 +14,10 @@ import java.util.concurrent.atomic.AtomicInteger;
  * avoiding recently played pairs and self-play. Runs matches sequentially, saving
  * each result to the store. Continues until stopped or max rounds reached.
  *
+ * <p>Supports endless mode ({@code maxRounds <= 0}): runs indefinitely until
+ * {@link #requestStop()} is called. Stop is effective mid-match — the current match
+ * is cancelled and partial results (completed games) are saved.
+ *
  * <h2>Pair selection algorithm</h2>
  * <ol>
  *   <li>Compute current Glicko-2 ratings from all match history</li>
@@ -31,7 +35,7 @@ public final class AutoBattleRunner {
     // Config
     private final int gamesPerMatch;
     private final int maxTurnsPerGame;
-    private final int maxRounds;
+    private final int effectiveMaxRounds;
     private final List<String> engineIds;
 
     // State
@@ -39,10 +43,15 @@ public final class AutoBattleRunner {
     private volatile boolean stopRequested;
     private volatile int roundsCompleted;
     private volatile int gamesCompletedInMatch;
+    private volatile int totalGamesPlayed;
+    private volatile long startTimeMs;
     private volatile String currentMatchup;
     private volatile String error;
     private final Map<String, Integer> pairPlayCount = new HashMap<>();
 
+    /**
+     * @param maxRounds maximum number of rounds; {@code <= 0} for endless mode
+     */
     public AutoBattleRunner(EngineOrchestrator orchestrator, H2hResultStore store,
                             int gamesPerMatch, int maxTurnsPerGame, int maxRounds,
                             List<String> engineIds) {
@@ -50,7 +59,7 @@ public final class AutoBattleRunner {
         this.store = store;
         this.gamesPerMatch = gamesPerMatch;
         this.maxTurnsPerGame = maxTurnsPerGame;
-        this.maxRounds = maxRounds;
+        this.effectiveMaxRounds = maxRounds <= 0 ? Integer.MAX_VALUE : maxRounds;
         this.engineIds = engineIds;
     }
 
@@ -60,6 +69,8 @@ public final class AutoBattleRunner {
         stopRequested = false;
         roundsCompleted = 0;
         gamesCompletedInMatch = 0;
+        totalGamesPlayed = 0;
+        startTimeMs = System.currentTimeMillis();
         error = null;
         currentMatchup = null;
         pairPlayCount.clear();
@@ -67,7 +78,7 @@ public final class AutoBattleRunner {
         try {
             MatchRunner runner = new MatchRunner(orchestrator);
 
-            while (!stopRequested && roundsCompleted < maxRounds) {
+            while (!stopRequested && roundsCompleted < effectiveMaxRounds) {
                 // 1. Compute current ratings
                 List<MatchResult> allResults = store.loadAll();
                 Map<String, Glicko2Rating> ratings = RatingCalculator.computeRatings(allResults);
@@ -83,15 +94,20 @@ public final class AutoBattleRunner {
                 String pairKey = pairKey(pair[0], pair[1]);
                 pairPlayCount.merge(pairKey, 1, Integer::sum);
 
-                // 3. Run match
+                // 3. Run match (with mid-match cancellation support)
                 gamesCompletedInMatch = 0;
                 AtomicInteger matchGamesCounter = new AtomicInteger(0);
                 MatchConfig config = new MatchConfig(
                         pair, gamesPerMatch, maxTurnsPerGame, 0, true);
                 MatchResult result = runner.runMatch(config, (gameIdx, log) -> {
                     gamesCompletedInMatch = matchGamesCounter.incrementAndGet();
-                });
-                store.save(result);
+                }, () -> stopRequested);
+
+                // Save result if at least one game completed
+                if (!result.gameLogs.isEmpty()) {
+                    store.save(result);
+                    totalGamesPlayed += result.gameLogs.size();
+                }
 
                 roundsCompleted++;
             }
@@ -103,7 +119,7 @@ public final class AutoBattleRunner {
         }
     }
 
-    /** Request a stop after the current match finishes. */
+    /** Request a stop. Effective mid-match — cancels remaining games in the current match. */
     public void requestStop() {
         stopRequested = true;
     }
@@ -112,9 +128,12 @@ public final class AutoBattleRunner {
 
     public boolean isRunning() { return running; }
     public int getRoundsCompleted() { return roundsCompleted; }
-    public int getMaxRounds() { return maxRounds; }
+    public int getMaxRounds() { return effectiveMaxRounds; }
+    public boolean isEndless() { return effectiveMaxRounds == Integer.MAX_VALUE; }
     public int getGamesPerMatch() { return gamesPerMatch; }
     public int getGamesCompletedInMatch() { return gamesCompletedInMatch; }
+    public int getTotalGamesPlayed() { return totalGamesPlayed; }
+    public long getStartTimeMs() { return startTimeMs; }
     public String getCurrentMatchup() { return currentMatchup; }
     public String getError() { return error; }
 

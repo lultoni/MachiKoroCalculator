@@ -141,8 +141,11 @@ export interface AutoBattleStatusResponse {
   running: boolean;
   roundsCompleted?: number;
   maxRounds?: number;
+  endless?: boolean;
   gamesPerMatch?: number;
   gamesCompletedInMatch?: number;
+  totalGamesPlayed?: number;
+  elapsedMs?: number;
   currentMatchup?: string;
   error?: string;
 }

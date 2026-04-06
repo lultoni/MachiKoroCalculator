@@ -43,6 +43,7 @@ public final class H2hResultStore {
         this.summaryPath = dataDir.resolve("h2h-summaries.json");
         this.gamelogDir = dataDir.resolve("h2h-gamelogs");
         migrateIfNeeded(dataDir);
+        loadBaselineIfEmpty();
         enrichSummariesIfNeeded();
     }
 
@@ -212,6 +213,30 @@ public final class H2hResultStore {
         if (changed) {
             writeSummaries(all);
             System.out.println("[H2hResultStore] Enriched " + all.size() + " summaries with per-engine stats.");
+        }
+    }
+
+    /**
+     * Loads pre-bundled baseline H2H results from the classpath when no local data exists.
+     * This gives new users immediate access to engine ratings without running their own matches.
+     * The baseline file is at {@code resources/h2h-baseline/h2h-summaries.json} on the classpath.
+     */
+    private void loadBaselineIfEmpty() {
+        if (Files.exists(summaryPath)) return;
+
+        InputStream stream = H2hResultStore.class.getClassLoader()
+                .getResourceAsStream("resources/h2h-baseline/h2h-summaries.json");
+        if (stream == null) return; // no baseline bundled
+
+        System.out.println("[H2hResultStore] Loading baseline H2H results from classpath...");
+        try (Reader reader = new InputStreamReader(stream, StandardCharsets.UTF_8)) {
+            List<MatchResult> baseline = GSON.fromJson(reader, SUMMARY_LIST_TYPE);
+            if (baseline != null && !baseline.isEmpty()) {
+                writeSummaries(baseline);
+                System.out.println("[H2hResultStore] Loaded " + baseline.size() + " baseline match results.");
+            }
+        } catch (Exception e) {
+            System.err.println("[H2hResultStore] Failed to load baseline: " + e.getMessage());
         }
     }
 

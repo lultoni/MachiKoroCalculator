@@ -6,6 +6,18 @@ Implementation history: what was built, why, and which design decisions were mad
 
 ## Phase 7: Iteration
 
+### 7.33 — Glicko-2 Game-Count Weighting, Endless Auto Battle, Baseline Results
+
+**Glicko-2 weighting:** Matches with more games now produce proportionally more rating update rounds (`max(1, gameCount / 100)`). A 500-game match = 5 rating periods, vs 1 for a 50-game match. This tightens RD faster and gives larger matches more influence on ratings.
+
+**Endless Auto Battle:** `maxRounds <= 0` enables endless mode — runs indefinitely until manually stopped. Mid-match cancellation via `BooleanSupplier` in MatchRunner stops within one game duration (remaining futures cancelled). Session stats (matches completed, total games, elapsed time) shown live. Stop button shows "Stopping..." feedback.
+
+**Pre-bundled baseline:** New users get pre-computed H2H results from classpath resource (`src/resources/h2h-baseline/h2h-summaries.json`). Loaded automatically when no local data exists. ~35KB summaries-only (no gamelogs).
+
+**Bug fixes:** Partial match game count now derived from `wins[]` sum instead of `config.gameCount()`. Stop button disabled with visual feedback during shutdown.
+
+**Files:** `RatingCalculator.java`, `MatchRunner.java`, `AutoBattleRunner.java`, `H2hResultStore.java`, `H2hHandler.java`, `H2hOverview.tsx`, `client.ts`, `en.ts`/`de.ts`, `resources/h2h-baseline/`.
+
 ### 7.32 — Auto Battle Mode (TODO #22)
 
 Automated engine ranking system that prioritizes matchups based on Glicko-2 rating uncertainty.

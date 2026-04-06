@@ -15,6 +15,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BooleanSupplier;
 
 /**
  * Runs a head-to-head match: multiple complete games between engine-controlled players.
@@ -70,6 +71,25 @@ public final class MatchRunner {
      * @return match result with all game logs
      */
     public MatchResult runMatch(MatchConfig config, ProgressListener listener) {
+        return runMatch(config, listener, null);
+    }
+
+    /**
+     * Runs a match with optional mid-match cancellation support.
+     *
+     * <p>Games run in parallel via ForkJoinPool. After each game completes (in submission
+     * order), the {@code shouldStop} predicate is checked. When it returns {@code true},
+     * remaining futures are cancelled and the result is built from completed games only.
+     *
+     * <p>Stop latency is approximately one game duration (running games are not interrupted).
+     *
+     * @param config     match configuration
+     * @param listener   optional progress listener (may be null)
+     * @param shouldStop optional stop predicate checked between games (may be null)
+     * @return match result (may contain fewer games than configured if stopped early)
+     */
+    public MatchResult runMatch(MatchConfig config, ProgressListener listener,
+                                BooleanSupplier shouldStop) {
         long startMs = System.currentTimeMillis();
 
         // Resolve engines and per-seat configs from registry
@@ -95,9 +115,19 @@ public final class MatchRunner {
         }
 
         List<GameLog> logs = new ArrayList<>();
+        boolean stopped = false;
         for (Future<GameLog> f : futures) {
+            if (stopped) {
+                f.cancel(false);
+                continue;
+            }
             try {
                 logs.add(f.get());
+                if (shouldStop != null && shouldStop.getAsBoolean()) {
+                    stopped = true;
+                }
+            } catch (CancellationException e) {
+                // Game was cancelled before starting, skip
             } catch (InterruptedException | ExecutionException e) {
                 throw new RuntimeException("Game execution failed", e);
             }

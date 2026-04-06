@@ -1,0 +1,1713 @@
+[
+  {
+    "id": "b6dbec88",
+    "date": "2026-04-01T16:04:20.857581Z",
+    "config": {
+      "engineIds": [
+        "mcts-v1-fast",
+        "mcts-v1-depth3"
+      ],
+      "gameCount": 4,
+      "maxTurnsPerGame": 200,
+      "iterationsPerEval": 0,
+      "seatSwap": true
+    },
+    "wins": [
+      0,
+      4
+    ],
+    "winRates": [
+      0.0,
+      1.0
+    ],
+    "avgGameLength": 127.0,
+    "avgEvalTimeMs": 29.687007874015748,
+    "avgEvalTimeMsPerEngine": [
+      43.992063492063494,
+      15.60546875
+    ],
+    "shortestGameIndex": 0,
+    "longestGameIndex": 3,
+    "shortestGameTurns": 76,
+    "longestGameTurns": 200,
+    "totalTimeMs": 5032
+  },
+  {
+    "id": "92e8bb61",
+    "date": "2026-04-01T16:04:27.270508Z",
+    "config": {
+      "engineIds": [
+        "mcts-v1-fast",
+        "mcts-v1-greedy-tree-fast"
+      ],
+      "gameCount": 4,
+      "maxTurnsPerGame": 200,
+      "iterationsPerEval": 0,
+      "seatSwap": true
+    },
+    "wins": [
+      2,
+      2
+    ],
+    "winRates": [
+      0.5,
+      0.5
+    ],
+    "avgGameLength": 121.75,
+    "avgEvalTimeMs": 46.17043121149897,
+    "avgEvalTimeMsPerEngine": [
+      46.68333333333333,
+      45.67206477732793
+    ],
+    "shortestGameIndex": 3,
+    "longestGameIndex": 2,
+    "shortestGameTurns": 98,
+    "longestGameTurns": 150,
+    "totalTimeMs": 6392
+  },
+  {
+    "id": "25d22a81",
+    "date": "2026-04-01T16:04:31.441420Z",
+    "config": {
+      "engineIds": [
+        "mcts-v1-depth3",
+        "mcts-v1-greedy-tree-fast"
+      ],
+      "gameCount": 4,
+      "maxTurnsPerGame": 200,
+      "iterationsPerEval": 0,
+      "seatSwap": true
+    },
+    "wins": [
+      3,
+      1
+    ],
+    "winRates": [
+      0.75,
+      0.25
+    ],
+    "avgGameLength": 105.75,
+    "avgEvalTimeMs": 32.38770685579196,
+    "avgEvalTimeMsPerEngine": [
+      13.476635514018692,
+      51.751196172248804
+    ],
+    "shortestGameIndex": 3,
+    "longestGameIndex": 1,
+    "shortestGameTurns": 79,
+    "longestGameTurns": 131,
+    "totalTimeMs": 4143
+  },
+  {
+    "id": "b9f2f473",
+    "date": "2026-04-01T16:10:17.845313Z",
+    "config": {
+      "engineIds": [
+        "mcts-v1-fast",
+        "mcts-v1-depth3"
+      ],
+      "gameCount": 4,
+      "maxTurnsPerGame": 200,
+      "iterationsPerEval": 0,
+      "seatSwap": true
+    },
+    "wins": [
+      0,
+      4
+    ],
+    "winRates": [
+      0.0,
+      1.0
+    ],
+    "avgGameLength": 127.0,
+    "avgEvalTimeMs": 33.169291338582674,
+    "avgEvalTimeMsPerEngine": [
+      51.011811023622045,
+      15.326771653543307
+    ],
+    "shortestGameIndex": 3,
+    "longestGameIndex": 2,
+    "shortestGameTurns": 109,
+    "longestGameTurns": 157,
+    "totalTimeMs": 4805
+  },
+  {
+    "id": "c72363ba",
+    "date": "2026-04-01T16:10:25.050244Z",
+    "config": {
+      "engineIds": [
+        "mcts-v1-fast",
+        "mcts-v1-greedy-tree-fast"
+      ],
+      "gameCount": 4,
+      "maxTurnsPerGame": 200,
+      "iterationsPerEval": 0,
+      "seatSwap": true
+    },
+    "wins": [
+      2,
+      2
+    ],
+    "winRates": [
+      0.5,
+      0.5
+    ],
+    "avgGameLength": 125.0,
+    "avgEvalTimeMs": 48.694,
+    "avgEvalTimeMsPerEngine": [
+      48.716,
+      48.672
+    ],
+    "shortestGameIndex": 2,
+    "longestGameIndex": 0,
+    "shortestGameTurns": 93,
+    "longestGameTurns": 178,
+    "totalTimeMs": 7143
+  },
+  {
+    "id": "3d6c962c",
+    "date": "2026-04-01T16:10:29.246116Z",
+    "config": {
+      "engineIds": [
+        "mcts-v1-depth3",
+        "mcts-v1-greedy-tree-fast"
+      ],
+      "gameCount": 4,
+      "maxTurnsPerGame": 200,
+      "iterationsPerEval": 0,
+      "seatSwap": true
+    },
+    "wins": [
+      3,
+      1
+    ],
+    "winRates": [
+      0.75,
+      0.25
+    ],
+    "avgGameLength": 103.75,
+    "avgEvalTimeMs": 36.028915662650604,
+    "avgEvalTimeMsPerEngine": [
+      15.759615384615385,
+      56.39613526570049
+    ],
+    "shortestGameIndex": 1,
+    "longestGameIndex": 3,
+    "shortestGameTurns": 88,
+    "longestGameTurns": 112,
+    "totalTimeMs": 4180
+  },
+  {
+    "id": "bf4e6fc5",
+    "date": "2026-04-01T16:15:25.243469Z",
+    "config": {
+      "engineIds": [
+        "mcts-v1-fast",
+        "mcts-v1-greedy-tree-fast"
+      ],
+      "gameCount": 20,
+      "maxTurnsPerGame": 200,
+      "iterationsPerEval": 0,
+      "seatSwap": true
+    },
+    "wins": [
+      5,
+      15
+    ],
+    "winRates": [
+      0.25,
+      0.75
+    ],
+    "avgGameLength": 136.6,
+    "avgEvalTimeMs": 60.16398243045388,
+    "avgEvalTimeMsPerEngine": [
+      61.086029411764706,
+      59.25
+    ],
+    "shortestGameIndex": 6,
+    "longestGameIndex": 14,
+    "shortestGameTurns": 92,
+    "longestGameTurns": 200,
+    "totalTimeMs": 24837
+  },
+  {
+    "id": "22e4bc67",
+    "date": "2026-04-01T16:15:41.760927Z",
+    "config": {
+      "engineIds": [
+        "mcts-v1-fast",
+        "mcts-v1-depth3"
+      ],
+      "gameCount": 20,
+      "maxTurnsPerGame": 200,
+      "iterationsPerEval": 0,
+      "seatSwap": true
+    },
+    "wins": [
+      4,
+      16
+    ],
+    "winRates": [
+      0.2,
+      0.8
+    ],
+    "avgGameLength": 125.4,
+    "avgEvalTimeMs": 44.235645933014354,
+    "avgEvalTimeMsPerEngine": [
+      67.59951845906902,
+      21.167987321711568
+    ],
+    "shortestGameIndex": 2,
+    "longestGameIndex": 4,
+    "shortestGameTurns": 80,
+    "longestGameTurns": 200,
+    "totalTimeMs": 16434
+  },
+  {
+    "id": "822589b2",
+    "date": "2026-04-01T16:16:03.401589Z",
+    "config": {
+      "engineIds": [
+        "mcts-v1-fast",
+        "mcts-v1-depth7"
+      ],
+      "gameCount": 20,
+      "maxTurnsPerGame": 200,
+      "iterationsPerEval": 0,
+      "seatSwap": true
+    },
+    "wins": [
+      3,
+      17
+    ],
+    "winRates": [
+      0.15,
+      0.85
+    ],
+    "avgGameLength": 130.45,
+    "avgEvalTimeMs": 54.115753162131085,
+    "avgEvalTimeMsPerEngine": [
+      69.89291217257319,
+      38.49504195270786
+    ],
+    "shortestGameIndex": 17,
+    "longestGameIndex": 1,
+    "shortestGameTurns": 73,
+    "longestGameTurns": 200,
+    "totalTimeMs": 21600
+  },
+  {
+    "id": "d9b8ba35",
+    "date": "2026-04-01T16:16:24.285364Z",
+    "config": {
+      "engineIds": [
+        "mcts-v1-fast",
+        "mcts-v1-depth10"
+      ],
+      "gameCount": 20,
+      "maxTurnsPerGame": 200,
+      "iterationsPerEval": 0,
+      "seatSwap": true
+    },
+    "wins": [
+      2,
+      18
+    ],
+    "winRates": [
+      0.1,
+      0.9
+    ],
+    "avgGameLength": 127.65,
+    "avgEvalTimeMs": 56.44496670583627,
+    "avgEvalTimeMsPerEngine": [
+      64.56254917387884,
+      48.39703588143526
+    ],
+    "shortestGameIndex": 2,
+    "longestGameIndex": 1,
+    "shortestGameTurns": 76,
+    "longestGameTurns": 200,
+    "totalTimeMs": 20843
+  },
+  {
+    "id": "5b763ea8",
+    "date": "2026-04-01T16:16:57.971334Z",
+    "config": {
+      "engineIds": [
+        "mcts-v1-fast",
+        "mcts-v1-adaptive-fast"
+      ],
+      "gameCount": 20,
+      "maxTurnsPerGame": 200,
+      "iterationsPerEval": 0,
+      "seatSwap": true
+    },
+    "wins": [
+      10,
+      10
+    ],
+    "winRates": [
+      0.5,
+      0.5
+    ],
+    "avgGameLength": 158.8,
+    "avgEvalTimeMs": 70.11240554156171,
+    "avgEvalTimeMsPerEngine": [
+      70.10075566750629,
+      70.12405541561712
+    ],
+    "shortestGameIndex": 7,
+    "longestGameIndex": 10,
+    "shortestGameTurns": 78,
+    "longestGameTurns": 201,
+    "totalTimeMs": 33649
+  },
+  {
+    "id": "7c5f2d2b",
+    "date": "2026-04-01T16:17:13.349783Z",
+    "config": {
+      "engineIds": [
+        "mcts-v1-greedy-tree-fast",
+        "mcts-v1-depth3"
+      ],
+      "gameCount": 20,
+      "maxTurnsPerGame": 200,
+      "iterationsPerEval": 0,
+      "seatSwap": true
+    },
+    "wins": [
+      7,
+      13
+    ],
+    "winRates": [
+      0.35,
+      0.65
+    ],
+    "avgGameLength": 104.05,
+    "avgEvalTimeMs": 53.275348390197024,
+    "avgEvalTimeMsPerEngine": [
+      80.89731285988483,
+      25.573628488931664
+    ],
+    "shortestGameIndex": 13,
+    "longestGameIndex": 1,
+    "shortestGameTurns": 77,
+    "longestGameTurns": 200,
+    "totalTimeMs": 15333
+  },
+  {
+    "id": "f577d92a",
+    "date": "2026-04-01T16:17:29.973906Z",
+    "config": {
+      "engineIds": [
+        "mcts-v1-greedy-tree-fast",
+        "mcts-v1-depth7"
+      ],
+      "gameCount": 20,
+      "maxTurnsPerGame": 200,
+      "iterationsPerEval": 0,
+      "seatSwap": true
+    },
+    "wins": [
+      6,
+      14
+    ],
+    "winRates": [
+      0.3,
+      0.7
+    ],
+    "avgGameLength": 90.0,
+    "avgEvalTimeMs": 64.10111111111111,
+    "avgEvalTimeMsPerEngine": [
+      86.02111111111111,
+      42.181111111111115
+    ],
+    "shortestGameIndex": 2,
+    "longestGameIndex": 7,
+    "shortestGameTurns": 74,
+    "longestGameTurns": 116,
+    "totalTimeMs": 16570
+  },
+  {
+    "id": "1058f0ef",
+    "date": "2026-04-01T16:17:49.964025Z",
+    "config": {
+      "engineIds": [
+        "mcts-v1-greedy-tree-fast",
+        "mcts-v1-depth10"
+      ],
+      "gameCount": 20,
+      "maxTurnsPerGame": 200,
+      "iterationsPerEval": 0,
+      "seatSwap": true
+    },
+    "wins": [
+      2,
+      18
+    ],
+    "winRates": [
+      0.1,
+      0.9
+    ],
+    "avgGameLength": 96.85,
+    "avgEvalTimeMs": 75.02323180175529,
+    "avgEvalTimeMsPerEngine": [
+      92.67601246105919,
+      57.56981519507187
+    ],
+    "shortestGameIndex": 19,
+    "longestGameIndex": 5,
+    "shortestGameTurns": 71,
+    "longestGameTurns": 200,
+    "totalTimeMs": 19928
+  },
+  {
+    "id": "9de8e697",
+    "date": "2026-04-01T16:18:21.789480Z",
+    "config": {
+      "engineIds": [
+        "mcts-v1-greedy-tree-fast",
+        "mcts-v1-adaptive-fast"
+      ],
+      "gameCount": 20,
+      "maxTurnsPerGame": 200,
+      "iterationsPerEval": 0,
+      "seatSwap": true
+    },
+    "wins": [
+      10,
+      10
+    ],
+    "winRates": [
+      0.5,
+      0.5
+    ],
+    "avgGameLength": 153.25,
+    "avgEvalTimeMs": 71.08776508972268,
+    "avgEvalTimeMsPerEngine": [
+      70.71419313026571,
+      71.4664914586071
+    ],
+    "shortestGameIndex": 3,
+    "longestGameIndex": 11,
+    "shortestGameTurns": 90,
+    "longestGameTurns": 201,
+    "totalTimeMs": 31752
+  },
+  {
+    "id": "9c462e54",
+    "date": "2026-04-01T16:18:28.656342Z",
+    "config": {
+      "engineIds": [
+        "mcts-v1-depth3",
+        "mcts-v1-depth7"
+      ],
+      "gameCount": 20,
+      "maxTurnsPerGame": 200,
+      "iterationsPerEval": 0,
+      "seatSwap": true
+    },
+    "wins": [
+      14,
+      6
+    ],
+    "winRates": [
+      0.7,
+      0.3
+    ],
+    "avgGameLength": 79.85,
+    "avgEvalTimeMs": 28.812773951158423,
+    "avgEvalTimeMsPerEngine": [
+      21.069565217391304,
+      36.68308080808081
+    ],
+    "shortestGameIndex": 16,
+    "longestGameIndex": 19,
+    "shortestGameTurns": 64,
+    "longestGameTurns": 94,
+    "totalTimeMs": 6799
+  },
+  {
+    "id": "54d93689",
+    "date": "2026-04-01T16:18:38.211515Z",
+    "config": {
+      "engineIds": [
+        "mcts-v1-depth3",
+        "mcts-v1-depth10"
+      ],
+      "gameCount": 20,
+      "maxTurnsPerGame": 200,
+      "iterationsPerEval": 0,
+      "seatSwap": true
+    },
+    "wins": [
+      17,
+      3
+    ],
+    "winRates": [
+      0.85,
+      0.15
+    ],
+    "avgGameLength": 84.75,
+    "avgEvalTimeMs": 39.66843657817109,
+    "avgEvalTimeMsPerEngine": [
+      24.264808362369337,
+      55.57074340527578
+    ],
+    "shortestGameIndex": 1,
+    "longestGameIndex": 6,
+    "shortestGameTurns": 69,
+    "longestGameTurns": 141,
+    "totalTimeMs": 9479
+  },
+  {
+    "id": "c678a892",
+    "date": "2026-04-01T16:18:57.693251Z",
+    "config": {
+      "engineIds": [
+        "mcts-v1-depth3",
+        "mcts-v1-adaptive-fast"
+      ],
+      "gameCount": 20,
+      "maxTurnsPerGame": 200,
+      "iterationsPerEval": 0,
+      "seatSwap": true
+    },
+    "wins": [
+      18,
+      2
+    ],
+    "winRates": [
+      0.9,
+      0.1
+    ],
+    "avgGameLength": 122.8,
+    "avgEvalTimeMs": 57.25325732899023,
+    "avgEvalTimeMsPerEngine": [
+      27.927419354838708,
+      87.15789473684211
+    ],
+    "shortestGameIndex": 8,
+    "longestGameIndex": 1,
+    "shortestGameTurns": 85,
+    "longestGameTurns": 200,
+    "totalTimeMs": 19398
+  },
+  {
+    "id": "09dc75e9",
+    "date": "2026-04-01T16:19:08.167546Z",
+    "config": {
+      "engineIds": [
+        "mcts-v1-depth7",
+        "mcts-v1-depth10"
+      ],
+      "gameCount": 20,
+      "maxTurnsPerGame": 200,
+      "iterationsPerEval": 0,
+      "seatSwap": true
+    },
+    "wins": [
+      10,
+      10
+    ],
+    "winRates": [
+      0.5,
+      0.5
+    ],
+    "avgGameLength": 82.5,
+    "avgEvalTimeMs": 45.09090909090909,
+    "avgEvalTimeMsPerEngine": [
+      38.42060606060606,
+      51.76121212121212
+    ],
+    "shortestGameIndex": 18,
+    "longestGameIndex": 6,
+    "shortestGameTurns": 60,
+    "longestGameTurns": 115,
+    "totalTimeMs": 10388
+  },
+  {
+    "id": "a548fb6b",
+    "date": "2026-04-01T16:19:27.443606Z",
+    "config": {
+      "engineIds": [
+        "mcts-v1-depth7",
+        "mcts-v1-adaptive-fast"
+      ],
+      "gameCount": 20,
+      "maxTurnsPerGame": 200,
+      "iterationsPerEval": 0,
+      "seatSwap": true
+    },
+    "wins": [
+      16,
+      4
+    ],
+    "winRates": [
+      0.8,
+      0.2
+    ],
+    "avgGameLength": 111.45,
+    "avgEvalTimeMs": 60.70480035890534,
+    "avgEvalTimeMsPerEngine": [
+      41.306322350845946,
+      80.4014466546112
+    ],
+    "shortestGameIndex": 9,
+    "longestGameIndex": 13,
+    "shortestGameTurns": 69,
+    "longestGameTurns": 171,
+    "totalTimeMs": 19185
+  },
+  {
+    "id": "26b38613",
+    "date": "2026-04-01T16:19:48.910156Z",
+    "config": {
+      "engineIds": [
+        "mcts-v1-depth10",
+        "mcts-v1-adaptive-fast"
+      ],
+      "gameCount": 20,
+      "maxTurnsPerGame": 200,
+      "iterationsPerEval": 0,
+      "seatSwap": true
+    },
+    "wins": [
+      20,
+      0
+    ],
+    "winRates": [
+      1.0,
+      0.0
+    ],
+    "avgGameLength": 122.4,
+    "avgEvalTimeMs": 62.822303921568626,
+    "avgEvalTimeMsPerEngine": [
+      51.64437194127243,
+      74.03682487725041
+    ],
+    "shortestGameIndex": 17,
+    "longestGameIndex": 9,
+    "shortestGameTurns": 76,
+    "longestGameTurns": 200,
+    "totalTimeMs": 21379
+  },
+  {
+    "id": "3efafca7",
+    "date": "2026-04-01T16:29:06.773556Z",
+    "config": {
+      "engineIds": [
+        "mcts-v1-depth3",
+        "mcts-v1-depth10"
+      ],
+      "gameCount": 4,
+      "maxTurnsPerGame": 200,
+      "iterationsPerEval": 0,
+      "seatSwap": true
+    },
+    "wins": [
+      4,
+      0
+    ],
+    "winRates": [
+      1.0,
+      0.0
+    ],
+    "avgGameLength": 78.25,
+    "avgEvalTimeMs": 22.533546325878593,
+    "avgEvalTimeMsPerEngine": [
+      13.459627329192546,
+      32.14473684210526
+    ],
+    "shortestGameIndex": 2,
+    "longestGameIndex": 3,
+    "shortestGameTurns": 68,
+    "longestGameTurns": 87,
+    "totalTimeMs": 2016
+  },
+  {
+    "id": "3bc7a07f",
+    "date": "2026-04-01T16:30:12.715523Z",
+    "config": {
+      "engineIds": [
+        "mcts-v1-depth3",
+        "mcts-v1-depth7"
+      ],
+      "gameCount": 6,
+      "maxTurnsPerGame": 200,
+      "iterationsPerEval": 0,
+      "seatSwap": true
+    },
+    "wins": [
+      4,
+      2
+    ],
+    "winRates": [
+      0.6666666666666666,
+      0.3333333333333333
+    ],
+    "avgGameLength": 79.66666666666667,
+    "avgEvalTimeMs": 24.872384937238493,
+    "avgEvalTimeMsPerEngine": [
+      19.11764705882353,
+      30.579166666666666
+    ],
+    "shortestGameIndex": 2,
+    "longestGameIndex": 5,
+    "shortestGameTurns": 67,
+    "longestGameTurns": 92,
+    "totalTimeMs": 2233
+  },
+  {
+    "id": "485f0532",
+    "date": "2026-04-01T16:30:15.763552Z",
+    "config": {
+      "engineIds": [
+        "mcts-v1-depth3",
+        "mcts-v1-depth10"
+      ],
+      "gameCount": 6,
+      "maxTurnsPerGame": 200,
+      "iterationsPerEval": 0,
+      "seatSwap": true
+    },
+    "wins": [
+      5,
+      1
+    ],
+    "winRates": [
+      0.8333333333333334,
+      0.16666666666666666
+    ],
+    "avgGameLength": 88.0,
+    "avgEvalTimeMs": 23.15909090909091,
+    "avgEvalTimeMsPerEngine": [
+      14.131578947368421,
+      32.32442748091603
+    ],
+    "shortestGameIndex": 1,
+    "longestGameIndex": 3,
+    "shortestGameTurns": 69,
+    "longestGameTurns": 130,
+    "totalTimeMs": 2799
+  },
+  {
+    "id": "8f0f2e0d",
+    "date": "2026-04-01T16:30:18.360821Z",
+    "config": {
+      "engineIds": [
+        "mcts-v1-depth7",
+        "mcts-v1-depth10"
+      ],
+      "gameCount": 6,
+      "maxTurnsPerGame": 200,
+      "iterationsPerEval": 0,
+      "seatSwap": true
+    },
+    "wins": [
+      4,
+      2
+    ],
+    "winRates": [
+      0.6666666666666666,
+      0.3333333333333333
+    ],
+    "avgGameLength": 80.33333333333333,
+    "avgEvalTimeMs": 26.53941908713693,
+    "avgEvalTimeMsPerEngine": [
+      22.74074074074074,
+      30.401673640167363
+    ],
+    "shortestGameIndex": 5,
+    "longestGameIndex": 3,
+    "shortestGameTurns": 57,
+    "longestGameTurns": 101,
+    "totalTimeMs": 2487
+  },
+  {
+    "id": "2377c1c3",
+    "date": "2026-04-01T16:33:44.853059Z",
+    "config": {
+      "engineIds": [
+        "mcts-v1-fast",
+        "mcts-v1-depth3"
+      ],
+      "gameCount": 10,
+      "maxTurnsPerGame": 200,
+      "iterationsPerEval": 0,
+      "seatSwap": true
+    },
+    "wins": [
+      4,
+      6
+    ],
+    "winRates": [
+      0.4,
+      0.6
+    ],
+    "avgGameLength": 134.7,
+    "avgEvalTimeMs": 39.25167037861915,
+    "avgEvalTimeMsPerEngine": [
+      59.013412816691506,
+      19.63609467455621
+    ],
+    "shortestGameIndex": 5,
+    "longestGameIndex": 0,
+    "shortestGameTurns": 79,
+    "longestGameTurns": 200,
+    "totalTimeMs": 9515
+  },
+  {
+    "id": "6d613819",
+    "date": "2026-04-01T16:34:00.699042Z",
+    "config": {
+      "engineIds": [
+        "mcts-v1-fast",
+        "mcts-v1-greedy-tree-fast"
+      ],
+      "gameCount": 10,
+      "maxTurnsPerGame": 200,
+      "iterationsPerEval": 0,
+      "seatSwap": true
+    },
+    "wins": [
+      4,
+      6
+    ],
+    "winRates": [
+      0.4,
+      0.6
+    ],
+    "avgGameLength": 133.6,
+    "avgEvalTimeMs": 56.23053892215569,
+    "avgEvalTimeMsPerEngine": [
+      56.56777108433735,
+      55.89732142857143
+    ],
+    "shortestGameIndex": 1,
+    "longestGameIndex": 3,
+    "shortestGameTurns": 83,
+    "longestGameTurns": 200,
+    "totalTimeMs": 15591
+  },
+  {
+    "id": "77f8a3ea",
+    "date": "2026-04-01T16:34:09.851737Z",
+    "config": {
+      "engineIds": [
+        "mcts-v1-depth3",
+        "mcts-v1-greedy-tree-fast"
+      ],
+      "gameCount": 10,
+      "maxTurnsPerGame": 200,
+      "iterationsPerEval": 0,
+      "seatSwap": true
+    },
+    "wins": [
+      10,
+      0
+    ],
+    "winRates": [
+      1.0,
+      0.0
+    ],
+    "avgGameLength": 106.0,
+    "avgEvalTimeMs": 43.097169811320754,
+    "avgEvalTimeMsPerEngine": [
+      19.785046728971963,
+      66.85333333333334
+    ],
+    "shortestGameIndex": 0,
+    "longestGameIndex": 8,
+    "shortestGameTurns": 74,
+    "longestGameTurns": 165,
+    "totalTimeMs": 9026
+  },
+  {
+    "id": "cd22d713",
+    "date": "2026-04-01T16:41:30.974068Z",
+    "config": {
+      "engineIds": [
+        "mcts-v1-fast",
+        "mcts-v1-balanced"
+      ],
+      "gameCount": 20,
+      "maxTurnsPerGame": 150,
+      "iterationsPerEval": 0,
+      "seatSwap": true
+    },
+    "wins": [
+      1,
+      19
+    ],
+    "winRates": [
+      0.05,
+      0.95
+    ],
+    "avgGameLength": 76.15,
+    "avgEvalTimeMs": 488.2862770847012,
+    "avgEvalTimeMsPerEngine": [
+      92.09308510638297,
+      874.715953307393
+    ],
+    "shortestGameIndex": 12,
+    "longestGameIndex": 1,
+    "shortestGameTurns": 62,
+    "longestGameTurns": 98,
+    "totalTimeMs": 110296
+  },
+  {
+    "id": "910e45be",
+    "date": "2026-04-01T16:58:49.668319Z",
+    "config": {
+      "engineIds": [
+        "mcts-v1-fast",
+        "mcts-v1-deep"
+      ],
+      "gameCount": 20,
+      "maxTurnsPerGame": 150,
+      "iterationsPerEval": 0,
+      "seatSwap": true
+    },
+    "wins": [
+      0,
+      20
+    ],
+    "winRates": [
+      0.0,
+      1.0
+    ],
+    "avgGameLength": 62.9,
+    "avgEvalTimeMs": 5789.517488076312,
+    "avgEvalTimeMsPerEngine": [
+      117.98703403565641,
+      11248.697347893916
+    ],
+    "shortestGameIndex": 9,
+    "longestGameIndex": 8,
+    "shortestGameTurns": 42,
+    "longestGameTurns": 79,
+    "totalTimeMs": 1038414
+  },
+  {
+    "id": "6a1b0ff1",
+    "date": "2026-04-01T17:56:52.549952Z",
+    "config": {
+      "engineIds": [
+        "flat-mc-fast",
+        "mcts-v1-fast"
+      ],
+      "gameCount": 50,
+      "maxTurnsPerGame": 200,
+      "iterationsPerEval": 500,
+      "seatSwap": true
+    },
+    "wins": [
+      50,
+      0
+    ],
+    "winRates": [
+      1.0,
+      0.0
+    ],
+    "avgGameLength": 75.54,
+    "avgEvalTimeMs": 109.16812284882181,
+    "avgEvalTimeMsPerEngine": [
+      104.92827442827443,
+      113.57042633567188
+    ],
+    "shortestGameIndex": 20,
+    "longestGameIndex": 45,
+    "shortestGameTurns": 41,
+    "longestGameTurns": 138,
+    "totalTimeMs": 54429
+  },
+  {
+    "id": "6662df59",
+    "date": "2026-04-01T17:56:54.233655Z",
+    "config": {
+      "engineIds": [
+        "heuristic-ev-default",
+        "mcts-v1-fast"
+      ],
+      "gameCount": 50,
+      "maxTurnsPerGame": 200,
+      "iterationsPerEval": 500,
+      "seatSwap": true
+    },
+    "wins": [
+      49,
+      1
+    ],
+    "winRates": [
+      0.98,
+      0.02
+    ],
+    "avgGameLength": 134.78,
+    "avgEvalTimeMs": 64.52366820002968,
+    "avgEvalTimeMsPerEngine": [
+      2.179479597871082,
+      127.3321417932678
+    ],
+    "shortestGameIndex": 34,
+    "longestGameIndex": 37,
+    "shortestGameTurns": 76,
+    "longestGameTurns": 200,
+    "totalTimeMs": 56120
+  },
+  {
+    "id": "0d4176b0",
+    "date": "2026-04-01T17:57:33.610496Z",
+    "config": {
+      "engineIds": [
+        "flat-mc-fast",
+        "heuristic-ev-default"
+      ],
+      "gameCount": 50,
+      "maxTurnsPerGame": 200,
+      "iterationsPerEval": 500,
+      "seatSwap": true
+    },
+    "wins": [
+      46,
+      4
+    ],
+    "winRates": [
+      0.92,
+      0.08
+    ],
+    "avgGameLength": 148.3,
+    "avgEvalTimeMs": 26.13998651382333,
+    "avgEvalTimeMsPerEngine": [
+      50.18145269364781,
+      1.7918023887079262
+    ],
+    "shortestGameIndex": 6,
+    "longestGameIndex": 31,
+    "shortestGameTurns": 109,
+    "longestGameTurns": 158,
+    "totalTimeMs": 25701
+  },
+  {
+    "id": "979d6845",
+    "date": "2026-04-01T19:05:31.855123Z",
+    "config": {
+      "engineIds": [
+        "mcts-v1-fast",
+        "mcts-v1-fast"
+      ],
+      "gameCount": 100,
+      "maxTurnsPerGame": 200,
+      "iterationsPerEval": 500,
+      "seatSwap": true
+    },
+    "wins": [
+      46,
+      54
+    ],
+    "winRates": [
+      0.46,
+      0.54
+    ],
+    "avgGameLength": 161.02,
+    "avgEvalTimeMs": 87.3857905850205,
+    "avgEvalTimeMsPerEngine": [
+      87.44116915422886,
+      87.33056313569834
+    ],
+    "shortestGameIndex": 88,
+    "longestGameIndex": 82,
+    "shortestGameTurns": 80,
+    "longestGameTurns": 201,
+    "totalTimeMs": 179457
+  },
+  {
+    "id": "c2401fe0",
+    "date": "2026-04-05T18:52:04.730664Z",
+    "config": {
+      "engineIds": [
+        "mcts-v1-fast",
+        "mcts-v1-fast"
+      ],
+      "gameCount": 10,
+      "maxTurnsPerGame": 200,
+      "iterationsPerEval": 200,
+      "seatSwap": true
+    },
+    "wins": [
+      5,
+      5
+    ],
+    "winRates": [
+      0.5,
+      0.5
+    ],
+    "avgGameLength": 200.0,
+    "avgEvalTimeMs": 45.454,
+    "avgEvalTimeMsPerEngine": [
+      45.778,
+      45.13
+    ],
+    "shortestGameIndex": 0,
+    "longestGameIndex": 0,
+    "shortestGameTurns": 200,
+    "longestGameTurns": 200,
+    "totalTimeMs": 15968
+  },
+  {
+    "id": "d3a2b8e1",
+    "date": "2026-04-06T11:37:00.258909Z",
+    "config": {
+      "engineIds": [
+        "mcts-v1-fast",
+        "mcts-v1-depth3"
+      ],
+      "gameCount": 100,
+      "maxTurnsPerGame": 200,
+      "iterationsPerEval": 0,
+      "seatSwap": true,
+      "configOverrides": [
+        {
+          "rolloutPolicy": "greedy",
+          "iterations": "500"
+        },
+        {
+          "maxRolloutDepth": "3",
+          "iterations": "2000"
+        }
+      ]
+    },
+    "wins": [
+      25,
+      75
+    ],
+    "winRates": [
+      0.25,
+      0.75
+    ],
+    "avgGameLength": 130.9,
+    "avgEvalTimeMs": 64.48082505729565,
+    "avgEvalTimeMsPerEngine": [
+      93.40193370165746,
+      35.81487678734408
+    ],
+    "shortestGameIndex": 89,
+    "longestGameIndex": 2,
+    "shortestGameTurns": 74,
+    "longestGameTurns": 200,
+    "totalTimeMs": 110823
+  },
+  {
+    "id": "ca04f2ef",
+    "date": "2026-04-06T14:16:03.434231Z",
+    "config": {
+      "engineIds": [
+        "mcts-v1-fast",
+        "mcts-v1-depth3"
+      ],
+      "gameCount": 5,
+      "maxTurnsPerGame": 200,
+      "iterationsPerEval": 500,
+      "seatSwap": true
+    },
+    "wins": [
+      1,
+      4
+    ],
+    "winRates": [
+      0.2,
+      0.8
+    ],
+    "avgGameLength": 143.6,
+    "avgEvalTimeMs": 62.54735376044568,
+    "avgEvalTimeMsPerEngine": [
+      116.38483146067416,
+      9.602209944751381
+    ],
+    "shortestGameIndex": 3,
+    "longestGameIndex": 0,
+    "shortestGameTurns": 103,
+    "longestGameTurns": 200,
+    "totalTimeMs": 10506
+  },
+  {
+    "id": "d134cfa5",
+    "date": "2026-04-06T14:16:35.530151Z",
+    "config": {
+      "engineIds": [
+        "mcts-v1-fast",
+        "mcts-v1-depth3"
+      ],
+      "gameCount": 20,
+      "maxTurnsPerGame": 200,
+      "iterationsPerEval": 500,
+      "seatSwap": true
+    },
+    "wins": [
+      9,
+      11
+    ],
+    "winRates": [
+      0.45,
+      0.55
+    ],
+    "avgGameLength": 128.7,
+    "avgEvalTimeMs": 73.56371406371406,
+    "avgEvalTimeMsPerEngine": [
+      137.24961119751165,
+      9.976708074534162
+    ],
+    "shortestGameIndex": 5,
+    "longestGameIndex": 1,
+    "shortestGameTurns": 69,
+    "longestGameTurns": 200,
+    "totalTimeMs": 26922
+  },
+  {
+    "id": "0bb11c9b",
+    "date": "2026-04-06T14:16:54.940769Z",
+    "config": {
+      "engineIds": [
+        "mcts-v1-fast",
+        "mcts-v1-depth3"
+      ],
+      "gameCount": 10,
+      "maxTurnsPerGame": 200,
+      "iterationsPerEval": 500,
+      "seatSwap": true
+    },
+    "wins": [
+      3,
+      7
+    ],
+    "winRates": [
+      0.3,
+      0.7
+    ],
+    "avgGameLength": 113.5,
+    "avgEvalTimeMs": 80.13303964757709,
+    "avgEvalTimeMsPerEngine": [
+      150.81625441696113,
+      9.82249560632689
+    ],
+    "shortestGameIndex": 4,
+    "longestGameIndex": 3,
+    "shortestGameTurns": 81,
+    "longestGameTurns": 142,
+    "totalTimeMs": 14323
+  },
+  {
+    "id": "992ca605",
+    "date": "2026-04-06T14:21:24.396825Z",
+    "config": {
+      "engineIds": [
+        "mcts-v1-fast",
+        "mcts-v1-depth3"
+      ],
+      "gameCount": 100,
+      "maxTurnsPerGame": 200,
+      "iterationsPerEval": 0,
+      "seatSwap": true,
+      "configOverrides": [
+        {
+          "iterations": "500"
+        },
+        {
+          "maxRolloutDepth": "3",
+          "iterations": "2000"
+        }
+      ]
+    },
+    "wins": [
+      23,
+      77
+    ],
+    "winRates": [
+      0.23,
+      0.77
+    ],
+    "avgGameLength": 99.92,
+    "avgEvalTimeMs": 70.1978582866293,
+    "avgEvalTimeMsPerEngine": [
+      107.80844221105528,
+      32.90213274865457
+    ],
+    "shortestGameIndex": 87,
+    "longestGameIndex": 89,
+    "shortestGameTurns": 63,
+    "longestGameTurns": 201,
+    "totalTimeMs": 89998
+  },
+  {
+    "id": "9eae7484",
+    "date": "2026-04-06T15:08:37.700388Z",
+    "config": {
+      "engineIds": [
+        "mcts-v1-fast",
+        "mcts-v1-depth3"
+      ],
+      "gameCount": 100,
+      "maxTurnsPerGame": 150,
+      "iterationsPerEval": 0,
+      "seatSwap": true,
+      "configOverrides": [
+        {
+          "iterations": "500"
+        },
+        {
+          "maxRolloutDepth": "3",
+          "iterations": "2000"
+        }
+      ]
+    },
+    "wins": [
+      26,
+      74
+    ],
+    "winRates": [
+      0.26,
+      0.74
+    ],
+    "avgGameLength": 94.64,
+    "avgEvalTimeMs": 73.45688926458158,
+    "avgEvalTimeMsPerEngine": [
+      113.50360627916844,
+      33.71368421052632
+    ],
+    "shortestGameIndex": 15,
+    "longestGameIndex": 25,
+    "shortestGameTurns": 68,
+    "longestGameTurns": 130,
+    "totalTimeMs": 89963
+  },
+  {
+    "id": "e951ac4c",
+    "date": "2026-04-06T16:46:52.870756Z",
+    "config": {
+      "engineIds": [
+        "mcts-v1-greedy-rollout-fast",
+        "mcts-v1-boltzmann-t03-fast"
+      ],
+      "gameCount": 10,
+      "maxTurnsPerGame": 200,
+      "iterationsPerEval": 0,
+      "seatSwap": true
+    },
+    "wins": [
+      3,
+      7
+    ],
+    "winRates": [
+      0.3,
+      0.7
+    ],
+    "avgGameLength": 150.3,
+    "avgEvalTimeMs": 902.8250166333999,
+    "avgEvalTimeMsPerEngine": [
+      927.1702127659574,
+      878.4474034620506
+    ],
+    "shortestGameIndex": 8,
+    "longestGameIndex": 4,
+    "shortestGameTurns": 90,
+    "longestGameTurns": 201,
+    "totalTimeMs": 242132
+  },
+  {
+    "id": "fff76794",
+    "date": "2026-04-06T16:50:57.334529Z",
+    "config": {
+      "engineIds": [
+        "mcts-v1-boltzmann-t07-fast",
+        "mcts-v1-boltzmann-t20-fast"
+      ],
+      "gameCount": 10,
+      "maxTurnsPerGame": 200,
+      "iterationsPerEval": 0,
+      "seatSwap": true
+    },
+    "wins": [
+      5,
+      5
+    ],
+    "winRates": [
+      0.5,
+      0.5
+    ],
+    "avgGameLength": 172.2,
+    "avgEvalTimeMs": 792.9262485481997,
+    "avgEvalTimeMsPerEngine": [
+      765.0507674144038,
+      819.9097142857142
+    ],
+    "shortestGameIndex": 0,
+    "longestGameIndex": 1,
+    "shortestGameTurns": 92,
+    "longestGameTurns": 200,
+    "totalTimeMs": 244357
+  },
+  {
+    "id": "e7717059",
+    "date": "2026-04-06T16:55:10.013088Z",
+    "config": {
+      "engineIds": [
+        "expectimax-d1-winprob",
+        "expectimax-d1-composite"
+      ],
+      "gameCount": 10,
+      "maxTurnsPerGame": 200,
+      "iterationsPerEval": 0,
+      "seatSwap": true
+    },
+    "wins": [
+      4,
+      6
+    ],
+    "winRates": [
+      0.4,
+      0.6
+    ],
+    "avgGameLength": 95.8,
+    "avgEvalTimeMs": 1492.6732776617955,
+    "avgEvalTimeMsPerEngine": [
+      2941.699373695198,
+      43.64718162839248
+    ],
+    "shortestGameIndex": 3,
+    "longestGameIndex": 0,
+    "shortestGameTurns": 62,
+    "longestGameTurns": 116,
+    "totalTimeMs": 252639
+  },
+  {
+    "id": "507d55e8",
+    "date": "2026-04-06T16:56:19.830563Z",
+    "config": {
+      "engineIds": [
+        "mcts-v1-greedy-rollout-fast",
+        "expectimax-d1-winprob"
+      ],
+      "gameCount": 10,
+      "maxTurnsPerGame": 200,
+      "iterationsPerEval": 0,
+      "seatSwap": true
+    },
+    "wins": [
+      0,
+      10
+    ],
+    "winRates": [
+      0.0,
+      1.0
+    ],
+    "avgGameLength": 150.8,
+    "avgEvalTimeMs": 254.81962864721484,
+    "avgEvalTimeMsPerEngine": [
+      445.55525965379496,
+      65.59577278731837
+    ],
+    "shortestGameIndex": 3,
+    "longestGameIndex": 8,
+    "shortestGameTurns": 117,
+    "longestGameTurns": 200,
+    "totalTimeMs": 69772
+  },
+  {
+    "id": "0a44037e",
+    "date": "2026-04-06T16:57:50.659908Z",
+    "config": {
+      "engineIds": [
+        "mcts-v1-boltzmann-t03-fast",
+        "expectimax-d1-composite"
+      ],
+      "gameCount": 10,
+      "maxTurnsPerGame": 200,
+      "iterationsPerEval": 0,
+      "seatSwap": true
+    },
+    "wins": [
+      0,
+      10
+    ],
+    "winRates": [
+      0.0,
+      1.0
+    ],
+    "avgGameLength": 143.7,
+    "avgEvalTimeMs": 309.2560890744607,
+    "avgEvalTimeMsPerEngine": [
+      611.8701117318436,
+      8.740638002773926
+    ],
+    "shortestGameIndex": 2,
+    "longestGameIndex": 5,
+    "shortestGameTurns": 96,
+    "longestGameTurns": 193,
+    "totalTimeMs": 90803
+  },
+  {
+    "id": "2b54d2b0",
+    "date": "2026-04-06T17:02:01.374278Z",
+    "config": {
+      "engineIds": [
+        "mcts-v1-boltzmann-t07-fast",
+        "mcts-v1-boltzmann-t20-fast"
+      ],
+      "gameCount": 10,
+      "maxTurnsPerGame": 200,
+      "iterationsPerEval": 0,
+      "seatSwap": true
+    },
+    "wins": [
+      5,
+      5
+    ],
+    "winRates": [
+      0.5,
+      0.5
+    ],
+    "avgGameLength": 171.1,
+    "avgEvalTimeMs": 591.7066043249562,
+    "avgEvalTimeMsPerEngine": [
+      572.9204678362573,
+      610.4707943925233
+    ],
+    "shortestGameIndex": 0,
+    "longestGameIndex": 2,
+    "shortestGameTurns": 78,
+    "longestGameTurns": 200,
+    "totalTimeMs": 183705
+  },
+  {
+    "id": "81a76055",
+    "date": "2026-04-06T17:03:05.778973Z",
+    "config": {
+      "engineIds": [
+        "mcts-v1-boltzmann-t03-fast",
+        "expectimax-d1-composite"
+      ],
+      "gameCount": 10,
+      "maxTurnsPerGame": 200,
+      "iterationsPerEval": 0,
+      "seatSwap": true
+    },
+    "wins": [
+      1,
+      9
+    ],
+    "winRates": [
+      0.1,
+      0.9
+    ],
+    "avgGameLength": 137.7,
+    "avgEvalTimeMs": 315.8496732026144,
+    "avgEvalTimeMsPerEngine": [
+      606.7365356622998,
+      26.22753623188406
+    ],
+    "shortestGameIndex": 8,
+    "longestGameIndex": 6,
+    "shortestGameTurns": 119,
+    "longestGameTurns": 183,
+    "totalTimeMs": 64342
+  },
+  {
+    "id": "11bd503d",
+    "date": "2026-04-06T17:03:56.584051Z",
+    "config": {
+      "engineIds": [
+        "mcts-v1-greedy-rollout-fast",
+        "expectimax-d1-winprob"
+      ],
+      "gameCount": 10,
+      "maxTurnsPerGame": 200,
+      "iterationsPerEval": 0,
+      "seatSwap": true
+    },
+    "wins": [
+      1,
+      9
+    ],
+    "winRates": [
+      0.1,
+      0.9
+    ],
+    "avgGameLength": 151.3,
+    "avgEvalTimeMs": 194.28750826173166,
+    "avgEvalTimeMsPerEngine": [
+      380.9006622516556,
+      8.41292875989446
+    ],
+    "shortestGameIndex": 6,
+    "longestGameIndex": 4,
+    "shortestGameTurns": 105,
+    "longestGameTurns": 200,
+    "totalTimeMs": 50784
+  },
+  {
+    "id": "a2717671",
+    "date": "2026-04-06T17:04:45.327883Z",
+    "config": {
+      "engineIds": [
+        "mcts-v1-boltzmann-t07-fast",
+        "heuristic-ev-default"
+      ],
+      "gameCount": 10,
+      "maxTurnsPerGame": 200,
+      "iterationsPerEval": 0,
+      "seatSwap": true
+    },
+    "wins": [
+      0,
+      10
+    ],
+    "winRates": [
+      0.0,
+      1.0
+    ],
+    "avgGameLength": 117.0,
+    "avgEvalTimeMs": 241.93931623931624,
+    "avgEvalTimeMsPerEngine": [
+      484.3653516295026,
+      1.1652470187393527
+    ],
+    "shortestGameIndex": 4,
+    "longestGameIndex": 7,
+    "shortestGameTurns": 98,
+    "longestGameTurns": 135,
+    "totalTimeMs": 48719
+  },
+  {
+    "id": "8b2e784c",
+    "date": "2026-04-06T17:06:21.329081Z",
+    "config": {
+      "engineIds": [
+        "mcts-v1-boltzmann-t20-fast",
+        "flat-mc-fast"
+      ],
+      "gameCount": 10,
+      "maxTurnsPerGame": 200,
+      "iterationsPerEval": 0,
+      "seatSwap": true
+    },
+    "wins": [
+      0,
+      10
+    ],
+    "winRates": [
+      0.0,
+      1.0
+    ],
+    "avgGameLength": 103.7,
+    "avgEvalTimeMs": 637.3249758919961,
+    "avgEvalTimeMsPerEngine": [
+      1209.5217391304348,
+      92.0677966101695
+    ],
+    "shortestGameIndex": 2,
+    "longestGameIndex": 3,
+    "shortestGameTurns": 52,
+    "longestGameTurns": 154,
+    "totalTimeMs": 95979
+  }
+]

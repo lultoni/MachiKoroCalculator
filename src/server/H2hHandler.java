@@ -261,7 +261,18 @@ final class H2hHandler implements HttpHandler {
             ApiUtils.sendError(exchange, 404, "Game index out of range: " + gameIndex);
             return;
         }
-        ApiUtils.sendJson(exchange, 200, result.gameLogs.get(gameIndex));
+
+        // Remap seat-indexed data to engine-seat space for swapped games
+        // so the frontend can display P1/P2 correctly without swap awareness.
+        h2h.GameLog game = result.gameLogs.get(gameIndex);
+        boolean hasSeatSwap = result.config.seatSwap()
+                && result.config.playerCount() == 2;
+        boolean swapped = hasSeatSwap
+                && gameIndex >= result.config.gameCount() / 2;
+        if (swapped) {
+            game = game.remapToEngineSeats();
+        }
+        ApiUtils.sendJson(exchange, 200, game);
     }
 
     // -------------------------------------------------------------------------

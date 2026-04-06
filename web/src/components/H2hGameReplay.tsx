@@ -254,8 +254,14 @@ export function H2hGameReplay({ game, engines, projects, language, onBack }: Pro
           </div>
 
           {/* Turn Detail (center) */}
-          {turn && (
-            <div className="bg-machi-surface rounded-xl p-5 border border-machi-border">
+          {turn && (() => {
+            const isP1 = turn.playerIndex === 0;
+            const gradientBg = isP1
+              ? 'linear-gradient(to right, #38bdf8, #334155 33%, #334155)'
+              : 'linear-gradient(to left, #E879F9, #334155 33%, #334155)';
+            return (
+            <div key={`turn-border-${turnIdx}`} className="rounded-xl p-[5px]" style={{ background: gradientBg }}>
+            <div className="bg-machi-surface rounded-[7px] p-5">
               <div className="flex items-center gap-3 mb-3">
                 <span className={`inline-block w-3 h-3 rounded-full ${turn.playerIndex === 0 ? 'bg-machi-accent' : 'bg-machi-purple'}`} />
                 <span className="font-semibold">
@@ -337,7 +343,8 @@ export function H2hGameReplay({ game, engines, projects, language, onBack }: Pro
                 </div>
               )}
             </div>
-          )}
+            </div>
+          )})()}
 
           {/* P2 Hand */}
           <div className="bg-machi-surface rounded-xl p-4 border border-machi-border">

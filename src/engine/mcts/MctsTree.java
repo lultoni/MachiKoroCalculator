@@ -348,14 +348,17 @@ public final class MctsTree {
         }
     }
 
-    /** Selects the child with the highest win rate (greedy / argmax exploitation). */
+    /**
+     * Selects the child with the highest win rate (greedy / argmax exploitation).
+     * On equal win rates, prefers later children over earlier ones (save is children[0]).
+     */
     private static MctsNode selectGreedyChild(List<MctsNode> children) {
         MctsNode best = children.get(0);
         double bestRate = best.visitCount > 0 ? best.totalScore / best.visitCount : 0.0;
         for (int i = 1; i < children.size(); i++) {
             MctsNode c = children.get(i);
             double rate = c.visitCount > 0 ? c.totalScore / c.visitCount : 0.0;
-            if (rate > bestRate) { bestRate = rate; best = c; }
+            if (rate >= bestRate) { bestRate = rate; best = c; }
         }
         return best;
     }
@@ -429,6 +432,10 @@ public final class MctsTree {
      * For decision nodes (DiceChoice, Funkturm, Bürohaus, BuyDecision), the most-visited
      * child represents the engine's preferred action.
      *
+     * <p>On equal visit counts, breaks ties by win rate (higher is better). This prevents
+     * the systematic save bias that occurs in {@link BuyDecisionNode} where save is always
+     * children[0] and the old strict-greater comparison defaulted to the first child on ties.
+     *
      * <p>Special case: if the node is a {@link BuyDecisionNode} with an instant-win child,
      * that child is returned unconditionally regardless of visit counts.
      *
@@ -445,9 +452,18 @@ public final class MctsTree {
         }
 
         MctsNode best = children.get(0);
+        double bestRate = best.visitCount > 0 ? best.totalScore / best.visitCount : 0.0;
         for (int i = 1; i < children.size(); i++) {
-            if (children.get(i).visitCount > best.visitCount) {
-                best = children.get(i);
+            MctsNode c = children.get(i);
+            if (c.visitCount > best.visitCount) {
+                best = c;
+                bestRate = c.visitCount > 0 ? c.totalScore / c.visitCount : 0.0;
+            } else if (c.visitCount == best.visitCount) {
+                double rate = c.visitCount > 0 ? c.totalScore / c.visitCount : 0.0;
+                if (rate > bestRate) {
+                    best = c;
+                    bestRate = rate;
+                }
             }
         }
         return best;

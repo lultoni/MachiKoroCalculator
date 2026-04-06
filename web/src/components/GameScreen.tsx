@@ -8,7 +8,7 @@ import { useInsights } from '../hooks/useInsights';
 import type { UseSessionReturn } from '../hooks/useSession';
 import type { Settings } from '../hooks/useSettings';
 import type { UseHoverReturn } from '../hooks/useHover';
-import type { ProjectDef, ApplyTurnRequest } from '../api/types';
+import type { ProjectDef, ApplyTurnRequest, BürohausRequest } from '../api/types';
 import { cardTextClass, categoryIconPath } from '../utils/cardDisplay';
 import { TurnIndicator } from './TurnIndicator';
 import { DiceInterface } from './DiceInterface';
@@ -17,6 +17,7 @@ import { PurchaseArea } from './PurchaseArea';
 import { OpponentTurnEntry } from './OpponentTurnEntry';
 import { InsightsPanel } from './InsightsPanel';
 import { CardTooltip } from './CardTooltip';
+import { BürohausPanel } from './BürohausPanel';
 import { BürohausModal } from './BürohausModal';
 import { SettingsScreen } from './SettingsScreen';
 import { SaveLoadMenu } from './SaveLoadMenu';
@@ -53,8 +54,10 @@ export function GameScreen({ session, settings, updateSettings, projects, hover 
   const insights = useInsights(settings.userPlayerIndex, isUserTurn, s.effectiveTurnCount);
   const ownsBürohaus = activePlayer.ownedIds.includes('bürohaus');
 
-  // Bürohaus modal state
-  const [showBürohaus, setShowBürohaus] = useState(false);
+  // Bürohaus inline panel state (replaces old modal)
+  const [pendingBürohausSwap, setPendingBürohausSwap] = useState<BürohausRequest | null>(null);
+  // Bürohaus popup (optional, controlled by settings)
+  const [showBürohausPopup, setShowBürohausPopup] = useState(false);
 
   // Compute roll total
   const rollTotal = die1 != null
@@ -87,12 +90,14 @@ export function GameScreen({ session, settings, updateSettings, projects, hover 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [s.nextPlayerIndex, s.effectiveTurnCount, settings.engineId]);
 
-  // Reset dice and hover state only on actual turn changes (not engine switches)
+  // Reset dice, hover state, and Bürohaus swap on actual turn changes
   useEffect(() => {
     setDie1(null);
     setDie2(null);
     setDiceCount(canUse2d6 ? 1 : 1);
     hover.onHover(null);
+    setPendingBürohausSwap(null);
+    setShowBürohausPopup(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [s.nextPlayerIndex, s.effectiveTurnCount]);
 
@@ -107,16 +112,17 @@ export function GameScreen({ session, settings, updateSettings, projects, hover 
     setDiceCount(count);
     setDie1(d1 > 0 ? d1 : null);
     setDie2(d2 != null && d2 > 0 ? d2 : null);
-    // Show Bürohaus modal when roll total = 6 and player owns Bürohaus
+    // Reset pending swap when roll changes away from 6
     const total = d1 > 0 ? (count === 2 && d2 != null && d2 > 0 ? d1 + d2 : d1) : 0;
-    if (total === 6 && ownsBürohaus) {
-      setShowBürohaus(true);
-    } else {
-      setShowBürohaus(false);
+    if (total !== 6) {
+      setPendingBürohausSwap(null);
+      setShowBürohausPopup(false);
+    } else if (total === 6 && ownsBürohaus && settings.showBürohausPanel) {
+      setShowBürohausPopup(true);
     }
-  }, [ownsBürohaus]);
+  }, [ownsBürohaus, settings.showBürohausPanel]);
 
-  const handleBuy = useCallback((projectId: string | null) => {
+  const handleBuy = useCallback(async (projectId: string | null) => {
     if (rollTotal === 0) return;
     const isDoubles = diceCount === 2 && die1 === die2;
     // Build compact engine snapshot for post-game decision review
@@ -131,19 +137,28 @@ export function GameScreen({ session, settings, updateSettings, projects, hover 
         summarySentence: o.summarySentence,
       })),
     } : undefined;
-    session.applyTurn({
+    // Apply turn first — creates the TurnRecord
+    await session.applyTurn({
       roll: rollTotal,
       boughtId: projectId === '_wait_' ? null : projectId,
       isDoubles,
       diceCount,
       engineSnapshot,
     });
-  }, [rollTotal, diceCount, die1, die2, session, engine.result]);
+    // Then apply Bürohaus swap if selected (amends the TurnRecord just created)
+    if (pendingBürohausSwap && !pendingBürohausSwap.decline) {
+      await session.applyBürohaus(pendingBürohausSwap);
+    }
+    setPendingBürohausSwap(null);
+  }, [rollTotal, diceCount, die1, die2, session, engine.result, pendingBürohausSwap]);
 
-  const handleOpponentConfirm = useCallback((req: ApplyTurnRequest) => {
-    session.applyTurn(req);
+  const handleOpponentConfirm = useCallback(async (req: ApplyTurnRequest, bürohausSwap?: BürohausRequest) => {
+    await session.applyTurn(req);
+    // Apply Bürohaus swap after turn if provided
+    if (bürohausSwap && !bürohausSwap.decline) {
+      await session.applyBürohaus(bürohausSwap);
+    }
     // Pre-compute evaluation for user's upcoming turn
-    // (fires after state update — the actual precompute runs against the new state)
     setTimeout(() => {
       const nextSession = session.session;
       if (nextSession && !nextSession.finished) {
@@ -152,10 +167,14 @@ export function GameScreen({ session, settings, updateSettings, projects, hover 
     }, 100);
   }, [session, engine, settings]);
 
-  const handleBürohausSwap = useCallback((req: import('../api/types').BürohausRequest) => {
-    session.applyBürohaus(req);
-    setShowBürohaus(false);
-  }, [session]);
+  // Popup swap handler — sets pending swap and closes popup
+  const handleBürohausPopupSwap = useCallback((req: BürohausRequest) => {
+    setPendingBürohausSwap(req);
+    setShowBürohausPopup(false);
+  }, []);
+
+  // Derive Bürohaus panel visibility (own turn) — always shown when roll=6 and owns Bürohaus
+  const showBürohausInline = rollTotal === 6 && ownsBürohaus;
 
   // Game over check
   if (s.finished) {
@@ -369,6 +388,20 @@ export function GameScreen({ session, settings, updateSettings, projects, hover 
                 )}
               </div>
 
+              {/* Bürohaus inline panel — between coin flow and purchase */}
+              {showBürohausInline && (
+                <BürohausPanel
+                  activePlayer={activePlayer}
+                  opponents={s.state.players
+                    .map((p, i) => ({ index: i, player: p }))
+                    .filter(o => o.index !== s.nextPlayerIndex)}
+                  projects={projects}
+                  language={settings.language}
+                  pendingSwap={pendingBürohausSwap}
+                  onSwapChange={setPendingBürohausSwap}
+                />
+              )}
+
               {/* Purchase area */}
               {rollTotal > 0 && (
                 <PurchaseArea
@@ -403,6 +436,7 @@ export function GameScreen({ session, settings, updateSettings, projects, hover 
                   activePlayerIndex={s.nextPlayerIndex}
                   players={s.state.players}
                   ownedIds={activePlayer.ownedIds}
+                  showBürohausPopupSetting={settings.showBürohausPanel}
                 />
               </div>
               <InsightsPanel
@@ -563,8 +597,8 @@ export function GameScreen({ session, settings, updateSettings, projects, hover 
         </aside>
       </div>
 
-      {/* Bürohaus modal */}
-      {showBürohaus && (
+      {/* Bürohaus popup modal (optional, settings-controlled) */}
+      {showBürohausPopup && (
         <BürohausModal
           activePlayer={activePlayer}
           opponents={s.state.players
@@ -573,8 +607,8 @@ export function GameScreen({ session, settings, updateSettings, projects, hover 
           projects={projects}
           language={settings.language}
           swapRankings={null}
-          onSwap={handleBürohausSwap}
-          onClose={() => setShowBürohaus(false)}
+          onSwap={handleBürohausPopupSwap}
+          onClose={() => setShowBürohausPopup(false)}
         />
       )}
 

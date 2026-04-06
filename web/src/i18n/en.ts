@@ -53,6 +53,8 @@ const en: Record<string, string> = {
   'bürohaus.notEligible': 'Not eligible',
   'bürohaus.recommended': 'Recommended',
   'bürohaus.swapLabel': "Swap your {own} ↔ {opp}'s {card}",
+  'bürohaus.declined': 'Swap declined',
+  'bürohaus.clickToChange': 'Click to change',
 
   // Insights
   'insights.etw': 'Estimated Turns to Win',
@@ -72,6 +74,7 @@ const en: Record<string, string> = {
   'settings.mode': 'Mode',
   'settings.language': 'Language',
   'settings.autosave': 'Autosave',
+  'settings.bürohausPanel': 'Bürohaus popup',
   'settings.userPlayer': 'My Player',
 
   // Game over

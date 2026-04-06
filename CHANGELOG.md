@@ -6,6 +6,34 @@ Implementation history: what was built, why, and which design decisions were mad
 
 ## Phase 7: Iteration
 
+### 7.28 — Bürohaus Inline Panel Rework
+
+**Critical bug fix — Bürohaus swap never applied:**
+The old BürohausModal called `applyBürohaus()` BEFORE `applyTurn()`, but the backend requires the reverse order (`applyBürohaus` amends the last TurnRecord created by `applyTurn`). The swap ended up on the wrong TurnRecord, and save files created with this bug have corrupted replay data.
+
+**New inline panel replaces modal as primary UI:**
+- Created `BürohausPanel.tsx` — inline panel between CoinFlowDisplay and PurchaseArea (not a popup). Always shows when roll=6 and player owns Bürohaus.
+- Card selection with CardTooltip + category icons + color-coded buttons.
+- Compact "declined" state with "click to change" re-open.
+- Same panel on opponent turns in `OpponentTurnEntry`.
+- Swap stored as `pendingBürohausSwap` state — only sent to server AFTER `applyTurn()` completes (correct order).
+
+**Optional popup modal (settings toggle):**
+- BürohausModal.tsx kept as optional popup, controlled by Settings → "Bürohaus-Popup" toggle (default: OFF).
+- When ON, popup appears on roll=6 for both own and opponent turns.
+- Popup also sets `pendingBürohausSwap` (same flow as inline panel).
+
+**Opponent turn Bürohaus support:**
+- `OpponentTurnEntry` now shows BürohausPanel when opponent rolls 6 with Bürohaus.
+- `onConfirm` signature extended to pass `BürohausRequest` alongside `ApplyTurnRequest`.
+- `handleOpponentConfirm` in GameScreen is now async: applies turn, then swap.
+
+**Settings & locale:**
+- Added `showBürohausPanel: boolean` (default: false) to Settings for popup toggle.
+- Locale keys: `settings.bürohausPanel`, `bürohaus.declined`, `bürohaus.clickToChange`.
+
+**Deleted corrupted save file** `saves/swap-coins-correctly-giving.mkoro` — created with old wrong-order flow.
+
 ### 7.27 — Legacy Cleanup + Card Display Standardisation
 
 **Task 10 — Legacy code removal:**

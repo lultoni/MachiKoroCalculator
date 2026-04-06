@@ -53,6 +53,8 @@ const de: Record<string, string> = {
   'bürohaus.notEligible': 'Nicht tauschbar',
   'bürohaus.recommended': 'Empfohlen',
   'bürohaus.swapLabel': 'Tausche dein {own} ↔ {opp}s {card}',
+  'bürohaus.declined': 'Tausch abgelehnt',
+  'bürohaus.clickToChange': 'Klicke um zu ändern',
 
   // Insights
   'insights.etw': 'Geschätzte Züge zum Sieg',
@@ -72,6 +74,7 @@ const de: Record<string, string> = {
   'settings.mode': 'Modus',
   'settings.language': 'Sprache',
   'settings.autosave': 'Automatisch speichern',
+  'settings.bürohausPanel': 'Bürohaus-Popup',
   'settings.userPlayer': 'Mein Spieler',
 
   // Game over

@@ -3,9 +3,11 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useLocale } from '../i18n/useLocale';
 import { DiceInterface } from './DiceInterface';
-import type { ProjectDef, ApplyTurnRequest, GameStateJson, PlayerState } from '../api/types';
+import type { ProjectDef, ApplyTurnRequest, BürohausRequest, GameStateJson, PlayerState } from '../api/types';
 import { cardTextClass, categoryIconPath } from '../utils/cardDisplay';
 import { CardTooltip } from './CardTooltip';
+import { BürohausPanel } from './BürohausPanel';
+import { BürohausModal } from './BürohausModal';
 import * as api from '../api/client';
 
 interface Props {
@@ -14,24 +16,29 @@ interface Props {
   projects: { projects: ProjectDef[]; byId: (id: string) => ProjectDef | undefined };
   language: 'de' | 'en';
   coinsAvailable: number;
-  onConfirm: (req: ApplyTurnRequest) => void;
+  onConfirm: (req: ApplyTurnRequest, bürohausSwap?: BürohausRequest) => void;
   loading: boolean;
   state: GameStateJson;
   activePlayerIndex: number;
   players: PlayerState[];
   ownedIds: string[];
+  showBürohausPopupSetting: boolean;
 }
 
-export function OpponentTurnEntry({ opponentName, canUse2d6, projects, language, coinsAvailable, onConfirm, loading, state, activePlayerIndex, players, ownedIds }: Props) {
+export function OpponentTurnEntry({ opponentName, canUse2d6, projects, language, coinsAvailable, onConfirm, loading, state, activePlayerIndex, players, ownedIds, showBürohausPopupSetting }: Props) {
   const { t } = useLocale();
   const [die1, setDie1] = useState<number | null>(null);
   const [die2, setDie2] = useState<number | null>(null);
   const [diceCount, setDiceCount] = useState<1 | 2>(1);
   const [boughtId, setBoughtId] = useState<string | null>(null);
   const [coinDeltas, setCoinDeltas] = useState<number[] | null>(null);
+  const [pendingBürohausSwap, setPendingBürohausSwap] = useState<BürohausRequest | null>(null);
+  const [showBürohausPopup, setShowBürohausPopup] = useState(false);
 
   const rollTotal = die1 != null ? (diceCount === 2 && die2 != null ? die1 + die2 : die1) : 0;
   const isDoubles = diceCount === 2 && die1 != null && die2 != null && die1 === die2;
+  const ownsBürohaus = ownedIds.includes('bürohaus');
+  const showBürohausPanelInline = rollTotal === 6 && ownsBürohaus;
 
   // Fetch coin deltas when roll is selected
   useEffect(() => {
@@ -48,7 +55,15 @@ export function OpponentTurnEntry({ opponentName, canUse2d6, projects, language,
     setDiceCount(count);
     setDie1(d1 > 0 ? d1 : null);
     setDie2(d2 != null && d2 > 0 ? d2 : null);
-  }, []);
+    // Reset pending swap when roll changes away from 6
+    const total = d1 > 0 ? (count === 2 && d2 != null && d2 > 0 ? d1 + d2 : d1) : 0;
+    if (total !== 6) {
+      setPendingBürohausSwap(null);
+      setShowBürohausPopup(false);
+    } else if (total === 6 && ownsBürohaus && showBürohausPopupSetting) {
+      setShowBürohausPopup(true);
+    }
+  }, [ownsBürohaus, showBürohausPopupSetting]);
 
   const handleConfirm = () => {
     if (rollTotal === 0) return;
@@ -57,12 +72,14 @@ export function OpponentTurnEntry({ opponentName, canUse2d6, projects, language,
       boughtId,
       isDoubles,
       diceCount,
-    });
+    }, pendingBürohausSwap ?? undefined);
     // Reset
     setDie1(null);
     setDie2(null);
     setBoughtId(null);
     setCoinDeltas(null);
+    setPendingBürohausSwap(null);
+    setShowBürohausPopup(false);
   };
 
   // Use post-roll coins for affordability when available
@@ -109,6 +126,20 @@ export function OpponentTurnEntry({ opponentName, canUse2d6, projects, language,
             );
           })}
         </div>
+      )}
+
+      {/* Bürohaus inline panel — between coin flow and purchase */}
+      {showBürohausPanelInline && (
+        <BürohausPanel
+          activePlayer={players[activePlayerIndex]}
+          opponents={players
+            .map((p, i) => ({ index: i, player: p }))
+            .filter(o => o.index !== activePlayerIndex)}
+          projects={projects}
+          language={language}
+          pendingSwap={pendingBürohausSwap}
+          onSwapChange={setPendingBürohausSwap}
+        />
       )}
 
       {/* Purchase selector — card buttons instead of dropdown for better UX */}
@@ -179,6 +210,21 @@ export function OpponentTurnEntry({ opponentName, canUse2d6, projects, language,
             {t('btn.confirmTurn')}
           </button>
         </div>
+      )}
+
+      {/* Bürohaus popup modal (optional, settings-controlled) */}
+      {showBürohausPopup && (
+        <BürohausModal
+          activePlayer={players[activePlayerIndex]}
+          opponents={players
+            .map((p, i) => ({ index: i, player: p }))
+            .filter(o => o.index !== activePlayerIndex)}
+          projects={projects}
+          language={language}
+          swapRankings={null}
+          onSwap={(req) => { setPendingBürohausSwap(req); setShowBürohausPopup(false); }}
+          onClose={() => setShowBürohausPopup(false)}
+        />
       )}
     </div>
   );

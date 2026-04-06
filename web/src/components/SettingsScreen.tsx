@@ -252,6 +252,23 @@ export function SettingsScreen({ settings, update, players, onClose }: Props) {
           </button>
         </div>
 
+        {/* Bürohaus panel */}
+        <div className="flex items-center justify-between">
+          <label className="text-sm text-machi-text-dim">{t('settings.bürohausPanel')}</label>
+          <button
+            className={`w-12 h-6 rounded-full transition-colors relative ${
+              settings.showBürohausPanel ? 'bg-machi-accent' : 'bg-machi-border'
+            }`}
+            onClick={() => update({ showBürohausPanel: !settings.showBürohausPanel })}
+          >
+            <span
+              className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all duration-200 ${
+                settings.showBürohausPanel ? 'left-[1.625rem]' : 'left-0.5'
+              }`}
+            />
+          </button>
+        </div>
+
         {/* User player */}
         <div className="space-y-1.5">
           <label className="text-sm text-machi-text-dim">{t('settings.userPlayer')}</label>

@@ -7,6 +7,7 @@ export interface Settings {
   language: 'de' | 'en';
   autosave: boolean;
   userPlayerIndex: number;
+  showBürohausPanel: boolean;
 }
 
 const STORAGE_KEY = 'machi-settings';
@@ -16,6 +17,7 @@ const DEFAULTS: Settings = {
   language: 'de',
   autosave: false,
   userPlayerIndex: 0,
+  showBürohausPanel: false,
 };
 
 function loadSettings(): Settings {

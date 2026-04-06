@@ -58,6 +58,20 @@ public final class BuyDecisionNode extends MctsNode {
     private static final String[] LANDMARK_IDS = {"bahnhof", "einkaufszentrum", "freizeitpark", "funkturm"};
 
     /**
+     * Index of a child that is an instant win for the active player, or -1 if none.
+     *
+     * <p>Set during {@link #expand()} when a purchase creates a terminal state
+     * (someone has won). When this is ≥ 0, MCTS should always select this child —
+     * no amount of exploration can find a better move than an immediate win.
+     *
+     * <p>This field fixes a convergence issue: with limited iteration budgets spread
+     * across full-turn trees (DiceChoice × ChanceNode × BuyDecisionNode), UCT may
+     * not allocate enough visits to the winning child for {@code bestChild()} (most-visited)
+     * to select it over "save", whose subtree accumulates visits from deeper exploration.
+     */
+    public int instantWinChildIndex = -1;
+
+    /**
      * @param state        game state after roll income applied (player can now buy)
      * @param supply       supply tracker matching state
      * @param parent       parent node
@@ -139,6 +153,7 @@ public final class BuyDecisionNode extends MctsNode {
                     nextPlayer, nextPlayer);
             terminal.expanded = true; // no children, already "done"
             children.add(terminal);
+            instantWinChildIndex = children.size() - 1;
             return;
         }
 

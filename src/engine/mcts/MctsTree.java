@@ -319,12 +319,23 @@ public final class MctsTree {
      * or a node with unvisited children.
      * When {@code greedyBuySelection} is true, {@link BuyDecisionNode} children are selected
      * by argmax over win rate (greedy exploitation) instead of UCT.
+     *
+     * <p>Special case: if a {@link BuyDecisionNode} has an instant-win child
+     * ({@code instantWinChildIndex >= 0}), that child is always selected. No amount of
+     * exploration can find a better move than an immediate win.
      */
     private MctsNode select(MctsNode node) {
         while (true) {
             if (!node.expanded) return node;
             List<MctsNode> children = node.getChildren();
             if (children.isEmpty()) return node;
+
+            // Instant-win short-circuit: always select the winning child
+            if (node instanceof BuyDecisionNode bd && bd.instantWinChildIndex >= 0) {
+                node = children.get(bd.instantWinChildIndex);
+                continue;
+            }
+
             for (MctsNode child : children) {
                 if (child.visitCount == 0) return node;
             }
@@ -418,12 +429,21 @@ public final class MctsTree {
      * For decision nodes (DiceChoice, Funkturm, Bürohaus, BuyDecision), the most-visited
      * child represents the engine's preferred action.
      *
+     * <p>Special case: if the node is a {@link BuyDecisionNode} with an instant-win child,
+     * that child is returned unconditionally regardless of visit counts.
+     *
      * @param node an expanded decision node
      * @return the most-visited child, or null if no children
      */
     public static MctsNode bestChild(MctsNode node) {
         List<MctsNode> children = node.getChildren();
         if (children.isEmpty()) return null;
+
+        // Instant-win short-circuit
+        if (node instanceof BuyDecisionNode bd && bd.instantWinChildIndex >= 0) {
+            return children.get(bd.instantWinChildIndex);
+        }
+
         MctsNode best = children.get(0);
         for (int i = 1; i < children.size(); i++) {
             if (children.get(i).visitCount > best.visitCount) {

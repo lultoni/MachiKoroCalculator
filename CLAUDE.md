@@ -104,6 +104,7 @@ These have caused bugs before. Read the Javadoc before touching these areas.
 5. **Purple card uniqueness.** Max 1 copy per player per purple card type. Enforced in all rollouts, BuyDecisionNode, and GameSession.
 6. **Funkturm once per turn.** TurnPlan forces "keep" on FunkturmNode after reroll.
 7. **Score convention.** MCTS scores are always from the perspective of the root `playerIndex` (1.0 = win, 0.0 = loss).
+8. **MCTS instant-win short-circuit.** `BuyDecisionNode.instantWinChildIndex` forces selection of a terminal winning child when one exists. `MctsTree.select()` and `bestChild()` both check this field. Do not remove — without it, UCT fails to converge on obvious wins with limited iteration budgets in full-turn trees.
 
 ## Committing
 

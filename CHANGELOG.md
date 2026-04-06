@@ -6,6 +6,16 @@ Implementation history: what was built, why, and which design decisions were mad
 
 ## Phase 7: Iteration
 
+### 7.29 — MCTS Instant-Win Detection (TODO #14)
+
+**Bug:** H2H games between mcts-v1-fast and mcts-v1-depth3 would reach 200-turn timeout with both players holding 100+ coins and 3 landmarks — engines never bought the final (winning) landmark.
+
+**Root cause:** In full-turn MCTS trees (DiceChoice → ChanceNode → BuyDecisionNode), the iteration budget is spread across many branches. A terminal "buy funkturm" child scores 1.0 every visit, but "save" also accumulates high scores from random rollouts that eventually buy the landmark. With limited iterations (500-2000), UCT's `bestChild()` (most-visited) never converges reliably on the winning child.
+
+**Fix:** Added `instantWinChildIndex` to `BuyDecisionNode`. During `expand()`, when a purchase creates a terminal winning state, the child index is recorded. `MctsTree.select()` and `MctsTree.bestChild()` now short-circuit to the instant-win child — no exploration needed when an immediate win exists. Zero performance cost; applies to all 6 MCTS engine variants.
+
+**Files:** `BuyDecisionNode.java` (instant-win tracking), `MctsTree.java` (selection + bestChild short-circuit).
+
 ### 7.28 — Bürohaus Inline Panel Rework
 
 **Critical bug fix — Bürohaus swap never applied:**

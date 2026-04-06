@@ -302,6 +302,14 @@ These are deliberate simplifications in the Calcs and WinProbability layers. Eac
 
 Maximum turn limit for rollouts. Games rarely exceed 60–70 turns with reasonable play — the limit must account for unlucky edge cases while preventing infinite loops.
 
+### 7.4 MCTS Instant-Win Detection (BuyDecisionNode) — FIXED
+
+**Fixed in:** 7.29
+
+**Problem:** In full-turn MCTS trees, the iteration budget is spread across DiceChoice × ChanceNode × BuyDecisionNode branches. A terminal "buy last landmark" child correctly scores 1.0 on every visit, but "save" also accumulates near-1.0 scores because random rollouts eventually buy the landmark. With limited budgets (500-2000 iterations), `bestChild()` (most-visited) may never converge on the winning child.
+
+**Fix:** `BuyDecisionNode.instantWinChildIndex` records any child that creates a terminal winning state during `expand()`. `MctsTree.select()` and `bestChild()` short-circuit to this child unconditionally — an immediate win is always optimal, no exploration needed.
+
 ---
 
 ## 8. Structured Explanation System

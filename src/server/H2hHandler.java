@@ -26,6 +26,9 @@ import java.util.concurrent.atomic.AtomicInteger;
  *   <li>{@code GET  /api/h2h/results/{matchId}}    — full result with game logs</li>
  *   <li>{@code GET  /api/h2h/results/{matchId}/game/{gameIndex}} — single game log</li>
  *   <li>{@code GET  /api/h2h/ratings}              — Glicko-2 ratings computed from all match history</li>
+ *   <li>{@code POST /api/h2h/auto/start}           — start auto battle mode</li>
+ *   <li>{@code POST /api/h2h/auto/stop}            — stop auto battle mode</li>
+ *   <li>{@code GET  /api/h2h/auto/status}          — auto battle status</li>
  * </ul>
  */
 final class H2hHandler implements HttpHandler {
@@ -44,6 +47,9 @@ final class H2hHandler implements HttpHandler {
     /** Cached Glicko-2 ratings (recomputed when store version changes). */
     private volatile java.util.Map<String, Glicko2Rating> cachedRatings;
     private volatile int cachedRatingsVersion = -1;
+
+    /** Active auto battle runner (only one at a time). */
+    private volatile AutoBattleRunner autoBattle;
 
     H2hHandler(EngineOrchestrator orchestrator, H2hResultStore store) {
         this.orchestrator = orchestrator;
@@ -84,6 +90,12 @@ final class H2hHandler implements HttpHandler {
                 handleAllResults(exchange);
             } else if (path.equals("/api/h2h/ratings") && "GET".equals(method)) {
                 handleRatings(exchange);
+            } else if (path.equals("/api/h2h/auto/start") && "POST".equals(method)) {
+                handleAutoStart(exchange);
+            } else if (path.equals("/api/h2h/auto/stop") && "POST".equals(method)) {
+                handleAutoStop(exchange);
+            } else if (path.equals("/api/h2h/auto/status") && "GET".equals(method)) {
+                handleAutoStatus(exchange);
             } else {
                 ApiUtils.sendError(exchange, 404, "Not found: " + path);
             }
@@ -228,6 +240,79 @@ final class H2hHandler implements HttpHandler {
             return;
         }
         ApiUtils.sendJson(exchange, 200, result.gameLogs.get(gameIndex));
+    }
+
+    // -------------------------------------------------------------------------
+    // POST /api/h2h/auto/start
+    // -------------------------------------------------------------------------
+
+    private void handleAutoStart(HttpExchange exchange) throws IOException {
+        if (autoBattle != null && autoBattle.isRunning()) {
+            ApiUtils.sendError(exchange, 409, "Auto battle already running");
+            return;
+        }
+
+        JsonObject body = ApiUtils.parseBody(exchange);
+        int gamesPerMatch = body.has("gamesPerMatch") ? body.get("gamesPerMatch").getAsInt() : 50;
+        int maxTurnsPerGame = body.has("maxTurns") ? body.get("maxTurns").getAsInt() : 200;
+        int maxRounds = body.has("maxRounds") ? body.get("maxRounds").getAsInt() : 20;
+        String tier = body.has("tier") ? body.get("tier").getAsString() : null;
+
+        AutoBattleRunner runner;
+        if (tier != null && !tier.isEmpty()) {
+            runner = AutoBattleRunner.createWithTier(orchestrator, store,
+                    tier, gamesPerMatch, maxTurnsPerGame, maxRounds);
+        } else {
+            runner = AutoBattleRunner.createWithAllEngines(orchestrator, store,
+                    gamesPerMatch, maxTurnsPerGame, maxRounds);
+        }
+        autoBattle = runner;
+
+        executor.submit(runner::run);
+
+        JsonObject response = new JsonObject();
+        response.addProperty("status", "started");
+        response.addProperty("maxRounds", maxRounds);
+        ApiUtils.sendJson(exchange, 202, response);
+    }
+
+    // -------------------------------------------------------------------------
+    // POST /api/h2h/auto/stop
+    // -------------------------------------------------------------------------
+
+    private void handleAutoStop(HttpExchange exchange) throws IOException {
+        if (autoBattle == null || !autoBattle.isRunning()) {
+            ApiUtils.sendError(exchange, 404, "No auto battle running");
+            return;
+        }
+        autoBattle.requestStop();
+        JsonObject response = new JsonObject();
+        response.addProperty("status", "stopping");
+        ApiUtils.sendJson(exchange, 200, response);
+    }
+
+    // -------------------------------------------------------------------------
+    // GET /api/h2h/auto/status
+    // -------------------------------------------------------------------------
+
+    private void handleAutoStatus(HttpExchange exchange) throws IOException {
+        JsonObject response = new JsonObject();
+        if (autoBattle == null) {
+            response.addProperty("running", false);
+        } else {
+            response.addProperty("running", autoBattle.isRunning());
+            response.addProperty("roundsCompleted", autoBattle.getRoundsCompleted());
+            response.addProperty("maxRounds", autoBattle.getMaxRounds());
+            response.addProperty("gamesPerMatch", autoBattle.getGamesPerMatch());
+            response.addProperty("gamesCompletedInMatch", autoBattle.getGamesCompletedInMatch());
+            if (autoBattle.getCurrentMatchup() != null) {
+                response.addProperty("currentMatchup", autoBattle.getCurrentMatchup());
+            }
+            if (autoBattle.getError() != null) {
+                response.addProperty("error", autoBattle.getError());
+            }
+        }
+        ApiUtils.sendJson(exchange, 200, response);
     }
 
     // -------------------------------------------------------------------------

@@ -127,3 +127,31 @@ export const h2hGameLog = (matchId: string, gameIndex: number) =>
 
 export const h2hRatings = () =>
   json<RatingsResponse>('/api/h2h/ratings');
+
+// ─── H2H Auto Battle ────────────────────────────────────────────────
+
+export interface AutoBattleStartRequest {
+  gamesPerMatch?: number;
+  maxTurns?: number;
+  maxRounds?: number;
+  tier?: string;
+}
+
+export interface AutoBattleStatusResponse {
+  running: boolean;
+  roundsCompleted?: number;
+  maxRounds?: number;
+  gamesPerMatch?: number;
+  gamesCompletedInMatch?: number;
+  currentMatchup?: string;
+  error?: string;
+}
+
+export const h2hAutoStart = (req: AutoBattleStartRequest) =>
+  post<{ status: string; maxRounds: number }>('/api/h2h/auto/start', req);
+
+export const h2hAutoStop = () =>
+  post<{ status: string }>('/api/h2h/auto/stop', {});
+
+export const h2hAutoStatus = () =>
+  json<AutoBattleStatusResponse>('/api/h2h/auto/status');

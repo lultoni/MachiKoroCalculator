@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useH2h } from '../hooks/useH2h';
 import { useLocale } from '../i18n/useLocale';
 import * as api from '../api/client';
@@ -62,6 +62,73 @@ export function H2hOverview({ onBack, projects, language }: Props) {
   const [fieldsA, setFieldsA] = useState<{ key: string; value: string }[]>([]);
   const [fieldsB, setFieldsB] = useState<{ key: string; value: string }[]>([]);
   const [view, setView] = useState<'overview' | 'ratings'>('overview');
+
+  // Auto Battle state
+  const [autoStatus, setAutoStatus] = useState<api.AutoBattleStatusResponse | null>(null);
+  const [autoGames, setAutoGames] = useState(50);
+  const [autoMaxRounds, setAutoMaxRounds] = useState(20);
+  const [autoTier, setAutoTier] = useState('');
+  const autoPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastSeenRoundsRef = useRef<number>(-1);
+  const loadResultsRef = useRef(h2h.loadResults);
+  loadResultsRef.current = h2h.loadResults;
+
+  const pollAutoStatus = useCallback(() => {
+    if (autoPollRef.current) clearInterval(autoPollRef.current);
+    lastSeenRoundsRef.current = -1;
+    autoPollRef.current = setInterval(async () => {
+      try {
+        const status = await api.h2hAutoStatus();
+        setAutoStatus(status);
+        // Reload results when a new round completes
+        const rounds = status.roundsCompleted ?? 0;
+        if (rounds > lastSeenRoundsRef.current && lastSeenRoundsRef.current >= 0) {
+          loadResultsRef.current();
+        }
+        lastSeenRoundsRef.current = rounds;
+        if (!status.running) {
+          if (autoPollRef.current) clearInterval(autoPollRef.current);
+          autoPollRef.current = null;
+          loadResultsRef.current();
+        }
+      } catch { /* ignore */ }
+    }, 2000);
+  }, []);
+
+  // Check auto battle status on mount
+  useEffect(() => {
+    api.h2hAutoStatus().then(s => {
+      setAutoStatus(s);
+      if (s.running) pollAutoStatus();
+    }).catch(() => {});
+  }, [pollAutoStatus]);
+
+  // Cleanup auto poll on unmount
+  useEffect(() => {
+    return () => {
+      if (autoPollRef.current) clearInterval(autoPollRef.current);
+    };
+  }, []);
+
+  const handleAutoStart = async () => {
+    try {
+      await api.h2hAutoStart({
+        gamesPerMatch: autoGames,
+        maxRounds: autoMaxRounds,
+        tier: autoTier || undefined,
+      });
+      setAutoStatus({ running: true, roundsCompleted: 0, maxRounds: autoMaxRounds });
+      pollAutoStatus();
+    } catch (e: unknown) {
+      setAutoStatus({ running: false, error: (e as Error).message });
+    }
+  };
+
+  const handleAutoStop = async () => {
+    try {
+      await api.h2hAutoStop();
+    } catch { /* ignore */ }
+  };
 
   useEffect(() => {
     h2h.loadResults();
@@ -308,6 +375,101 @@ export function H2hOverview({ onBack, projects, language }: Props) {
 
           {h2h.error && (
             <p className="mt-2 text-red-400 text-sm">{h2h.error}</p>
+          )}
+        </div>
+
+        {/* Auto Battle Panel */}
+        <div className="bg-machi-surface rounded-xl p-6 mb-6 border border-machi-border">
+          <h2 className="text-lg font-semibold mb-4">{t('h2h.autoBattle')}</h2>
+          <p className="text-xs text-machi-text-dim mb-3">{t('h2h.autoBattleDesc')}</p>
+
+          {autoStatus?.running ? (
+            <div>
+              <div className="flex justify-between text-sm text-machi-text-dim mb-1">
+                <span>{t('h2h.autoRunning')}</span>
+                <span className="tabular-nums">
+                  {t('h2h.game')} {autoStatus.gamesCompletedInMatch ?? 0}/{autoStatus.gamesPerMatch ?? '?'}
+                  {' · '}
+                  Round {(autoStatus.roundsCompleted ?? 0) + 1}/{autoStatus.maxRounds ?? '?'}
+                </span>
+              </div>
+              {autoStatus.currentMatchup && (
+                <div className="text-xs text-machi-text-dim mb-2">
+                  {t('h2h.autoCurrent')}: <span className="font-mono text-machi-text">{autoStatus.currentMatchup}</span>
+                </div>
+              )}
+              {/* Game progress within current match */}
+              <div className="w-full bg-machi-bg rounded-full h-2 overflow-hidden mb-1">
+                <div
+                  className="bg-machi-purple/60 h-full transition-all duration-300 rounded-full"
+                  style={{ width: `${((autoStatus.gamesCompletedInMatch ?? 0) / (autoStatus.gamesPerMatch ?? 1)) * 100}%` }}
+                />
+              </div>
+              {/* Overall round progress */}
+              <div className="w-full bg-machi-bg rounded-full h-3 overflow-hidden mb-3">
+                <div
+                  className="bg-machi-purple h-full transition-all duration-500 rounded-full"
+                  style={{ width: `${((autoStatus.roundsCompleted ?? 0) / (autoStatus.maxRounds ?? 1)) * 100}%` }}
+                />
+              </div>
+              <button
+                onClick={handleAutoStop}
+                className="w-full bg-red-500/80 text-white font-semibold py-2 rounded-lg
+                           hover:bg-red-500 transition"
+              >
+                {t('h2h.autoStop')}
+              </button>
+            </div>
+          ) : (
+            <div>
+              <div className="flex flex-wrap items-center gap-4 mb-3">
+                <div>
+                  <label className="block text-[11px] text-machi-text-dim mb-1">{t('h2h.autoGamesPerMatch')}</label>
+                  <input
+                    type="number"
+                    value={autoGames}
+                    onChange={e => setAutoGames(Number(e.target.value))}
+                    min={10}
+                    max={500}
+                    className="w-24 bg-machi-bg border border-machi-border rounded px-2 py-1 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] text-machi-text-dim mb-1">{t('h2h.autoMaxRounds')}</label>
+                  <input
+                    type="number"
+                    value={autoMaxRounds}
+                    onChange={e => setAutoMaxRounds(Number(e.target.value))}
+                    min={1}
+                    max={100}
+                    className="w-24 bg-machi-bg border border-machi-border rounded px-2 py-1 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] text-machi-text-dim mb-1">{t('h2h.autoTier')}</label>
+                  <select
+                    value={autoTier}
+                    onChange={e => setAutoTier(e.target.value)}
+                    className="w-32 bg-machi-bg border border-machi-border rounded px-2 py-1 text-sm"
+                  >
+                    <option value="">{t('h2h.autoAllEngines')}</option>
+                    <option value="fast">fast</option>
+                    <option value="balanced">balanced</option>
+                    <option value="deep">deep</option>
+                  </select>
+                </div>
+              </div>
+              <button
+                onClick={handleAutoStart}
+                className="w-full bg-machi-purple text-white font-semibold py-2 rounded-lg
+                           hover:brightness-110 transition"
+              >
+                {t('h2h.autoStart')}
+              </button>
+              {autoStatus?.error && (
+                <p className="mt-2 text-red-400 text-xs">{autoStatus.error}</p>
+              )}
+            </div>
           )}
         </div>
 

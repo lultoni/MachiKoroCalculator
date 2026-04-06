@@ -6,6 +6,32 @@ Implementation history: what was built, why, and which design decisions were mad
 
 ## Phase 7: Iteration
 
+### 7.32 — Auto Battle Mode (TODO #22)
+
+Automated engine ranking system that prioritizes matchups based on Glicko-2 rating uncertainty.
+
+**Backend:** `AutoBattleRunner` selects engine pairs with highest combined RD (rating deviation), penalizing recently played pairs (-50 per repeat). Runs matches sequentially, saving each result to the store. Supports tier filtering and configurable rounds/games.
+
+**Frontend:** Auto Battle panel in H2H overview with start/stop controls, tier selector, games-per-match and max-rounds inputs. Dual progress bars (game-level + round-level) with 2-second polling. Results table auto-reloads after each completed round.
+
+**Bug fix:** Game progress counter jumped backwards because `MatchRunner` runs games in parallel via ForkJoinPool — `gameIdx + 1` was non-monotonic. Fixed with `AtomicInteger.incrementAndGet()`.
+
+**Files:** `AutoBattleRunner.java` (new), `H2hHandler.java` (3 endpoints), `ApiServer.java` (context), `H2hOverview.tsx` (UI), `client.ts` (API types), `en.ts`/`de.ts` (i18n).
+
+### 7.31 — H2H Game Replay Redesign (TODO #19)
+
+Three-column layout with per-player card inventories reconstructed from turn logs. Left/right columns show player hands with landmarks as colored initials and non-landmarks as grouped chips with category icons. Game insights panel shows total income, purchases, saves, and event counts (doubles, Funkturm, Bürohaus). Bürohaus swaps tracked in inventory reconstruction.
+
+**Files:** `H2hGameReplay.tsx` (rewritten), `en.ts`/`de.ts` (i18n keys).
+
+### 7.30 — H2H Match Overview Layout & Stats (TODO #16)
+
+Symmetric results table: `[Eval A | Win% A | Matchup | Win% B | Eval B | Games | Avg Turns]` with winner highlighting. Per-engine eval times computed with seat-swap correction. Match highlights (shortest/longest game, biggest blowout, richest finish) as clickable cards. Backend enrichment migration backfills old summaries with per-engine eval times and game extremes.
+
+**Bug fix:** Per-engine eval times were equal for different engines because seat swap averaged them out. Fixed by mapping seat index back to engine index using swap point.
+
+**Files:** `MatchResult.java` (new fields), `H2hResultStore.java` (enrichment migration), `H2hHandler.java` (serialization), `H2hMatchDetail.tsx` (rewritten), `H2hOverview.tsx` (table layout), `types.ts` (API types).
+
 ### 7.29 — MCTS Instant-Win Detection (TODO #14)
 
 **Bug:** H2H games between mcts-v1-fast and mcts-v1-depth3 would reach 200-turn timeout with both players holding 100+ coins and 3 landmarks — engines never bought the final (winning) landmark.

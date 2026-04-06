@@ -265,6 +265,7 @@ export interface H2hMatchSummary {
   engines: string[];
   wins: number[];
   winRates: number[];
+  ratingDelta?: number[];
 }
 
 export interface H2hMatchResult extends H2hMatchSummary {

@@ -189,9 +189,22 @@ final class H2hHandler implements HttpHandler {
 
     private void handleAllResults(HttpExchange exchange) throws IOException {
         List<MatchResult> all = store.loadAll();
+
+        // Compute rating deltas for each match
+        java.util.Map<String, RatingCalculator.RatingDelta> deltas = new java.util.HashMap<>();
+        RatingCalculator.computeRatingsWithDeltas(all, deltas);
+
         JsonArray arr = new JsonArray();
         for (MatchResult r : all) {
-            arr.add(toSummaryJson(r));
+            JsonObject obj = toSummaryJson(r);
+            RatingCalculator.RatingDelta delta = deltas.get(r.id);
+            if (delta != null) {
+                JsonArray rd = new JsonArray();
+                rd.add(Math.round(delta.deltaA()));
+                rd.add(Math.round(delta.deltaB()));
+                obj.add("ratingDelta", rd);
+            }
+            arr.add(obj);
         }
         ApiUtils.sendJson(exchange, 200, arr);
     }

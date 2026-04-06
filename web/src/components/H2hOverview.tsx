@@ -525,13 +525,16 @@ export function H2hOverview({ onBack, projects, language }: Props) {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-machi-text-dim border-b border-machi-border">
+                    <th className="text-right py-2 px-2 text-[11px]">Elo</th>
                     <th className="text-right py-2 px-2">{t('h2h.avgEval')}</th>
                     <th className="text-right py-2 px-2">{t('h2h.winRate')}</th>
                     <th className="text-center py-2 px-2">{t('h2h.matchup')}</th>
                     <th className="text-left py-2 px-2">{t('h2h.winRate')}</th>
                     <th className="text-left py-2 px-2">{t('h2h.avgEval')}</th>
+                    <th className="text-left py-2 px-2 text-[11px]">Elo</th>
                     <th className="text-center py-2 px-2">{t('h2h.gamesCol')}</th>
                     <th className="text-center py-2 px-2">{t('h2h.avgTurns')}</th>
+                    <th className="text-right py-2 px-2">{t('h2h.time')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -542,12 +545,17 @@ export function H2hOverview({ onBack, projects, language }: Props) {
                     const winB = r.winRates[1] * 100;
                     const aWins = winA > winB;
                     const bWins = winB > winA;
+                    const deltaA = r.ratingDelta?.[0] ?? 0;
+                    const deltaB = r.ratingDelta?.[1] ?? 0;
                     return (
                       <tr
                         key={r.id}
                         onClick={() => h2h.selectResult(r.id)}
                         className="border-b border-machi-border/50 hover:bg-machi-bg/50 cursor-pointer transition"
                       >
+                        <td className={`text-right py-2 px-2 text-[11px] tabular-nums ${deltaA > 0 ? 'text-green-400' : deltaA < 0 ? 'text-red-400' : 'text-machi-text-dim'}`}>
+                          {deltaA > 0 ? '+' : ''}{deltaA}
+                        </td>
                         <td className="text-right py-2 px-2 text-machi-text-dim text-xs tabular-nums">
                           {evalA.toFixed(0)}<span className="text-[10px]">ms</span>
                         </td>
@@ -565,8 +573,14 @@ export function H2hOverview({ onBack, projects, language }: Props) {
                         <td className="text-left py-2 px-2 text-machi-text-dim text-xs tabular-nums">
                           {evalB.toFixed(0)}<span className="text-[10px]">ms</span>
                         </td>
+                        <td className={`text-left py-2 px-2 text-[11px] tabular-nums ${deltaB > 0 ? 'text-green-400' : deltaB < 0 ? 'text-red-400' : 'text-machi-text-dim'}`}>
+                          {deltaB > 0 ? '+' : ''}{deltaB}
+                        </td>
                         <td className="text-center py-2 px-2 text-machi-text-dim">{r.gameCount}</td>
                         <td className="text-center py-2 px-2 text-machi-text-dim">{r.avgGameLength.toFixed(0)}</td>
+                        <td className="text-right py-2 px-2 text-machi-text-dim text-xs tabular-nums">
+                          {formatElapsed(r.totalTimeMs)}
+                        </td>
                       </tr>
                     );
                   })}

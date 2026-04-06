@@ -26,6 +26,11 @@ public final class RatingCalculator {
     private RatingCalculator() {}
 
     /**
+     * Rating change for both engines in a single match.
+     */
+    public record RatingDelta(double deltaA, double deltaB) {}
+
+    /**
      * Computes current Glicko-2 ratings from all H2H match results.
      *
      * <p>Matches are sorted by date (ISO-8601 string comparison) and replayed in order.
@@ -36,6 +41,18 @@ public final class RatingCalculator {
      * @return map of engine ID → current Glicko-2 rating (only engines that appeared in matches)
      */
     public static Map<String, Glicko2Rating> computeRatings(List<MatchResult> results) {
+        return computeRatingsWithDeltas(results, null);
+    }
+
+    /**
+     * Computes Glicko-2 ratings and optionally records per-match rating deltas.
+     *
+     * @param results all H2H match results (may be unsorted)
+     * @param deltas  if non-null, populated with match ID → rating delta for each processed match
+     * @return map of engine ID → current Glicko-2 rating
+     */
+    public static Map<String, Glicko2Rating> computeRatingsWithDeltas(
+            List<MatchResult> results, Map<String, RatingDelta> deltas) {
         Map<String, Glicko2Rating> ratings = new HashMap<>();
 
         // Sort by date for chronological replay
@@ -53,6 +70,8 @@ public final class RatingCalculator {
 
             Glicko2Rating ratingA = ratings.getOrDefault(idA, Glicko2Rating.initial());
             Glicko2Rating ratingB = ratings.getOrDefault(idB, Glicko2Rating.initial());
+            double beforeA = ratingA.rating;
+            double beforeB = ratingB.rating;
 
             // Score from A's perspective = A's win rate
             double scoreA = match.winRates[0];
@@ -69,6 +88,11 @@ public final class RatingCalculator {
             }
             ratings.put(idA, ratingA);
             ratings.put(idB, ratingB);
+
+            if (deltas != null) {
+                deltas.put(match.id, new RatingDelta(
+                        ratingA.rating - beforeA, ratingB.rating - beforeB));
+            }
         }
 
         return ratings;

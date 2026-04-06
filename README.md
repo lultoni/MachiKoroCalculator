@@ -168,6 +168,41 @@ The tournament prints four sections on completion (or on Ctrl+C for partial resu
 - Seat swapping eliminates first-player advantage: half the games each engine plays as P1, half as P2
 - Games that hit the turn limit (200) use softmax win probability as a tiebreaker (no draws)
 
+## Multi-Machine H2H Testing
+
+You can run H2H matches on multiple machines and combine the results into a single rating pool. The workflow uses Export/Import in the web UI.
+
+### Setup
+
+1. Clone the repo and build on each machine (see Build & Run above)
+2. On first startup, each machine loads the **baseline** from `src/resources/h2h-baseline/h2h-summaries.json` — a bundled snapshot of match results so everyone starts with the same ratings
+
+### Workflow
+
+1. **Run matches** on each machine — use the H2H page (manual matches, auto battle, CLI tournaments). Results are stored locally in `data/h2h-summaries.json`
+2. **Export** — on each machine, click the **Export** button in the Results table header. This downloads the local `h2h-summaries.json` file
+3. **Import** — on your main machine, click **Import** and select each exported file. The merge deduplicates by match ID: existing matches are skipped, only new ones are added. Ratings recompute automatically from the combined history
+4. **Repeat** — import is idempotent. Importing the same file twice adds nothing. You can safely import from the same machine multiple times
+
+### Single Source of Truth
+
+To consolidate everything into one canonical dataset:
+
+1. Pick one machine as the **main** (the one with the most results, or any machine)
+2. Import all exported files from the other machines into it
+3. Update the baseline snapshot so new clones start with the full history:
+   ```bash
+   cp data/h2h-summaries.json src/resources/h2h-baseline/h2h-summaries.json
+   ```
+4. Commit and push — now every clone of the repo starts with the combined ratings
+5. On the other machines, delete `data/h2h-summaries.json` and restart the server — they'll load the new baseline automatically
+
+### Notes
+
+- **Summaries only** — Export/Import transfers match summaries (~40 KB for 60 matches), not game logs (~43 MB). Ratings and leaderboards work from summaries alone. Detailed game replays are only available on the machine that ran the match.
+- **No conflicts** — match IDs are 8-character UUIDs, so collisions are effectively impossible. Import order doesn't matter.
+- **Glicko-2 is deterministic** — replaying the same match history always produces the same ratings, regardless of which machine computed them.
+
 ## Cards (Base Game)
 
 All 19 cards defined in `src/resources/jsons/projects.json`.

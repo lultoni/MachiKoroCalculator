@@ -10,7 +10,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Reads and writes H2H match results with split storage:
@@ -104,6 +106,37 @@ public final class H2hResultStore {
             return logs.get(gameIndex);
         }
         return null;
+    }
+
+    /**
+     * Merges imported match summaries into the local store, skipping duplicates
+     * (by match ID) and entries with missing required fields.
+     *
+     * @param imported the match summaries to merge (gameLogs expected to be null)
+     * @return the number of new matches actually added
+     */
+    public synchronized int mergeImported(List<MatchResult> imported) {
+        List<MatchResult> all = loadAll();
+        Set<String> existingIds = new HashSet<>();
+        for (MatchResult r : all) existingIds.add(r.id);
+
+        int added = 0;
+        for (MatchResult r : imported) {
+            if (r.id == null || r.id.isEmpty()) continue;
+            if (r.config == null || r.config.engineIds() == null) continue;
+            if (r.wins == null || r.winRates == null) continue;
+            if (existingIds.contains(r.id)) continue;
+
+            all.add(r);
+            existingIds.add(r.id);
+            added++;
+        }
+
+        if (added > 0) {
+            writeSummaries(all);
+            version++;
+        }
+        return added;
     }
 
     // -------------------------------------------------------------------------

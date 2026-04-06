@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import * as api from '../api/client';
-import type { H2hMatchSummary, H2hMatchResult, H2hGameLog } from '../api/types';
+import type { H2hMatchSummary, H2hMatchResult, H2hGameLog, H2hImportResponse } from '../api/types';
 
 export interface H2hState {
   results: H2hMatchSummary[];
@@ -104,6 +104,19 @@ export function useH2h() {
     setState(s => ({ ...s, selectedGame: null }));
   }, []);
 
+  const importResults = useCallback(async (fileContent: string): Promise<H2hImportResponse | null> => {
+    setState(s => ({ ...s, loading: true, error: null }));
+    try {
+      const result = await api.h2hImport(fileContent);
+      await loadResults();
+      setState(s => ({ ...s, loading: false }));
+      return result;
+    } catch (e: unknown) {
+      setState(s => ({ ...s, loading: false, error: (e as Error).message }));
+      return null;
+    }
+  }, [loadResults]);
+
   // Cleanup polling on unmount
   useEffect(() => {
     return () => {
@@ -119,5 +132,6 @@ export function useH2h() {
     selectGame,
     clearSelection,
     clearGame,
+    importResults,
   };
 }

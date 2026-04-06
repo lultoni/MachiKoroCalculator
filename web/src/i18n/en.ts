@@ -189,6 +189,12 @@ const en: Record<string, string> = {
   'h2h.ratingsMatchesTip': 'Number of H2H matches this engine has participated in.',
   'h2h.ratingsConf': 'Confidence',
   'h2h.ratingsConfTip': 'Rating confidence based on RD: High (RD<100, many matches), Mid (RD 100–200), Low (RD>200, few matches).',
+
+  // H2H Export/Import
+  'h2h.export': 'Export',
+  'h2h.import': 'Import',
+  'h2h.importSuccess': '{imported} matches imported, {skipped} skipped (duplicates)',
+  'h2h.importNone': 'No new matches found in file',
 };
 
 export default en;

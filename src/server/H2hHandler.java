@@ -2,12 +2,15 @@ package server;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonSyntaxException;
+import com.google.gson.reflect.TypeToken;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import h2h.*;
 import iface.EngineOrchestrator;
 
 import java.io.IOException;
+import java.lang.reflect.Type;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -32,6 +35,8 @@ import java.util.concurrent.atomic.AtomicInteger;
  * </ul>
  */
 final class H2hHandler implements HttpHandler {
+
+    private static final Type SUMMARY_LIST_TYPE = new TypeToken<List<MatchResult>>() {}.getType();
 
     private final EngineOrchestrator orchestrator;
     private final H2hResultStore store;
@@ -90,6 +95,10 @@ final class H2hHandler implements HttpHandler {
                 handleAllResults(exchange);
             } else if (path.equals("/api/h2h/ratings") && "GET".equals(method)) {
                 handleRatings(exchange);
+            } else if (path.equals("/api/h2h/export") && "GET".equals(method)) {
+                handleExport(exchange);
+            } else if (path.equals("/api/h2h/import") && "POST".equals(method)) {
+                handleImport(exchange);
             } else if (path.equals("/api/h2h/auto/start") && "POST".equals(method)) {
                 handleAutoStart(exchange);
             } else if (path.equals("/api/h2h/auto/stop") && "POST".equals(method)) {
@@ -330,6 +339,50 @@ final class H2hHandler implements HttpHandler {
                 response.addProperty("error", autoBattle.getError());
             }
         }
+        ApiUtils.sendJson(exchange, 200, response);
+    }
+
+    // -------------------------------------------------------------------------
+    // GET /api/h2h/export
+    // -------------------------------------------------------------------------
+
+    private void handleExport(HttpExchange exchange) throws IOException {
+        List<MatchResult> all = store.loadAll();
+        byte[] bytes = ApiUtils.GSON.toJson(all, SUMMARY_LIST_TYPE).getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        exchange.getResponseHeaders().set("Content-Type", "application/json; charset=utf-8");
+        exchange.getResponseHeaders().set("Content-Disposition", "attachment; filename=\"h2h-summaries.json\"");
+        exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
+        exchange.sendResponseHeaders(200, bytes.length);
+        try (java.io.OutputStream os = exchange.getResponseBody()) {
+            os.write(bytes);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // POST /api/h2h/import
+    // -------------------------------------------------------------------------
+
+    private void handleImport(HttpExchange exchange) throws IOException {
+        String body = ApiUtils.readBody(exchange);
+        List<MatchResult> imported;
+        try {
+            imported = ApiUtils.GSON.fromJson(body, SUMMARY_LIST_TYPE);
+        } catch (JsonSyntaxException e) {
+            ApiUtils.sendError(exchange, 400, "Invalid JSON format");
+            return;
+        }
+        if (imported == null || imported.isEmpty()) {
+            JsonObject response = new JsonObject();
+            response.addProperty("imported", 0);
+            response.addProperty("skipped", 0);
+            ApiUtils.sendJson(exchange, 200, response);
+            return;
+        }
+
+        int added = store.mergeImported(imported);
+        JsonObject response = new JsonObject();
+        response.addProperty("imported", added);
+        response.addProperty("skipped", imported.size() - added);
         ApiUtils.sendJson(exchange, 200, response);
     }
 

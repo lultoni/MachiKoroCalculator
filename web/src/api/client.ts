@@ -19,6 +19,7 @@ import type {
   H2hMatchResult,
   H2hGameLog,
   RatingsResponse,
+  H2hImportResponse,
 } from './types';
 
 const BASE = '';  // same-origin; Vite proxy handles /api → :8080
@@ -127,6 +128,31 @@ export const h2hGameLog = (matchId: string, gameIndex: number) =>
 
 export const h2hRatings = () =>
   json<RatingsResponse>('/api/h2h/ratings');
+
+export async function h2hExport(): Promise<void> {
+  const res = await fetch(BASE + '/api/h2h/export');
+  if (!res.ok) {
+    const body = await res.json();
+    throw new ApiError(res.status, body.error ?? res.statusText);
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'h2h-summaries.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+export function h2hImport(fileContent: string): Promise<H2hImportResponse> {
+  return json<H2hImportResponse>('/api/h2h/import', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: fileContent,
+  });
+}
 
 // ─── H2H Auto Battle ────────────────────────────────────────────────
 

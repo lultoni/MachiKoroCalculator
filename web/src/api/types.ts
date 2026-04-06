@@ -278,3 +278,8 @@ export interface H2hMatchResult extends H2hMatchSummary {
     seatSwap?: boolean;
   };
 }
+
+export interface H2hImportResponse {
+  imported: number;
+  skipped: number;
+}

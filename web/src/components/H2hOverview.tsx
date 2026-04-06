@@ -86,6 +86,10 @@ export function H2hOverview({ onBack, projects, language }: Props) {
   const loadResultsRef = useRef(h2h.loadResults);
   loadResultsRef.current = h2h.loadResults;
 
+  // Export/Import state
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [importMessage, setImportMessage] = useState<string | null>(null);
+
   const pollAutoStatus = useCallback(() => {
     if (autoPollRef.current) clearInterval(autoPollRef.current);
     lastSeenRoundsRef.current = -1;
@@ -144,6 +148,36 @@ export function H2hOverview({ onBack, projects, language }: Props) {
     try {
       await api.h2hAutoStop();
     } catch { /* ignore */ }
+  };
+
+  const handleExport = async () => {
+    try {
+      await api.h2hExport();
+    } catch { /* ignore */ }
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const content = event.target?.result as string;
+      const result = await h2h.importResults(content);
+      if (result) {
+        if (result.imported > 0) {
+          setImportMessage(
+            t('h2h.importSuccess')
+              .replace('{imported}', String(result.imported))
+              .replace('{skipped}', String(result.skipped))
+          );
+        } else {
+          setImportMessage(t('h2h.importNone'));
+        }
+        setTimeout(() => setImportMessage(null), 5000);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
   };
 
   useEffect(() => {
@@ -517,7 +551,37 @@ export function H2hOverview({ onBack, projects, language }: Props) {
 
         {/* Results Table */}
         <div className="bg-machi-surface rounded-xl p-6 border border-machi-border">
-          <h2 className="text-lg font-semibold mb-4">{t('h2h.results')}</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold">{t('h2h.results')}</h2>
+            <div className="flex items-center gap-2">
+              {importMessage && (
+                <span className="text-xs text-machi-accent mr-2">{importMessage}</span>
+              )}
+              <button
+                onClick={handleExport}
+                disabled={h2h.results.length === 0}
+                className="text-sm px-3 py-1.5 rounded-lg border border-machi-border text-machi-text-dim
+                           hover:text-machi-text hover:border-machi-accent transition disabled:opacity-40"
+              >
+                {t('h2h.export')}
+              </button>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={h2h.loading}
+                className="text-sm px-3 py-1.5 rounded-lg border border-machi-border text-machi-text-dim
+                           hover:text-machi-text hover:border-machi-accent transition disabled:opacity-40"
+              >
+                {t('h2h.import')}
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".json"
+                className="hidden"
+                onChange={handleFileSelect}
+              />
+            </div>
+          </div>
           {h2h.results.length === 0 ? (
             <p className="text-machi-text-dim text-sm">{t('h2h.noResults')}</p>
           ) : (

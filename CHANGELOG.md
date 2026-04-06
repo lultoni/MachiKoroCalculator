@@ -6,6 +6,29 @@ Implementation history: what was built, why, and which design decisions were mad
 
 ## Phase 7: Iteration
 
+### 7.34 — Heuristic Review: WinProbability & Calcs Fixes (TODO #11)
+
+Comprehensive review and fix of all heuristic approximations in Calcs/Core layers, documented in ARCHITECTURE.md Section 7.2.
+
+**WinProbability improvements:**
+- **Continuous endgame gradient:** Replaced binary 2.5× multiplier (3 landmarks + can afford) with `score *= 1.0 + landmarkCount × 0.5 × proximity` where proximity scales from 0 to 1 based on coins/cheapestLandmarkCost.
+- **Dynamic landmark weights:** Replaced static constants (24/36/24/48) with per-player marginal EV calculations. Bahnhof value = 0 when no non-red high-range cards; Freizeitpark value = 0 without Bahnhof; EKZ and Funkturm scale with actual card synergies.
+- **Adaptive coin-advantage scale:** Replaced static `COIN_ADVANTAGE_SCALE = 50` with `max(1.0, avgEvPerRound × 2.0)`. Coin lead significance adapts to game phase.
+- **Landmark-based remaining turns:** Replaced dead `turnsElapsed` parameter with `max(3.0, 50 × (1 − avgLandmarks/4))`. Removed `turnsElapsed` from `RankingOptions` and all callers.
+- **TOTAL_EXPECTED_TURNS:** Calibrated to 50.0 (was 25.0) based on empirical H2H data (~60 turns/player avg).
+
+**Calcs improvements:**
+- **Iterative compound turn projection:** `evPerRound` now compounds each opponent's income into the coin base for the next, replacing linear `stepCoins + step × bluePerOppTurn`.
+- **CVaR/VaR optimal dice:** Risk metrics use `max(1d6_metric, 2d6_metric)` instead of inheriting EV-optimal dice choice.
+
+**Other:**
+- `GameSimulator.ROI_GEOMETRIC_SUM` sourced from `RankingOptions.DEFAULT_DISCOUNT_FACTOR`.
+- Javadoc for `c=99` correctness (not approximation) in `CardIncome`.
+- Javadoc for `BürohausLogic` greedy swap as deliberate design decision.
+- Fixed 7 pre-existing Bürohaus test failures (bergwerk → mini-markt: bergwerk unreachable without Bahnhof).
+
+**Files:** `WinProbability.java`, `Calcs.java`, `GameSimulator.java`, `RankingOptions.java`, `CardIncome.java`, `BürohausLogic.java`, `RuntimeTester.java`, `ARCHITECTURE.md`.
+
 ### 7.33 — Glicko-2 Game-Count Weighting, Endless Auto Battle, Baseline Results
 
 **Glicko-2 weighting:** Matches with more games now produce proportionally more rating update rounds (`max(1, gameCount / 100)`). A 500-game match = 5 rating periods, vs 1 for a 50-game match. This tightens RD faster and gives larger matches more influence on ratings.

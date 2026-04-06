@@ -286,17 +286,31 @@ Deterministic minimax engine with probability-weighted chance nodes. No random r
 
 ### 7.2 Heuristic Choices (Documented for Discussion)
 
-These are deliberate simplifications in the Calcs and WinProbability layers. Each has a known directional effect on evaluation quality.
+These are deliberate simplifications in the Calcs and WinProbability layers. Items 1-5 were reviewed and fixed as part of TODO #11. Additional approximations (A-F) were discovered during the review.
 
 1. **Blue card EV now Bahnhof-aware** (`CardIncome.playerEvPerRound`, `contextualCardEvPerRound`): Previously took `max(1d6_ev, 2d6_ev)` for all players regardless of Bahnhof ownership. Now correctly uses only 1d6 when the player doesn't own Bahnhof. **Fixed in 7.20.**
 
-2. **WinProbability endgame bonus is binary** (`WinProbability.java`): 2.5× score multiplier only when player has exactly 3 landmarks AND can afford the 4th right now. No gradient for "almost there" (e.g., 1-2 coins short). **Effect:** may undervalue endgame positions where the player is very close to winning but doesn't quite have enough coins.
+2. **WinProbability endgame bonus — continuous gradient** (`WinProbability.computeScores`): Replaced binary 2.5× multiplier (3 landmarks + can afford 4th) with a continuous proximity bonus: `score *= 1.0 + landmarkCount × 0.5 × proximity` where `proximity = min(1, coins / cheapestLandmarkCost)`. 0 landmarks → no bonus; 3 landmarks + can afford → 2.5× (backwards-compatible peak). **Fixed in TODO #11.**
 
-3. **Landmark weights are static constants** (`WinProbability.java`): Fixed coin-equivalent values (Bahnhof=24, Einkaufszentrum=36, Freizeitpark=24, Funkturm=48). Don't adapt to card synergies or game phase. **Effect:** softmax heuristic may mis-rank players in unusual board states where landmark value differs from the average case.
+3. **Landmark weights are dynamic and synergy-aware** (`WinProbability.computeLandmarkWeight`): Replaced static constants (24/36/24/48) with per-player marginal EV calculations. Bahnhof: `max(0, ev_2d6 − ev_1d6)`, zero if no non-red cards with dice activation ≥ 7. Einkaufszentrum: sum of +1 bonuses across store/café cards with turn-frequency scaling. Freizeitpark: `P(doubles) × secondRollEV`, zero without Bahnhof. Funkturm: expected reroll improvement `Σ P(r) × max(0, baseline − gain(r))`. Each scaled by `remainingTurns`. **Fixed in TODO #11.**
 
-4. **Linear turn projection in evPerRound** (`Calcs.java`): Assumes linear coin accumulation over opponent turns. **Effect:** overestimates opponent resource growth in high-variance portfolios. Matters more in late game with concentrated income distributions.
+4. **Iterative compound turn projection** (`Calcs.evPerRound`): Replaced linear `stepCoins = baseCoins + step × bluePerOppTurn` with iterative accumulation where each opponent's turn income compounds into the coin base for the next. Eliminates overestimation in high-variance portfolios. **Fixed in TODO #11.**
 
-5. **CVaR assumes fixed dice strategy** (`Calcs.java`): Risk metrics use the same dice choice for the tail distribution as for the expected case. **Effect:** may understate downside risk when switching dice count would be better in bad scenarios. Only affects UI risk explanations, not engine ranking.
+5. **CVaR/VaR uses optimal dice strategy** (`Calcs.conditionalValueAtRisk`, `Calcs.valueAtRisk`): Risk metrics now use `max(1d6_metric, 2d6_metric)` instead of inheriting the EV-optimal dice choice. Correctly models downside risk when switching dice count is better in tail scenarios. **Fixed in TODO #11.**
+
+**Additional findings (discovered during TODO #11 review):**
+
+- **A. Adaptive coin-advantage scale** (`WinProbability.computeScores`): Replaced static `COIN_ADVANTAGE_SCALE = 50.0` with `max(1.0, avgEvPerRound × 2.0)`. Early game (low EV) → coin lead matters more; late game (high EV) → less so. **Fixed in TODO #11.**
+
+- **B. Landmark-based remaining turns** (`WinProbability.computeScores`): Replaced dead `turnsElapsed` parameter with landmark-progress estimation: `max(3.0, 50.0 × (1 − avgLandmarks / 4))`. Calibrated from empirical H2H data (avg ~60 turns/player). **Fixed in TODO #11.**
+
+- **C. `TOTAL_EXPECTED_TURNS`** calibrated to 50.0 (was 25.0). Based on H2H empirical data showing average 59.7 turns per player; 50 is conservative for human play.
+
+- **D. `GameSimulator.ROI_GEOMETRIC_SUM`** now sourced from `RankingOptions.DEFAULT_DISCOUNT_FACTOR` (was a magic 0.95 literal). **Fixed in TODO #11.**
+
+- **E. `c=99` in `CardIncome.estimateUncappedOwnTurnEV` and `playerEvPerRound`** is correct, not an approximation. Blue/green cards pay from the bank (c irrelevant); red cards use actual opponent coins array. Documented in Javadoc. **Documented in TODO #11.**
+
+- **F. `BürohausLogic` greedy swap policy** is a deliberate design choice. Single-activation greedy EV-max is the correct analytical approximation for Calcs/Core. Multi-turn swap optimization belongs in Engine layer (MCTS tree search). Documented in class-level Javadoc. **Documented in TODO #11.**
 
 ### 7.3 Safety Valve
 

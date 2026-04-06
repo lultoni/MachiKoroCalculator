@@ -12,6 +12,15 @@ package core;
  * beneficial (i.e. the opponent's card has higher EV in the active player's
  * context than the player's worst card).
  *
+ * <p><b>Design decision: the greedy policy is deliberate.</b> For the Calcs/Core layer,
+ * single-activation greedy EV-maximization is the correct analytical approximation.
+ * Multi-turn look-ahead swap optimization belongs in the Engine layer — MCTS engines
+ * model Bürohaus as a tree node ({@code BürohausNode}) and explore swap options during
+ * tree search. The greedy fallback here is also used by rollout policies (Greedy, Boltzmann)
+ * where a single-swap heuristic is appropriate: in practice, the swap has at most one
+ * beneficial option (lowest-own vs highest-opp), and exploring worse swaps adds noise
+ * without meaningful strategic diversity.
+ *
  * <p>Purple (lila) cards are excluded because they are unique per player —
  * swapping one would give the recipient a second copy of a unique card,
  * which is illegal under the official rules.

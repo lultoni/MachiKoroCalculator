@@ -874,9 +874,11 @@ public class RuntimeTester {
     private static void test_buerohaus_swap_note_set_in_ranking() {
         // When bürohaus is affordable and opponents own better cards,
         // the RankEntry.notes should contain the swap advice string.
+        // Uses mini-markt (grün, roll 4, income 3, EV=0.5) vs weizenfeld (blau, roll 1, EV=0.333 in 2p)
+        // — mini-markt has higher contextual EV, making the swap beneficial.
         GameStateBuilder b = new GameStateBuilder(2);
         b.setPlayerName(0, "P0").setCoins(0, 10).addProject(0, "weizenfeld");
-        b.setPlayerName(1, "P1").setCoins(1, 5).addProject(1, "bergwerk");
+        b.setPlayerName(1, "P1").setCoins(1, 5).addProject(1, "mini-markt");
         GameState gs = b.build();
 
         RankingOptions opts = new RankingOptions();
@@ -895,22 +897,23 @@ public class RuntimeTester {
     }
 
     private static void test_buerohaus_swap_executed_in_simulator() {
-        // P0 owns bürohaus + weizenfeld (low EV); P1 owns bergwerk (high EV).
-        // executeBürohausSwap should swap weizenfeld → P1, bergwerk → P0.
+        // P0 owns bürohaus + weizenfeld (low EV); P1 owns mini-markt (higher EV).
+        // executeBürohausSwap should swap weizenfeld → P1, mini-markt → P0.
+        // mini-markt (grün, roll 4, income 3, EV=0.5) > weizenfeld (blau, roll 1, EV=0.333 in 2p).
         GameStateBuilder b = new GameStateBuilder(2);
         b.setPlayerName(0, "P0").setCoins(0, 5)
          .addProject(0, "bürohaus").addProject(0, "weizenfeld");
-        b.setPlayerName(1, "P1").setCoins(1, 5).addProject(1, "bergwerk");
+        b.setPlayerName(1, "P1").setCoins(1, 5).addProject(1, "mini-markt");
         GameState gs = b.build();
 
         Calcs.executeBürohausSwap(gs, 0);
 
-        assertTrue("P0 now owns bergwerk after swap", gs.getPlayers()[0].hasProject("bergwerk"));
+        assertTrue("P0 now owns mini-markt after swap", gs.getPlayers()[0].hasProject("mini-markt"));
         assertTrue("P0 no longer owns weizenfeld after swap",
                 !gs.getPlayers()[0].hasProject("weizenfeld"));
         assertTrue("P1 now owns weizenfeld after swap", gs.getPlayers()[1].hasProject("weizenfeld"));
-        assertTrue("P1 no longer owns bergwerk after swap",
-                !gs.getPlayers()[1].hasProject("bergwerk"));
+        assertTrue("P1 no longer owns mini-markt after swap",
+                !gs.getPlayers()[1].hasProject("mini-markt"));
         // Bürohaus itself must remain with P0
         assertTrue("P0 still owns bürohaus after swap", gs.getPlayers()[0].hasProject("bürohaus"));
     }
@@ -1813,15 +1816,16 @@ public class RuntimeTester {
 
     private static void test_bürohaus_allows_non_purple_non_landmark_swaps() {
         // Non-purple, non-landmark cards must remain valid swap candidates after the fix.
+        // Uses mini-markt (grün, roll 4, income 3, EV=0.5) vs bäckerei (grün, roll 2-3, EV=0.333).
         core.Project bäckerei = core.ProjectLoader.getProject("bäckerei").orElseThrow();
-        core.Project bergwerk = core.ProjectLoader.getProject("bergwerk").orElseThrow();
+        core.Project miniMarkt = core.ProjectLoader.getProject("mini-markt").orElseThrow();
         core.Project bürohaus = core.ProjectLoader.getProject("bürohaus").orElseThrow();
 
         java.util.ArrayList<core.Project> owned0 = new java.util.ArrayList<>();
         owned0.add(bürohaus);
         owned0.add(bäckerei);
         java.util.ArrayList<core.Project> owned1 = new java.util.ArrayList<>();
-        owned1.add(bergwerk);   // bergwerk (blau, roll 9) has higher EV than bäckerei (grün, roll 2-3)
+        owned1.add(miniMarkt);   // mini-markt (grün, roll 4) has higher EV than bäckerei (grün, roll 2-3)
 
         core.Player p0 = new core.Player("Alice", 10, owned0);
         core.Player p1 = new core.Player("Bob",   10, owned1);
@@ -1830,10 +1834,10 @@ public class RuntimeTester {
 
         double ev = core.BürohausLogic.swapEV(gs, 0);
         String note = core.BürohausLogic.swapNote(gs, 0);
-        assertTrue("bürohaus: Bäckerei ↔ Bergwerk swap is valid (swapEV ≥ 0)", ev >= 0.0);
+        assertTrue("bürohaus: Bäckerei ↔ Mini-Markt swap is valid (swapEV > 0)", ev > 0.0);
         assertTrue("bürohaus: swapNote is non-null for valid swap", note != null);
         if (note != null) {
-            assertTrue("bürohaus: note mentions Bergwerk", note.toLowerCase().contains("bergwerk"));
+            assertTrue("bürohaus: note mentions Mini-markt", note.toLowerCase().contains("mini-markt"));
         }
     }
 

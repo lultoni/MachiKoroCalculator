@@ -188,18 +188,6 @@ public final class Calcs {
             }
 
             final Player activeP = gs.getPlayers()[playerIndex];
-            final CardIncome.PlayerStats activeStats = CardIncome.PlayerStats.of(activeP);
-            double bluePerOppTurn = 0.0;
-            for (int r = 2; r <= 12; r++) {
-                int blueIncome = CardIncome.sumColorIncome(activeP, "blau", r, activeStats, 99, CardIncome.EMPTY_INT_ARRAY);
-                bluePerOppTurn += CardIncome.P2[r] * blueIncome;
-            }
-            double bluePerOppTurn1d6 = 0.0;
-            for (int r = 1; r <= 6; r++) {
-                int blueIncome = CardIncome.sumColorIncome(activeP, "blau", r, activeStats, 99, CardIncome.EMPTY_INT_ARRAY);
-                bluePerOppTurn1d6 += CardIncome.P1[r] * blueIncome;
-            }
-            bluePerOppTurn = Math.max(bluePerOppTurn, bluePerOppTurn1d6);
 
             double total = 0.0;
 
@@ -209,17 +197,20 @@ public final class Calcs {
             double[] ownCache = buildRollGainCache(gs, playerIndex);
             total += computeOwnTurnEV(gs, playerIndex, ownCache, hasBahnhof, hasFreizeitpark, hasFunkturm);
 
-            int step = 0;
+            // Iterative compound projection: each opponent turn uses the accumulated
+            // coin count from previous turns, correctly capturing the compounding effect
+            // of blue/red income over multiple opponent turns.
+            double accumulatedCoins = baseCoins[playerIndex];
             for (int opponentIdx = 0; opponentIdx < n; opponentIdx++) {
                 if (opponentIdx == playerIndex) continue;
-                step++;
-                int stepCoins = (int) Math.round(baseCoins[playerIndex] + step * bluePerOppTurn);
-                gs.getPlayers()[playerIndex].setCoins(stepCoins);
+                gs.getPlayers()[playerIndex].setCoins((int) Math.round(accumulatedCoins));
 
                 boolean opponentHasBahnhof = gs.getPlayers()[opponentIdx].hasProject("bahnhof");
                 final int oppIdx = opponentIdx;
-                total += CardIncome.bestDiceEV(opponentHasBahnhof,
+                double gainThisOppTurn = CardIncome.bestDiceEV(opponentHasBahnhof,
                         r -> computeOpponentTurnGainForRoll(gs, playerIndex, oppIdx, r));
+                total += gainThisOppTurn;
+                accumulatedCoins += gainThisOppTurn;
             }
 
             return total;
@@ -366,9 +357,7 @@ public final class Calcs {
         if (!hasBahnhof) {
             return rollQuantile1d6(cache, alpha);
         } else {
-            IntToDoubleFunction payout = r -> cache[r];
-            boolean use2d6 = CardIncome.weightedRollEV(true, payout) > CardIncome.weightedRollEV(false, payout);
-            return use2d6 ? rollQuantile2d6(cache, alpha) : rollQuantile1d6(cache, alpha);
+            return Math.max(rollQuantile1d6(cache, alpha), rollQuantile2d6(cache, alpha));
         }
     }
 
@@ -393,9 +382,7 @@ public final class Calcs {
         if (!hasBahnhof) {
             return rollCVar1d6(cache, alpha);
         } else {
-            IntToDoubleFunction payout = r -> cache[r];
-            boolean use2d6 = CardIncome.weightedRollEV(true, payout) > CardIncome.weightedRollEV(false, payout);
-            return use2d6 ? rollCVar2d6(cache, alpha) : rollCVar1d6(cache, alpha);
+            return Math.max(rollCVar1d6(cache, alpha), rollCVar2d6(cache, alpha));
         }
     }
 
@@ -689,7 +676,7 @@ public final class Calcs {
      * using the analytical softmax only (no Monte Carlo).
      */
     public static double estimateWinProbDelta(GameState gs, int playerIndex, Project candidate) {
-        return WinProbability.estimateWinProbDelta(gs, playerIndex, candidate, 0);
+        return WinProbability.estimateWinProbDelta(gs, playerIndex, candidate);
     }
 
     /**
@@ -705,7 +692,7 @@ public final class Calcs {
             double afterBuy = GameSimulator.mcWinRate(stateAfter, playerIndex, mcSimulations);
             return afterBuy - baseline;
         }
-        return WinProbability.estimateWinProbDelta(gs, playerIndex, candidate, 0);
+        return WinProbability.estimateWinProbDelta(gs, playerIndex, candidate);
     }
 
     /**
@@ -760,7 +747,7 @@ public final class Calcs {
 
             if (opts.includeWinProbDelta) {
                 entry.winProbDelta = WinProbability.estimateWinProbDelta(
-                        gs, playerIndex, candidate, opts.turnsElapsed);
+                        gs, playerIndex, candidate);
             }
 
             results.add(entry);

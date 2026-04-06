@@ -39,7 +39,7 @@ public class GameSimulator {
      */
     private static final double ROI_GEOMETRIC_SUM;
     static {
-        double gamma = 0.95;
+        double gamma = RankingOptions.DEFAULT_DISCOUNT_FACTOR;
         int T = RankingOptions.DEFAULT_HORIZON;
         ROI_GEOMETRIC_SUM = gamma * (1.0 - Math.pow(gamma, T)) / (1.0 - gamma);
     }

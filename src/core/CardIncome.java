@@ -307,8 +307,12 @@ public class CardIncome {
      * without any coin-clamp (uses {@code c=99}). Suitable as a conservative floor when
      * projecting future coin counts for EV calculations.
      *
-     * <p>Red cards are excluded because their payment depends on the coin count being
-     * estimated — including them would create a circular dependency.
+     * <p><b>Why c=99 is correct (not an approximation):</b> Blue and green cards pay from
+     * the bank, so the player's own coin count is irrelevant for their income. The {@code c}
+     * parameter in {@link #get_I} only matters for red cards (clamping the roller's payment
+     * to their available coins), and red cards are intentionally excluded here because their
+     * payment depends on the coin count being estimated — including them would create a
+     * circular dependency.
      */
     public static double estimateUncappedOwnTurnEV(Player player, boolean hasBahnhof) {
         PlayerStats stats = PlayerStats.of(player);
@@ -332,12 +336,18 @@ public class CardIncome {
      * <p>Dice strategy: if the player owns Bahnhof, takes {@code max(2d6_ev, 1d6_ev)} per card
      * (player can choose the better dice count). Without Bahnhof, uses only 1d6.
      *
+     * <p><b>Why c=99 is correct (not an approximation):</b> The {@code c} parameter is the
+     * queried player's own coins, used only for red-card inability-to-pay clamping. In this
+     * method, red cards are evaluated from the <em>owner's</em> perspective ({@code oop=true}),
+     * where the owner <em>receives</em> income — the {@code c} parameter is irrelevant.
+     * Opponent coin clamping for Stadion/Fernsehsender uses the actual {@code opponentCoins}
+     * array, which IS correct.
+     *
      * <p>Assumptions:
      * <ul>
      *   <li>Blue cards are multiplied by {@code numPlayers} (fire on every player's turn).</li>
      *   <li>Red cards contribute positively (income on each opponent's turn × (numPlayers−1)).</li>
      *   <li>Landmark cards ({@code gelb}) are excluded from this calculation.</li>
-     *   <li>Coins use {@code c=99} (no clamping) for the scoring pass.</li>
      * </ul>
      */
     public static double playerEvPerRound(Player player, int numPlayers, int[] opponentCoins) {

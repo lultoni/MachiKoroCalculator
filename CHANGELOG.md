@@ -6,6 +6,14 @@ Implementation history: what was built, why, and which design decisions were mad
 
 ## Phase 7: Iteration
 
+### 7.43 — Fix MCTS duplicate-card purchase bug, heuristic-ev score display, dice fortune sparklines
+
+**MCTS: Fix inferPurchase dropping duplicate-card purchases (gameplay bug):** `TurnPlan.inferPurchase()` used `List.contains()` with id-based Project equality. When a player already owned a copy of a card (starter Bäckerei/Weizenfeld, or previously purchased duplicates), `contains()` returned true for the new copy too, making the method unable to detect the purchase. The engine's chosen buy was silently replaced with save. Fixed with count-based comparison matching the proven `inferCardId()` approach. Also ensured `buildDetailFromMctsAlternatives` always includes the chosen option in the detail list.
+
+**HeuristicEvEngine: Score type flag for correct display:** Added `scoreIsWinRate` to TurnPlan/TurnLog and `scoresAreWinRates` to DecisionDetail. HeuristicEv's composite scores (unbounded weighted sums of EV, ROI, landmark bonus, tempo) were displayed as percentages (e.g., "10560%"). UI now shows "Score: 105.60" for non-win-rate engines and "WR: 23.2%" for MCTS/FlatMc/Expectimax. Applied to all display paths: purchase box, decision detail, key events.
+
+**H2H Game Replay: Dice Fortune section:** Added sparkline visualizations and income frequency table to Game Insights. Three-column layout: frequency table (left) showing how many times each income amount occurred on own vs opponent turns, own-turn sparklines (center), opponent-turn sparklines (right). Each sparkline shows per-turn income as Unicode block characters with average annotation.
+
 ### 7.42 — Fix save-then-buy, tiebreaker, stop button, expanded Game Insights (TODO #32, #37, #38)
 
 **Creator Engine: Fix heuristic-only score normalization (TODO #32):** Replaced softmax normalization with linear min-max scaling for heuristic-only mode. Softmax compressed differences between save (0.0) and cards with small positive scores (e.g., 0.01), making them nearly indistinguishable. Linear scaling preserves the natural ordering: save at 0.0 loses to any positive-scored card. With delta-based scoring (#30), cards that genuinely add value now have clearly positive scores and reliably beat save.

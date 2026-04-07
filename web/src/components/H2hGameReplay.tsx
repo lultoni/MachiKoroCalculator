@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useLocale } from '../i18n/useLocale';
 import type { H2hGameLog, H2hTurnLog, ProjectDef } from '../api/types';
 import { cardTextClass, categoryIconPath } from '../utils/cardDisplay';
@@ -129,6 +129,57 @@ function computeInsights(game: H2hGameLog, playerCount: number) {
     biggestIncome, diceChoices1d6, diceChoices2d6, landmarkTurns, avgIncome,
     doublesCount, funkturmCount, bürohausCount,
   };
+}
+
+/** Unicode block characters for sparklines (8 levels). */
+const SPARK = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
+
+interface DiceFortune {
+  /** Per-player array of own-turn income values (one per own turn, in order). */
+  ownIncome: number[][];
+  /** Per-player array of income received on OPPONENT turns (from red cards etc.). */
+  oppIncome: number[][];
+  /** Per-player coin-frequency histogram: how many turns yielded 0 coins, 1 coin, etc. */
+  ownIncomeFreq: Map<number, number>[];
+  oppIncomeFreq: Map<number, number>[];
+}
+
+/** Compute dice fortune data for sparklines and frequency tables. */
+function computeDiceFortune(game: H2hGameLog, playerCount: number): DiceFortune {
+  const ownIncome: number[][] = Array.from({ length: playerCount }, () => []);
+  const oppIncome: number[][] = Array.from({ length: playerCount }, () => []);
+  const ownIncomeFreq: Map<number, number>[] = Array.from({ length: playerCount }, () => new Map());
+  const oppIncomeFreq: Map<number, number>[] = Array.from({ length: playerCount }, () => new Map());
+
+  for (const tn of game.turns) {
+    const roller = tn.playerIndex;
+    for (let p = 0; p < playerCount; p++) {
+      const delta = tn.coinDeltas?.[p] ?? 0;
+      if (p === roller) {
+        // Own turn income
+        ownIncome[p].push(delta);
+        ownIncomeFreq[p].set(delta, (ownIncomeFreq[p].get(delta) ?? 0) + 1);
+      } else {
+        // Opponent's turn → income from red cards (or losses)
+        oppIncome[p].push(delta);
+        oppIncomeFreq[p].set(delta, (oppIncomeFreq[p].get(delta) ?? 0) + 1);
+      }
+    }
+  }
+
+  return { ownIncome, oppIncome, ownIncomeFreq, oppIncomeFreq };
+}
+
+/** Render a sparkline string from an array of values. */
+function sparkline(values: number[]): string {
+  if (values.length === 0) return '';
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  return values.map(v => {
+    const idx = Math.min(7, Math.floor(((v - min) / range) * 7.99));
+    return SPARK[idx];
+  }).join('');
 }
 
 interface GameEvent {
@@ -267,6 +318,11 @@ export function H2hGameReplay({ game, engines, matchId, projects, language, onBa
 
   const insights = useMemo(
     () => computeInsights(game, playerCount),
+    [game, playerCount],
+  );
+
+  const fortune = useMemo(
+    () => computeDiceFortune(game, playerCount),
     [game, playerCount],
   );
 
@@ -635,6 +691,110 @@ export function H2hGameReplay({ game, engines, matchId, projects, language, onBa
               {insights.bürohausCount > 0 && (
                 <div>{projects.byId('bürohaus')?.[nameKey] ?? (language === 'en' ? 'Business Center' : 'Bürohaus')}: <span className="font-mono">{insights.bürohausCount}</span></div>
               )}
+            </div>
+          </div>
+          {/* Dice Fortune */}
+          <div className="bg-machi-bg rounded-lg p-3 text-xs mb-3">
+            <div className="text-machi-text-dim mb-2 font-semibold">{language === 'en' ? 'Dice Fortune' : 'Würfelglück'}</div>
+            <div className="grid gap-3" style={{ gridTemplateColumns: 'auto 1fr 1fr' }}>
+              {/* Col 1: Frequency table */}
+              {(() => {
+                const allAmounts = new Set<number>();
+                for (let p = 0; p < playerCount; p++) {
+                  for (const k of fortune.ownIncomeFreq[p].keys()) allAmounts.add(k);
+                  for (const k of fortune.oppIncomeFreq[p].keys()) allAmounts.add(k);
+                }
+                const sorted = [...allAmounts].sort((a, b) => a - b);
+                if (sorted.length === 0) return <div />;
+
+                return (
+                  <div>
+                    <div className="text-machi-text-dim/60 text-[10px] mb-1">{language === 'en' ? 'Income frequency' : 'Einkommenshäufigkeit'}</div>
+                    <table className="text-center text-[10px] font-mono" style={{ borderSpacing: 0 }}>
+                      <thead>
+                        <tr className="text-machi-text-dim/50">
+                          <td className="pr-1.5 text-left">{language === 'en' ? '¢' : '¢'}</td>
+                          {sorted.map(amt => (
+                            <td key={amt} className={`px-[3px] ${amt < 0 ? 'text-red-400/60' : amt === 0 ? '' : 'text-green-400/60'}`}>
+                              {amt >= 0 ? `+${amt}` : amt}
+                            </td>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {engines.map((_eng, i) => (
+                          <React.Fragment key={i}>
+                            <tr>
+                              <td className={`pr-1.5 text-left whitespace-nowrap ${i === 0 ? 'text-machi-accent' : 'text-fuchsia-400'}`}>
+                                P{i + 1}{language === 'en' ? ' own' : ' eig'}
+                              </td>
+                              {sorted.map(amt => {
+                                const count = fortune.ownIncomeFreq[i].get(amt) ?? 0;
+                                return (
+                                  <td key={amt} className={`px-[3px] ${count > 0 ? 'text-machi-text' : 'text-machi-text-dim/20'}`}>
+                                    {count || '·'}
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                            <tr>
+                              <td className={`pr-1.5 text-left whitespace-nowrap ${i === 0 ? 'text-machi-accent/50' : 'text-fuchsia-400/50'}`}>
+                                P{i + 1}{language === 'en' ? ' opp' : ' geg'}
+                              </td>
+                              {sorted.map(amt => {
+                                const count = fortune.oppIncomeFreq[i].get(amt) ?? 0;
+                                return (
+                                  <td key={amt} className={`px-[3px] ${count > 0 ? 'text-machi-text' : 'text-machi-text-dim/20'}`}>
+                                    {count || '·'}
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          </React.Fragment>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              })()}
+              {/* Col 2: Own turns sparklines */}
+              <div>
+                <div className="text-center text-machi-text-dim/60 text-[10px] mb-1">{language === 'en' ? 'Own turns' : 'Eigene Züge'}</div>
+                <div className="space-y-1.5">
+                  {engines.map((_eng, i) => (
+                    <div key={i} className="flex items-end gap-1" title={fortune.ownIncome[i].join(', ')}>
+                      <span className={`font-mono text-[10px] flex-shrink-0 ${i === 0 ? 'text-machi-accent' : 'text-fuchsia-400'}`}>P{i + 1}</span>
+                      <div className="font-mono text-xl leading-none tracking-[-0.02em] flex-1 text-center overflow-hidden">
+                        {sparkline(fortune.ownIncome[i])}
+                      </div>
+                      <span className="text-[9px] text-machi-text-dim/50 flex-shrink-0">
+                        Ø{fortune.ownIncome[i].length > 0
+                          ? (fortune.ownIncome[i].reduce((a, b) => a + b, 0) / fortune.ownIncome[i].length).toFixed(1)
+                          : '0'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              {/* Col 3: Opponent turns sparklines */}
+              <div>
+                <div className="text-center text-machi-text-dim/60 text-[10px] mb-1">{language === 'en' ? 'Opponent turns' : 'Gegnerische Züge'}</div>
+                <div className="space-y-1.5">
+                  {engines.map((_eng, i) => (
+                    <div key={i} className="flex items-end gap-1" title={fortune.oppIncome[i].join(', ')}>
+                      <span className={`font-mono text-[10px] flex-shrink-0 ${i === 0 ? 'text-machi-accent' : 'text-fuchsia-400'}`}>P{i + 1}</span>
+                      <div className="font-mono text-xl leading-none tracking-[-0.02em] flex-1 text-center overflow-hidden">
+                        {sparkline(fortune.oppIncome[i])}
+                      </div>
+                      <span className="text-[9px] text-machi-text-dim/50 flex-shrink-0">
+                        Ø{fortune.oppIncome[i].length > 0
+                          ? (fortune.oppIncome[i].reduce((a, b) => a + b, 0) / fortune.oppIncome[i].length).toFixed(1)
+                          : '0'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
           {/* Event Timeline (inside Game Insights) */}

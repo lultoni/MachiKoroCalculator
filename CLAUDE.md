@@ -111,6 +111,7 @@ These have caused bugs before. Read the Javadoc before touching these areas.
 7. **Score convention.** MCTS scores are always from the perspective of the root `playerIndex` (1.0 = win, 0.0 = loss).
 8. **MCTS instant-win short-circuit.** `BuyDecisionNode.instantWinChildIndex` forces selection of a terminal winning child when one exists. `MctsTree.select()` and `bestChild()` both check this field. Do not remove — without it, UCT fails to converge on obvious wins with limited iteration budgets in full-turn trees.
 9. **Rollout instant-win.** All rollout policies (MctsRollout, GreedyRollout, BoltzmannRollout) call `GameState.findInstantWinLandmark()` before any purchase logic. When a player has 3 landmarks and can afford the 4th, the winning landmark is always bought — no randomness, no sampling.
+10. **inferPurchase must use count-based comparison.** `Project.equals` is id-based, so `List.contains()` cannot detect a second copy of a card the player already owns (e.g., buying a second Bäckerei when the starter copy exists). `TurnPlan.inferPurchase()` uses count-based comparison (like `inferCardId`). Do not change to contains-based — this caused a gameplay bug where engine purchases were silently dropped.
 
 ## Committing
 

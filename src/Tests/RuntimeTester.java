@@ -379,6 +379,8 @@ public class RuntimeTester {
             test_creator_registry_entries();
             test_creator_evaluate_full_turn();
             test_creator_config_override();
+            test_creator_burohaus_swap_bait_bonus();
+            test_creator_burohaus_purchase_bonus();
         });
 
         runSection("Engine Compliance", () -> {
@@ -3836,5 +3838,72 @@ public class RuntimeTester {
                     - overrideScored.get(0).compositeScore) > 0.01;
         }
         assertTrue("Creator config override: changing wIncome changes scores", scoresDiffer);
+    }
+
+    private static void test_creator_burohaus_swap_bait_bonus() {
+        // When player owns Bürohaus but has already swapped away their cheapest card,
+        // a new cheap low-EV card should get a burohausSwapBonus to incentivize restocking bait.
+        core.GameState gs = core.GameState.initial(2);
+        core.Player p0 = gs.getPlayers()[0];
+        p0.setCoins(5);
+        p0.addProject(core.ProjectLoader.getProject("bürohaus").orElseThrow());
+        // Give P0 Bahnhof so high-range cards have value in P0's context
+        p0.addProject(core.ProjectLoader.getProject("bahnhof").orElseThrow());
+        // Simulate post-swap: remove the cheap Weizenfeld (was swapped away)
+        p0.getOwned_projects().removeIf(p -> "weizenfeld".equals(p.getId()));
+        // Give P0 some mid-value cards so worst EV is higher
+        p0.addProject(core.ProjectLoader.getProject("wald").orElseThrow());
+        p0.addProject(core.ProjectLoader.getProject("wald").orElseThrow());
+        p0.addProject(core.ProjectLoader.getProject("möbelfabrik").orElseThrow());
+
+        // Give opponent high-value cards (high-range, valuable in P0's Bahnhof context)
+        core.Player p1 = gs.getPlayers()[1];
+        p1.addProject(core.ProjectLoader.getProject("bergwerk").orElseThrow());
+        p1.addProject(core.ProjectLoader.getProject("bergwerk").orElseThrow());
+
+        engine.mcts.SupplyTracker supply = engine.mcts.SupplyTracker.fromGameState(gs);
+        EngineConfig config = new EngineConfig(0, 0, 0.0, null);
+        java.util.List<engine.creator.CreatorScorer.ScoredCandidate> scored =
+                engine.creator.CreatorScorer.scoreAll(gs, 0, supply, config);
+
+        // A cheap card like Weizenfeld or Bauernhof should get a swap bait bonus since
+        // it would lower P0's worst-card EV, improving the swap delta for future roll=6 swaps.
+        boolean anySwapBonus = scored.stream()
+                .anyMatch(sc -> sc.metrics.containsKey("burohausSwapBonus"));
+        assertTrue("Creator Bürohaus swap bait: at least one card has burohausSwapBonus", anySwapBonus);
+    }
+
+    private static void test_creator_burohaus_purchase_bonus() {
+        // When player has a cheap card (good swap bait) and opponent has high-value cards,
+        // Bürohaus should get a purchase bonus (Case B).
+        core.GameState gs = core.GameState.initial(2);
+        core.Player p0 = gs.getPlayers()[0];
+        p0.setCoins(10); // enough to afford Bürohaus (cost 8)
+        // Give P0 Bahnhof so opponent's 7-12 cards have EV in P0's context
+        p0.addProject(core.ProjectLoader.getProject("bahnhof").orElseThrow());
+
+        // Give opponent high-range cards that are valuable to P0 (who has Bahnhof)
+        core.Player p1 = gs.getPlayers()[1];
+        p1.addProject(core.ProjectLoader.getProject("bergwerk").orElseThrow());
+        p1.addProject(core.ProjectLoader.getProject("molkerei").orElseThrow());
+        // Add animal cards so Molkerei synergy kicks in
+        p1.addProject(core.ProjectLoader.getProject("bauernhof").orElseThrow());
+        p1.addProject(core.ProjectLoader.getProject("bauernhof").orElseThrow());
+
+        engine.mcts.SupplyTracker supply = engine.mcts.SupplyTracker.fromGameState(gs);
+        EngineConfig config = new EngineConfig(0, 0, 0.0, null);
+        java.util.List<engine.creator.CreatorScorer.ScoredCandidate> scored =
+                engine.creator.CreatorScorer.scoreAll(gs, 0, supply, config);
+
+        // Find Bürohaus in scored list
+        engine.creator.CreatorScorer.ScoredCandidate burohausSc = scored.stream()
+                .filter(sc -> "bürohaus".equals(sc.card.getId()))
+                .findFirst().orElse(null);
+
+        assertTrue("Creator Bürohaus purchase: bürohaus is in scored list", burohausSc != null);
+        if (burohausSc != null) {
+            boolean hasSwapBonus = burohausSc.metrics.containsKey("burohausSwapBonus");
+            assertTrue("Creator Bürohaus purchase: bürohaus has burohausSwapBonus metric", hasSwapBonus);
+        }
     }
 }

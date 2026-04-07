@@ -2,6 +2,7 @@ package engine.creator;
 
 import calcs.Calcs;
 import calcs.RankEntry;
+import core.BürohausLogic;
 import core.CardIncome;
 import core.GameState;
 import core.Player;
@@ -22,6 +23,12 @@ import java.util.Map;
  * 8 weighted dimensions (income, risk, coverage, tempo, winProb, landmark, urgency, roi).
  * Weights are modulated by a continuous situation assessment and gravity wells that
  * activate gradually as endgame conditions strengthen.
+ *
+ * <p>Additionally applies a Bürohaus swap bonus: when the player owns Bürohaus, cheap
+ * low-EV cards receive a bonus as "swap bait" (maximizing the swap delta on roll=6).
+ * When scoring Bürohaus itself for purchase, a bonus reflects the future swap value
+ * that ownership would unlock. Both bonuses include a quality guard that discounts
+ * when the swap bait card would be valuable to the opponent.
  *
  * <h2>Design principles</h2>
  * <ul>
@@ -136,6 +143,56 @@ public final class CreatorScorer {
     private static final double CVAR_ALPHA   = 0.10;
 
     // =====================================================================
+    // Bürohaus swap bonus defaults
+    // =====================================================================
+
+    private static final double DEFAULT_BUROHAUS_SWAP_WEIGHT = 1.5;
+
+    // =====================================================================
+    // Bürohaus swap context — precomputed once per scoreAll() call
+    // =====================================================================
+
+    /**
+     * Precomputed swap context for Bürohaus-aware scoring.
+     * Computed once per {@code scoreAll()} call to avoid redundant scans.
+     */
+    static final class SwapContext {
+        /** Whether the player owns Bürohaus. */
+        final boolean ownsBurohaus;
+        /** Current worst-own-card EV (Double.MAX_VALUE if no swappable cards). */
+        final double worstOwnEv;
+        /** Current worst-own Project (null if none). */
+        final Project worstOwn;
+        /** Best opponent card EV evaluated in OUR context. */
+        final double bestOppEv;
+        /** Index of the opponent owning the best card (-1 if none). */
+        final int bestOppPlayer;
+        /** Current swap delta: max(0, bestOppEv - worstOwnEv). */
+        final double currentSwapDelta;
+        /** P(roll=6) for the player's likely dice choice. */
+        final double pRoll6;
+        /** Configurable weight for the swap bonus. */
+        final double weight;
+
+        SwapContext(boolean ownsBurohaus, double worstOwnEv, Project worstOwn,
+                    double bestOppEv, int bestOppPlayer,
+                    double currentSwapDelta, double pRoll6, double weight) {
+            this.ownsBurohaus = ownsBurohaus;
+            this.worstOwnEv = worstOwnEv;
+            this.worstOwn = worstOwn;
+            this.bestOppEv = bestOppEv;
+            this.bestOppPlayer = bestOppPlayer;
+            this.currentSwapDelta = currentSwapDelta;
+            this.pRoll6 = pRoll6;
+            this.weight = weight;
+        }
+
+        /** Inactive sentinel: no Bürohaus, no swap bonus. */
+        static final SwapContext INACTIVE = new SwapContext(
+                false, Double.MAX_VALUE, null, 0.0, -1, 0.0, 0.0, 0.0);
+    }
+
+    // =====================================================================
     // Public API
     // =====================================================================
 
@@ -204,6 +261,22 @@ public final class CreatorScorer {
         RankEntry baselineRoi = Calcs.roiOverHorizon(gs, playerIndex, RankEntry.WAIT_SENTINEL, ROI_HORIZON, ROI_DISCOUNT);
         double baselineProbNoIncome = baselineRoi.probNoIncomeRound;
 
+        // ---- Bürohaus swap context (computed once) ----
+        // When the player owns Bürohaus, cheap low-EV cards gain hidden value as "swap bait"
+        // — they maximize the swap delta on roll=6. We also boost Bürohaus purchase score
+        // when good swap conditions exist (Case B).
+        BürohausLogic.SwapCandidates swapCands = BürohausLogic.findCandidates(gs, playerIndex);
+        double wSwap = readDouble(config, "wBurohausSwap", DEFAULT_BUROHAUS_SWAP_WEIGHT);
+        boolean hasBahnhof = active.hasProject("bahnhof");
+        boolean hasHigh = hasHigh7to12Card(active);
+        double pRoll6 = (hasBahnhof && hasHigh) ? CardIncome.P2[6] : CardIncome.P1[6];
+        double swapWorstEv = swapCands.worstOwn() != null ? swapCands.worstOwnEV() : Double.MAX_VALUE;
+        double swapBestEv = swapCands.bestOpp() != null ? swapCands.bestOppEV() : 0.0;
+        double swapDelta = Math.max(0.0, swapBestEv - swapWorstEv);
+        boolean hasBurohaus = active.hasProject("bürohaus");
+        SwapContext swapCtx = new SwapContext(hasBurohaus, swapWorstEv, swapCands.worstOwn(),
+                swapBestEv, swapCands.bestOppPlayer(), swapDelta, pRoll6, wSwap);
+
         // ---- Score all candidates ----
         List<ScoredCandidate> affordableCards = new ArrayList<>();
         List<ScoredCandidate> unaffordableCards = new ArrayList<>();
@@ -217,7 +290,8 @@ public final class CreatorScorer {
             ScoredCandidate sc = scoreCard(gs, playerIndex, p, supply, effectiveWeights,
                     numPlayers, situation, activeWell, canAfford, false, config,
                     wellResult.sprintIntensity,
-                    baselineCvar, baselineProbNoIncome, baselineEntropy, baselineCoverageDensity);
+                    baselineCvar, baselineProbNoIncome, baselineEntropy, baselineCoverageDensity,
+                    swapCtx);
             allCandidates.add(sc);
             if (canAfford) affordableCards.add(sc); else unaffordableCards.add(sc);
         }
@@ -250,7 +324,8 @@ public final class CreatorScorer {
             ScoredCandidate sc = scoreCard(gs, playerIndex, lm, supply, effectiveWeights,
                     numPlayers, situation, activeWell, canAfford, true, config,
                     wellResult.sprintIntensity,
-                    baselineCvar, baselineProbNoIncome, baselineEntropy, baselineCoverageDensity);
+                    baselineCvar, baselineProbNoIncome, baselineEntropy, baselineCoverageDensity,
+                    swapCtx);
             allCandidates.add(sc);
             if (canAfford) affordableCards.add(sc); else unaffordableCards.add(sc);
         }
@@ -422,7 +497,8 @@ public final class CreatorScorer {
                                               boolean isLandmark, EngineConfig config,
                                               double sprintIntensity,
                                               double baselineCvar, double baselineProbNoIncome,
-                                              double baselineEntropy, double baselineCoverageDensity) {
+                                              double baselineEntropy, double baselineCoverageDensity,
+                                              SwapContext swapCtx) {
         // ---- Compute dimension raw values ----
         // Compute roiOverHorizon first — it internally computes evPerRound and portfolioDeltaEV,
         // which we reuse to avoid redundant Calcs calls (saves ~3 full recomputations per card).
@@ -523,6 +599,52 @@ public final class CreatorScorer {
             compositeScore *= (1.0 + 5.0 * sprintIntensity);
         }
 
+        // ---- Bürohaus swap bonus ----
+        // Two cases: (A) player owns Bürohaus → cheap low-EV cards get a bonus as swap bait,
+        // (B) candidate IS Bürohaus → bonus reflects the future swap value of ownership.
+        //
+        // Case A reasoning: when Bürohaus is owned, the player's worst card gets swapped away
+        // on roll=6, so the engine needs a steady supply of cheap "bait" cards. Cards with lower
+        // EV provide better swap delta (opponent's best card - our worst card). The bonus scales
+        // with how much swap value this card provides as potential bait, guarded by how useful
+        // the bait would be to the opponent (we don't want to empower them).
+        //
+        // Note: we use the CARD-ALONE EV (contextualCardEvPerRound), not the portfolio EV
+        // (roi.evPerRound), because we're comparing against the worstOwnEV from BürohausLogic
+        // which also uses card-alone EV.
+        double burohausSwapBonus = 0.0;
+        if (swapCtx.ownsBurohaus && !isLandmark && swapCtx.bestOppEv > 0.0
+                && !"lila".equals(card.getColor())) {
+            // Case A: player owns Bürohaus, scoring a non-landmark, non-purple card.
+            // Compute this card's standalone EV in the player's context.
+            Player active = gs.getPlayers()[playerIndex];
+            CardIncome.PlayerStats activeStats = CardIncome.PlayerStats.of(active).withExtra(card);
+            int[] oppCoins = CardIncome.buildOpponentCoins(gs.getPlayers(), playerIndex);
+            double cardAloneEv = CardIncome.contextualCardEvPerRound(card, activeStats, numPlayers, oppCoins);
+
+            // Swap delta if this card were the bait = bestOppEv - cardAloneEv
+            double candidateSwapDelta = Math.max(0.0, swapCtx.bestOppEv - cardAloneEv);
+            if (candidateSwapDelta > swapCtx.currentSwapDelta && candidateSwapDelta > 0.001) {
+                // This card would be a better bait than the current worst → bonus for the improvement
+                double swapDeltaGain = candidateSwapDelta - swapCtx.currentSwapDelta;
+                // Quality guard: is this bait card bad for the opponent (what we want)?
+                double baitEvForOpp = computeBaitEvForOpponent(card, gs, swapCtx.bestOppPlayer);
+                double swapQuality = clamp01(1.0 - baitEvForOpp / Math.max(0.01, swapCtx.bestOppEv));
+                burohausSwapBonus = swapCtx.pRoll6 * swapDeltaGain * swapQuality * swapCtx.weight;
+            }
+        } else if (!swapCtx.ownsBurohaus && "bürohaus".equals(card.getId())
+                   && swapCtx.worstOwn != null && swapCtx.bestOppEv > 0.0) {
+            // Case B: candidate IS Bürohaus (player doesn't own it yet).
+            // Bonus = the per-round swap value that ownership would unlock.
+            double potentialSwapDelta = Math.max(0.0, swapCtx.bestOppEv - swapCtx.worstOwnEv);
+            if (potentialSwapDelta > 0.001) {
+                double baitEvForOpp = computeBaitEvForOpponent(swapCtx.worstOwn, gs, swapCtx.bestOppPlayer);
+                double swapQuality = clamp01(1.0 - baitEvForOpp / Math.max(0.01, swapCtx.bestOppEv));
+                burohausSwapBonus = swapCtx.pRoll6 * potentialSwapDelta * swapQuality * swapCtx.weight;
+            }
+        }
+        compositeScore += burohausSwapBonus;
+
         // ---- 7-12 activation guard ----
         // Cards that ONLY activate on rolls 7-12 need specific conditions to be useful:
         // - Green (own turn): needs OWN Bahnhof to choose 2d6. Fully penalized without it.
@@ -590,6 +712,9 @@ public final class CreatorScorer {
         metrics.put("isLandmark", String.valueOf(isLandmark));
         if (activationGuard < 1.0) {
             metrics.put("activationGuard", fmt(activationGuard));
+        }
+        if (burohausSwapBonus > 0.001) {
+            metrics.put("burohausSwapBonus", fmt(burohausSwapBonus));
         }
         for (int d = 0; d < NUM_DIMS; d++) {
             metrics.put("w_" + DIM_NAMES[d], fmt(weights[d]));
@@ -750,6 +875,37 @@ public final class CreatorScorer {
             if (gain > 0) income += gain;
         }
         return income;
+    }
+
+    // =====================================================================
+    // Bürohaus swap helpers
+    // =====================================================================
+
+    /**
+     * Evaluates a swap-bait card's EV in the OPPONENT's context (their synergies, their dice).
+     * High EV means the bait card is valuable to the opponent — bad for us as swap bait.
+     */
+    private static double computeBaitEvForOpponent(Project bait, GameState gs, int oppIndex) {
+        if (bait == null || oppIndex < 0) return 0.0;
+        Player opp = gs.getPlayers()[oppIndex];
+        CardIncome.PlayerStats oppStats = CardIncome.PlayerStats.of(opp).withExtra(bait);
+        int n = gs.getPlayers().length;
+        int[] oppCoins = CardIncome.buildOpponentCoins(gs.getPlayers(), oppIndex);
+        return CardIncome.contextualCardEvPerRound(bait, oppStats, n, oppCoins);
+    }
+
+    /**
+     * Returns true if the player owns at least one non-red, non-landmark card
+     * activating on rolls 7-12 (incentive to use 2d6).
+     */
+    private static boolean hasHigh7to12Card(Player player) {
+        for (Project card : player.getOwned_projects()) {
+            if ("rot".equals(card.getColor()) || "gelb".equals(card.getColor())) continue;
+            for (int act : card.getDice_activation()) {
+                if (act >= 7 && act <= 12) return true;
+            }
+        }
+        return false;
     }
 
     // =====================================================================

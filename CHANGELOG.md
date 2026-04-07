@@ -6,6 +6,10 @@ Implementation history: what was built, why, and which design decisions were mad
 
 ## Phase 7: Iteration
 
+### 7.44 — Creator Engine: Bürohaus swap bait bonus (TODO #35)
+
+**CreatorScorer: Bürohaus-aware purchase scoring.** When the Creator Engine owns Bürohaus, cheap low-EV cards now receive a scoring bonus as "swap bait" — they maximize the swap delta on roll=6 (opponent's best card EV minus our worst card EV). Two cases: (A) when owning Bürohaus and the player's worst card was swapped away, new cheap cards get a bonus to incentivize restocking bait; (B) when evaluating Bürohaus for purchase, a bonus reflects the future swap value that ownership would unlock. Both cases include a quality guard that discounts the bonus when the swap bait card would be valuable to the opponent (we don't want to empower them). The bonus uses card-alone `contextualCardEvPerRound` (not portfolio EV) for correct comparison against `BürohausLogic.findCandidates()`. Configurable via `wBurohausSwap` parameter (default 1.5). Swap context is precomputed once per `scoreAll()` call via the existing `BürohausLogic.findCandidates()` scan.
+
 ### 7.43 — Fix MCTS duplicate-card purchase bug, heuristic-ev score display, dice fortune sparklines
 
 **MCTS: Fix inferPurchase dropping duplicate-card purchases (gameplay bug):** `TurnPlan.inferPurchase()` used `List.contains()` with id-based Project equality. When a player already owned a copy of a card (starter Bäckerei/Weizenfeld, or previously purchased duplicates), `contains()` returned true for the new copy too, making the method unable to detect the purchase. The engine's chosen buy was silently replaced with save. Fixed with count-based comparison matching the proven `inferCardId()` approach. Also ensured `buildDetailFromMctsAlternatives` always includes the chosen option in the detail list.

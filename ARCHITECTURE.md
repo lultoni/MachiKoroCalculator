@@ -323,6 +323,12 @@ Each weight has a situational multiplier: `effectiveWeight = baseWeight × (low 
 
 **CreatorRollout:** Custom rollout policy that evaluates landmarks by marginal EV contribution (not cheapest-first). Dice/Funkturm/Burohaus logic follows proven greedy patterns.
 
+**Bürohaus Swap Bonus:** Post-composite bonus (not a 9th dimension) applied when Bürohaus is relevant:
+- **Case A (owns Bürohaus):** Cheap low-EV cards get a bonus as swap bait when they would lower the player's worst-card EV below the current worst. `bonus = P(roll=6) × swapDeltaGain × swapQuality × wBurohausSwap`. `swapQuality` discounts when the bait card is valuable to the opponent. Uses card-alone `contextualCardEvPerRound`, not portfolio EV.
+- **Case B (buying Bürohaus):** Bürohaus purchase gets a bonus reflecting the expected swap value that ownership would unlock: `bonus = P(roll=6) × potentialSwapDelta × swapQuality × wBurohausSwap`.
+- Swap context (`SwapContext`) is precomputed once per `scoreAll()` call via `BürohausLogic.findCandidates()`.
+- Configurable: `wBurohausSwap` (default 1.5).
+
 **31 configurable knobs** via `EngineConfig.extra` for H2H sweep optimization: 4 situation weights, 8 base weights, 1 sigmoid steepness, 4 gravity well parameters, 1 save discount, rollout policy + temperature, plus multiplier endpoints.
 
 **Config:** `iterations` (iteration budget), `timeBudgetMs` (anytime mode), `rolloutPolicy` ("creator"/"greedy"/"uniform"/"boltzmann"). Registry: 3 entries (fast/balanced/deep).

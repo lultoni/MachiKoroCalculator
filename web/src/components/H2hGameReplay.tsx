@@ -167,7 +167,9 @@ function extractEvents(
         playerIndex: tn.playerIndex,
         type: 'landmark',
         label: `${turnLabel}: ${cardName(tn.purchasedCardId)}`,
-        detail: `${(tn.purchaseWinRate * 100).toFixed(0)}%`,
+        detail: tn.scoreIsWinRate !== false
+          ? `${(tn.purchaseWinRate * 100).toFixed(0)}%`
+          : tn.purchaseWinRate.toFixed(1),
       });
     }
 
@@ -205,8 +207,9 @@ function extractEvents(
     // Collected separately and trimmed after the loop.
     if (tn.decisionDetail && tn.decisionDetail.confidence >= 0 && tn.decisionDetail.options.length >= 2) {
       const opts = tn.decisionDetail.options;
+      const isWR = tn.decisionDetail.scoresAreWinRates !== false;
       const top2 = opts.slice(0, 2).map(o =>
-        `${cardName(o.cardId)} ${(o.score * 100).toFixed(0)}%`
+        `${cardName(o.cardId)} ${isWR ? `${(o.score * 100).toFixed(0)}%` : o.score.toFixed(1)}`
       );
       events.push({
         turnIndex: ti,
@@ -462,7 +465,9 @@ export function H2hGameReplay({ game, engines, matchId, projects, language, onBa
                     })() : t('h2h.save')}
                   </div>
                   <div className="text-xs text-machi-text-dim mt-0.5">
-                    WR: {(turn.purchaseWinRate * 100).toFixed(1)}%
+                    {turn.scoreIsWinRate !== false
+                      ? `WR: ${(turn.purchaseWinRate * 100).toFixed(1)}%`
+                      : `Score: ${turn.purchaseWinRate.toFixed(2)}`}
                   </div>
                 </div>
 
@@ -536,8 +541,9 @@ export function H2hGameReplay({ game, engines, matchId, projects, language, onBa
                         const name = isSave
                           ? (language === 'en' ? 'Save' : 'Sparen')
                           : (proj?.[nameKey] ?? proj?.name_de ?? opt.cardId);
+                        const isWR = turn.decisionDetail!.scoresAreWinRates !== false;
                         const topScore = turn.decisionDetail!.options[0]?.score || 1;
-                        const barWidth = Math.max(0, Math.min(100, topScore <= 1
+                        const barWidth = Math.max(0, Math.min(100, isWR
                           ? opt.score * 100
                           : (opt.score / topScore) * 100
                         ));
@@ -563,7 +569,7 @@ export function H2hGameReplay({ game, engines, matchId, projects, language, onBa
                               />
                             </div>
                             <span className="font-mono text-right">
-                              {opt.score <= 1 ? `${(opt.score * 100).toFixed(1)}%` : opt.score.toFixed(1)}
+                              {isWR ? `${(opt.score * 100).toFixed(1)}%` : opt.score.toFixed(1)}
                             </span>
                             <span className="text-center">{opt.chosen ? <span className="text-machi-accent">←</span> : ''}</span>
                           </div>

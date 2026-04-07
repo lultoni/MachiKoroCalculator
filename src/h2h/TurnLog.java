@@ -50,10 +50,19 @@ public final class TurnLog {
         /** Engine confidence in [0,1], or NaN if unavailable. */
         public final double confidence;
 
+        /** True if option scores are [0,1] win probabilities; false if composite scores. */
+        public final boolean scoresAreWinRates;
+
         public DecisionDetail(List<DecisionOption> options, int iterations, double confidence) {
+            this(options, iterations, confidence, true);
+        }
+
+        public DecisionDetail(List<DecisionOption> options, int iterations, double confidence,
+                              boolean scoresAreWinRates) {
             this.options = options;
             this.iterations = iterations;
             this.confidence = confidence;
+            this.scoresAreWinRates = scoresAreWinRates;
         }
     }
 
@@ -68,6 +77,7 @@ public final class TurnLog {
     public final int[] coinDeltas;
     public final String purchasedCardId;   // null = save
     public final double purchaseWinRate;
+    public final boolean scoreIsWinRate;   // true = purchaseWinRate is [0,1] win probability; false = composite score
     public final int coinsAfterPurchase;
     public final String bürohausSwap;      // "ownCardId→oppCardId" or null
     public final boolean bürohausActivated; // true if Bürohaus was triggered (swap or decline)
@@ -77,6 +87,7 @@ public final class TurnLog {
 
     public TurnLog(int playerIndex, int diceCount, int roll, boolean isDoubles,
                    int[] coinDeltas, String purchasedCardId, double purchaseWinRate,
+                   boolean scoreIsWinRate,
                    int coinsAfterPurchase, String bürohausSwap, boolean bürohausActivated,
                    boolean funkturmRerolled, long evaluateTimeMs,
                    DecisionDetail decisionDetail) {
@@ -87,6 +98,7 @@ public final class TurnLog {
         this.coinDeltas = coinDeltas;
         this.purchasedCardId = purchasedCardId;
         this.purchaseWinRate = purchaseWinRate;
+        this.scoreIsWinRate = scoreIsWinRate;
         this.coinsAfterPurchase = coinsAfterPurchase;
         this.bürohausSwap = bürohausSwap;
         this.bürohausActivated = bürohausActivated;
@@ -101,7 +113,7 @@ public final class TurnLog {
                 ? new int[]{coinDeltas[1], coinDeltas[0]} : coinDeltas;
         return new TurnLog(
                 1 - playerIndex, diceCount, roll, isDoubles,
-                swappedDeltas, purchasedCardId, purchaseWinRate,
+                swappedDeltas, purchasedCardId, purchaseWinRate, scoreIsWinRate,
                 coinsAfterPurchase, bürohausSwap, bürohausActivated, funkturmRerolled,
                 evaluateTimeMs, decisionDetail
         );

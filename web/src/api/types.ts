@@ -237,6 +237,7 @@ export interface H2hDecisionDetail {
   options: H2hDecisionOption[];
   iterations: number;
   confidence: number;
+  scoresAreWinRates?: boolean;
 }
 
 export interface H2hTurnLog {
@@ -247,6 +248,7 @@ export interface H2hTurnLog {
   coinDeltas: number[];
   purchasedCardId: string | null;
   purchaseWinRate: number;
+  scoreIsWinRate?: boolean;
   coinsAfterPurchase: number;
   bürohausSwap: string | null;
   bürohausActivated?: boolean;

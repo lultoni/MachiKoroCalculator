@@ -342,7 +342,7 @@ public final class MatchRunner {
 
         return new TurnLog(
                 activePlayer, diceCount, roll, doubles,
-                deltas, purchasedCardId, plan.purchaseWinRate,
+                deltas, purchasedCardId, plan.purchaseWinRate, plan.scoreIsWinRate,
                 coinsAfterPurchase, bürohausSwap, bürohausActivated, funkturmRerolled,
                 plan.computeTimeMs, detail
         );
@@ -356,9 +356,9 @@ public final class MatchRunner {
     private TurnLog.DecisionDetail buildDecisionDetail(TurnPlan plan, String chosenCardId) {
         // Non-MCTS engines carry the full EngineResult
         if (plan.engineResult != null) {
-            return buildDetailFromEngineResult(plan.engineResult, chosenCardId);
+            return buildDetailFromEngineResult(plan.engineResult, chosenCardId, plan.scoreIsWinRate);
         }
-        // MCTS engines: extract from tree
+        // MCTS engines: extract from tree (scores are always win rates)
         java.util.List<TurnPlan.BuyAlternative> alts = plan.getMctsBuyAlternatives(5);
         if (alts != null && !alts.isEmpty()) {
             return buildDetailFromMctsAlternatives(alts, chosenCardId, plan.iterationsUsed);
@@ -366,7 +366,8 @@ public final class MatchRunner {
         return null;
     }
 
-    private TurnLog.DecisionDetail buildDetailFromEngineResult(EngineResult result, String chosenCardId) {
+    private TurnLog.DecisionDetail buildDetailFromEngineResult(EngineResult result, String chosenCardId,
+                                                                boolean scoresAreWinRates) {
         java.util.List<TurnLog.DecisionOption> options = new java.util.ArrayList<>();
         String chosenKey = chosenCardId != null ? chosenCardId : "_wait_";
         boolean chosenIncluded = false;
@@ -396,16 +397,23 @@ public final class MatchRunner {
             options = new java.util.ArrayList<>(options.subList(0, 6));
         }
         double conf = sanitizeDouble(result.confidence);
-        return new TurnLog.DecisionDetail(options, result.iterationsUsed, conf);
+        return new TurnLog.DecisionDetail(options, result.iterationsUsed, conf, scoresAreWinRates);
     }
 
     private TurnLog.DecisionDetail buildDetailFromMctsAlternatives(
             java.util.List<TurnPlan.BuyAlternative> alts, String chosenCardId, int iterations) {
         java.util.List<TurnLog.DecisionOption> options = new java.util.ArrayList<>();
         String chosenKey = chosenCardId != null ? chosenCardId : "_wait_";
+        boolean chosenIncluded = false;
         for (TurnPlan.BuyAlternative alt : alts) {
             boolean chosen = alt.cardId().equals(chosenKey);
+            if (chosen) chosenIncluded = true;
             options.add(new TurnLog.DecisionOption(alt.cardId(), sanitizeDouble(alt.winRate()), chosen));
+        }
+        // Ensure chosen option is always present (may have been outside top-N)
+        if (!chosenIncluded) {
+            options.add(new TurnLog.DecisionOption(chosenKey, sanitizeDouble(
+                    chosenCardId != null ? -1.0 : 0.0), true));
         }
         return new TurnLog.DecisionDetail(options, iterations, -1.0);
     }

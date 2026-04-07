@@ -76,8 +76,10 @@ public final class HeuristicEvEngine implements SimulationEngine {
         EngineResult.Option top = result.topAffordableRecommendation();
         Project purchase = "_wait_".equals(top.project.getId()) ? null : top.project;
         long elapsed = System.currentTimeMillis() - start;
-        return TurnPlan.staticPlan(diceCount, purchase != null ? purchase : RankEntry.WAIT_SENTINEL,
+        TurnPlan plan = TurnPlan.staticPlan(diceCount, purchase != null ? purchase : RankEntry.WAIT_SENTINEL,
                 top.score, 0, elapsed, result);
+        plan.scoreIsWinRate = false; // composite score, not a [0,1] win probability
+        return plan;
     }
 
     @Override

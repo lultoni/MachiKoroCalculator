@@ -63,8 +63,11 @@ public final class TurnPlan {
     /** Card to purchase. Null means save. */
     public Project purchase;
 
-    /** Engine's win rate for the chosen purchase. */
+    /** Engine's win rate for the chosen purchase (or composite score for heuristic engines). */
     public double purchaseWinRate;
+
+    /** True if purchaseWinRate is a [0,1] win probability; false if it's an unbounded composite score. */
+    public boolean scoreIsWinRate = true;
 
     /** MCTS iterations used. */
     public int iterationsUsed;
@@ -319,11 +322,29 @@ public final class TurnPlan {
         }
     }
 
+    /**
+     * Infers which card was purchased by comparing before/after owned project lists.
+     *
+     * <p><b>INVARIANT: Uses count-based comparison, not contains().</b> Project.equals is
+     * id-based, so contains() cannot detect a second copy of a card the player already owns
+     * (e.g., buying a second Bäckerei when the starter copy exists). The count-based approach
+     * detects any card whose count increased, matching the logic in {@link #inferCardId}.
+     */
     private Project inferPurchase(BuyDecisionNode buyNode, MctsNode bestChild) {
         Player before = buyNode.state.getPlayers()[buyNode.activePlayer];
         Player after = bestChild.state.getPlayers()[buyNode.activePlayer];
+        // Count-based comparison: detect which card id has a higher count in "after".
+        java.util.Map<String, Integer> counts = new java.util.HashMap<>();
+        for (Project p : before.getOwned_projects()) {
+            counts.merge(p.getId(), 1, Integer::sum);
+        }
+        String purchasedId = null;
         for (Project p : after.getOwned_projects()) {
-            if (!before.getOwned_projects().contains(p)) return p;
+            int remaining = counts.merge(p.getId(), -1, Integer::sum);
+            if (remaining < 0) {
+                purchasedId = p.getId();
+                return p; // This is the newly added Project instance from the child state
+            }
         }
         return RankEntry.WAIT_SENTINEL;
     }

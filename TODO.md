@@ -20,6 +20,7 @@ Priorisiere in deiner Abarbeitung die wichtigsten Features. Erkenne Abhänigkeit
 | 41 | Creator Engine: Multi-opponent sweep | Extend SweepMain to optimize against a weighted combination of opponents (e.g., 50% heuristic-ev + 30% mcts-v1 + 20% flat-mc). Prevents overfitting to one opponent's weaknesses. Objective = weighted sum of win rates across opponents. Add `--opponents heuristic-ev-default:0.5,mcts-v1-fast:0.3,flat-mc-fast:0.2` CLI syntax. |
 | 42 | Sweep progressive refinement | Two-phase sweep: Phase 1 = wide LHS exploration (100 trials), Phase 2 = local search around top-5 regions with shrinking step sizes (CMA-ES or coordinate descent). Currently TPE handles both phases, but explicit local refinement may extract more performance from promising regions. |
 | 43 | Sweep visualization in UI | Add a Sweep Results tab to the H2H page. Visualize: (1) convergence plot (best WR over trials), (2) parameter importance (correlation of each param with WR), (3) parallel coordinates plot of top-10 vectors, (4) param distribution heatmaps for good vs bad trials. Data source: `data/sweep-results.json`. |
+| 44 | Make Calculations run on GPU | This is for running large scale tests on my PC with a RTX 4070, which could more easily calculate large sums of matches and such. |
 
 ## Done
 

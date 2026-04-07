@@ -6,6 +6,18 @@ import { cardTextClass, categoryIconPath } from '../utils/cardDisplay';
 
 const DELAY_MS = 500;
 
+/** Category type references in descriptions, mapped to their icon category. */
+const CATEGORY_PATTERNS: { pattern: RegExp; category: string }[] = [
+  { pattern: /Lebensmittelgebäude/g, category: 'food' },
+  { pattern: /Tier-Gebäude/g, category: 'animal' },
+  { pattern: /Rohstoff-Gebäude/g, category: 'production' },
+  { pattern: /Café- und Geschäftsgebäude/g, category: 'cafe+store' },
+  { pattern: /food establishment/gi, category: 'food' },
+  { pattern: /animal establishment/gi, category: 'animal' },
+  { pattern: /production establishment/gi, category: 'production' },
+  { pattern: /Café and Store establishments/gi, category: 'cafe+store' },
+];
+
 interface Props {
   project: ProjectDef | undefined;
   language: 'de' | 'en';
@@ -47,6 +59,24 @@ export function CardTooltip({ project, language, children }: Props) {
   const dice = project.dice_activation.length > 0
     ? project.dice_activation.join(', ')
     : '—';
+
+  // Replace category type text references with inline icons
+  const descParts: (string | { text: string; cat: string })[] = [];
+  let remaining = desc;
+  while (remaining.length > 0) {
+    let earliest: { idx: number; len: number; cat: string } | null = null;
+    for (const { pattern, category } of CATEGORY_PATTERNS) {
+      pattern.lastIndex = 0;
+      const m = pattern.exec(remaining);
+      if (m && (earliest === null || m.index < earliest.idx)) {
+        earliest = { idx: m.index, len: m[0].length, cat: category };
+      }
+    }
+    if (!earliest) { descParts.push(remaining); break; }
+    if (earliest.idx > 0) descParts.push(remaining.slice(0, earliest.idx));
+    descParts.push({ text: remaining.slice(earliest.idx, earliest.idx + earliest.len), cat: earliest.cat });
+    remaining = remaining.slice(earliest.idx + earliest.len);
+  }
 
   const colorLabel: Record<string, string> = {
     blau: language === 'de' ? 'Blau' : 'Blue',
@@ -99,11 +129,26 @@ export function CardTooltip({ project, language, children }: Props) {
           </div>
 
           {/* Description */}
-          <p className="text-machi-text-dim leading-relaxed">{desc}</p>
+          <p className="text-machi-text-dim leading-relaxed">
+            {descParts.map((part, i) => {
+              if (typeof part === 'string') return part;
+              const cats = part.cat.split('+');
+              return (
+                <span key={i} className="inline-flex items-center gap-0.5 align-baseline">
+                  {cats.map((c, j) => (
+                    <img key={j} src={categoryIconPath(c)} alt={c} className="w-3.5 h-3.5 inline-block align-text-bottom" />
+                  ))}
+                </span>
+              );
+            })}
+          </p>
 
           {/* Category */}
-          {project.category && (
-            <div className="text-machi-text-dim/60 capitalize">{project.category}</div>
+          {project.category && icon && (
+            <div className="flex items-center gap-1 text-machi-text-dim/60">
+              <img src={icon} alt={project.category} className="w-3.5 h-3.5" />
+              <span className="capitalize">{project.category}</span>
+            </div>
           )}
         </div>
       )}

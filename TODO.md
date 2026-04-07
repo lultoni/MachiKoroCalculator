@@ -21,8 +21,6 @@ Priorisiere in deiner Abarbeitung die wichtigsten Features. Erkenne Abhänigkeit
 | 32 | Creator Engine: Fix early-game save-then-buy pattern | Engine saves on turn N when an affordable card exists, then buys that same card on turn N+2. Root cause: save scores 0.0 (fixed from old discount bug), but some affordable cards also score near 0 or slightly negative due to risk/coverage baseline inflation (#30). When MC validation runs, the save option is excluded from MC but card scores come back as MC win rates — if those MC rates are very close together (e.g., 0.48 vs 0.49), the top pick can flip between save and buy across turns. Fix depends on #30 (making dimension scores properly delta-based will spread card scores apart). Additionally consider: if the best affordable card has a positive heuristic score, save should be suppressed. |
 | 33 | H2H Game Replay: Show engine decision details (the "why") | Save engine evaluation metrics/explanation factors alongside each purchase decision in H2H game logs. Display in match replay UI so users can understand why specific choices were made. Requires: (a) extend GameLog/TurnRecord to store EngineResult metrics map for the chosen option, (b) serialize in game JSON, (c) display in H2hGameReplay component (expandable section per turn showing top-3 factors, composite score breakdown, active gravity well). |
 | 34 | H2H Game Replay: Show Bürohaus swap actions | Bürohaus swap decisions are not currently shown in match replay. The swap IS executed during H2H games (via BürohausLogic.executeSwap in rollouts and GameSession), but the result (which card was swapped for which) is not logged. Requires: (a) extend TurnRecord to store swap details (ownCard, opponentCard, opponentIndex), (b) log swap in GameSession.playTurn(), (c) display in H2hGameReplay as a sub-action within the turn. |
-| 35 | H2H Game Replay: Fix landmark name localization | Landmark names appear in German in match replay even when EN locale is selected. Likely using raw project ID or German name from projects.json instead of the localized `name_en` field. Check H2hGameReplay.tsx landmark rendering — should use the same i18n pipeline as the rest of the UI (TODO #20 fixed Funkturm/Bürohaus labels but may have missed landmark purchase display). |
-| 36 | UI: Replace category type text with icons in project tooltips | Project tooltips for synergy cards (Möbelfabrik, Käsefabrik, Markthalle) reference category types as text ("production establishments", "Produktionsgebäude"). Replace these text references with the actual category icons (food/animal/production) for better readability. Icons already exist in `src/resources/category_icons/`. |
 
 ## Done
 
@@ -30,6 +28,8 @@ Moved here when completed. Full history in CHANGELOG.md.
 
 | # | Task |
 |---|------|
+| 36 | UI: Replace category type text with icons in project tooltips. |
+| 35 | H2H Game Replay: Fix landmark name/abbreviation localization. |
 | 21 | Creator Engine: custom strategy engine (seeded FlatMC + CreatorScorer + CreatorRollout). |
 | 24 | All Engines get a "can win" check to prevent games from going on too long. |
 | 25 | Check which Engines still don't have a rating and make them play the best one. |

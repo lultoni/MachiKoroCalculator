@@ -13,7 +13,8 @@ interface Props {
 }
 
 const LANDMARK_IDS = ['bahnhof', 'einkaufszentrum', 'freizeitpark', 'funkturm'];
-const LANDMARK_ABBR = ['B', 'E', 'F', 'F'];
+const LANDMARK_ABBR_DE = ['B', 'E', 'F', 'F'];
+const LANDMARK_ABBR_EN = ['T', 'S', 'A', 'R'];
 const STARTER_CARDS = ['weizenfeld', 'bäckerei'];
 
 /** Reconstruct per-player card inventories and coin totals up to each turn. */
@@ -118,6 +119,7 @@ export function H2hGameReplay({ game, engines, projects, language, onBack }: Pro
   const { t } = useLocale();
   const [turnIdx, setTurnIdx] = useState(0);
   const nameKey = `name_${language}` as 'name_de' | 'name_en';
+  const landmarkAbbr = language === 'en' ? LANDMARK_ABBR_EN : LANDMARK_ABBR_DE;
 
   const turn = game.turns[turnIdx] as H2hTurnLog | undefined;
   const totalTurns = game.turns.length;
@@ -155,7 +157,7 @@ export function H2hGameReplay({ game, engines, projects, language, onBack }: Pro
                 <span className={`inline-block w-6 h-6 rounded text-center text-xs font-bold leading-6 ${
                   owned ? 'bg-machi-yellow/30 text-machi-yellow' : 'bg-machi-bg text-machi-text-dim/30'
                 }`}>
-                  {LANDMARK_ABBR[i]}
+                  {landmarkAbbr[i]}
                 </span>
               </CardTooltip>
             );
@@ -282,7 +284,7 @@ export function H2hGameReplay({ game, engines, projects, language, onBack }: Pro
                   </div>
                   {turn.funkturmRerolled && (
                     <div className="text-xs text-machi-accent mt-0.5">
-                      {projects.byId('funkturm')?.[nameKey] ?? 'Funkturm'} ↻
+                      {projects.byId('funkturm')?.[nameKey] ?? (language === 'en' ? 'Radio Tower' : 'Funkturm')} ↻
                     </div>
                   )}
                 </div>
@@ -339,7 +341,7 @@ export function H2hGameReplay({ game, engines, projects, language, onBack }: Pro
 
               {turn.bürohausSwap && (
                 <div className="mt-2 text-xs text-machi-purple">
-                  {projects.byId('bürohaus')?.[nameKey] ?? 'Bürohaus'}: {turn.bürohausSwap}
+                  {projects.byId('bürohaus')?.[nameKey] ?? (language === 'en' ? 'Business Center' : 'Bürohaus')}: {turn.bürohausSwap}
                 </div>
               )}
             </div>
@@ -376,10 +378,10 @@ export function H2hGameReplay({ game, engines, projects, language, onBack }: Pro
               <div className="space-y-0.5">
                 <div>{t('dice.doubles')}: <span className="font-mono">{insights.doublesCount}</span></div>
                 {insights.funkturmCount > 0 && (
-                  <div>{projects.byId('funkturm')?.[nameKey] ?? 'Funkturm'}: <span className="font-mono">{insights.funkturmCount}</span></div>
+                  <div>{projects.byId('funkturm')?.[nameKey] ?? (language === 'en' ? 'Radio Tower' : 'Funkturm')}: <span className="font-mono">{insights.funkturmCount}</span></div>
                 )}
                 {insights.bürohausCount > 0 && (
-                  <div>{projects.byId('bürohaus')?.[nameKey] ?? 'Bürohaus'}: <span className="font-mono">{insights.bürohausCount}</span></div>
+                  <div>{projects.byId('bürohaus')?.[nameKey] ?? (language === 'en' ? 'Business Center' : 'Bürohaus')}: <span className="font-mono">{insights.bürohausCount}</span></div>
                 )}
               </div>
             </div>

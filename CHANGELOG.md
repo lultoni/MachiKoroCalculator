@@ -6,6 +6,14 @@ Implementation history: what was built, why, and which design decisions were mad
 
 ## Phase 7: Iteration
 
+### 7.38 — H2H Replay Localization + Category Icons in Tooltips (TODO #35, #36)
+
+**H2H Replay landmark localization (TODO #35):** Landmark abbreviation badges now show language-appropriate letters: DE=B/E/F/F, EN=T/S/A/R (Train Station, Shopping Mall, Amusement Park, Radio Tower). Funkturm and Bürohaus fallback names now use localized strings instead of hardcoded German.
+
+**Category icons in tooltips (TODO #36):** CardTooltip now parses description text and replaces category type references (Lebensmittelgebäude, Tier-Gebäude, Rohstoff-Gebäude, Café- und Geschäftsgebäude, and their EN equivalents) with inline category icons. Supports multi-category patterns (Shopping Mall references both café and store). Category label at tooltip bottom now shows icon alongside text.
+
+**Files:** `H2hGameReplay.tsx`, `CardTooltip.tsx`, `TODO.md`.
+
 ### 7.37 — Creator Engine (TODO #21)
 
 **New engine: CreatorEngine** — a custom strategy engine encoding a low-risk, income-first, adaptive philosophy with decisive endgame execution. Uses a novel **seeded Flat Monte Carlo** architecture: a fast heuristic pre-ranks candidates (~2-5ms), then MC rollouts validate and refine with biased allocation (50%/30%/20% by heuristic rank).

@@ -78,30 +78,160 @@ function countCards(ids: string[]): [string, number][] {
 /** Compute game-level insights. */
 function computeInsights(game: H2hGameLog, playerCount: number) {
   const totalIncome = Array(playerCount).fill(0);
+  const totalLost = Array(playerCount).fill(0);
   const totalPurchases = Array(playerCount).fill(0);
   const saveTurns = Array(playerCount).fill(0);
+  const turnCounts = Array(playerCount).fill(0);
+  const biggestIncome = Array(playerCount).fill(0);
+  const diceChoices1d6 = Array(playerCount).fill(0);
+  const diceChoices2d6 = Array(playerCount).fill(0);
+  const landmarkTurns: number[][] = Array.from({ length: playerCount }, () => []);
   let doublesCount = 0;
   let funkturmCount = 0;
   let bürohausCount = 0;
 
   for (const tn of game.turns) {
-    // Income
+    const pi = tn.playerIndex;
+    turnCounts[pi]++;
+
+    // Income & losses
     for (let i = 0; i < playerCount; i++) {
       const d = tn.coinDeltas?.[i] ?? 0;
       if (d > 0) totalIncome[i] += d;
+      if (d < 0) totalLost[i] += Math.abs(d);
+      if (d > biggestIncome[i]) biggestIncome[i] = d;
     }
-    // Purchases
+
+    // Dice choices
+    if (tn.diceCount === 1) diceChoices1d6[pi]++;
+    else diceChoices2d6[pi]++;
+
+    // Purchases & spending
     if (tn.purchasedCardId) {
-      totalPurchases[tn.playerIndex]++;
+      totalPurchases[pi]++;
+      // Track landmark purchase turns
+      if (LANDMARK_IDS.includes(tn.purchasedCardId)) {
+        landmarkTurns[pi].push(turnCounts[pi]);
+      }
     } else {
-      saveTurns[tn.playerIndex]++;
+      saveTurns[pi]++;
     }
     if (tn.isDoubles) doublesCount++;
     if (tn.funkturmRerolled) funkturmCount++;
     if (tn.bürohausSwap) bürohausCount++;
   }
 
-  return { totalIncome, totalPurchases, saveTurns, doublesCount, funkturmCount, bürohausCount };
+  // Average income per turn
+  const avgIncome = turnCounts.map((tc, i) => tc > 0 ? totalIncome[i] / tc : 0);
+
+  return {
+    totalIncome, totalLost, totalPurchases, saveTurns, turnCounts,
+    biggestIncome, diceChoices1d6, diceChoices2d6, landmarkTurns, avgIncome,
+    doublesCount, funkturmCount, bürohausCount,
+  };
+}
+
+interface GameEvent {
+  turnIndex: number;
+  playerIndex: number;
+  type: 'landmark' | 'burohaus' | 'funkturm' | 'close-decision';
+  label: string;
+  detail?: string;
+}
+
+/** Extract notable game events for the timeline. */
+function extractEvents(
+  game: H2hGameLog,
+  byId: (id: string) => ProjectDef | undefined,
+  language: 'de' | 'en'
+): GameEvent[] {
+  const events: GameEvent[] = [];
+  const playerTurnCount = [0, 0];
+
+  const cardName = (id: string): string => {
+    if (id === '_wait_') return language === 'en' ? 'Save' : 'Sparen';
+    const card = byId(id);
+    if (!card) return id;
+    return language === 'en' ? card.name_en : card.name_de;
+  };
+
+  for (let ti = 0; ti < game.turns.length; ti++) {
+    const tn = game.turns[ti];
+    playerTurnCount[tn.playerIndex]++;
+    const turnLabel = `T${playerTurnCount[tn.playerIndex]}`;
+
+    // Landmark purchases
+    if (tn.purchasedCardId && LANDMARK_IDS.includes(tn.purchasedCardId)) {
+      events.push({
+        turnIndex: ti,
+        playerIndex: tn.playerIndex,
+        type: 'landmark',
+        label: `${turnLabel}: ${cardName(tn.purchasedCardId)}`,
+        detail: `${(tn.purchaseWinRate * 100).toFixed(0)}%`,
+      });
+    }
+
+    // Bürohaus swaps
+    if (tn.bürohausSwap) {
+      const parts = tn.bürohausSwap.split('→');
+      if (parts.length === 2) {
+        events.push({
+          turnIndex: ti,
+          playerIndex: tn.playerIndex,
+          type: 'burohaus',
+          label: `${turnLabel}: ${cardName(parts[0].trim())} → ${cardName(parts[1].trim())}`,
+        });
+      }
+    } else if (tn.bürohausActivated) {
+      events.push({
+        turnIndex: ti,
+        playerIndex: tn.playerIndex,
+        type: 'burohaus',
+        label: `${turnLabel}: ${language === 'en' ? 'declined' : 'abgelehnt'}`,
+      });
+    }
+
+    // Funkturm rerolls
+    if (tn.funkturmRerolled) {
+      events.push({
+        turnIndex: ti,
+        playerIndex: tn.playerIndex,
+        type: 'funkturm',
+        label: `${turnLabel}: ${language === 'en' ? 'rerolled' : 'neu gewürfelt'} (${tn.roll})`,
+      });
+    }
+
+    // Close decisions (lowest 5 confidence values in the game)
+    // Collected separately and trimmed after the loop.
+    if (tn.decisionDetail && tn.decisionDetail.confidence >= 0 && tn.decisionDetail.options.length >= 2) {
+      const opts = tn.decisionDetail.options;
+      const top2 = opts.slice(0, 2).map(o =>
+        `${cardName(o.cardId)} ${(o.score * 100).toFixed(0)}%`
+      );
+      events.push({
+        turnIndex: ti,
+        playerIndex: tn.playerIndex,
+        type: 'close-decision',
+        label: `${turnLabel}: ${top2.join(' vs ')}`,
+        detail: `Δ${(tn.decisionDetail.confidence * 100).toFixed(1)}%`,
+      });
+    }
+  }
+
+  // Keep only the 5 closest decisions (lowest confidence) to avoid flooding
+  const closeEvents = events.filter(e => e.type === 'close-decision');
+  const otherEvents = events.filter(e => e.type !== 'close-decision');
+  closeEvents.sort((a, b) => {
+    const confA = parseFloat(a.detail?.replace('Δ', '').replace('%', '') ?? '0');
+    const confB = parseFloat(b.detail?.replace('Δ', '').replace('%', '') ?? '0');
+    return confA - confB;
+  });
+  const topClose = closeEvents.slice(0, 5);
+
+  // Merge back and sort by turn index
+  const merged = [...otherEvents, ...topClose];
+  merged.sort((a, b) => a.turnIndex - b.turnIndex);
+  return merged;
 }
 
 /** Background color class for card color. */
@@ -135,6 +265,11 @@ export function H2hGameReplay({ game, engines, matchId, projects, language, onBa
   const insights = useMemo(
     () => computeInsights(game, playerCount),
     [game, playerCount],
+  );
+
+  const events = useMemo(
+    () => extractEvents(game, projects.byId, language),
+    [game, projects, language],
   );
 
   const currentInv = inventories[turnIdx];
@@ -456,30 +591,79 @@ export function H2hGameReplay({ game, engines, matchId, projects, language, onBa
         {/* Game Insights */}
         <div className="bg-machi-surface rounded-xl p-4 border border-machi-border mb-4">
           <h3 className="text-sm font-semibold mb-3">{t('h2h.gameInsights')}</h3>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-xs">
+          {/* Per-player stats side by side */}
+          <div className="grid grid-cols-2 gap-3 text-xs mb-3">
             {engines.map((eng, i) => (
               <div key={i} className="bg-machi-bg rounded-lg p-3">
-                <div className="text-machi-text-dim mb-1">P{i + 1}: {eng}</div>
-                <div className="space-y-0.5">
+                <div className="flex items-center gap-1.5 mb-2">
+                  <span className={`inline-block w-2 h-2 rounded-full ${i === 0 ? 'bg-machi-accent' : 'bg-machi-purple'}`} />
+                  <span className="text-machi-text-dim font-semibold">P{i + 1}: {eng}</span>
+                  <span className="ml-auto text-[10px] text-machi-text-dim/60">{insights.turnCounts[i]} {language === 'en' ? 'turns' : 'Züge'}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">
                   <div>{t('h2h.totalIncome')}: <span className="text-green-400 font-mono">{insights.totalIncome[i]}</span></div>
+                  <div>{language === 'en' ? 'Lost to red' : 'Rot verloren'}: <span className="text-red-400 font-mono">{insights.totalLost[i]}</span></div>
+                  <div>{language === 'en' ? 'Avg/turn' : 'Ø/Zug'}: <span className="text-green-400/80 font-mono">{insights.avgIncome[i].toFixed(1)}</span></div>
+                  <div>{language === 'en' ? 'Best turn' : 'Bester Zug'}: <span className="font-mono text-machi-yellow">{insights.biggestIncome[i]}</span></div>
                   <div>{t('h2h.purchases')}: <span className="font-mono">{insights.totalPurchases[i]}</span></div>
                   <div>{t('h2h.saves')}: <span className="font-mono">{insights.saveTurns[i]}</span></div>
+                  <div>1d6: <span className="font-mono">{insights.diceChoices1d6[i]}</span></div>
+                  <div>2d6: <span className="font-mono">{insights.diceChoices2d6[i]}</span></div>
+                  {insights.landmarkTurns[i].length > 0 && (
+                    <div className="col-span-2 mt-1 text-machi-yellow/80">
+                      {language === 'en' ? 'Landmarks' : 'Großprojekte'}: {insights.landmarkTurns[i].map((t: number) => `T${t}`).join(', ')}
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
-            <div className="bg-machi-bg rounded-lg p-3">
-              <div className="text-machi-text-dim mb-1">{t('h2h.gameEvents')}</div>
-              <div className="space-y-0.5">
-                <div>{t('dice.doubles')}: <span className="font-mono">{insights.doublesCount}</span></div>
-                {insights.funkturmCount > 0 && (
-                  <div>{projects.byId('funkturm')?.[nameKey] ?? (language === 'en' ? 'Radio Tower' : 'Funkturm')}: <span className="font-mono">{insights.funkturmCount}</span></div>
-                )}
-                {insights.bürohausCount > 0 && (
-                  <div>{projects.byId('bürohaus')?.[nameKey] ?? (language === 'en' ? 'Business Center' : 'Bürohaus')}: <span className="font-mono">{insights.bürohausCount}</span></div>
-                )}
-              </div>
+          </div>
+          {/* Game-wide events summary */}
+          <div className="bg-machi-bg rounded-lg p-3 text-xs mb-3">
+            <div className="text-machi-text-dim mb-1 font-semibold">{t('h2h.gameEvents')}</div>
+            <div className="flex flex-wrap gap-x-4 gap-y-0.5">
+              <div>{t('dice.doubles')}: <span className="font-mono">{insights.doublesCount}</span></div>
+              {insights.funkturmCount > 0 && (
+                <div>{projects.byId('funkturm')?.[nameKey] ?? (language === 'en' ? 'Radio Tower' : 'Funkturm')}: <span className="font-mono">{insights.funkturmCount}</span></div>
+              )}
+              {insights.bürohausCount > 0 && (
+                <div>{projects.byId('bürohaus')?.[nameKey] ?? (language === 'en' ? 'Business Center' : 'Bürohaus')}: <span className="font-mono">{insights.bürohausCount}</span></div>
+              )}
             </div>
           </div>
+          {/* Event Timeline (inside Game Insights) */}
+          {events.length > 0 && (
+            <div className="mt-3 bg-machi-bg rounded-lg p-3">
+              <div className="text-machi-text-dim text-xs mb-2">{language === 'en' ? 'Key Events' : 'Wichtige Ereignisse'}</div>
+              <div className="space-y-1 text-xs max-h-48 overflow-y-auto">
+                {events.map((ev, i) => {
+                  const typeConfig = ev.type === 'landmark'
+                    ? { bg: 'bg-amber-500/20 text-amber-400', tag: '★' }
+                    : ev.type === 'burohaus'
+                    ? { bg: 'bg-fuchsia-500/20 text-fuchsia-400', tag: '⇄' }
+                    : ev.type === 'funkturm'
+                    ? { bg: 'bg-cyan-500/20 text-cyan-400', tag: '↻' }
+                    : { bg: 'bg-orange-500/20 text-orange-300', tag: '⚖' };
+                  return (
+                    <div
+                      key={i}
+                      className="flex items-center gap-2 px-2 py-1 rounded hover:bg-machi-surface/50 cursor-pointer"
+                      onClick={() => setTurnIdx(ev.turnIndex)}
+                    >
+                      <span className={`inline-flex items-center justify-center w-4 h-4 rounded text-[9px] font-bold flex-shrink-0 ${typeConfig.bg}`}>
+                        {typeConfig.tag}
+                      </span>
+                      <span className={`font-mono w-5 flex-shrink-0 ${ev.playerIndex === 0 ? 'text-machi-accent' : 'text-fuchsia-400'}`}>
+                        P{ev.playerIndex + 1}
+                      </span>
+                      <span className="truncate">{ev.label}</span>
+                      {ev.detail && <span className="text-machi-text-dim ml-auto flex-shrink-0">{ev.detail}</span>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Final State */}

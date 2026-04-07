@@ -358,10 +358,8 @@ public final class CreatorEngine implements SimulationEngine {
                     c.structuredFactors, null, metrics, affordable));
         }
 
-        // Sort: descending score, save last on ties
-        options.sort(Comparator
-                .comparingDouble((EngineResult.Option o) -> o.score).reversed()
-                .thenComparing(o -> "_wait_".equals(o.project.getId()) ? 1 : 0));
+        // Sort using standard comparator (score DESC, save last, landmarks first, cost DESC)
+        options.sort(EngineResult.OPTION_COMPARATOR);
 
         // Confidence = margin between top two
         double confidence = 0.0;

@@ -2,6 +2,7 @@ package engine;
 
 import core.Project;
 
+import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -20,6 +21,28 @@ import java.util.List;
  * </ol>
  */
 public final class EngineResult {
+
+    /**
+     * Standard comparator for sorting engine result options.
+     * All engines should use this for consistent ranking behavior.
+     *
+     * <p>Sort order:
+     * <ol>
+     *   <li>Score descending (higher = better)</li>
+     *   <li>Save last on ties (non-save before save)</li>
+     *   <li>Landmarks first on ties (prefer game-advancing purchases)</li>
+     *   <li>Cost descending on ties (prefer higher-value cards for tempo)</li>
+     * </ol>
+     *
+     * <p>The landmark and cost tiebreakers fix TODO #38: when all options score 1.0
+     * (certain win) or 0.0 (certain loss), the engine now picks the fastest winning
+     * move (landmark) or the highest-tempo move (most expensive) instead of arbitrary ordering.
+     */
+    public static final Comparator<Option> OPTION_COMPARATOR = Comparator
+            .comparingDouble((Option o) -> o.score).reversed()
+            .thenComparing(o -> "_wait_".equals(o.project.getId()) ? 1 : 0)
+            .thenComparing(o -> o.project.isIs_grossprojekt() ? 0 : 1)
+            .thenComparingInt((Option o) -> -o.project.getCost());
 
     // -------------------------------------------------------------------------
     // ExplanationFactor — structured, weighted explanation entry

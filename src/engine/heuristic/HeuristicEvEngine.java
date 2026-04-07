@@ -190,10 +190,8 @@ public final class HeuristicEvEngine implements SimulationEngine {
             options.add(new EngineResult.Option(s.card, s.score, List.of(), s.metrics, affordable));
         }
 
-        // Sort: descending score, save last on ties
-        options.sort(Comparator
-                .comparingDouble((EngineResult.Option o) -> o.score).reversed()
-                .thenComparing(o -> "_wait_".equals(o.project.getId()) ? 1 : 0));
+        // Sort using standard comparator (score DESC, save last, landmarks first, cost DESC)
+        options.sort(EngineResult.OPTION_COMPARATOR);
 
         double confidence = 0.0;
         if (options.size() >= 2) {

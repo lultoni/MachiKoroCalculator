@@ -178,10 +178,8 @@ public class MctsV1Engine implements SimulationEngine {
                 ? buildOptionsLite(tree, state, playerIndex)
                 : buildOptions(state, playerIndex, tree, iterationsUsed);
 
-        // Sort descending by score; on ties, non-save options rank above save
-        rawOptions.sort(Comparator
-                .comparingDouble((EngineResult.Option o) -> o.score).reversed()
-                .thenComparing(o -> "_wait_".equals(o.project.getId()) ? 1 : 0));
+        // Sort using standard comparator (score DESC, save last, landmarks first, cost DESC)
+        rawOptions.sort(EngineResult.OPTION_COMPARATOR);
 
         // ---- Pass 2: Enrich with structured factors using cross-option stats ----
         List<EngineResult.Option> options = skipEnrichment

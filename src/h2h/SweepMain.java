@@ -12,6 +12,7 @@ import engine.mcts.MctsGreedyTreeEngine;
 import engine.mcts.MctsV1Engine;
 import iface.EngineOrchestrator;
 import iface.EngineRegistry;
+import iface.EngineRegistryEntry;
 
 import java.util.*;
 
@@ -98,6 +99,7 @@ public final class SweepMain {
         int games = 50;
         String creatorId = "creator-fast";
         String opponent = "heuristic-ev-default";
+        List<String> opponentList = null;  // set when --opponents is used
         int iterations = 0;  // 0 = use registry defaults
         int startup = 20;
         double gamma = 0.25;
@@ -113,6 +115,7 @@ public final class SweepMain {
                 case "--games"     -> games = Integer.parseInt(args[++i]);
                 case "--creator"   -> creatorId = args[++i];
                 case "--opponent"  -> opponent = args[++i];
+                case "--opponents" -> opponentList = Arrays.asList(args[++i].split(","));
                 case "--iterations"-> iterations = Integer.parseInt(args[++i]);
                 case "--startup"   -> startup = Integer.parseInt(args[++i]);
                 case "--gamma"     -> gamma = Double.parseDouble(args[++i]);
@@ -131,14 +134,23 @@ public final class SweepMain {
             trials = Integer.MAX_VALUE;
         }
 
-        // Validate engines exist
-        if (EngineRegistry.findById(opponent).isEmpty()) {
-            System.err.println("Unknown opponent engine: " + opponent);
-            return;
-        }
-        if (EngineRegistry.findById(creatorId).isEmpty()) {
+        // Validate creator engine and read its registry entry for tier/iterations metadata
+        Optional<EngineRegistryEntry> creatorEntryOpt = EngineRegistry.findById(creatorId);
+        if (creatorEntryOpt.isEmpty()) {
             System.err.println("Unknown creator engine: " + creatorId);
             return;
+        }
+        EngineRegistryEntry creatorEntry = creatorEntryOpt.get();
+
+        // Resolve opponent list — single --opponent or multi --opponents
+        if (opponentList == null) {
+            opponentList = List.of(opponent);
+        }
+        for (String opp : opponentList) {
+            if (EngineRegistry.findById(opp).isEmpty()) {
+                System.err.println("Unknown opponent engine: " + opp);
+                return;
+            }
         }
 
         // Register all engines
@@ -162,8 +174,11 @@ public final class SweepMain {
         List<SweepResult.Trial> priorTrials = resume ? SweepResult.loadAllTrials() : new ArrayList<>();
         int priorCount = priorTrials.size();
 
+        String oppDisplay = opponentList.size() == 1
+                ? opponentList.get(0)
+                : "[" + String.join(", ", opponentList) + "]";
         System.out.printf("[SWEEP] %s vs %s — %s trials (%d startup), %d games/trial, seed=%d%n",
-                creatorId, opponent,
+                creatorId, oppDisplay,
                 infinite ? "∞" : String.valueOf(trials),
                 startup, games, seed);
         if (priorCount > 0) {
@@ -197,10 +212,11 @@ public final class SweepMain {
         final int[] trialsOnExit = {0};
         final long[] startMsRef = {sweepStartMs};
         final String finalCreatorId = creatorId;
-        final String finalOpponent = opponent;
+        final String finalOppDisplay = oppDisplay;
         final int finalGames = games;
         final int finalStartup = startup;
         final double finalGamma = gamma;
+        final List<String> finalOpponentList = opponentList;
 
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             if (normalExit[0] || trialsOnExit[0] == 0) return;
@@ -208,12 +224,12 @@ public final class SweepMain {
             System.out.printf("%n[SWEEP] Interrupted — saving %d completed trial(s)...%n",
                     trialsOnExit[0]);
             SweepResult.SweepRun run = new SweepResult.SweepRun(
-                    runId, finalCreatorId, finalOpponent, finalGames,
+                    runId, finalCreatorId, finalOppDisplay, finalGames,
                     trialsOnExit[0], finalStartup, finalGamma,
                     new ArrayList<>(newTrials), elapsed);
             SweepResult.saveOrUpdate(run);
             System.out.printf("[SWEEP] Saved to data/sweep-results.json%n");
-            printTopResults(newTrials, priorTrials, 10);
+            printTopResults(newTrials, priorTrials, 10, creatorEntry, finalOpponentList);
         }, "sweep-shutdown"));
 
         // ---- Main trial loop ----
@@ -221,6 +237,9 @@ public final class SweepMain {
 
         for (int t = 0; t < trials; t++) {
             int trialIdx = startIdx + t;
+
+            // Pick opponent for this trial (round-robin when multiple)
+            String currentOpponent = opponentList.get(t % opponentList.size());
 
             // Choose parameter vector
             double[] paramValues;
@@ -282,7 +301,7 @@ public final class SweepMain {
             overrides[1] = Map.of();
 
             MatchConfig matchConfig = new MatchConfig(
-                    new String[]{creatorId, opponent}, games, 200, iterations, true, overrides);
+                    new String[]{creatorId, currentOpponent}, games, 200, iterations, true, overrides);
 
             // Run the match
             long matchStart = System.currentTimeMillis();
@@ -311,8 +330,9 @@ public final class SweepMain {
             String trialLabel = infinite
                     ? String.format("Trial %d", t + 1)
                     : String.format("Trial %d/%d", t + 1, trials);
-            System.out.printf("  %s (%s): WR=%.1f%%  [best: %.1f%% @ #%d]  (%.1fs)%n",
-                    trialLabel, source, winRate * 100,
+            String oppSuffix = opponentList.size() > 1 ? " vs " + currentOpponent : "";
+            System.out.printf("  %s (%s)%s: WR=%.1f%%  [best: %.1f%% @ #%d]  (%.1fs)%n",
+                    trialLabel, source, oppSuffix, winRate * 100,
                     bestWinRate * 100, bestTrialIdx, matchTime / 1000.0);
 
             if (verbose) {
@@ -326,7 +346,7 @@ public final class SweepMain {
             // saveOrUpdate replaces the in-progress entry by runId (no duplicates).
             long elapsed = System.currentTimeMillis() - sweepStartMs;
             SweepResult.SweepRun inProgress = new SweepResult.SweepRun(
-                    runId, creatorId, opponent, games,
+                    runId, creatorId, oppDisplay, games,
                     newTrials.size(), startup, gamma,
                     new ArrayList<>(newTrials), elapsed);
             SweepResult.saveOrUpdate(inProgress);
@@ -340,7 +360,7 @@ public final class SweepMain {
         System.out.printf("[SWEEP] Complete in %s — %d trials evaluated%n",
                 TournamentMain.formatDuration(totalTime), newTrials.size());
         System.out.println();
-        printTopResults(newTrials, priorTrials, 10);
+        printTopResults(newTrials, priorTrials, 10, creatorEntry, opponentList);
     }
 
     // =====================================================================
@@ -365,7 +385,9 @@ public final class SweepMain {
     }
 
     private static void printTopResults(List<SweepResult.Trial> newTrials,
-                                         List<SweepResult.Trial> priorTrials, int topN) {
+                                         List<SweepResult.Trial> priorTrials, int topN,
+                                         EngineRegistryEntry creatorEntry,
+                                         List<String> opponentList) {
         List<SweepResult.Trial> all = new ArrayList<>(priorTrials);
         all.addAll(newTrials);
         all.sort(Comparator.comparingDouble((SweepResult.Trial t) -> t.winRate).reversed());
@@ -392,19 +414,32 @@ public final class SweepMain {
             System.out.println();
         }
 
-        // Print as engines.json config snippet for the best vector
+        // Print as engines.json config snippet for the best vector.
+        // Tier and iterations are derived from the registry entry of the creator engine used,
+        // so creator-balanced-tuned correctly gets tier=balanced and iterations=5000.
         if (!all.isEmpty()) {
             SweepResult.Trial best = all.get(0);
+            String tier = creatorEntry.tier();
+            int registryIterations = creatorEntry.config().iterations;
+
+            // Derive tuned ID: replace the base creator ID suffix, e.g.
+            // "creator-fast" → "creator-fast-tuned", "creator-balanced" → "creator-balanced-tuned"
+            String tunedId = creatorEntry.id() + "-tuned";
+
+            String oppDesc = opponentList.size() == 1
+                    ? opponentList.get(0)
+                    : String.join("+", opponentList);
+
             System.out.println("=== engines.json CONFIG FOR BEST VECTOR ===");
             System.out.println("{");
-            System.out.printf("  \"id\": \"creator-tuned\",%n");
+            System.out.printf("  \"id\": \"%s\",%n", tunedId);
             System.out.printf("  \"engineClass\": \"creator\",%n");
-            System.out.printf("  \"description\": \"Creator Engine — TPE-tuned (WR=%.1f%% vs opponent)\",%n",
-                    best.winRate * 100);
+            System.out.printf("  \"description\": \"Creator Engine — TPE-tuned %s (WR=%.1f%% vs %s)\",%n",
+                    tier, best.winRate * 100, oppDesc);
             System.out.printf("  \"default\": false,%n");
-            System.out.printf("  \"tier\": \"fast\",%n");
+            System.out.printf("  \"tier\": \"%s\",%n", tier);
             System.out.printf("  \"config\": {%n");
-            System.out.printf("    \"iterations\": \"500\"");
+            System.out.printf("    \"iterations\": \"%d\"", registryIterations);
             TreeMap<String, Double> sorted = new TreeMap<>(best.params);
             for (Map.Entry<String, Double> e : sorted.entrySet()) {
                 System.out.printf(",%n    \"%s\": \"%.4f\"", e.getKey(), e.getValue());
@@ -428,19 +463,20 @@ public final class SweepMain {
         System.out.println("Ctrl+C stops the sweep and prints the top results found so far.");
         System.out.println();
         System.out.println("Options:");
-        System.out.println("  --trials N        Total evaluation trials (default: 100)");
-        System.out.println("  --infinite        Run indefinitely until Ctrl+C (overrides --trials)");
-        System.out.println("  --games N         Games per trial match (default: 50)");
-        System.out.println("  --creator <id>    Creator engine ID (default: creator-fast)");
-        System.out.println("  --opponent <id>   Opponent engine ID (default: heuristic-ev-default)");
-        System.out.println("  --iterations N    Override iterations (0 = registry default)");
-        System.out.println("  --startup N       Random trials before TPE (default: 20)");
-        System.out.println("  --gamma F         TPE good/bad split (default: 0.25)");
-        System.out.println("  --seed N          Random seed for reproducibility");
-        System.out.println("  --resume          Continue from all trials in sweep-results.json");
-        System.out.println("  --no-default      Skip evaluating default params as trial 0");
-        System.out.println("  --verbose         Per-game results, param deltas, match details");
-        System.out.println("  --help            Show this help");
+        System.out.println("  --trials N           Total evaluation trials (default: 100)");
+        System.out.println("  --infinite           Run indefinitely until Ctrl+C (overrides --trials)");
+        System.out.println("  --games N            Games per trial match (default: 50)");
+        System.out.println("  --creator <id>       Creator engine ID (default: creator-fast)");
+        System.out.println("  --opponent <id>      Single opponent engine ID (default: heuristic-ev-default)");
+        System.out.println("  --opponents <a,b,c>  Comma-separated opponent list; round-robined per trial");
+        System.out.println("  --iterations N       Override iterations (0 = registry default)");
+        System.out.println("  --startup N          Random trials before TPE (default: 20)");
+        System.out.println("  --gamma F            TPE good/bad split (default: 0.25)");
+        System.out.println("  --seed N             Random seed for reproducibility");
+        System.out.println("  --resume             Continue from all trials in sweep-results.json");
+        System.out.println("  --no-default         Skip evaluating default params as trial 0");
+        System.out.println("  --verbose            Per-game results, param deltas, match details");
+        System.out.println("  --help               Show this help");
         System.out.println();
         System.out.println("Examples:");
         System.out.println("  # Quick smoke test (~1 min)");
@@ -448,6 +484,11 @@ public final class SweepMain {
         System.out.println();
         System.out.println("  # Run indefinitely (overnight), stop with Ctrl+C");
         System.out.println("  java -cp \"out:src:gson-2.11.0.jar\" h2h.SweepMain --infinite --games 50");
+        System.out.println();
+        System.out.println("  # Overnight balanced run against multiple opponents");
+        System.out.println("  java -cp \"out:src:gson-2.11.0.jar\" h2h.SweepMain \\");
+        System.out.println("    --creator creator-balanced --infinite --games 50 \\");
+        System.out.println("    --opponents heuristic-ev-default,flat-mc-fast,mcts-v1-depth3,mcts-v1-fast");
         System.out.println();
         System.out.println("  # Resume all prior work and continue to 200 trials total");
         System.out.println("  java -cp \"out:src:gson-2.11.0.jar\" h2h.SweepMain --trials 200 --resume");

@@ -17,14 +17,15 @@ public final class TurnLog {
     public final String purchasedCardId;   // null = save
     public final double purchaseWinRate;
     public final int coinsAfterPurchase;
-    public final String bürohausSwap;      // "cardA→cardB" or null
+    public final String bürohausSwap;      // "ownCardId→oppCardId" or null
+    public final boolean bürohausActivated; // true if Bürohaus was triggered (swap or decline)
     public final boolean funkturmRerolled;
     public final long evaluateTimeMs;
 
     public TurnLog(int playerIndex, int diceCount, int roll, boolean isDoubles,
                    int[] coinDeltas, String purchasedCardId, double purchaseWinRate,
-                   int coinsAfterPurchase, String bürohausSwap, boolean funkturmRerolled,
-                   long evaluateTimeMs) {
+                   int coinsAfterPurchase, String bürohausSwap, boolean bürohausActivated,
+                   boolean funkturmRerolled, long evaluateTimeMs) {
         this.playerIndex = playerIndex;
         this.diceCount = diceCount;
         this.roll = roll;
@@ -34,6 +35,7 @@ public final class TurnLog {
         this.purchaseWinRate = purchaseWinRate;
         this.coinsAfterPurchase = coinsAfterPurchase;
         this.bürohausSwap = bürohausSwap;
+        this.bürohausActivated = bürohausActivated;
         this.funkturmRerolled = funkturmRerolled;
         this.evaluateTimeMs = evaluateTimeMs;
     }
@@ -45,7 +47,7 @@ public final class TurnLog {
         return new TurnLog(
                 1 - playerIndex, diceCount, roll, isDoubles,
                 swappedDeltas, purchasedCardId, purchaseWinRate,
-                coinsAfterPurchase, bürohausSwap, funkturmRerolled,
+                coinsAfterPurchase, bürohausSwap, bürohausActivated, funkturmRerolled,
                 evaluateTimeMs
         );
     }

@@ -236,6 +236,7 @@ export interface H2hTurnLog {
   purchaseWinRate: number;
   coinsAfterPurchase: number;
   bürohausSwap: string | null;
+  bürohausActivated?: boolean;
   funkturmRerolled: boolean;
   evaluateTimeMs: number;
 }

@@ -20,7 +20,7 @@ Priorisiere in deiner Abarbeitung die wichtigsten Features. Erkenne Abhänigkeit
 | 31 | Creator Engine: Penalize 7-12 cards without Bahnhof in scorer | Cards activating on rolls 7-12 (Apfelplantage, Wald, Bergwerk, Möbelfabrik, Käsefabrik, Obstgarten) provide 0 own-turn income without Bahnhof. The Calcs layer correctly computes 0 EV, but CreatorScorer's risk/coverage dimensions still inflate their composite score (see #30). Independent of #30: add an explicit coverage-based penalty to the `incomeTerm` or a new guard that scales the composite score by the player's ability to actually activate the card (1d6 for rolls 1-6, needs Bahnhof for 7-12). Must NOT prevent the engine from building toward a 2d6 strategy — only penalize buying these cards BEFORE Bahnhof is owned. |
 | 32 | Creator Engine: Fix early-game save-then-buy pattern | Engine saves on turn N when an affordable card exists, then buys that same card on turn N+2. Root cause: save scores 0.0 (fixed from old discount bug), but some affordable cards also score near 0 or slightly negative due to risk/coverage baseline inflation (#30). When MC validation runs, the save option is excluded from MC but card scores come back as MC win rates — if those MC rates are very close together (e.g., 0.48 vs 0.49), the top pick can flip between save and buy across turns. Fix depends on #30 (making dimension scores properly delta-based will spread card scores apart). Additionally consider: if the best affordable card has a positive heuristic score, save should be suppressed. |
 | 33 | H2H Game Replay: Show engine decision details (the "why") | Save engine evaluation metrics/explanation factors alongside each purchase decision in H2H game logs. Display in match replay UI so users can understand why specific choices were made. Requires: (a) extend GameLog/TurnRecord to store EngineResult metrics map for the chosen option, (b) serialize in game JSON, (c) display in H2hGameReplay component (expandable section per turn showing top-3 factors, composite score breakdown, active gravity well). |
-| 34 | H2H Game Replay: Show Bürohaus swap actions | Bürohaus swap decisions are not currently shown in match replay. The swap IS executed during H2H games (via BürohausLogic.executeSwap in rollouts and GameSession), but the result (which card was swapped for which) is not logged. Requires: (a) extend TurnRecord to store swap details (ownCard, opponentCard, opponentIndex), (b) log swap in GameSession.playTurn(), (c) display in H2hGameReplay as a sub-action within the turn. |
+| 35 | Creator Engine soll, wenn es ein Bürohaus besitzt immer eine Low Value Cheap Karte besitzen, sodass es bei einem potentiellen Tausch gut benefittet. | Hier muss aber darauf geachtet werden, dass diese karte für den gegner nicht gut wäre und man selber von der getaschten karte profitiert. |
 
 ## Done
 
@@ -28,6 +28,7 @@ Moved here when completed. Full history in CHANGELOG.md.
 
 | # | Task |
 |---|------|
+| 34 | H2H Game Replay: Show Bürohaus swap actions + greedy fallback for non-MCTS engines. |
 | 36 | UI: Replace category type text with icons in project tooltips. |
 | 35 | H2H Game Replay: Fix landmark name/abbreviation localization. |
 | 21 | Creator Engine: custom strategy engine (seeded FlatMC + CreatorScorer + CreatorRollout). |

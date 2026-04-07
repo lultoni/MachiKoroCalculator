@@ -47,7 +47,7 @@ public final class BürohausLogic {
      * would violate that rule. This exclusion was a bug fix — do not remove the
      * {@code "lila".equals(p.getColor())} checks below.
      */
-    static SwapCandidates findCandidates(GameState state, int playerIndex) {
+    public static SwapCandidates findCandidates(GameState state, int playerIndex) {
         Player active = state.getPlayers()[playerIndex];
         int n = state.getPlayers().length;
         CardIncome.PlayerStats activeStats = CardIncome.PlayerStats.of(active);
@@ -76,13 +76,13 @@ public final class BürohausLogic {
         return new SwapCandidates(worstOwn, worstOwnEV, bestOpp, bestOppEV, bestOppPlayer);
     }
 
-    record SwapCandidates(
+    public record SwapCandidates(
             Project worstOwn,  double worstOwnEV,
             Project bestOpp,   double bestOppEV,
             int bestOppPlayer) {
 
         /** True when a beneficial swap exists. */
-        boolean isBeneficial() {
+        public boolean isBeneficial() {
             return worstOwn != null && bestOpp != null && bestOppEV > worstOwnEV;
         }
     }

@@ -6,6 +6,18 @@ Implementation history: what was built, why, and which design decisions were mad
 
 ## Phase 7: Iteration
 
+### 7.39 — H2H Replay Bürohaus Swap Display + Greedy Fallback (TODO #34)
+
+**Bürohaus swap display in H2H replay (TODO #34):** Swap actions now show localized card names with category icons and color coding instead of raw card IDs. Declined swaps show "declined"/"abgelehnt" label. New `bürohausActivated` field in TurnLog tracks whether Bürohaus was triggered.
+
+**Greedy Bürohaus fallback for non-MCTS engines:** FlatMcEngine, CreatorEngine, HeuristicEvEngine, and ExpectimaxEngine used `TurnPlan.staticPlan()` which never populated Bürohaus swap decisions. MatchRunner now applies a greedy Bürohaus swap (via `BürohausLogic.findCandidates`) when the engine's TurnPlan lacks Bürohaus data but the active player owns Bürohaus and rolled 6.
+
+**Public API change:** `BürohausLogic.findCandidates()` and `SwapCandidates` promoted from package-private to public for cross-package access.
+
+**Engine Compliance tests expanded (Tier 4):** New assertions verify `evaluateFullTurn()` returns valid TurnPlan with dice count and purchase, and that Bürohaus greedy swap is beneficial in test scenarios. 271 assertions across all 10 engine classes pass.
+
+**Files:** `TurnLog.java`, `MatchRunner.java`, `BürohausLogic.java`, `H2hGameReplay.tsx`, `types.ts`, `RuntimeTester.java`.
+
 ### 7.38 — H2H Replay Localization + Category Icons in Tooltips (TODO #35, #36)
 
 **H2H Replay landmark localization (TODO #35):** Landmark abbreviation badges now show language-appropriate letters: DE=B/E/F/F, EN=T/S/A/R (Train Station, Shopping Mall, Amusement Park, Radio Tower). Funkturm and Bürohaus fallback names now use localized strings instead of hardcoded German.

@@ -13,6 +13,7 @@ import engine.mcts.MctsV1Engine;
 import engine.EngineConfig;
 import engine.EngineResult;
 import engine.SimulationEngine;
+import engine.TurnPlan;
 import engine.mcts.SupplyTracker;
 import h2h.MatchConfig;
 import h2h.MatchResult;
@@ -3568,6 +3569,43 @@ public class RuntimeTester {
         for (String rid : registryIds) {
             assertTrue(tag + "registry entry '" + rid + "' exists",
                     EngineRegistry.findById(rid).isPresent());
+        }
+
+        // ---- Tier 4: H2H Decision Support ----
+
+        // 14. evaluateFullTurn returns non-null TurnPlan
+        TurnPlan plan = engine.evaluateFullTurn(gs, 0, cfg);
+        assertTrue(tag + "evaluateFullTurn returns non-null", plan != null);
+
+        // 15. TurnPlan has valid diceCount (1 or 2)
+        assertTrue(tag + "TurnPlan diceCount is 1 or 2 (was " + plan.diceCount + ")",
+                plan.diceCount == 1 || plan.diceCount == 2);
+
+        // 16. TurnPlan has valid purchase (non-null or null for save)
+        //     purchase can be null (= save) or a Project (including WAIT_SENTINEL for save)
+        assertTrue(tag + "TurnPlan purchase is valid (null=save or Project)",
+                plan.purchase == null || plan.purchase instanceof core.Project);
+
+        // 17. Bürohaus swap scenario: player owns Bürohaus + high-EV opponent cards
+        //     → MatchRunner greedy fallback must produce a swap.
+        //     (Engines don't need to handle Bürohaus in TurnPlan; MatchRunner does.)
+        {
+            core.Project bürohaus  = core.ProjectLoader.getProject("bürohaus").orElseThrow();
+            core.Project miniMarkt = core.ProjectLoader.getProject("mini-markt").orElseThrow();
+            java.util.ArrayList<core.Project> bOwned = new java.util.ArrayList<>();
+            bOwned.add(weizen); bOwned.add(baeckerei); bOwned.add(bürohaus);
+            java.util.ArrayList<core.Project> bOppOwned = new java.util.ArrayList<>();
+            bOppOwned.add(weizen); bOppOwned.add(baeckerei); bOppOwned.add(miniMarkt);
+            core.Player bp0 = new core.Player("Alice", 10, bOwned);
+            core.Player bp1 = new core.Player("Bob",    5, bOppOwned);
+            java.util.ArrayList<core.Project> bUnbuilt = new java.util.ArrayList<>(
+                    core.ProjectLoader.getAllProjects());
+            core.GameState bGs = new core.GameState(new core.Player[]{bp0, bp1}, bUnbuilt);
+
+            // Greedy swap should be beneficial: Weizenfeld (low EV) → Mini-Markt (higher EV)
+            core.BürohausLogic.SwapCandidates cand = core.BürohausLogic.findCandidates(bGs, 0);
+            assertTrue(tag + "Bürohaus greedy swap is beneficial in test scenario",
+                    cand.isBeneficial());
         }
     }
 

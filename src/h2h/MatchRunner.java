@@ -290,15 +290,29 @@ public final class MatchRunner {
         }
 
         // 6. Bürohaus swap
+        // MCTS engines populate plan.hasBürohausChoice + swap details via tree navigation.
+        // Non-MCTS engines (FlatMc, Creator) use staticPlan which leaves these empty.
+        // Fallback: if the active player owns Bürohaus and rolled 6, apply greedy swap.
         String bürohausSwap = null;
+        boolean bürohausActivated = plan.hasBürohausChoice;
         if (plan.hasBürohausChoice && plan.bürohausOwnCard != null
                 && plan.bürohausOppPlayer >= 0 && plan.bürohausOppCard != null) {
+            // MCTS-provided swap decision
             try {
                 BürohausLogic.executeSwap(state, activePlayer,
                         plan.bürohausOwnCard, plan.bürohausOppPlayer, plan.bürohausOppCard);
                 bürohausSwap = plan.bürohausOwnCard.getId() + "→" + plan.bürohausOppCard.getId();
             } catch (IllegalArgumentException e) {
                 // Swap not valid in current state (tree divergence) — skip
+            }
+        } else if (!plan.hasBürohausChoice
+                && state.getPlayers()[activePlayer].hasProject("bürohaus") && roll == 6) {
+            // Greedy fallback for non-MCTS engines
+            bürohausActivated = true;
+            BürohausLogic.SwapCandidates candidates = BürohausLogic.findCandidates(state, activePlayer);
+            if (candidates.isBeneficial()) {
+                BürohausLogic.executeSwap(state, activePlayer);
+                bürohausSwap = candidates.worstOwn().getId() + "→" + candidates.bestOpp().getId();
             }
         }
 
@@ -325,7 +339,7 @@ public final class MatchRunner {
         return new TurnLog(
                 activePlayer, diceCount, roll, doubles,
                 deltas, purchasedCardId, plan.purchaseWinRate,
-                coinsAfterPurchase, bürohausSwap, funkturmRerolled,
+                coinsAfterPurchase, bürohausSwap, bürohausActivated, funkturmRerolled,
                 plan.computeTimeMs
         );
     }

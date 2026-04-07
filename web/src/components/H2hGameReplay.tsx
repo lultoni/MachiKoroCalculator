@@ -339,11 +339,41 @@ export function H2hGameReplay({ game, engines, projects, language, onBack }: Pro
                 </div>
               </div>
 
-              {turn.bürohausSwap && (
-                <div className="mt-2 text-xs text-machi-purple">
-                  {projects.byId('bürohaus')?.[nameKey] ?? (language === 'en' ? 'Business Center' : 'Bürohaus')}: {turn.bürohausSwap}
-                </div>
-              )}
+              {(turn.bürohausSwap || turn.bürohausActivated) && (() => {
+                const bürohausName = projects.byId('bürohaus')?.[nameKey] ?? (language === 'en' ? 'Business Center' : 'Bürohaus');
+                if (turn.bürohausSwap) {
+                  const parts = turn.bürohausSwap.split('→');
+                  const ownId = parts[0]?.trim();
+                  const oppId = parts[1]?.trim();
+                  const ownProj = ownId ? projects.byId(ownId) : undefined;
+                  const oppProj = oppId ? projects.byId(oppId) : undefined;
+                  const ownName = ownProj?.[nameKey] ?? ownProj?.name_de ?? ownId;
+                  const oppName = oppProj?.[nameKey] ?? oppProj?.name_de ?? oppId;
+                  return (
+                    <div className="mt-2 flex items-center gap-1.5 text-xs text-machi-purple">
+                      <span className="font-semibold">{bürohausName}:</span>
+                      <span className="inline-flex items-center gap-0.5">
+                        {categoryIconPath(ownProj?.category) && (
+                          <img src={categoryIconPath(ownProj?.category)} alt="" className="w-3 h-3" />
+                        )}
+                        <span className={cardTextClass(ownProj?.color)}>{ownName}</span>
+                      </span>
+                      <span className="text-machi-text-dim">→</span>
+                      <span className="inline-flex items-center gap-0.5">
+                        {categoryIconPath(oppProj?.category) && (
+                          <img src={categoryIconPath(oppProj?.category)} alt="" className="w-3 h-3" />
+                        )}
+                        <span className={cardTextClass(oppProj?.color)}>{oppName}</span>
+                      </span>
+                    </div>
+                  );
+                }
+                return (
+                  <div className="mt-2 text-xs text-machi-purple/60">
+                    {bürohausName}: {language === 'en' ? 'declined' : 'abgelehnt'}
+                  </div>
+                );
+              })()}
             </div>
             </div>
           )})()}

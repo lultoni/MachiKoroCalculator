@@ -35,13 +35,17 @@ UI (React 19 SPA) --HTTP--> Interface --> Engines --> Calcs --> Core
 |-------|---------|----------------|
 | Core | `core/` | Game rules: state, cards, dice, income, turn order, win condition. No strategy. |
 | Calcs | `calcs/` | Reusable math: EV, ROI, variance, 11 advanced metrics. Stateless. |
-| Engines | `engine/` | 9 engine classes, 32 registry configs. Returns ranked options + explanations. |
+| Engines | `engine/` | Public API (SimulationEngine, EngineConfig, EngineResult, TurnPlan). |
+| | `engine/mcts/` | MctsV1 + 5 variants (A-E), tree nodes, rollout policies, support classes. |
+| | `engine/expectimax/` | ExpectimaxEngine. |
+| | `engine/flat/` | FlatMcEngine. |
+| | `engine/heuristic/` | HeuristicEvEngine. |
 | Interface | `iface/` | Engine registry (JSON), routing, result formatting. |
 | Server | `server/` | Java HTTP API (21 endpoints), session management, pre-computation. |
 | H2H | `h2h/` | Engine comparison: match runner, tournament, Glicko-2 ratings, game logging. |
 | UI | `web/` | React 19 + TypeScript + Vite 8 + Tailwind CSS 4. 17 components, 8 hooks, DE/EN. |
 
-**Engine classes:** MctsV1 (base) + 5 variants (A-E), FlatMcEngine, HeuristicEvEngine, ExpectimaxEngine.
+**Engine classes (9 classes, 32 registry configs):** MctsV1 (base) + 5 variants (A-E) in `engine.mcts`, FlatMcEngine in `engine.flat`, HeuristicEvEngine in `engine.heuristic`, ExpectimaxEngine in `engine.expectimax`.
 
 ## Build & Run
 
@@ -105,6 +109,7 @@ These have caused bugs before. Read the Javadoc before touching these areas.
 6. **Funkturm once per turn.** TurnPlan forces "keep" on FunkturmNode after reroll.
 7. **Score convention.** MCTS scores are always from the perspective of the root `playerIndex` (1.0 = win, 0.0 = loss).
 8. **MCTS instant-win short-circuit.** `BuyDecisionNode.instantWinChildIndex` forces selection of a terminal winning child when one exists. `MctsTree.select()` and `bestChild()` both check this field. Do not remove — without it, UCT fails to converge on obvious wins with limited iteration budgets in full-turn trees.
+9. **Rollout instant-win.** All rollout policies (MctsRollout, GreedyRollout, BoltzmannRollout) call `GameState.findInstantWinLandmark()` before any purchase logic. When a player has 3 landmarks and can afford the 4th, the winning landmark is always bought — no randomness, no sampling.
 
 ## Committing
 

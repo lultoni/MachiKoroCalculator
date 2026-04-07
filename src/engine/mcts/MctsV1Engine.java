@@ -1,4 +1,4 @@
-package engine;
+package engine.mcts;
 
 import calcs.Calcs;
 import calcs.RankEntry;
@@ -8,12 +8,10 @@ import core.GameState;
 import core.Player;
 import core.Project;
 import core.ProjectLoader;
-import engine.mcts.BuyDecisionNode;
-import engine.mcts.DiceChoiceNode;
-import engine.mcts.MctsNode;
-import engine.mcts.MctsRollout;
-import engine.mcts.MctsTree;
-import engine.mcts.SupplyTracker;
+import engine.EngineConfig;
+import engine.EngineResult;
+import engine.SimulationEngine;
+import engine.TurnPlan;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -939,10 +937,10 @@ public class MctsV1Engine implements SimulationEngine {
             if (child.visitCount > maxVisits) maxVisits = child.visitCount;
             // Expand and look for special nodes
             for (MctsNode grandchild : child.getChildren()) {
-                if (grandchild instanceof engine.mcts.FunkturmNode) seenFunkturm = true;
-                if (grandchild instanceof engine.mcts.BürohausNode) seenBürohaus = true;
-                if (grandchild instanceof engine.mcts.DiceChoiceNode dc && dc.isBonusTurn) seenBonus = true;
-                if (grandchild instanceof engine.mcts.ChanceNode cn && cn.isBonusTurn) seenBonus = true;
+                if (grandchild instanceof FunkturmNode) seenFunkturm = true;
+                if (grandchild instanceof BürohausNode) seenBürohaus = true;
+                if (grandchild instanceof DiceChoiceNode dc && dc.isBonusTurn) seenBonus = true;
+                if (grandchild instanceof ChanceNode cn && cn.isBonusTurn) seenBonus = true;
             }
         }
         if (seenFunkturm) sb.append(", Funkturm/keep+reroll explored");

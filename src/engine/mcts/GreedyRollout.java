@@ -169,6 +169,14 @@ public final class GreedyRollout {
         Player active = state.getPlayers()[activePlayer];
         int coins = active.getCoins();
 
+        // Instant-win check: if buying a landmark wins the game, buy it immediately.
+        Project winLandmark = GameState.findInstantWinLandmark(active);
+        if (winLandmark != null) {
+            active.setCoins(coins - winLandmark.getCost());
+            active.addProject(winLandmark);
+            return;
+        }
+
         // 1. Landmark priority: buy the cheapest unowned affordable landmark
         int cheapestCost = Integer.MAX_VALUE;
         Project landmarkToBuy = null;

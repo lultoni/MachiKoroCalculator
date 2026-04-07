@@ -1,4 +1,4 @@
-package engine;
+package engine.flat;
 
 import calcs.Calcs;
 import calcs.RankEntry;
@@ -6,6 +6,10 @@ import core.GameState;
 import core.Player;
 import core.Project;
 import core.ProjectLoader;
+import engine.EngineConfig;
+import engine.EngineResult;
+import engine.SimulationEngine;
+import engine.TurnPlan;
 import engine.mcts.MctsRollout;
 import engine.mcts.SupplyTracker;
 

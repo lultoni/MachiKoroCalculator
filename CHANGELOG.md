@@ -6,6 +6,21 @@ Implementation history: what was built, why, and which design decisions were mad
 
 ## Phase 7: Iteration
 
+### 7.35 — Engine Package Reorganisation + Instant-Win Rollout Fix (TODO #24)
+
+**Engine package reorganisation:** Moved all 9 engine implementations into thematic subpackages for better readability. Root `engine/` now contains only the 4 public API classes (SimulationEngine, EngineConfig, EngineResult, TurnPlan).
+
+| Subpackage | Contents |
+|------------|----------|
+| `engine.mcts` | MctsV1Engine + 5 variants (A-E) + tree nodes + rollout policies + support classes |
+| `engine.expectimax` | ExpectimaxEngine |
+| `engine.flat` | FlatMcEngine |
+| `engine.heuristic` | HeuristicEvEngine |
+
+**Instant-win check for rollout policies (TODO #24):** Added `GameState.findInstantWinLandmark(Player)` utility method with O(1) fast-path (only activates when player has exactly 3 landmarks). All 3 rollout policies (MctsRollout, GreedyRollout, BoltzmannRollout) now force-buy the winning landmark instead of risking a random "save" or suboptimal purchase. DepthLimitedRollout inherits the fix via MctsRollout delegation. TurnPlan constructor visibility changed to public for cross-package access.
+
+**Files:** 9 engine files moved, `GameState.java`, `MctsRollout.java`, `GreedyRollout.java`, `BoltzmannRollout.java`, `TurnPlan.java`, `ServerMain.java`, `H2hMain.java`, `TournamentMain.java`, `RuntimeTester.java`.
+
 ### 7.34 — Heuristic Review: WinProbability & Calcs Fixes (TODO #11)
 
 Comprehensive review and fix of all heuristic approximations in Calcs/Core layers, documented in ARCHITECTURE.md Section 7.2.

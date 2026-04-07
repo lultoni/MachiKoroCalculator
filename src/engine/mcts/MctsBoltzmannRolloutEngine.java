@@ -1,9 +1,9 @@
-package engine;
+package engine.mcts;
 
 import core.GameState;
-import engine.mcts.BoltzmannRollout;
-import engine.mcts.MctsTree;
-import engine.mcts.SupplyTracker;
+import engine.EngineConfig;
+import engine.EngineResult;
+import engine.TurnPlan;
 
 /**
  * Variant B engine: MCTS with a Boltzmann (softmax) rollout policy.

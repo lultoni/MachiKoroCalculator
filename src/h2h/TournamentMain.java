@@ -1,6 +1,13 @@
 package h2h;
 
-import engine.*;
+import engine.flat.FlatMcEngine;
+import engine.heuristic.HeuristicEvEngine;
+import engine.mcts.MctsAdaptiveEngine;
+import engine.mcts.MctsBoltzmannRolloutEngine;
+import engine.mcts.MctsDepthLimitedEngine;
+import engine.mcts.MctsGreedyRolloutEngine;
+import engine.mcts.MctsGreedyTreeEngine;
+import engine.mcts.MctsV1Engine;
 import iface.EngineOrchestrator;
 import iface.EngineRegistry;
 import iface.EngineRegistryEntry;

@@ -113,6 +113,33 @@ public class GameState {
     }
 
     /**
+     * Returns an affordable landmark whose purchase would make the player win,
+     * or {@code null} if no such instant-win purchase exists.
+     *
+     * <p>Fast-path: returns immediately when the player does not have exactly 3 landmarks.
+     * The full loop only runs when the player needs exactly 1 more landmark to win.
+     *
+     * <p><b>Does NOT mutate the player.</b> Caller is responsible for applying the purchase.
+     *
+     * @param player the player to check
+     * @return the winning landmark {@link Project}, or {@code null}
+     */
+    public static Project findInstantWinLandmark(Player player) {
+        if (player.getLandmarkCount() != 3) return null;
+
+        int coins = player.getCoins();
+        String[] LANDMARK_IDS = {"bahnhof", "einkaufszentrum", "freizeitpark", "funkturm"};
+        for (String lmId : LANDMARK_IDS) {
+            if (player.hasProject(lmId)) continue;
+            Project lm = ProjectLoader.getProject(lmId).orElse(null);
+            if (lm != null && coins >= lm.getCost()) {
+                return lm;
+            }
+        }
+        return null;
+    }
+
+    /**
      * Returns a structural hash of this game state: player coins, owned card IDs (sorted), and landmarks.
      * Used by the pre-computation cache to detect when the state has changed meaningfully.
      */

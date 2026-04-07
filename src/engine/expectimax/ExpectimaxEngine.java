@@ -1,4 +1,4 @@
-package engine;
+package engine.expectimax;
 
 import calcs.Calcs;
 import calcs.RankEntry;
@@ -9,6 +9,10 @@ import core.Player;
 import core.Project;
 import core.ProjectLoader;
 import core.RollResolver;
+import engine.EngineConfig;
+import engine.EngineResult;
+import engine.SimulationEngine;
+import engine.TurnPlan;
 import engine.mcts.SupplyTracker;
 
 import java.util.ArrayList;

@@ -143,6 +143,14 @@ public final class BoltzmannRollout {
         Player active = state.getPlayers()[activePlayer];
         int coins = active.getCoins();
 
+        // Instant-win check: if buying a landmark wins the game, buy it immediately.
+        Project winLandmark = GameState.findInstantWinLandmark(active);
+        if (winLandmark != null) {
+            active.setCoins(coins - winLandmark.getCost());
+            active.addProject(winLandmark);
+            return;
+        }
+
         // 1. Landmark priority (deterministic — same as greedy)
         int cheapestCost = Integer.MAX_VALUE;
         Project landmarkToBuy = null;

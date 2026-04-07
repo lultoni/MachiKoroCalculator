@@ -1,11 +1,9 @@
-package engine;
+package engine.mcts;
 
-import engine.mcts.DepthLimitedRollout;
-import engine.mcts.MctsTree;
-import engine.mcts.SupplyTracker;
 import core.GameState;
 import engine.EngineConfig;
 import engine.EngineResult;
+import engine.TurnPlan;
 
 /**
  * Variant D: depth-limited rollout with heuristic evaluation.

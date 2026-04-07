@@ -1,9 +1,9 @@
-package engine;
+package engine.mcts;
 
 import core.GameState;
-import engine.mcts.MctsNode;
-import engine.mcts.MctsTree;
-import engine.mcts.SupplyTracker;
+import engine.EngineConfig;
+import engine.EngineResult;
+import engine.TurnPlan;
 
 /**
  * Variant E: adaptive iteration budget.
@@ -68,7 +68,7 @@ public final class MctsAdaptiveEngine extends MctsV1Engine {
 
         boolean hasBahnhof = state.getPlayers()[playerIndex].hasProject("bahnhof");
         int diceCount = 1;
-        if (hasBahnhof && tree.fullTurnRoot instanceof engine.mcts.DiceChoiceNode diceNode) {
+        if (hasBahnhof && tree.fullTurnRoot instanceof DiceChoiceNode diceNode) {
             if (diceNode.expanded && diceNode.getChildren().size() == 2) {
                 MctsNode best = MctsTree.bestChild(diceNode);
                 diceCount = (diceNode.getChildren().indexOf(best) == 1) ? 2 : 1;

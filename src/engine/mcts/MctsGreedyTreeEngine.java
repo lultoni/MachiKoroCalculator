@@ -1,9 +1,6 @@
-package engine;
+package engine.mcts;
 
 import core.GameState;
-import engine.mcts.MctsRollout;
-import engine.mcts.MctsTree;
-import engine.mcts.SupplyTracker;
 
 /**
  * Variant C engine: MCTS with greedy tree selection at {@link engine.mcts.BuyDecisionNode}.

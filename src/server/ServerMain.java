@@ -1,14 +1,14 @@
 package server;
 
-import engine.ExpectimaxEngine;
-import engine.FlatMcEngine;
-import engine.HeuristicEvEngine;
-import engine.MctsAdaptiveEngine;
-import engine.MctsBoltzmannRolloutEngine;
-import engine.MctsDepthLimitedEngine;
-import engine.MctsGreedyRolloutEngine;
-import engine.MctsGreedyTreeEngine;
-import engine.MctsV1Engine;
+import engine.expectimax.ExpectimaxEngine;
+import engine.flat.FlatMcEngine;
+import engine.heuristic.HeuristicEvEngine;
+import engine.mcts.MctsAdaptiveEngine;
+import engine.mcts.MctsBoltzmannRolloutEngine;
+import engine.mcts.MctsDepthLimitedEngine;
+import engine.mcts.MctsGreedyRolloutEngine;
+import engine.mcts.MctsGreedyTreeEngine;
+import engine.mcts.MctsV1Engine;
 import iface.EngineOrchestrator;
 
 /**

@@ -9,7 +9,7 @@ import iface.EngineRegistry;
 import iface.EngineRegistryEntry;
 import iface.EngineOrchestrator;
 import server.ApiServer;
-import engine.MctsV1Engine;
+import engine.mcts.MctsV1Engine;
 import engine.EngineConfig;
 import engine.EngineResult;
 import engine.SimulationEngine;
@@ -247,7 +247,7 @@ public class RuntimeTester {
             MctsV1Engine mctsEngine = new MctsV1Engine();
             EngineConfig fastConfig  = EngineConfig.ofIterations(500);
             core.GameState mctsGs = core.GameState.initial(2);
-            engine.MctsGreedyTreeEngine greedyTreeEngine = new engine.MctsGreedyTreeEngine();
+            engine.mcts.MctsGreedyTreeEngine greedyTreeEngine = new engine.mcts.MctsGreedyTreeEngine();
             test_greedy_tree_returns_nonnull_result(greedyTreeEngine, mctsGs, fastConfig);
             test_greedy_tree_scores_descending(greedyTreeEngine, mctsGs, fastConfig);
             test_greedy_tree_obvious_landmark_buy(greedyTreeEngine);
@@ -257,7 +257,7 @@ public class RuntimeTester {
         runSection("Variant B: Boltzmann Rollout Engine Tests", () -> {
             EngineConfig fastConfig  = EngineConfig.ofIterations(500);
             core.GameState mctsGs = core.GameState.initial(2);
-            engine.MctsBoltzmannRolloutEngine boltzEngine = new engine.MctsBoltzmannRolloutEngine();
+            engine.mcts.MctsBoltzmannRolloutEngine boltzEngine = new engine.mcts.MctsBoltzmannRolloutEngine();
             test_boltzmann_rollout_returns_nonnull_result(boltzEngine, mctsGs, fastConfig);
             test_boltzmann_rollout_includes_save_option(boltzEngine, mctsGs, fastConfig);
             test_boltzmann_rollout_scores_descending(boltzEngine, mctsGs, fastConfig);
@@ -268,7 +268,7 @@ public class RuntimeTester {
         runSection("Variant A: Greedy Rollout Engine Tests", () -> {
             EngineConfig fastConfig  = EngineConfig.ofIterations(500);
             core.GameState mctsGs = core.GameState.initial(2);
-            engine.MctsGreedyRolloutEngine greedyEngine = new engine.MctsGreedyRolloutEngine();
+            engine.mcts.MctsGreedyRolloutEngine greedyEngine = new engine.mcts.MctsGreedyRolloutEngine();
             test_greedy_rollout_returns_nonnull_result(greedyEngine, mctsGs, fastConfig);
             test_greedy_rollout_ranked_options_nonempty(greedyEngine, mctsGs, fastConfig);
             test_greedy_rollout_includes_save_option(greedyEngine, mctsGs, fastConfig);
@@ -280,7 +280,7 @@ public class RuntimeTester {
         runSection("Variant D: Depth-Limited Rollout Engine Tests", () -> {
             EngineConfig fastConfig  = EngineConfig.ofIterations(500);
             core.GameState mctsGs = core.GameState.initial(2);
-            engine.MctsDepthLimitedEngine depthEngine = new engine.MctsDepthLimitedEngine();
+            engine.mcts.MctsDepthLimitedEngine depthEngine = new engine.mcts.MctsDepthLimitedEngine();
             test_depth_limited_returns_nonnull_result(depthEngine, mctsGs, fastConfig);
             test_depth_limited_scores_descending(depthEngine, mctsGs, fastConfig);
             test_depth_limited_obvious_landmark_buy(depthEngine);
@@ -290,7 +290,7 @@ public class RuntimeTester {
         runSection("Variant E: Adaptive Budget Engine Tests", () -> {
             EngineConfig fastConfig  = EngineConfig.ofIterations(500);
             core.GameState mctsGs = core.GameState.initial(2);
-            engine.MctsAdaptiveEngine adaptiveEngine = new engine.MctsAdaptiveEngine();
+            engine.mcts.MctsAdaptiveEngine adaptiveEngine = new engine.mcts.MctsAdaptiveEngine();
             test_adaptive_returns_nonnull_result(adaptiveEngine, mctsGs, fastConfig);
             test_adaptive_scores_descending(adaptiveEngine, mctsGs, fastConfig);
             test_adaptive_obvious_landmark_buy(adaptiveEngine);
@@ -370,14 +370,14 @@ public class RuntimeTester {
             // This ensures any newly added engine passes the universal contract tests.
             EngineOrchestrator orch = new EngineOrchestrator();
             orch.register(new MctsV1Engine());
-            orch.register(new engine.MctsGreedyRolloutEngine());
-            orch.register(new engine.MctsBoltzmannRolloutEngine());
-            orch.register(new engine.MctsGreedyTreeEngine());
-            orch.register(new engine.MctsDepthLimitedEngine());
-            orch.register(new engine.MctsAdaptiveEngine());
-            orch.register(new engine.FlatMcEngine());
-            orch.register(new engine.HeuristicEvEngine());
-            orch.register(new engine.ExpectimaxEngine());
+            orch.register(new engine.mcts.MctsGreedyRolloutEngine());
+            orch.register(new engine.mcts.MctsBoltzmannRolloutEngine());
+            orch.register(new engine.mcts.MctsGreedyTreeEngine());
+            orch.register(new engine.mcts.MctsDepthLimitedEngine());
+            orch.register(new engine.mcts.MctsAdaptiveEngine());
+            orch.register(new engine.flat.FlatMcEngine());
+            orch.register(new engine.heuristic.HeuristicEvEngine());
+            orch.register(new engine.expectimax.ExpectimaxEngine());
 
             // Group registry entries by engineClass to avoid running the same engine multiple times
             Map<String, List<EngineRegistryEntry>> byClass = new HashMap<>();
@@ -1944,19 +1944,19 @@ public class RuntimeTester {
     // =========================================================================
 
     private static void test_mcts_returns_nonnull_result(
-            engine.MctsV1Engine eng, core.GameState gs, engine.EngineConfig cfg) {
+            engine.mcts.MctsV1Engine eng, core.GameState gs, engine.EngineConfig cfg) {
         engine.EngineResult result = eng.evaluate(gs, 0, cfg);
         assertTrue("mcts: evaluate returns non-null EngineResult", result != null);
     }
 
     private static void test_mcts_ranked_options_nonempty(
-            engine.MctsV1Engine eng, core.GameState gs, engine.EngineConfig cfg) {
+            engine.mcts.MctsV1Engine eng, core.GameState gs, engine.EngineConfig cfg) {
         engine.EngineResult result = eng.evaluate(gs, 0, cfg);
         assertTrue("mcts: rankedOptions is non-empty", result != null && !result.rankedOptions.isEmpty());
     }
 
     private static void test_mcts_includes_save_option(
-            engine.MctsV1Engine eng, core.GameState gs, engine.EngineConfig cfg) {
+            engine.mcts.MctsV1Engine eng, core.GameState gs, engine.EngineConfig cfg) {
         engine.EngineResult result = eng.evaluate(gs, 0, cfg);
         boolean hasSave = result.rankedOptions.stream()
                 .anyMatch(o -> "_wait_".equals(o.project.getId()));
@@ -1964,7 +1964,7 @@ public class RuntimeTester {
     }
 
     private static void test_mcts_scores_descending(
-            engine.MctsV1Engine eng, core.GameState gs, engine.EngineConfig cfg) {
+            engine.mcts.MctsV1Engine eng, core.GameState gs, engine.EngineConfig cfg) {
         engine.EngineResult result = eng.evaluate(gs, 0, cfg);
         boolean sorted = true;
         for (int i = 1; i < result.rankedOptions.size(); i++) {
@@ -1977,7 +1977,7 @@ public class RuntimeTester {
     }
 
     private static void test_mcts_affordable_flag_matches_coins(
-            engine.MctsV1Engine eng, core.GameState gs, engine.EngineConfig cfg) {
+            engine.mcts.MctsV1Engine eng, core.GameState gs, engine.EngineConfig cfg) {
         engine.EngineResult result = eng.evaluate(gs, 0, cfg);
         int playerCoins = gs.getPlayers()[0].getCoins();
         boolean allCorrect = true;
@@ -1990,7 +1990,7 @@ public class RuntimeTester {
     }
 
     private static void test_mcts_all_metric_keys_present(
-            engine.MctsV1Engine eng, core.GameState gs, engine.EngineConfig cfg) {
+            engine.mcts.MctsV1Engine eng, core.GameState gs, engine.EngineConfig cfg) {
         engine.EngineResult result = eng.evaluate(gs, 0, cfg);
         engine.EngineResult.Option top = result.topRecommendation();
         assertTrue("mcts: top option has non-null metrics map", top.metrics != null);
@@ -2009,7 +2009,7 @@ public class RuntimeTester {
     }
 
     private static void test_mcts_terminates_within_time_budget(
-            engine.MctsV1Engine eng, core.GameState gs, engine.EngineConfig cfg) {
+            engine.mcts.MctsV1Engine eng, core.GameState gs, engine.EngineConfig cfg) {
         long start = System.currentTimeMillis();
         eng.evaluate(gs, 0, cfg);
         long elapsed = System.currentTimeMillis() - start;
@@ -2017,7 +2017,7 @@ public class RuntimeTester {
                 elapsed < 10_000);
     }
 
-    private static void test_mcts_obvious_landmark_buy(engine.MctsV1Engine eng) {
+    private static void test_mcts_obvious_landmark_buy(engine.mcts.MctsV1Engine eng) {
         // Player has 22 coins and 3 landmarks; only Funkturm (cost 22) is missing.
         // MCTS top recommendation should be Funkturm (the winning move).
         core.Project bahnhof = core.ProjectLoader.getProject("bahnhof").orElseThrow();
@@ -2053,7 +2053,7 @@ public class RuntimeTester {
     }
 
     private static void test_mcts_bürohaus_state_has_swap_children(
-            engine.MctsV1Engine eng, engine.EngineConfig cfg) {
+            engine.mcts.MctsV1Engine eng, engine.EngineConfig cfg) {
         // Build a state where player 0 owns Bürohaus (so BürohausNode should be created on roll 6).
         // debugInfo should confirm multiple swap options were expanded.
         core.Project bürohaus = core.ProjectLoader.getProject("bürohaus").orElseThrow();
@@ -2085,7 +2085,7 @@ public class RuntimeTester {
     }
 
     private static void test_mcts_funkturm_decision_explored(
-            engine.MctsV1Engine eng, engine.EngineConfig cfg) {
+            engine.mcts.MctsV1Engine eng, engine.EngineConfig cfg) {
         // Player owns Funkturm → FunkturmNode should be created; debugInfo should confirm
         // both keep and reroll branches have visitCount > 0.
         core.Project funkturm = core.ProjectLoader.getProject("funkturm").orElseThrow();
@@ -2117,7 +2117,7 @@ public class RuntimeTester {
     }
 
     private static void test_mcts_freizeitpark_bonus_turn_extends_depth(
-            engine.MctsV1Engine eng, engine.EngineConfig cfg) {
+            engine.mcts.MctsV1Engine eng, engine.EngineConfig cfg) {
         // Build two states: one with Freizeitpark + Bahnhof, one without.
         // The tree with Freizeitpark/Bahnhof should have greater depth (bonus turn nodes inserted).
         // We verify via debugInfo mentioning depth or bonus turns.
@@ -2163,7 +2163,7 @@ public class RuntimeTester {
     }
 
     private static void test_mcts_deep_uses_more_iterations_than_fast(
-            engine.MctsV1Engine eng, core.GameState gs,
+            engine.mcts.MctsV1Engine eng, core.GameState gs,
             engine.EngineConfig fastCfg, engine.EngineConfig deepCfg) {
         engine.EngineResult fastResult = eng.evaluate(gs, 0, fastCfg);
         engine.EngineResult deepResult = eng.evaluate(gs, 0, deepCfg);
@@ -2172,7 +2172,7 @@ public class RuntimeTester {
     }
 
     private static void test_mcts_confidence_in_range(
-            engine.MctsV1Engine eng, core.GameState gs, engine.EngineConfig cfg) {
+            engine.mcts.MctsV1Engine eng, core.GameState gs, engine.EngineConfig cfg) {
         engine.EngineResult result = eng.evaluate(gs, 0, cfg);
         boolean inRange = Double.isNaN(result.confidence)
                 || (result.confidence >= 0.0 && result.confidence <= 1.0);
@@ -2180,7 +2180,7 @@ public class RuntimeTester {
     }
 
     private static void test_mcts_visit_count_sums_to_iterations(
-            engine.MctsV1Engine eng, core.GameState gs, engine.EngineConfig cfg) {
+            engine.mcts.MctsV1Engine eng, core.GameState gs, engine.EngineConfig cfg) {
         engine.EngineResult result = eng.evaluate(gs, 0, cfg);
         // Sum of visit counts of all root children should approximately equal iterationsUsed.
         // We allow a small delta for overhead / initialization iterations.
@@ -2203,13 +2203,13 @@ public class RuntimeTester {
     // =========================================================================
 
     private static void test_greedy_tree_returns_nonnull_result(
-            engine.MctsGreedyTreeEngine eng, core.GameState gs, engine.EngineConfig cfg) {
+            engine.mcts.MctsGreedyTreeEngine eng, core.GameState gs, engine.EngineConfig cfg) {
         engine.EngineResult result = eng.evaluate(gs, 0, cfg);
         assertTrue("greedy-tree: evaluate returns non-null EngineResult", result != null);
     }
 
     private static void test_greedy_tree_scores_descending(
-            engine.MctsGreedyTreeEngine eng, core.GameState gs, engine.EngineConfig cfg) {
+            engine.mcts.MctsGreedyTreeEngine eng, core.GameState gs, engine.EngineConfig cfg) {
         engine.EngineResult result = eng.evaluate(gs, 0, cfg);
         boolean sorted = true;
         for (int i = 1; i < result.rankedOptions.size(); i++) {
@@ -2220,7 +2220,7 @@ public class RuntimeTester {
         assertTrue("greedy-tree: rankedOptions scores are non-increasing", sorted);
     }
 
-    private static void test_greedy_tree_obvious_landmark_buy(engine.MctsGreedyTreeEngine eng) {
+    private static void test_greedy_tree_obvious_landmark_buy(engine.mcts.MctsGreedyTreeEngine eng) {
         core.Project bahnhof   = core.ProjectLoader.getProject("bahnhof").orElseThrow();
         core.Project einkauf   = core.ProjectLoader.getProject("einkaufszentrum").orElseThrow();
         core.Project freizeit  = core.ProjectLoader.getProject("freizeitpark").orElseThrow();
@@ -2257,13 +2257,13 @@ public class RuntimeTester {
     // =========================================================================
 
     private static void test_boltzmann_rollout_returns_nonnull_result(
-            engine.MctsBoltzmannRolloutEngine eng, core.GameState gs, engine.EngineConfig cfg) {
+            engine.mcts.MctsBoltzmannRolloutEngine eng, core.GameState gs, engine.EngineConfig cfg) {
         engine.EngineResult result = eng.evaluate(gs, 0, cfg);
         assertTrue("boltzmann-rollout: evaluate returns non-null EngineResult", result != null);
     }
 
     private static void test_boltzmann_rollout_includes_save_option(
-            engine.MctsBoltzmannRolloutEngine eng, core.GameState gs, engine.EngineConfig cfg) {
+            engine.mcts.MctsBoltzmannRolloutEngine eng, core.GameState gs, engine.EngineConfig cfg) {
         engine.EngineResult result = eng.evaluate(gs, 0, cfg);
         boolean hasSave = result.rankedOptions.stream()
                 .anyMatch(o -> "_wait_".equals(o.project.getId()));
@@ -2271,7 +2271,7 @@ public class RuntimeTester {
     }
 
     private static void test_boltzmann_rollout_scores_descending(
-            engine.MctsBoltzmannRolloutEngine eng, core.GameState gs, engine.EngineConfig cfg) {
+            engine.mcts.MctsBoltzmannRolloutEngine eng, core.GameState gs, engine.EngineConfig cfg) {
         engine.EngineResult result = eng.evaluate(gs, 0, cfg);
         boolean sorted = true;
         for (int i = 1; i < result.rankedOptions.size(); i++) {
@@ -2283,7 +2283,7 @@ public class RuntimeTester {
     }
 
     private static void test_boltzmann_rollout_obvious_landmark_buy(
-            engine.MctsBoltzmannRolloutEngine eng) {
+            engine.mcts.MctsBoltzmannRolloutEngine eng) {
         core.Project bahnhof   = core.ProjectLoader.getProject("bahnhof").orElseThrow();
         core.Project einkauf   = core.ProjectLoader.getProject("einkaufszentrum").orElseThrow();
         core.Project freizeit  = core.ProjectLoader.getProject("freizeitpark").orElseThrow();
@@ -2323,20 +2323,20 @@ public class RuntimeTester {
     // =========================================================================
 
     private static void test_greedy_rollout_returns_nonnull_result(
-            engine.MctsGreedyRolloutEngine eng, core.GameState gs, engine.EngineConfig cfg) {
+            engine.mcts.MctsGreedyRolloutEngine eng, core.GameState gs, engine.EngineConfig cfg) {
         engine.EngineResult result = eng.evaluate(gs, 0, cfg);
         assertTrue("greedy-rollout: evaluate returns non-null EngineResult", result != null);
     }
 
     private static void test_greedy_rollout_ranked_options_nonempty(
-            engine.MctsGreedyRolloutEngine eng, core.GameState gs, engine.EngineConfig cfg) {
+            engine.mcts.MctsGreedyRolloutEngine eng, core.GameState gs, engine.EngineConfig cfg) {
         engine.EngineResult result = eng.evaluate(gs, 0, cfg);
         assertTrue("greedy-rollout: rankedOptions is non-empty",
                 result != null && !result.rankedOptions.isEmpty());
     }
 
     private static void test_greedy_rollout_includes_save_option(
-            engine.MctsGreedyRolloutEngine eng, core.GameState gs, engine.EngineConfig cfg) {
+            engine.mcts.MctsGreedyRolloutEngine eng, core.GameState gs, engine.EngineConfig cfg) {
         engine.EngineResult result = eng.evaluate(gs, 0, cfg);
         boolean hasSave = result.rankedOptions.stream()
                 .anyMatch(o -> "_wait_".equals(o.project.getId()));
@@ -2344,7 +2344,7 @@ public class RuntimeTester {
     }
 
     private static void test_greedy_rollout_scores_descending(
-            engine.MctsGreedyRolloutEngine eng, core.GameState gs, engine.EngineConfig cfg) {
+            engine.mcts.MctsGreedyRolloutEngine eng, core.GameState gs, engine.EngineConfig cfg) {
         engine.EngineResult result = eng.evaluate(gs, 0, cfg);
         boolean sorted = true;
         for (int i = 1; i < result.rankedOptions.size(); i++) {
@@ -2356,7 +2356,7 @@ public class RuntimeTester {
         assertTrue("greedy-rollout: rankedOptions scores are non-increasing", sorted);
     }
 
-    private static void test_greedy_rollout_obvious_landmark_buy(engine.MctsGreedyRolloutEngine eng) {
+    private static void test_greedy_rollout_obvious_landmark_buy(engine.mcts.MctsGreedyRolloutEngine eng) {
         // Same obvious-win test as MCTS v1: player has 3 landmarks + 22 coins, only Funkturm missing
         core.Project bahnhof   = core.ProjectLoader.getProject("bahnhof").orElseThrow();
         core.Project einkauf   = core.ProjectLoader.getProject("einkaufszentrum").orElseThrow();
@@ -2402,13 +2402,13 @@ public class RuntimeTester {
     // =========================================================================
 
     private static void test_depth_limited_returns_nonnull_result(
-            engine.MctsDepthLimitedEngine eng, core.GameState gs, engine.EngineConfig cfg) {
+            engine.mcts.MctsDepthLimitedEngine eng, core.GameState gs, engine.EngineConfig cfg) {
         engine.EngineResult result = eng.evaluate(gs, 0, cfg);
         assertTrue("depth-limited: evaluate returns non-null EngineResult", result != null);
     }
 
     private static void test_depth_limited_scores_descending(
-            engine.MctsDepthLimitedEngine eng, core.GameState gs, engine.EngineConfig cfg) {
+            engine.mcts.MctsDepthLimitedEngine eng, core.GameState gs, engine.EngineConfig cfg) {
         engine.EngineResult result = eng.evaluate(gs, 0, cfg);
         boolean sorted = true;
         for (int i = 1; i < result.rankedOptions.size(); i++) {
@@ -2419,7 +2419,7 @@ public class RuntimeTester {
         assertTrue("depth-limited: rankedOptions scores are non-increasing", sorted);
     }
 
-    private static void test_depth_limited_obvious_landmark_buy(engine.MctsDepthLimitedEngine eng) {
+    private static void test_depth_limited_obvious_landmark_buy(engine.mcts.MctsDepthLimitedEngine eng) {
         core.Project bahnhof   = core.ProjectLoader.getProject("bahnhof").orElseThrow();
         core.Project einkauf   = core.ProjectLoader.getProject("einkaufszentrum").orElseThrow();
         core.Project freizeit  = core.ProjectLoader.getProject("freizeitpark").orElseThrow();
@@ -2460,13 +2460,13 @@ public class RuntimeTester {
     // =========================================================================
 
     private static void test_adaptive_returns_nonnull_result(
-            engine.MctsAdaptiveEngine eng, core.GameState gs, engine.EngineConfig cfg) {
+            engine.mcts.MctsAdaptiveEngine eng, core.GameState gs, engine.EngineConfig cfg) {
         engine.EngineResult result = eng.evaluate(gs, 0, cfg);
         assertTrue("adaptive: evaluate returns non-null EngineResult", result != null);
     }
 
     private static void test_adaptive_scores_descending(
-            engine.MctsAdaptiveEngine eng, core.GameState gs, engine.EngineConfig cfg) {
+            engine.mcts.MctsAdaptiveEngine eng, core.GameState gs, engine.EngineConfig cfg) {
         engine.EngineResult result = eng.evaluate(gs, 0, cfg);
         boolean sorted = true;
         for (int i = 1; i < result.rankedOptions.size(); i++) {
@@ -2477,7 +2477,7 @@ public class RuntimeTester {
         assertTrue("adaptive: rankedOptions scores are non-increasing", sorted);
     }
 
-    private static void test_adaptive_obvious_landmark_buy(engine.MctsAdaptiveEngine eng) {
+    private static void test_adaptive_obvious_landmark_buy(engine.mcts.MctsAdaptiveEngine eng) {
         core.Project bahnhof   = core.ProjectLoader.getProject("bahnhof").orElseThrow();
         core.Project einkauf   = core.ProjectLoader.getProject("einkaufszentrum").orElseThrow();
         core.Project freizeit  = core.ProjectLoader.getProject("freizeitpark").orElseThrow();
@@ -2511,7 +2511,7 @@ public class RuntimeTester {
     }
 
     private static void test_adaptive_total_iterations_match_budget(
-            engine.MctsAdaptiveEngine eng, core.GameState gs) {
+            engine.mcts.MctsAdaptiveEngine eng, core.GameState gs) {
         engine.EngineConfig cfg = engine.EngineConfig.ofIterations(500);
         engine.EngineResult result = eng.evaluate(gs, 0, cfg);
         // The adaptive engine runs exactly totalBudget iterations (survey + focused phases)

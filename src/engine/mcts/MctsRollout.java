@@ -267,6 +267,14 @@ public final class MctsRollout {
         Player active = state.getPlayers()[activePlayer];
         int coins = active.getCoins();
 
+        // Instant-win check: if buying a landmark wins the game, buy it immediately.
+        Project winLandmark = GameState.findInstantWinLandmark(active);
+        if (winLandmark != null) {
+            active.setCoins(coins - winLandmark.getCost());
+            active.addProject(winLandmark);
+            return;
+        }
+
         // Count eligible options: 1 (save) + non-landmarks + landmarks
         int count = 1; // save is always option 0
 

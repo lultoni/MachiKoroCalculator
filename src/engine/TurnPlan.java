@@ -76,7 +76,7 @@ public final class TurnPlan {
     private final MctsTree tree;
     private MctsNode currentNode; // tracks our position in the tree
 
-    TurnPlan(MctsTree tree, int diceCount, int iterationsUsed, long computeTimeMs) {
+    public TurnPlan(MctsTree tree, int diceCount, int iterationsUsed, long computeTimeMs) {
         this.tree = tree;
         this.diceCount = diceCount;
         this.iterationsUsed = iterationsUsed;

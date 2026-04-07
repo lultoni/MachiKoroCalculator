@@ -244,7 +244,7 @@ Six engine variants are implemented:
 - **Variant D (depth-limited)**: Stop rollout after N turns, evaluate position via `WinProbability.computeBaselineWinProb`. Faster, quality depends on heuristic.
 - **Variant E (adaptive budget)**: Survey phase (iterations/5), then concentrate remaining budget on close races. Focused subtree exploration via `MctsTree.runIterationsFromNode`.
 
-Each variant has fast/balanced/deep configurations. Total: 32 registry entries across 9 engine classes (6 MCTS + FlatMc + HeuristicEv + Expectimax).
+Each variant has fast/balanced/deep configurations. Total: 32 registry entries across 9 engine classes (6 MCTS in `engine.mcts` + FlatMc in `engine.flat` + HeuristicEv in `engine.heuristic` + Expectimax in `engine.expectimax`).
 
 ### 6.4 Expectimax Engine
 
@@ -323,6 +323,14 @@ Maximum turn limit for rollouts. Games rarely exceed 60–70 turns with reasonab
 **Problem:** In full-turn MCTS trees, the iteration budget is spread across DiceChoice × ChanceNode × BuyDecisionNode branches. A terminal "buy last landmark" child correctly scores 1.0 on every visit, but "save" also accumulates near-1.0 scores because random rollouts eventually buy the landmark. With limited budgets (500-2000 iterations), `bestChild()` (most-visited) may never converge on the winning child.
 
 **Fix:** `BuyDecisionNode.instantWinChildIndex` records any child that creates a terminal winning state during `expand()`. `MctsTree.select()` and `bestChild()` short-circuit to this child unconditionally — an immediate win is always optimal, no exploration needed.
+
+### 7.5 Rollout Instant-Win Detection — FIXED
+
+**Fixed in:** 7.35
+
+**Problem:** MCTS rollout policies (uniform-random, greedy, Boltzmann) did not check for instant-win states. In endgame positions where a simulated player has 3 landmarks and enough coins to buy the 4th, the uniform-random rollout could choose "save" with probability 1/N (where N = number of options), dragging out games and reducing rollout signal quality.
+
+**Fix:** `GameState.findInstantWinLandmark(Player)` — O(1) fast-path when `getLandmarkCount() != 3`. All 3 rollout purchase methods call this before any other logic. DepthLimitedRollout inherits the fix via delegation to MctsRollout.
 
 ---
 

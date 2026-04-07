@@ -1,9 +1,6 @@
-package engine;
+package engine.mcts;
 
 import core.GameState;
-import engine.mcts.GreedyRollout;
-import engine.mcts.MctsTree;
-import engine.mcts.SupplyTracker;
 
 import java.util.List;
 

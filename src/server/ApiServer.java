@@ -113,6 +113,7 @@ public final class ApiServer {
         H2hHandler h2hHandler = new H2hHandler(orchestrator, h2hStore);
         httpServer.createContext("/api/h2h/start",   h2hHandler);
         httpServer.createContext("/api/h2h/status",  h2hHandler);
+        httpServer.createContext("/api/h2h/cancel",  h2hHandler);
         httpServer.createContext("/api/h2h/results", h2hHandler);
         httpServer.createContext("/api/h2h/ratings", h2hHandler);
         httpServer.createContext("/api/h2h/export",  h2hHandler);

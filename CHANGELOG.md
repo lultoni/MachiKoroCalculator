@@ -6,11 +6,13 @@ Implementation history: what was built, why, and which design decisions were mad
 
 ## Phase 7: Iteration
 
-### 7.42 — Fix save-then-buy pattern + tiebreaker + expanded Game Insights (TODO #32, #38)
+### 7.42 — Fix save-then-buy, tiebreaker, stop button, expanded Game Insights (TODO #32, #37, #38)
 
 **Creator Engine: Fix heuristic-only score normalization (TODO #32):** Replaced softmax normalization with linear min-max scaling for heuristic-only mode. Softmax compressed differences between save (0.0) and cards with small positive scores (e.g., 0.01), making them nearly indistinguishable. Linear scaling preserves the natural ordering: save at 0.0 loses to any positive-scored card. With delta-based scoring (#30), cards that genuinely add value now have clearly positive scores and reliably beat save.
 
 **All engines: tempo tiebreaker for tied scores (TODO #38):** Added `EngineResult.OPTION_COMPARATOR` — a standard 4-level comparator used by all 5 engines (MCTS, Expectimax, FlatMc, HeuristicEv, Creator). When options score identically (e.g., all 1.0 for certain wins or all 0.0), the tiebreaker now prefers: (1) landmarks over regular cards, (2) higher-cost cards over cheaper ones. Previously, tied options were in arbitrary insertion order, causing engines to buy random cards instead of game-winning landmarks at 100%.
+
+**H2H: Stop button with live progress feedback (TODO #37):** Running matches can now be stopped from the UI. A red "Stop Match" button appears below the progress bar during a running match. When clicked, the backend signals cancellation to MatchRunner (which already supported a `BooleanSupplier shouldStop` predicate). Running games finish; pending games are cancelled. Partial results are saved and displayed. Button shows "Stopping..." feedback with "Finishing current game..." hint while cancellation is in flight. Backend: new `POST /api/h2h/cancel/{matchId}` endpoint. Frontend: `cancelMatch()` in useH2h hook, cancel button in H2hOverview.
 
 **H2H Game Insights expansion:** Moved events timeline inside the Game Insights section. Added per-player metrics: red card losses, average income/turn, best single-turn income, 1d6/2d6 dice choice breakdown, landmark purchase turn timeline. Replaced plain dots with distinct colored icon badges for event types (★ landmark, ⇄ bürohaus, ↻ funkturm, ⚖ close decision).
 

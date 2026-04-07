@@ -406,12 +406,25 @@ export function H2hOverview({ onBack, projects, language }: Props) {
                 <span>{t('h2h.running')}</span>
                 <span>{h2h.progress.completed} / {h2h.progress.total}</span>
               </div>
-              <div className="w-full bg-machi-bg rounded-full h-3 overflow-hidden">
+              <div className="w-full bg-machi-bg rounded-full h-3 overflow-hidden mb-2">
                 <div
                   className="bg-machi-accent h-full transition-all duration-500 rounded-full"
                   style={{ width: `${(h2h.progress.completed / h2h.progress.total) * 100}%` }}
                 />
               </div>
+              <button
+                onClick={() => h2h.cancelMatch()}
+                disabled={h2h.cancelling}
+                className="w-full bg-red-500/80 text-white font-semibold py-2 rounded-lg
+                           hover:bg-red-500 transition disabled:opacity-60 disabled:cursor-not-allowed text-sm"
+              >
+                {h2h.cancelling ? `${t('h2h.stop')}...` : t('h2h.stop')}
+              </button>
+              {h2h.cancelling && (
+                <p className="text-center text-[10px] text-machi-text-dim/60 mt-1">
+                  {language === 'en' ? 'Finishing current game...' : 'Aktuelles Spiel wird beendet...'}
+                </p>
+              )}
             </div>
           ) : (
             <button

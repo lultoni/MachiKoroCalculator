@@ -6,6 +6,7 @@ export interface H2hState {
   results: H2hMatchSummary[];
   activeMatchId: string | null;
   progress: { completed: number; total: number } | null;
+  cancelling: boolean;
   selectedResult: H2hMatchResult | null;
   selectedGame: H2hGameLog | null;
   loading: boolean;
@@ -17,6 +18,7 @@ export function useH2h() {
     results: [],
     activeMatchId: null,
     progress: null,
+    cancelling: false,
     selectedResult: null,
     selectedGame: null,
     loading: false,
@@ -59,7 +61,7 @@ export function useH2h() {
           if (status.completed) {
             if (pollRef.current) clearInterval(pollRef.current);
             pollRef.current = null;
-            setState(s => ({ ...s, activeMatchId: null, progress: null }));
+            setState(s => ({ ...s, activeMatchId: null, progress: null, cancelling: false }));
             await loadResults();
           }
           if (status.error) {
@@ -117,6 +119,18 @@ export function useH2h() {
     }
   }, [loadResults]);
 
+  const cancelMatch = useCallback(async () => {
+    const matchId = state.activeMatchId;
+    if (!matchId) return;
+    setState(s => ({ ...s, cancelling: true }));
+    try {
+      await api.h2hCancel(matchId);
+      // Polling continues — it will pick up the completed+cancelled status
+    } catch (e: unknown) {
+      setState(s => ({ ...s, error: (e as Error).message, cancelling: false }));
+    }
+  }, [state.activeMatchId]);
+
   // Cleanup polling on unmount
   useEffect(() => {
     return () => {
@@ -128,6 +142,7 @@ export function useH2h() {
     ...state,
     loadResults,
     startMatch,
+    cancelMatch,
     selectResult,
     selectGame,
     clearSelection,

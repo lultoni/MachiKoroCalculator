@@ -123,6 +123,7 @@ const de: Record<string, string> = {
   'h2h.games': 'Spiele',
   'h2h.iterations': 'Iterationen / Eval',
   'h2h.start': 'Match starten',
+  'h2h.stop': 'Match stoppen',
   'h2h.running': 'Läuft...',
   'h2h.results': 'Ergebnisse',
   'h2h.noResults': 'Noch keine Matches gespielt.',

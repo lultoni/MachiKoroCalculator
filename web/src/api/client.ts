@@ -117,6 +117,9 @@ export const h2hStart = (req: H2hStartRequest) =>
 export const h2hStatus = (matchId: string) =>
   json<H2hStatusResponse>(`/api/h2h/status/${matchId}`);
 
+export const h2hCancel = (matchId: string) =>
+  post<{ matchId: string; status: string; gamesCompleted: number }>(`/api/h2h/cancel/${matchId}`, {});
+
 export const h2hResults = () =>
   json<H2hMatchSummary[]>('/api/h2h/results');
 

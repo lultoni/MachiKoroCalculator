@@ -99,6 +99,9 @@ final class H2hHandler implements HttpHandler {
                 handleExport(exchange);
             } else if (path.equals("/api/h2h/import") && "POST".equals(method)) {
                 handleImport(exchange);
+            } else if (path.startsWith("/api/h2h/cancel/") && "POST".equals(method)) {
+                String matchId = path.substring("/api/h2h/cancel/".length());
+                handleCancel(exchange, matchId);
             } else if (path.equals("/api/h2h/auto/start") && "POST".equals(method)) {
                 handleAutoStart(exchange);
             } else if (path.equals("/api/h2h/auto/stop") && "POST".equals(method)) {
@@ -150,7 +153,10 @@ final class H2hHandler implements HttpHandler {
                 MatchRunner runner = new MatchRunner(orchestrator);
                 MatchResult result = runner.runMatch(config, (gameIdx, log) -> {
                     progress.gamesCompleted.incrementAndGet();
-                });
+                }, progress.shouldStop::get);
+                if (progress.shouldStop.get()) {
+                    progress.cancelled = true;
+                }
                 store.save(result);
                 progress.resultId = result.id;
                 progress.completed = true;
@@ -183,12 +189,32 @@ final class H2hHandler implements HttpHandler {
         response.addProperty("gamesCompleted", progress.gamesCompleted.get());
         response.addProperty("gameCount", progress.config.gameCount());
         response.addProperty("completed", progress.completed);
+        response.addProperty("cancelled", progress.cancelled);
         if (progress.error != null) {
             response.addProperty("error", progress.error);
         }
         if (progress.resultId != null) {
             response.addProperty("resultId", progress.resultId);
         }
+        ApiUtils.sendJson(exchange, 200, response);
+    }
+
+    // -------------------------------------------------------------------------
+    // POST /api/h2h/cancel/{matchId}
+    // -------------------------------------------------------------------------
+
+    private void handleCancel(HttpExchange exchange, String matchId) throws IOException {
+        MatchProgress progress = activeMatches.get(matchId);
+        if (progress == null) {
+            ApiUtils.sendError(exchange, 404, "No active match: " + matchId);
+            return;
+        }
+        progress.shouldStop.set(true);
+
+        JsonObject response = new JsonObject();
+        response.addProperty("matchId", matchId);
+        response.addProperty("status", "cancelling");
+        response.addProperty("gamesCompleted", progress.gamesCompleted.get());
         ApiUtils.sendJson(exchange, 200, response);
     }
 
@@ -491,7 +517,9 @@ final class H2hHandler implements HttpHandler {
         final String matchId;
         final MatchConfig config;
         final AtomicInteger gamesCompleted = new AtomicInteger(0);
+        final java.util.concurrent.atomic.AtomicBoolean shouldStop = new java.util.concurrent.atomic.AtomicBoolean(false);
         volatile boolean completed;
+        volatile boolean cancelled;
         volatile String error;
         volatile String resultId;
 

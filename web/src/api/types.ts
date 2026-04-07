@@ -222,6 +222,7 @@ export interface H2hStatusResponse {
   gamesCompleted: number;
   gameCount: number;
   completed: boolean;
+  cancelled?: boolean;
   error?: string;
   resultId?: string;
 }

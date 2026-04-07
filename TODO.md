@@ -17,7 +17,6 @@ Priorisiere in deiner Abarbeitung die wichtigsten Features. Erkenne Abhänigkeit
 | 28 | Creator Engine: Automated H2H weight sweep | Script/tool that runs H2H tournaments varying Creator Engine parameter vectors (31 knobs), records win rates, and converges on optimal weights via grid search or Bayesian optimization. |
 | 29 | Creator Engine: CreatorRollout v2 | Full CreatorScorer heuristic in rollouts (once performance is validated). Add a "rollout-mode" fast-path in CreatorScorer that skips expensive metrics. Profile first to identify bottleneck dimensions. |
 | 35 | Creator Engine soll, wenn es ein Bürohaus besitzt immer eine Low Value Cheap Karte besitzen, sodass es bei einem potentiellen Tausch gut benefittet. | Hier muss aber darauf geachtet werden, dass diese karte für den gegner nicht gut wäre und man selber von der getaschten karte profitiert. |
-| 37 | H2H: Add stop button with live progress feedback | Currently running matches can't be stopped from the UI. Add a cancel button that stops the match mid-run and shows partial results (games completed so far). |
 
 ## Done
 
@@ -25,6 +24,7 @@ Moved here when completed. Full history in CHANGELOG.md.
 
 | # | Task |
 |---|------|
+| 37 | H2H: Stop button with live progress feedback — cancel running matches from UI. |
 | 38 | All engines: tempo tiebreaker when options score identically (landmarks first, cost DESC). |
 | 32 | Creator Engine: Fix early-game save-then-buy pattern — linear normalization replaces softmax. |
 | 30 | Creator Engine: Fix risk/coverage dimension baseline inflation — delta-based scoring. |

@@ -3603,8 +3603,8 @@ public class RuntimeTester {
 
         assertTrue("Creator instant-win: top recommendation is funkturm",
                 "funkturm".equals(result.topRecommendation().project.getId()));
-        assertTrue("Creator instant-win: score is MAX_VALUE",
-                result.topRecommendation().score == Double.MAX_VALUE);
+        assertTrue("Creator instant-win: score is 1.0 (normalized)",
+                result.topRecommendation().score == 1.0);
     }
 
     private static void test_creator_heuristic_only_valid_result() {

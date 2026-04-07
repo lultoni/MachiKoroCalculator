@@ -1,5 +1,7 @@
 package h2h;
 
+import engine.creator.CreatorEngine;
+import engine.expectimax.ExpectimaxEngine;
 import engine.flat.FlatMcEngine;
 import engine.heuristic.HeuristicEvEngine;
 import engine.mcts.MctsAdaptiveEngine;
@@ -62,6 +64,8 @@ public final class H2hMain {
         orchestrator.register(new MctsAdaptiveEngine());
         orchestrator.register(new FlatMcEngine());
         orchestrator.register(new HeuristicEvEngine());
+        orchestrator.register(new ExpectimaxEngine());
+        orchestrator.register(new CreatorEngine());
 
         MatchConfig config = new MatchConfig(
                 new String[]{engineA, engineB}, games, maxTurns, iterations, true);

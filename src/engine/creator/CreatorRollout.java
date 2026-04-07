@@ -48,9 +48,6 @@ public final class CreatorRollout {
     private static final double DISCOUNT = 0.95;
     private static final int    EV_CACHE_REFRESH = 40;
 
-    /** Minimum marginal EV multiplied by geometric sum for a landmark to be worth buying. */
-    private static final double LANDMARK_MIN_VALUE = 0.5;
-
     private CreatorRollout() {}
 
     /**
@@ -150,11 +147,12 @@ public final class CreatorRollout {
     // =====================================================================
 
     /**
-     * Creator purchase policy: instant-win → best-value landmark → best net-EV card → save.
+     * Creator purchase policy: instant-win → cheapest affordable landmark → best net-EV card → save.
      *
-     * <p>Unlike GreedyRollout, landmarks are NOT always bought cheapest-first. Each landmark
-     * is evaluated by its marginal EV contribution to the current portfolio. A landmark that
-     * doesn't help (e.g., Bahnhof when no 7-12 cards exist) is skipped.
+     * <p>Landmarks use cheapest-first ordering (like GreedyRollout) with a coverage check:
+     * Bahnhof is skipped if the player has no non-red cards activating on 7-12. This avoids
+     * the expensive per-turn marginal-EV analysis while preserving the key Creator insight
+     * that Bahnhof without high-range cards is wasteful.
      */
     private static void applyPurchase(GameState state, SupplyTracker.MutableSupplyTracker supply,
                                       int activePlayer, EvCache evCache) {
@@ -169,33 +167,19 @@ public final class CreatorRollout {
             return;
         }
 
-        // 2. Best-value landmark (not cheapest-first)
-        int numPlayers = state.getPlayers().length;
-        int[] oppCoins = CardIncome.buildOpponentCoins(state.getPlayers(), activePlayer);
-        CardIncome.PlayerStats baseStats = CardIncome.PlayerStats.of(active);
-
+        // 2. Cheapest affordable landmark (skip Bahnhof without 7-12 coverage)
         Project bestLandmark = null;
-        double bestLandmarkValue = LANDMARK_MIN_VALUE;
-
+        int bestCost = Integer.MAX_VALUE;
         for (String lmId : LANDMARK_IDS) {
             if (active.hasProject(lmId)) continue;
             Project lm = ProjectLoader.getProject(lmId).orElse(null);
             if (lm == null || coins < lm.getCost()) continue;
-
-            // Compute marginal EV of this landmark
-            CardIncome.PlayerStats withLm = baseStats.withExtra(lm);
-            double evBefore = CardIncome.playerEvPerRound(active, numPlayers, oppCoins);
-
-            // Temporarily add landmark to compute EV
-            active.addProject(lm);
-            double evAfter = CardIncome.playerEvPerRound(active, numPlayers, oppCoins);
-            active.removeProject(lm);
-
-            double marginalEv = evAfter - evBefore;
-            double landmarkValue = marginalEv * Calcs.geometricSum(HORIZON, DISCOUNT);
-
-            if (landmarkValue > bestLandmarkValue) {
-                bestLandmarkValue = landmarkValue;
+            // Skip Bahnhof if no non-red 7-12 cards
+            if ("bahnhof".equals(lmId) && !hasHigh7to12Card(active)) continue;
+            // Skip Freizeitpark if player doesn't own Bahnhof (doubles only with 2d6)
+            if ("freizeitpark".equals(lmId) && !active.hasProject("bahnhof")) continue;
+            if (lm.getCost() < bestCost) {
+                bestCost = lm.getCost();
                 bestLandmark = lm;
             }
         }

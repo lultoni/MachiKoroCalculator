@@ -104,8 +104,8 @@ public final class CreatorEngine implements SimulationEngine {
             boolean isInstantWin = sc.compositeScore == Double.MAX_VALUE;
 
             if (isSave) {
-                // Save option: no post-state needed for MC (uses base state)
-                CandidateOption opt = new CandidateOption(sc.card, state, baseSupply, false,
+                // Save option: excluded from MC — competes on heuristic score (0.0)
+                CandidateOption opt = new CandidateOption(sc.card, state, baseSupply, false, true,
                         sc.compositeScore, sc.metrics, sc.factors, true);
                 candidates.add(opt);
                 continue;
@@ -124,7 +124,7 @@ public final class CreatorEngine implements SimulationEngine {
                     ? baseSupply : baseSupply.withPurchase(sc.card.getId());
 
             if (isInstantWin) {
-                CandidateOption opt = new CandidateOption(sc.card, childState, childSupply, true,
+                CandidateOption opt = new CandidateOption(sc.card, childState, childSupply, true, false,
                         sc.compositeScore, sc.metrics, sc.factors, canAfford);
                 opt.wins = 1;
                 opt.samples = 1;
@@ -132,7 +132,7 @@ public final class CreatorEngine implements SimulationEngine {
                 continue;
             }
 
-            CandidateOption opt = new CandidateOption(sc.card, childState, childSupply, false,
+            CandidateOption opt = new CandidateOption(sc.card, childState, childSupply, false, false,
                     sc.compositeScore, sc.metrics, sc.factors, canAfford);
             opt.unaffordable = !canAfford;
             candidates.add(opt);
@@ -153,10 +153,14 @@ public final class CreatorEngine implements SimulationEngine {
             usedMC = true;
             RolloutFn rolloutFn = selectRolloutFn(config);
 
-            // Separate affordable candidates for MC sampling
+            // Separate affordable non-save candidates for MC sampling.
+            // Save is excluded: its heuristic score (0.0) competes against MC win rates,
+            // so save only wins when MC shows all cards have <0% marginal value.
+            // Including save in MC would make it indistinguishable from card purchases
+            // because the rollout immediately buys cards on the player's next turn.
             List<CandidateOption> mcCandidates = new ArrayList<>();
             for (CandidateOption c : candidates) {
-                if (!c.unaffordable && !c.isInstantWin) mcCandidates.add(c);
+                if (!c.unaffordable && !c.isInstantWin && !c.isSave) mcCandidates.add(c);
             }
 
             if (!mcCandidates.isEmpty()) {
@@ -260,15 +264,19 @@ public final class CreatorEngine implements SimulationEngine {
     // =====================================================================
 
     private RolloutFn selectRolloutFn(EngineConfig config) {
-        String policy = config.extra != null ? config.extra.getOrDefault("rolloutPolicy", "creator") : "creator";
+        // Default: uniform (MctsRollout). The Creator's smart rollout policy is too deterministic
+        // for flat MC differentiation — all candidates converge to the same win rate because
+        // the one-card difference is swamped by identical greedy play over ~50+ turns.
+        // Uniform rollouts preserve enough variance to differentiate candidates.
+        String policy = config.extra != null ? config.extra.getOrDefault("rolloutPolicy", "uniform") : "uniform";
         switch (policy) {
             case "greedy":    return GreedyRollout::simulate;
-            case "uniform":   return MctsRollout::simulate;
+            case "creator":   return CreatorRollout::simulate;
             case "boltzmann": {
                 double temp = CreatorScorer.readDouble(config, "rolloutTemperature", 0.7);
                 return BoltzmannRollout.withTemperature(temp);
             }
-            default:          return CreatorRollout::simulate;
+            default:          return MctsRollout::simulate;
         }
     }
 
@@ -281,14 +289,33 @@ public final class CreatorEngine implements SimulationEngine {
                                      boolean usedMC, long phase1Ms) {
         List<EngineResult.Option> options = new ArrayList<>();
 
+        // Score assignment strategy:
+        // - Instant-win: 1.0
+        // - MC-sampled candidates: MC win rate (already in [0,1])
+        // - Save (when MC active): 0.0 (last resort — only wins if no card has positive value)
+        // - Non-MC candidates when MC is OFF: softmax-normalize heuristic scores to [0,1]
+        // - Unaffordable candidates: softmax-normalize alongside above
+        double softmaxDenom = 0.0;
+        boolean heuristicOnly = !usedMC;
+        if (heuristicOnly) {
+            for (CandidateOption c : candidates) {
+                if (c.isInstantWin) continue;
+                softmaxDenom += Math.exp(c.heuristicScore);
+            }
+        }
+
         for (CandidateOption c : candidates) {
             double finalScore;
             if (c.isInstantWin) {
-                finalScore = Double.MAX_VALUE;
+                finalScore = 1.0;
             } else if (usedMC && c.samples > 0) {
                 finalScore = c.winRate();
+            } else if (heuristicOnly && softmaxDenom > 0) {
+                finalScore = Math.exp(c.heuristicScore) / softmaxDenom;
             } else {
-                finalScore = c.heuristicScore;
+                // Save or unaffordable when MC is active: score 0.0
+                // These compete below any MC-validated purchase
+                finalScore = 0.0;
             }
 
             boolean isSave = c.card == RankEntry.WAIT_SENTINEL;
@@ -316,11 +343,7 @@ public final class CreatorEngine implements SimulationEngine {
         if (options.size() >= 2) {
             double top = options.get(0).score;
             double second = options.get(1).score;
-            if (top != Double.MAX_VALUE) {
-                confidence = Math.max(0.0, Math.min(1.0, top - second));
-            } else {
-                confidence = 1.0;
-            }
+            confidence = Math.max(0.0, Math.min(1.0, top - second));
         }
 
         String debugInfo = String.format("creator | %d options | phase1=%dms | mc=%s | total=%dms",
@@ -338,6 +361,7 @@ public final class CreatorEngine implements SimulationEngine {
         final GameState postState;
         final SupplyTracker postSupply;
         final boolean isInstantWin;
+        final boolean isSave;
         final double heuristicScore;
         final Map<String, String> metrics;
         final List<EngineResult.ExplanationFactor> structuredFactors;
@@ -347,7 +371,7 @@ public final class CreatorEngine implements SimulationEngine {
         double wins = 0.0;
 
         CandidateOption(Project card, GameState postState, SupplyTracker postSupply,
-                        boolean isInstantWin, double heuristicScore,
+                        boolean isInstantWin, boolean isSave, double heuristicScore,
                         Map<String, String> metrics,
                         List<EngineResult.ExplanationFactor> structuredFactors,
                         boolean affordable) {
@@ -355,6 +379,7 @@ public final class CreatorEngine implements SimulationEngine {
             this.postState = postState;
             this.postSupply = postSupply;
             this.isInstantWin = isInstantWin;
+            this.isSave = isSave;
             this.heuristicScore = heuristicScore;
             this.metrics = metrics;
             this.structuredFactors = structuredFactors;

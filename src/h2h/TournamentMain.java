@@ -1,5 +1,7 @@
 package h2h;
 
+import engine.creator.CreatorEngine;
+import engine.expectimax.ExpectimaxEngine;
 import engine.flat.FlatMcEngine;
 import engine.heuristic.HeuristicEvEngine;
 import engine.mcts.MctsAdaptiveEngine;
@@ -85,6 +87,8 @@ public final class TournamentMain {
         orchestrator.register(new MctsAdaptiveEngine());
         orchestrator.register(new FlatMcEngine());
         orchestrator.register(new HeuristicEvEngine());
+        orchestrator.register(new ExpectimaxEngine());
+        orchestrator.register(new CreatorEngine());
 
         // Select engines
         List<String> engineIds;

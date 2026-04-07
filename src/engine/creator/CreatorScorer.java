@@ -2,7 +2,6 @@ package engine.creator;
 
 import calcs.Calcs;
 import calcs.RankEntry;
-import calcs.WinProbability;
 import core.CardIncome;
 import core.GameState;
 import core.Player;
@@ -128,11 +127,6 @@ public final class CreatorScorer {
     private static final double DEFAULT_THREAT_SHARPNESS = 1.0;
 
     // =====================================================================
-    // Save scoring defaults
-    // =====================================================================
-
-    private static final double DEFAULT_SAVE_DISCOUNT = 0.90;
-
     // =====================================================================
     // ROI horizon defaults
     // =====================================================================
@@ -193,7 +187,8 @@ public final class CreatorScorer {
         double[] effectiveWeights = computeEffectiveWeights(baseWeights, situation, sigmoidK, config);
 
         // ---- Apply gravity wells ----
-        String activeWell = applyGravityWells(gs, playerIndex, effectiveWeights, config);
+        GravityWellResult wellResult = applyGravityWells(gs, playerIndex, effectiveWeights, config);
+        String activeWell = wellResult.activeWell;
 
         // ---- Score all candidates ----
         List<ScoredCandidate> affordableCards = new ArrayList<>();
@@ -206,7 +201,8 @@ public final class CreatorScorer {
             if ("lila".equals(p.getColor()) && active.hasProject(p.getId())) continue;
             boolean canAfford = coins >= p.getCost();
             ScoredCandidate sc = scoreCard(gs, playerIndex, p, supply, effectiveWeights,
-                    numPlayers, situation, activeWell, canAfford, false, config);
+                    numPlayers, situation, activeWell, canAfford, false, config,
+                    wellResult.sprintIntensity);
             allCandidates.add(sc);
             if (canAfford) affordableCards.add(sc); else unaffordableCards.add(sc);
         }
@@ -237,7 +233,8 @@ public final class CreatorScorer {
             }
 
             ScoredCandidate sc = scoreCard(gs, playerIndex, lm, supply, effectiveWeights,
-                    numPlayers, situation, activeWell, canAfford, true, config);
+                    numPlayers, situation, activeWell, canAfford, true, config,
+                    wellResult.sprintIntensity);
             allCandidates.add(sc);
             if (canAfford) affordableCards.add(sc); else unaffordableCards.add(sc);
         }
@@ -322,14 +319,28 @@ public final class CreatorScorer {
     // =====================================================================
 
     /**
+     * Result of applying gravity wells. Contains the active well name and the sprint
+     * intensity for use in landmark bonus calculations.
+     */
+    static final class GravityWellResult {
+        final String activeWell;
+        final double sprintIntensity;
+
+        GravityWellResult(String activeWell, double sprintIntensity) {
+            this.activeWell = activeWell;
+            this.sprintIntensity = sprintIntensity;
+        }
+    }
+
+    /**
      * Applies gravity wells as multiplicative modifiers to the effective weights.
-     * Returns the name of the active gravity well, or "none".
+     * Returns the result including the active gravity well name and sprint intensity.
      *
      * <p>Gravity wells ramp gradually with configurable sharpness. The win-sprint and
      * threat-response wells do NOT snap on/off — they smoothly increase influence as
      * the triggering condition strengthens.
      */
-    static String applyGravityWells(GameState gs, int playerIndex,
+    static GravityWellResult applyGravityWells(GameState gs, int playerIndex,
                                      double[] weights, EngineConfig config) {
         Player active = gs.getPlayers()[playerIndex];
         int numPlayers = gs.getPlayers().length;
@@ -364,10 +375,12 @@ public final class CreatorScorer {
 
         // ---- Apply the strongest well ----
         String activeWell = "none";
+        double finalSprintIntensity = 0.0;
 
         if (sprintIntensity > 0.01 || threatIntensity > 0.01) {
             if (sprintIntensity >= threatIntensity) {
                 activeWell = "win-sprint";
+                finalSprintIntensity = sprintIntensity;
                 weights[DIM_WINPROB] *= (1.0 + 2.0 * sprintIntensity);
                 weights[DIM_TEMPO]   *= (1.0 + 2.0 * sprintIntensity);
                 weights[DIM_INCOME]  *= (1.0 - 0.7 * sprintIntensity);
@@ -379,7 +392,7 @@ public final class CreatorScorer {
             }
         }
 
-        return activeWell;
+        return new GravityWellResult(activeWell, finalSprintIntensity);
     }
 
     // =====================================================================
@@ -390,16 +403,19 @@ public final class CreatorScorer {
                                               SupplyTracker supply, double[] weights,
                                               int numPlayers, double situation,
                                               String activeWell, boolean affordable,
-                                              boolean isLandmark, EngineConfig config) {
+                                              boolean isLandmark, EngineConfig config,
+                                              double sprintIntensity) {
         // ---- Compute dimension raw values ----
+        // Compute roiOverHorizon first — it internally computes evPerRound and portfolioDeltaEV,
+        // which we reuse to avoid redundant Calcs calls (saves ~3 full recomputations per card).
+        RankEntry roi = Calcs.roiOverHorizon(gs, playerIndex, card, ROI_HORIZON, ROI_DISCOUNT);
 
-        // Income dimension: evPerRound + portfolioDeltaEV
-        double evPerRound = Calcs.evPerRound(gs, playerIndex, card);
-        double portfolioDelta = Calcs.portfolioDeltaEV(gs, playerIndex, card);
+        // Income dimension: evPerRound + portfolioDeltaEV (extracted from roi)
+        double evPerRound = roi.evPerRound;
+        double portfolioDelta = roi.portfolioDeltaEV;
         double incomeTerm = evPerRound + portfolioDelta;
 
         // Risk dimension: CVaR + (1 - probNoIncomeRound) + correlation diversity
-        RankEntry roi = Calcs.roiOverHorizon(gs, playerIndex, card, ROI_HORIZON, ROI_DISCOUNT);
         double cvar = Calcs.conditionalValueAtRisk(gs, playerIndex, card, CVAR_ALPHA);
         double probNoIncome = roi.probNoIncomeRound;
         double rollCorr = Calcs.rollCorrelation(gs, playerIndex, card);
@@ -412,18 +428,53 @@ public final class CreatorScorer {
         double coverageDensity = computeCoverageDensity(gs, playerIndex, card);
         double coverageTerm = entropy + coverageDensity;
 
-        // Tempo dimension
-        double tempo = Calcs.tempoAdvantage(gs, playerIndex, card);
+        // Tempo dimension — inline computation using values we already have,
+        // avoiding 2 redundant evPerRound calls inside Calcs.tempoAdvantage()
+        double playerEtw = evPerRound > 1e-9 ? Math.max(0.0, remainingLandmarkCost(gs.getPlayers()[playerIndex]) - gs.getPlayers()[playerIndex].getCoins()) / evPerRound : Double.MAX_VALUE;
+        double opponentMinEtw = Double.MAX_VALUE;
+        for (int i = 0; i < numPlayers; i++) {
+            if (i == playerIndex) continue;
+            double oppEtw = Calcs.estimatedTurnsToWin(gs, i, RankEntry.WAIT_SENTINEL);
+            if (oppEtw < opponentMinEtw) opponentMinEtw = oppEtw;
+        }
+        double tempo = opponentMinEtw == Double.MAX_VALUE ? 0.0 : opponentMinEtw - playerEtw;
 
         // Win probability dimension
         double winProbDelta = Calcs.estimateWinProbDelta(gs, playerIndex, card);
 
         // Landmark dimension: use winProbDelta as proxy for landmark marginal value
         // For non-landmarks this is 0
-        double landmarkValue = isLandmark ? winProbDelta * 10.0 : 0.0;
+        // Bahnhof penalty: scale by [7..12] coverage density — near-zero if no high cards
+        // Freizeitpark penalty: near-zero if player doesn't own Bahnhof (doubles only with 2d6)
+        double landmarkValue;
+        if (!isLandmark) {
+            landmarkValue = 0.0;
+        } else if ("bahnhof".equals(card.getId())) {
+            double highCoverage = computeHighRangeCoverage(gs.getPlayers()[playerIndex]);
+            landmarkValue = winProbDelta * 10.0 * highCoverage;
+        } else if ("freizeitpark".equals(card.getId())) {
+            boolean hasBahnhof = gs.getPlayers()[playerIndex].hasProject("bahnhof");
+            landmarkValue = hasBahnhof ? winProbDelta * 10.0 : 0.0;
+        } else {
+            landmarkValue = winProbDelta * 10.0;
+        }
 
-        // Urgency dimension
-        double urgency = Calcs.purchaseUrgency(gs, playerIndex, card, supply);
+        // Urgency dimension — inline to avoid redundant portfolioDeltaEV call
+        double urgency;
+        if (portfolioDelta <= 0.0) {
+            urgency = 0.0;
+        } else {
+            int remaining = supply.getCount(card.getId());
+            double scarcity = CreatorScorer.clamp01(1.0 - (double) remaining / GameState.SUPPLY_PER_CARD);
+            long opponentDemand = 0;
+            Player[] players = gs.getPlayers();
+            for (int i = 0; i < players.length; i++) {
+                if (i == playerIndex) continue;
+                if (players[i].getCoins() >= card.getCost()) opponentDemand++;
+            }
+            double demandNorm = (double) opponentDemand / Math.max(1, players.length - 1);
+            urgency = portfolioDelta * scarcity * demandNorm;
+        }
 
         // ROI dimension
         double roiVal = roi.roiOverHorizon;
@@ -437,6 +488,13 @@ public final class CreatorScorer {
         double compositeScore = 0.0;
         for (int d = 0; d < NUM_DIMS; d++) {
             compositeScore += weights[d] * rawValues[d];
+        }
+
+        // Win-sprint landmark boost: when sprinting, affordable landmarks get a massive
+        // bonus proportional to sprint intensity. This ensures the engine buys landmarks
+        // to close out the game rather than continuing to build income.
+        if (isLandmark && affordable && sprintIntensity > 0.01) {
+            compositeScore *= (1.0 + 5.0 * sprintIntensity);
         }
 
         // ---- Metrics map (explainability) ----
@@ -485,57 +543,17 @@ public final class CreatorScorer {
                                               List<ScoredCandidate> affordable,
                                               List<ScoredCandidate> unaffordable,
                                               EngineConfig config) {
-        double saveDiscount = readDouble(config, "saveDiscount", DEFAULT_SAVE_DISCOUNT);
-
-        Player active = gs.getPlayers()[playerIndex];
-        int coins = active.getCoins();
-        int numPlayers = gs.getPlayers().length;
-        int[] oppCoins = CardIncome.buildOpponentCoins(gs.getPlayers(), playerIndex);
-        double portfolioEv = CardIncome.playerEvPerRound(active, numPlayers, oppCoins);
-
-        // Find best affordable and best unaffordable scores
-        double bestAffordableScore = Double.NEGATIVE_INFINITY;
-        for (ScoredCandidate sc : affordable) {
-            if (sc.compositeScore > bestAffordableScore) bestAffordableScore = sc.compositeScore;
-        }
-
-        double bestUnaffordableScore = Double.NEGATIVE_INFINITY;
-        int bestUnaffordableCost = 0;
-        for (ScoredCandidate sc : unaffordable) {
-            if (sc.compositeScore > bestUnaffordableScore) {
-                bestUnaffordableScore = sc.compositeScore;
-                bestUnaffordableCost = sc.card.getCost();
-            }
-        }
-
-        // Compute save value
-        double saveValue;
-        String saveReason;
-        if (bestUnaffordableScore > Double.NEGATIVE_INFINITY && portfolioEv > 0.01) {
-            double turnsToAfford = Math.max(1.0, (bestUnaffordableCost - coins) / portfolioEv);
-            double discountedValue = bestUnaffordableScore * Math.pow(saveDiscount, turnsToAfford);
-            saveValue = discountedValue;
-            saveReason = String.format("Saving toward %d-cost card (%.1f turns, discounted score %.4f)",
-                    bestUnaffordableCost, turnsToAfford, discountedValue);
-        } else {
-            saveValue = -1.0; // No attractive save target
-            saveReason = "No valuable unaffordable target to save for";
-        }
-
-        // If all affordable options are negative, save wins by default
-        if (bestAffordableScore < 0 && saveValue < 0) {
-            saveValue = 0.0;
-            saveReason = "All options negative; saving is the safest choice";
-        }
+        // Save scores 0.0 — it only wins when all affordable cards score negative.
+        // This follows the proven HeuristicEvEngine pattern. The MC phase will validate
+        // whether saving actually leads to better outcomes via rollout simulation.
+        double saveValue = 0.0;
+        String saveReason = "Save baseline (wins only if no affordable card scores positive)";
 
         Map<String, String> metrics = new LinkedHashMap<>();
         metrics.put("compositeScore", fmt(saveValue));
         metrics.put("situation", fmt(situation));
         metrics.put("activeGravityWell", activeWell);
         metrics.put("saveReason", saveReason);
-        metrics.put("bestAffordableScore", fmt(bestAffordableScore));
-        metrics.put("bestUnaffordableScore", fmt(bestUnaffordableScore));
-        metrics.put("portfolioEvPerRound", fmt(portfolioEv));
         metrics.put("cost", "0");
 
         List<EngineResult.ExplanationFactor> factors = List.of(
@@ -548,6 +566,24 @@ public final class CreatorScorer {
     // =====================================================================
     // Coverage density
     // =====================================================================
+
+    /**
+     * Returns the fraction of non-red cards the player owns that activate in the [7..12] range.
+     * Used to penalize Bahnhof when the player has no high-range cards.
+     *
+     * @return 0.0 if no 7-12 non-red cards exist, up to 1.0 if many do
+     */
+    private static double computeHighRangeCoverage(Player player) {
+        int highCards = 0;
+        for (Project card : player.getOwned_projects()) {
+            if ("rot".equals(card.getColor()) || "gelb".equals(card.getColor())) continue;
+            for (int act : card.getDice_activation()) {
+                if (act >= 7 && act <= 12) { highCards++; break; }
+            }
+        }
+        // Normalize: 0 cards → 0.0, 3+ cards → 1.0
+        return Math.min(1.0, highCards / 3.0);
+    }
 
     /**
      * Computes the fraction of roll values (1-12) that produce income for this player

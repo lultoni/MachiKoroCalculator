@@ -1,5 +1,6 @@
 package h2h;
 
+import engine.creator.CreatorEngine;
 import engine.expectimax.ExpectimaxEngine;
 import engine.flat.FlatMcEngine;
 import engine.heuristic.HeuristicEvEngine;
@@ -67,6 +68,7 @@ public final class BenchmarkMain {
         orchestrator.register(new FlatMcEngine());
         orchestrator.register(new HeuristicEvEngine());
         orchestrator.register(new ExpectimaxEngine());
+        orchestrator.register(new CreatorEngine());
 
         // Load existing H2H results and compute ratings
         H2hResultStore store = new H2hResultStore();

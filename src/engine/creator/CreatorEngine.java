@@ -106,7 +106,7 @@ public final class CreatorEngine implements SimulationEngine {
             if (isSave) {
                 // Save option: excluded from MC — competes on heuristic score (0.0)
                 CandidateOption opt = new CandidateOption(sc.card, state, baseSupply, false, true,
-                        sc.compositeScore, sc.metrics, sc.factors, true);
+                        sc.compositeScore, sc.metrics, sc.factors, true, sc.activationGuard);
                 candidates.add(opt);
                 continue;
             }
@@ -125,7 +125,7 @@ public final class CreatorEngine implements SimulationEngine {
 
             if (isInstantWin) {
                 CandidateOption opt = new CandidateOption(sc.card, childState, childSupply, true, false,
-                        sc.compositeScore, sc.metrics, sc.factors, canAfford);
+                        sc.compositeScore, sc.metrics, sc.factors, canAfford, sc.activationGuard);
                 opt.wins = 1;
                 opt.samples = 1;
                 candidates.add(opt);
@@ -133,7 +133,7 @@ public final class CreatorEngine implements SimulationEngine {
             }
 
             CandidateOption opt = new CandidateOption(sc.card, childState, childSupply, false, false,
-                    sc.compositeScore, sc.metrics, sc.factors, canAfford);
+                    sc.compositeScore, sc.metrics, sc.factors, canAfford, sc.activationGuard);
             opt.unaffordable = !canAfford;
             candidates.add(opt);
         }
@@ -158,9 +158,13 @@ public final class CreatorEngine implements SimulationEngine {
             // so save only wins when MC shows all cards have <0% marginal value.
             // Including save in MC would make it indistinguishable from card purchases
             // because the rollout immediately buys cards on the player's next turn.
+            // Cards with activationGuard == 0.0 are also excluded: they can't activate
+            // on own turns (7-12 without Bahnhof) and would get artificially inflated
+            // MC win rates from the rollout policy eventually buying Bahnhof.
             List<CandidateOption> mcCandidates = new ArrayList<>();
             for (CandidateOption c : candidates) {
-                if (!c.unaffordable && !c.isInstantWin && !c.isSave) mcCandidates.add(c);
+                if (!c.unaffordable && !c.isInstantWin && !c.isSave
+                        && c.activationGuard > 0.0) mcCandidates.add(c);
             }
 
             if (!mcCandidates.isEmpty()) {
@@ -312,10 +316,17 @@ public final class CreatorEngine implements SimulationEngine {
                 finalScore = c.winRate();
             } else if (heuristicOnly && softmaxDenom > 0) {
                 finalScore = Math.exp(c.heuristicScore) / softmaxDenom;
-            } else {
-                // Save or unaffordable when MC is active: score 0.0
-                // These compete below any MC-validated purchase
+                // Apply activation guard: cards that can't activate get score pushed below save
+                if (c.activationGuard <= 0.0 && !c.isSave) {
+                    finalScore = -1.0;
+                }
+            } else if (c.isSave) {
+                // Save when MC is active: score 0.0 (last resort)
                 finalScore = 0.0;
+            } else {
+                // Unaffordable or activation-guarded cards when MC is active: score -1.0
+                // Negative score ensures they rank below save (0.0)
+                finalScore = -1.0;
             }
 
             boolean isSave = c.card == RankEntry.WAIT_SENTINEL;
@@ -366,6 +377,7 @@ public final class CreatorEngine implements SimulationEngine {
         final Map<String, String> metrics;
         final List<EngineResult.ExplanationFactor> structuredFactors;
         final boolean affordable;
+        final double activationGuard;
         boolean unaffordable = false;
         int samples = 0;
         double wins = 0.0;
@@ -374,7 +386,7 @@ public final class CreatorEngine implements SimulationEngine {
                         boolean isInstantWin, boolean isSave, double heuristicScore,
                         Map<String, String> metrics,
                         List<EngineResult.ExplanationFactor> structuredFactors,
-                        boolean affordable) {
+                        boolean affordable, double activationGuard) {
             this.card = card;
             this.postState = postState;
             this.postSupply = postSupply;
@@ -384,6 +396,7 @@ public final class CreatorEngine implements SimulationEngine {
             this.metrics = metrics;
             this.structuredFactors = structuredFactors;
             this.affordable = affordable;
+            this.activationGuard = activationGuard;
         }
 
         double winRate() {

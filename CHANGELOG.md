@@ -6,6 +6,27 @@ Implementation history: what was built, why, and which design decisions were mad
 
 ## Phase 7: Iteration
 
+### 7.41 — Creator Engine: Delta-based risk/coverage + 7-12 activation guard (TODO #30, #31)
+
+**Fix risk/coverage dimension baseline inflation (TODO #30):** CreatorScorer's `riskTerm` and `coverageTerm` now compute **delta-based** values (after minus before adding the card) instead of absolute portfolio metrics. Baselines are computed once per `scoreAll()` call using `WAIT_SENTINEL`:
+- `cvarDelta = CVaR(with card) − CVaR(baseline)` — positive means card improves worst-case income.
+- `probNoIncomeDelta = baseline_probNoIncome − probNoIncome(with card)` — positive means card reduces no-income probability.
+- `entropyDelta = entropy(with card) − entropy(baseline)` — positive means card improves income distribution.
+- `coverageDelta = coverage(with card) − coverage(baseline)` — positive means card covers more roll values.
+
+Previously, a zero-income card (e.g., Möbelfabrik with 0 production cards) got a positive composite score because `(1−probNoIncome)` and `coverageDensity` reflected portfolio quality, not the card's marginal contribution. Now these score 0 on risk/coverage dimensions.
+
+**Penalize 7-12 cards without Bahnhof (TODO #31):** Cards that only activate on rolls 7-12 have their composite score scaled by an `activationGuard` factor:
+- Green cards: `0.0` without own Bahnhof (no own-turn income).
+- Blue cards: `0.5 × oppFrac2d6` without own Bahnhof (only opponent-turn value, scaled by fraction of opponents using 2d6); `1.0` with own Bahnhof.
+- Red cards: `oppFrac2d6` — scales by fraction of opponents likely to use 2d6.
+- `oppFrac2d6 = count(opponents with Bahnhof + non-red 7-12 cards) / totalOpponents`. Scales to 3-4 player games.
+- Cards with `activationGuard = 0.0` are excluded from MC sampling and score `-1.0` (below save) in the final result to prevent the MC phase from inflating their win rates via rollouts that eventually buy Bahnhof.
+
+`fractionOpponents2d6()` computes the fraction of opponents who own Bahnhof AND have non-red 7-12 cards (incentive to choose 2d6).
+
+**Files:** `CreatorScorer.java` (delta baselines, activation guard, opponent 2d6 check), `CreatorEngine.java` (MC exclusion, score=-1.0 for guarded cards, activationGuard field in CandidateOption), `ARCHITECTURE.md`.
+
 ### 7.40 — H2H Replay Engine Decision Details + Affordable Purchase Fix (TODO #33)
 
 **Engine decision details in H2H replay (TODO #33):** Each turn in the H2H game replay now has a collapsible "Decision detail" / "Entscheidungsdetails" section showing the top-5 buy alternatives the engine evaluated, with score bars, chosen-option highlighting, iteration count, and confidence (when available). Works for all 10 engine classes:

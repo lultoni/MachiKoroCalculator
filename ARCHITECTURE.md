@@ -297,13 +297,22 @@ All four weights configurable via `EngineConfig.extra` (`sitLandmark`, `sitIncom
 | Dimension | Default base | Source |
 |-----------|-------------|--------|
 | income | 2.5 | evPerRound + portfolioDeltaEV |
-| risk | 2.0 | CVaR(10%) + probNoIncome + correlation diversity |
-| coverage | 1.5 | incomeEntropy + coverage density |
+| risk | 2.0 | ΔCVaR(10%) + ΔprobNoIncome + correlation diversity |
+| coverage | 1.5 | ΔincomeEntropy + Δcoverage density |
 | tempo | 2.0 | tempoAdvantage |
 | winProb | 3.0 | estimateWinProbDelta |
 | landmark | 2.0 | dynamic landmark value (EV-based) |
 | urgency | 1.0 | purchaseUrgency (scarcity) |
 | roi | 1.5 | roiOverHorizon(horizon=5, γ=0.95) |
+
+Risk and coverage dimensions are **delta-based**: each measures the card's marginal improvement over the current portfolio baseline (computed once via `WAIT_SENTINEL`). A card that doesn't change the portfolio's risk profile or roll coverage scores 0 on those dimensions. This prevents baseline inflation where useless cards (e.g., Möbelfabrik with 0 production cards) scored positive purely from existing portfolio quality.
+
+**7-12 Activation Guard:** Non-landmark cards that only activate on rolls 7-12 have their composite score scaled by an `activationGuard` factor:
+- Green (own-turn): `0.0` without own Bahnhof (can't trigger on own turn).
+- Blue (all turns): `0.5 × oppFrac2d6` without own Bahnhof (only opponent-turn value remains, scaled by fraction of opponents using 2d6); `1.0` with own Bahnhof.
+- Red (opponent turns): `oppFrac2d6` — scales by fraction of opponents likely to use 2d6.
+- `oppFrac2d6 = count(opponents with Bahnhof + non-red 7-12 cards) / totalOpponents`.
+- Cards with `activationGuard = 0.0` are excluded from MC sampling to prevent inflated win rates from rollouts eventually buying Bahnhof.
 
 Each weight has a situational multiplier: `effectiveWeight = baseWeight × (low + (high − low) × sigmoid(k × (situation − 0.5)))`. Multipliers shift with game situation (e.g., income emphasis decreases as situation rises).
 

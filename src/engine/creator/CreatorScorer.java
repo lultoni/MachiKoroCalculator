@@ -148,16 +148,19 @@ public final class CreatorScorer {
         public final Map<String, String> metrics;
         public final List<EngineResult.ExplanationFactor> factors;
         public final boolean affordable;
+        /** 1.0 = fully active, 0.0 = card can't activate on own turns (7-12 without Bahnhof). */
+        public final double activationGuard;
 
         ScoredCandidate(Project card, double compositeScore,
                         Map<String, String> metrics,
                         List<EngineResult.ExplanationFactor> factors,
-                        boolean affordable) {
+                        boolean affordable, double activationGuard) {
             this.card = card;
             this.compositeScore = compositeScore;
             this.metrics = metrics;
             this.factors = factors;
             this.affordable = affordable;
+            this.activationGuard = activationGuard;
         }
     }
 
@@ -190,6 +193,17 @@ public final class CreatorScorer {
         GravityWellResult wellResult = applyGravityWells(gs, playerIndex, effectiveWeights, config);
         String activeWell = wellResult.activeWell;
 
+        // ---- Compute baselines for delta-based dimensions ----
+        // Risk and coverage dimensions must measure the card's MARGINAL contribution,
+        // not the absolute portfolio quality. Compute "before" values once using
+        // WAIT_SENTINEL (inert no-op card), then each card computes "after" values.
+        // Delta = after - before. A card that doesn't change risk/coverage scores 0.
+        double baselineCvar = Calcs.conditionalValueAtRisk(gs, playerIndex, RankEntry.WAIT_SENTINEL, CVAR_ALPHA);
+        double baselineEntropy = Calcs.incomeEntropy(gs, playerIndex, RankEntry.WAIT_SENTINEL);
+        double baselineCoverageDensity = computeCoverageDensity(gs, playerIndex, RankEntry.WAIT_SENTINEL);
+        RankEntry baselineRoi = Calcs.roiOverHorizon(gs, playerIndex, RankEntry.WAIT_SENTINEL, ROI_HORIZON, ROI_DISCOUNT);
+        double baselineProbNoIncome = baselineRoi.probNoIncomeRound;
+
         // ---- Score all candidates ----
         List<ScoredCandidate> affordableCards = new ArrayList<>();
         List<ScoredCandidate> unaffordableCards = new ArrayList<>();
@@ -202,7 +216,8 @@ public final class CreatorScorer {
             boolean canAfford = coins >= p.getCost();
             ScoredCandidate sc = scoreCard(gs, playerIndex, p, supply, effectiveWeights,
                     numPlayers, situation, activeWell, canAfford, false, config,
-                    wellResult.sprintIntensity);
+                    wellResult.sprintIntensity,
+                    baselineCvar, baselineProbNoIncome, baselineEntropy, baselineCoverageDensity);
             allCandidates.add(sc);
             if (canAfford) affordableCards.add(sc); else unaffordableCards.add(sc);
         }
@@ -226,7 +241,7 @@ public final class CreatorScorer {
                     new EngineResult.ExplanationFactor("winRate", 1.0,
                         "Buying this landmark wins the game immediately.",
                         "Player has 3 landmarks and can afford the 4th."));
-                ScoredCandidate sc = new ScoredCandidate(lm, Double.MAX_VALUE, metrics, factors, true);
+                ScoredCandidate sc = new ScoredCandidate(lm, Double.MAX_VALUE, metrics, factors, true, 1.0);
                 allCandidates.add(sc);
                 affordableCards.add(sc);
                 continue;
@@ -234,7 +249,8 @@ public final class CreatorScorer {
 
             ScoredCandidate sc = scoreCard(gs, playerIndex, lm, supply, effectiveWeights,
                     numPlayers, situation, activeWell, canAfford, true, config,
-                    wellResult.sprintIntensity);
+                    wellResult.sprintIntensity,
+                    baselineCvar, baselineProbNoIncome, baselineEntropy, baselineCoverageDensity);
             allCandidates.add(sc);
             if (canAfford) affordableCards.add(sc); else unaffordableCards.add(sc);
         }
@@ -404,7 +420,9 @@ public final class CreatorScorer {
                                               int numPlayers, double situation,
                                               String activeWell, boolean affordable,
                                               boolean isLandmark, EngineConfig config,
-                                              double sprintIntensity) {
+                                              double sprintIntensity,
+                                              double baselineCvar, double baselineProbNoIncome,
+                                              double baselineEntropy, double baselineCoverageDensity) {
         // ---- Compute dimension raw values ----
         // Compute roiOverHorizon first — it internally computes evPerRound and portfolioDeltaEV,
         // which we reuse to avoid redundant Calcs calls (saves ~3 full recomputations per card).
@@ -415,18 +433,26 @@ public final class CreatorScorer {
         double portfolioDelta = roi.portfolioDeltaEV;
         double incomeTerm = evPerRound + portfolioDelta;
 
-        // Risk dimension: CVaR + (1 - probNoIncomeRound) + correlation diversity
+        // Risk dimension: delta-based CVaR + delta probNoIncome + correlation diversity
+        // Each component measures the card's MARGINAL improvement over the current portfolio.
+        // A card that doesn't change risk profile scores 0 on cvarDelta and probNoIncomeDelta.
         double cvar = Calcs.conditionalValueAtRisk(gs, playerIndex, card, CVAR_ALPHA);
         double probNoIncome = roi.probNoIncomeRound;
         double rollCorr = Calcs.rollCorrelation(gs, playerIndex, card);
         if (Double.isNaN(rollCorr)) rollCorr = 0.0;
-        // Higher is better: good CVaR (less negative), low probNoIncome, low correlation
-        double riskTerm = cvar + (1.0 - probNoIncome) + (1.0 - rollCorr) / 2.0;
+        double cvarDelta = cvar - baselineCvar;               // positive = card improves worst-case income
+        double probNoIncomeDelta = baselineProbNoIncome - probNoIncome; // positive = card reduces no-income probability
+        // rollCorrelation is already delta-like (card-alone vs portfolio): low correlation = good diversification
+        double riskTerm = cvarDelta + probNoIncomeDelta + (1.0 - rollCorr) / 2.0;
 
-        // Coverage dimension: entropy + coverage density
+        // Coverage dimension: delta-based entropy + delta coverage density
+        // Measures the card's marginal improvement to roll coverage and income distribution.
+        // A card that doesn't expand coverage or improve entropy scores 0.
         double entropy = Calcs.incomeEntropy(gs, playerIndex, card);
         double coverageDensity = computeCoverageDensity(gs, playerIndex, card);
-        double coverageTerm = entropy + coverageDensity;
+        double entropyDelta = entropy - baselineEntropy;
+        double coverageDelta = coverageDensity - baselineCoverageDensity;
+        double coverageTerm = entropyDelta + coverageDelta;
 
         // Tempo dimension — inline computation using values we already have,
         // avoiding 2 redundant evPerRound calls inside Calcs.tempoAdvantage()
@@ -497,6 +523,45 @@ public final class CreatorScorer {
             compositeScore *= (1.0 + 5.0 * sprintIntensity);
         }
 
+        // ---- 7-12 activation guard ----
+        // Cards that ONLY activate on rolls 7-12 need specific conditions to be useful:
+        // - Green (own turn): needs OWN Bahnhof to choose 2d6. Fully penalized without it.
+        // - Blue (all turns): works on own turn with Bahnhof, or opponent turns with opponent 2d6.
+        //   Guard scales by fraction of opponents likely to use 2d6 (scalable to 3-4 players).
+        // - Red (opponent turns): guard scales by fraction of opponents likely to use 2d6.
+        // This does NOT prevent building toward a 2d6 strategy: once Bahnhof is owned,
+        // the guard is inactive and these cards score normally.
+        double activationGuard = 1.0;
+        if (!isLandmark) {
+            boolean onlyHighRoll = true;
+            for (int act : card.getDice_activation()) {
+                if (act >= 1 && act <= 6) { onlyHighRoll = false; break; }
+            }
+            if (onlyHighRoll && card.getDice_activation().length > 0) {
+                boolean ownBahnhof = gs.getPlayers()[playerIndex].hasProject("bahnhof");
+                double oppFrac2d6 = fractionOpponents2d6(gs, playerIndex);
+                String color = card.getColor();
+                if ("grün".equals(color)) {
+                    // Green: own-turn only, needs own Bahnhof
+                    activationGuard = ownBahnhof ? 1.0 : 0.0;
+                } else if ("blau".equals(color)) {
+                    // Blue: activates on all turns. Own turn (weight ~0.5) needs own Bahnhof;
+                    // opponent turns (weight ~0.5) scale by fraction of opponents using 2d6.
+                    // Without own Bahnhof, only opponent-turn value remains.
+                    if (ownBahnhof) {
+                        activationGuard = 1.0;
+                    } else {
+                        // Scale by opponent 2d6 fraction: 0 opponents → 0.0, all opponents → ~0.5
+                        activationGuard = 0.5 * oppFrac2d6;
+                    }
+                } else if ("rot".equals(color)) {
+                    // Red: opponent-turn only, scales by fraction of opponents using 2d6
+                    activationGuard = oppFrac2d6;
+                }
+                compositeScore *= activationGuard;
+            }
+        }
+
         // ---- Metrics map (explainability) ----
         Map<String, String> metrics = new LinkedHashMap<>();
         metrics.put("compositeScore", fmt(compositeScore));
@@ -507,11 +572,15 @@ public final class CreatorScorer {
         metrics.put("incomeTerm", fmt(incomeTerm));
         metrics.put("roiOverHorizon", fmt(roiVal));
         metrics.put("cvar_10pct", fmt(cvar));
+        metrics.put("cvarDelta", fmt(cvarDelta));
         metrics.put("probNoIncomeRound", fmt(probNoIncome));
+        metrics.put("probNoIncomeDelta", fmt(probNoIncomeDelta));
         metrics.put("rollCorrelation", fmt(rollCorr));
         metrics.put("riskTerm", fmt(riskTerm));
         metrics.put("incomeEntropy", fmt(entropy));
+        metrics.put("entropyDelta", fmt(entropyDelta));
         metrics.put("coverageDensity", fmt(coverageDensity));
+        metrics.put("coverageDelta", fmt(coverageDelta));
         metrics.put("coverageTerm", fmt(coverageTerm));
         metrics.put("tempoAdvantage", fmt(tempo));
         metrics.put("winProbDelta", fmt(winProbDelta));
@@ -519,6 +588,9 @@ public final class CreatorScorer {
         metrics.put("purchaseUrgency", fmt(urgency));
         metrics.put("cost", String.valueOf(card.getCost()));
         metrics.put("isLandmark", String.valueOf(isLandmark));
+        if (activationGuard < 1.0) {
+            metrics.put("activationGuard", fmt(activationGuard));
+        }
         for (int d = 0; d < NUM_DIMS; d++) {
             metrics.put("w_" + DIM_NAMES[d], fmt(weights[d]));
         }
@@ -530,7 +602,7 @@ public final class CreatorScorer {
         }
         List<EngineResult.ExplanationFactor> factors = buildTopFactors(contributions, rawValues, weights, 3);
 
-        return new ScoredCandidate(card, compositeScore, metrics, factors, affordable);
+        return new ScoredCandidate(card, compositeScore, metrics, factors, affordable, activationGuard);
     }
 
     // =====================================================================
@@ -560,7 +632,42 @@ public final class CreatorScorer {
             new EngineResult.ExplanationFactor("cost", 0.5, saveReason,
                 "Save compares discounted future value of best unaffordable card against best current option."));
 
-        return new ScoredCandidate(RankEntry.WAIT_SENTINEL, saveValue, metrics, factors, true);
+        return new ScoredCandidate(RankEntry.WAIT_SENTINEL, saveValue, metrics, factors, true, 1.0);
+    }
+
+    // =====================================================================
+    // Opponent 2d6 likelihood
+    // =====================================================================
+
+    /**
+     * Returns the fraction of opponents likely to choose 2d6 (roll 7-12).
+     * An opponent is considered likely to use 2d6 if they own Bahnhof AND have at least
+     * one non-red card activating on rolls 7-12 (meaning they have own-turn income
+     * incentive to roll 2d6). Without Bahnhof they can't choose 2d6; without 7-12
+     * non-red cards they have no reason to.
+     *
+     * @return fraction in [0, 1]: 0 opponents → 0.0, all opponents → 1.0
+     */
+    private static double fractionOpponents2d6(GameState gs, int playerIndex) {
+        int oppCount = 0;
+        int likely2d6 = 0;
+        for (int i = 0; i < gs.getPlayers().length; i++) {
+            if (i == playerIndex) continue;
+            oppCount++;
+            Player opp = gs.getPlayers()[i];
+            if (!opp.hasProject("bahnhof")) continue;
+            // Check if opponent has non-red 7-12 cards (incentive to use 2d6)
+            boolean hasHighCards = false;
+            for (Project card : opp.getOwned_projects()) {
+                if ("rot".equals(card.getColor()) || "gelb".equals(card.getColor())) continue;
+                for (int act : card.getDice_activation()) {
+                    if (act >= 7 && act <= 12) { hasHighCards = true; break; }
+                }
+                if (hasHighCards) break;
+            }
+            if (hasHighCards) likely2d6++;
+        }
+        return oppCount > 0 ? (double) likely2d6 / oppCount : 0.0;
     }
 
     // =====================================================================

@@ -6,6 +6,14 @@ Implementation history: what was built, why, and which design decisions were mad
 
 ## Phase 7: Iteration
 
+### 7.48 — Sweep: infinite mode, per-trial checkpointing, shutdown hook; README revamp
+
+**SweepMain: run indefinitely with safe Ctrl+C.** Added `--infinite` flag (also `--trials 0`) that sets trials to `Integer.MAX_VALUE`. A JVM shutdown hook prints the top-results summary and flushes in-progress state when the process is interrupted. The `saveIntermediateResults()` stub (previously a no-op print) is replaced by calling `SweepResult.saveOrUpdate()` after **every completed trial** — so Ctrl+C never loses work regardless of when it fires.
+
+**SweepResult: `saveOrUpdate()` for stable-ID persistence.** New method replaces an existing `SweepRun` entry in the JSON file by matching its `id` field, preventing duplicate entries when the same run is written incrementally. The `SweepRun` constructor now accepts an explicit `id` parameter (overload keeps the auto-UUID convenience constructor). All writes are synchronized.
+
+**README fully revamped.** Removed the stale tournament section (TournamentMain is a dev tool, not a user-facing workflow). Reorganised around the three main user journeys: purchase advisor, auto-battle H2H, and parameter sweep. Simplified Quick Start to three commands. Added dedicated sync sections for both H2H results and sweep results across devices. Removed obsolete engine counts and phase markers.
+
 ### 7.47 — Creator Engine: Automated H2H Weight Sweep via TPE (TODO #28)
 
 **New CLI tool: `h2h.SweepMain`** — automated parameter optimization for the Creator Engine using Tree-structured Parzen Estimator (Bayesian optimization). Sweeps over 20 configurable CreatorScorer parameters (8 base weights, 6 situation assessment weights, sigmoid sharpness, 4 gravity well params, Bürohaus swap weight) by running H2H matches against a fixed opponent and maximizing win rate.

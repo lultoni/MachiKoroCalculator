@@ -11,16 +11,17 @@ Phases 1–6 complete. The app is a fully functional web-based Machi Koro purcha
 **What works today:**
 - All 19 base-game cards with correct income rules
 - Turn-by-turn game tracking with undo and session persistence
-- 9 engine classes with 32 configurations (6 MCTS variants, Flat Monte Carlo, Heuristic EV, Expectimax)
+- 10 engine classes with 35 configurations (6 MCTS variants, Flat Monte Carlo, Heuristic EV, Expectimax, Creator Engine)
 - 11 advanced statistical metrics (Sharpe, Sortino, Kelly, VaR/CVaR, HHI, entropy, IG, ETW, tempo, urgency, roll correlation)
 - Weighted structured explanations with expandable detail per purchase option (9 factor categories)
 - Passive-turn insights panel with ETW bars, tempo, supply warnings, narrative guidance
 - Background pre-computation during opponent turns for instant results
 - Head-to-head engine testing: full games where all decisions (dice, Funkturm, Bürohaus, purchase) come from real MCTS tree search
-- H2H match runner with parallel game execution, mid-match seat swapping, CLI runner, round-robin tournament with leaderboard + matrix, REST API, and visual replay UI
+- H2H match runner with parallel game execution, mid-match seat swapping, CLI runner, round-robin tournament with leaderboard + matrix, auto battle mode, REST API, and visual game replay UI
+- Automated Creator Engine parameter sweep via TPE (Bayesian optimization)
 - Web SPA (React 19 + TypeScript + Vite 8 + Tailwind CSS 4) with full DE/EN localization
-- 21 REST API endpoints (game state, session management, engine evaluation, insights, pre-computation, H2H testing, Glicko-2 ratings)
-- 470+ test assertions across 30 test sections
+- 22 REST API endpoints (game state, session management, engine evaluation, insights, pre-computation, H2H testing, Glicko-2 ratings)
+- 480+ test assertions across 30 test sections
 
 **What's next:**
 - UI refinement based on real gameplay
@@ -67,7 +68,7 @@ java -cp "out:src:gson-2.11.0.jar" h2h.TournamentMain --tier fast --games 50
 java -cp "out:src:gson-2.11.0.jar" h2h.TournamentMain \
   --engines mcts-v1-fast,mcts-v1-depth3,mcts-v1-greedy-tree-fast --games 20
 
-# Tournament with ALL 32 engines (warning: may take hours)
+# Tournament with ALL 35 engines (warning: may take hours)
 java -cp "out:src:gson-2.11.0.jar" h2h.TournamentMain --unleashed --games 30
 ```
 
@@ -81,9 +82,9 @@ UI (Web SPA) → Interface (orchestration) → Simulation Engines → Standard C
 
 - **Core** — game rules only: state, cards, dice, income, turn order, win condition
 - **Standard Calcs** — reusable math: EV, ROI, probability, variance, 11 advanced risk/tempo metrics
-- **Simulation Engines** — pluggable strategy: 9 engine classes with 32 configurations
+- **Simulation Engines** — pluggable strategy: 10 engine classes with 35 configurations
 - **Interface** — engine registry (JSON), request routing, result formatting
-- **UI** — React 19 SPA (17 components, 8 hooks) with Java HTTP API backend (21 endpoints)
+- **UI** — React 19 SPA (17 components, 8 hooks) with Java HTTP API backend (22 endpoints)
 
 See `NORTH-STAR.md` for the complete specification.
 
@@ -132,7 +133,7 @@ java -cp "out:src:gson-2.11.0.jar" h2h.TournamentMain --tier deep --games 20
 
 ### All Engines — The Full Run (~days)
 
-All 32 engines across all tiers. 496 matchups. Only for when you really want the complete picture:
+All 35 engines across all tiers. 595 matchups. Only for when you really want the complete picture:
 ```bash
 java -cp "out:src:gson-2.11.0.jar" h2h.TournamentMain --unleashed --games 30
 ```
@@ -143,7 +144,7 @@ java -cp "out:src:gson-2.11.0.jar" h2h.TournamentMain --unleashed --games 30
 |------|---------|-------------|
 | `--tier <fast\|balanced\|deep>` | `fast` | Select engines by performance tier |
 | `--engines <id1,id2,...>` | — | Select specific engines by ID |
-| `--unleashed` | — | All 32 engines |
+| `--unleashed` | — | All 35 engines |
 | `--games <n>` | 50 | Games per matchup (split across seat swap) |
 | `--iterations <n>` | 0 | Override MCTS iterations (0 = registry default) |
 | `--maxTurns <n>` | 200 | Max turns per game |
@@ -167,6 +168,64 @@ The tournament prints four sections on completion (or on Ctrl+C for partial resu
 - Press **Ctrl+C** at any time — the runner prints results from all completed matchups
 - Seat swapping eliminates first-player advantage: half the games each engine plays as P1, half as P2
 - Games that hit the turn limit (200) use softmax win probability as a tiebreaker (no draws)
+
+## Creator Engine Parameter Sweep
+
+The sweep tool uses TPE (Tree-structured Parzen Estimator) to automatically optimize the Creator Engine's 20 scoring parameters. It runs H2H matches with different parameter vectors and converges on high-win-rate configurations.
+
+All commands below assume you've compiled first:
+```bash
+javac -cp "src:gson-2.11.0.jar" -d out $(find src -name "*.java")
+```
+
+### Quick Smoke Test (~1 min)
+
+Verify the sweep tool works. 5 trials, 20 games each:
+```bash
+java -cp "out:src:gson-2.11.0.jar" h2h.SweepMain --trials 5 --games 20
+```
+
+### Standard Sweep (~30-60 min)
+
+100 trials with 50 games each. The first 20 trials use Latin Hypercube Sampling for uniform coverage, then TPE guides the remaining 80:
+```bash
+java -cp "out:src:gson-2.11.0.jar" h2h.SweepMain --trials 100 --games 50
+```
+
+### Against a Specific Opponent
+
+Default opponent is `heuristic-ev-default` (instant, good heuristic play). For tougher calibration:
+```bash
+java -cp "out:src:gson-2.11.0.jar" h2h.SweepMain \
+  --opponent mcts-v1-fast --trials 50 --games 100 --seed 42
+```
+
+### Resume a Previous Sweep
+
+Results are saved to `data/sweep-results.json`. Resume with `--resume`:
+```bash
+java -cp "out:src:gson-2.11.0.jar" h2h.SweepMain --trials 200 --resume
+```
+
+### Options Reference
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--trials <n>` | 100 | Total evaluation trials |
+| `--games <n>` | 50 | Games per trial match |
+| `--creator <id>` | `creator-fast` | Creator engine registry ID |
+| `--opponent <id>` | `heuristic-ev-default` | Opponent engine ID |
+| `--iterations <n>` | 0 | Override iterations (0 = registry default) |
+| `--startup <n>` | 20 | Random trials before TPE kicks in |
+| `--gamma <f>` | 0.25 | TPE good/bad split quantile |
+| `--seed <n>` | random | Random seed for reproducibility |
+| `--resume` | — | Continue from existing sweep-results.json |
+| `--no-default` | — | Skip evaluating default params as trial 0 |
+| `--help` | — | Show usage with parameter space listing |
+
+### Output
+
+The sweep prints progress per trial and a ranked top-10 summary at the end, including a ready-to-use `engines.json` config snippet for the best parameter vector found.
 
 ## Multi-Machine H2H Testing
 

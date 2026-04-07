@@ -6,6 +6,23 @@ Implementation history: what was built, why, and which design decisions were mad
 
 ## Phase 7: Iteration
 
+### 7.47 — Creator Engine: Automated H2H Weight Sweep via TPE (TODO #28)
+
+**New CLI tool: `h2h.SweepMain`** — automated parameter optimization for the Creator Engine using Tree-structured Parzen Estimator (Bayesian optimization). Sweeps over 20 configurable CreatorScorer parameters (8 base weights, 6 situation assessment weights, sigmoid sharpness, 4 gravity well params, Bürohaus swap weight) by running H2H matches against a fixed opponent and maximizing win rate.
+
+**Key components:**
+- `TpeSampler.java` — TPE implementation: 1D Gaussian KDE per dimension, good/bad observation splitting, l(x)/g(x) acquisition function, Latin Hypercube Sampling for startup trials. ~200 lines, no external dependencies.
+- `SweepResult.java` — Trial data model + JSON serialization to `data/sweep-results.json`. Supports appending multiple sweep runs and resuming.
+- `SweepMain.java` — CLI entry point: parameter space definition, trial loop with progress output, MatchConfig integration via `configOverrides`, ranked top-10 summary with ready-to-use `engines.json` snippet.
+
+**Design decisions:**
+- TPE over GP: 20 dimensions makes Gaussian Processes impractical (need ARD with 22+ hyperparameters). TPE models each dimension independently, scales well, is noise-robust, and needs ~150 lines vs 400+ for robust GP.
+- Single opponent default (`heuristic-ev-default`) for speed (~2s per trial at 500 iterations). Configurable via `--opponent`.
+- Latin Hypercube Sampling for startup (uniform coverage) before TPE kicks in.
+- Trial 0 always evaluates default params as a baseline reference.
+
+**README updated** with sweep tool quick-start commands. **TODO.md updated** with future ideas: per-player-count tuned variants (#40), multi-opponent sweep (#41), progressive refinement (#42), sweep visualization UI (#43).
+
 ### 7.46 — CreatorRollout v3: Coverage bonus + save-toward-landmark (TODO #29 continued)
 
 **CreatorRollout v3: Two strategic enhancements over GreedyRollout.** After v2 (7.45) established that the Creator rollout was functionally identical to GreedyRollout (50-50 head-to-head), v3 adds two lightweight heuristics that give Creator a measurable edge:

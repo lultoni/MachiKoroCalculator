@@ -6,6 +6,33 @@ Implementation history: what was built, why, and which design decisions were mad
 
 ## Phase 7: Iteration
 
+### 7.46 — CreatorRollout v3: Coverage bonus + save-toward-landmark (TODO #29 continued)
+
+**CreatorRollout v3: Two strategic enhancements over GreedyRollout.** After v2 (7.45) established that the Creator rollout was functionally identical to GreedyRollout (50-50 head-to-head), v3 adds two lightweight heuristics that give Creator a measurable edge:
+
+1. **Coverage bonus** (`COVERAGE_BONUS=0.15`): Cards activating on roll values the player doesn't currently cover get a bonus proportional to `newCoverage × 0.15 × cardEV`. Uses a bitmask of covered rolls (excluding red/landmark cards). Encourages portfolio diversification across dice outcomes rather than stacking the same activation numbers.
+
+2. **Save-toward-landmark** (`SAVE_THRESHOLD_RATIO=0.3`): When within 4 coins of the next unowned landmark and the best card's net value is below 30% of that landmark's cost, the rollout saves instead of buying a marginal card. Prevents wasteful 1-2 coin purchases that delay landmark progression by a turn.
+
+**H2H results (5000 iterations, 100 games each):**
+| Matchup | Creator v3 | Greedy | Uniform |
+|---------|-----------|--------|---------|
+| vs Heuristic-EV | **67%** | 66% | 50% |
+| vs MCTS v1 | **74%** | 70% | — |
+| vs Flat MC | **61%** | 61% | — |
+
+**Default rollout changed from greedy to creator.** CreatorRollout v3 matches or exceeds GreedyRollout across all opponents, with the largest gain (+4%) against MCTS v1. The coverage bonus particularly helps in mid-game portfolio construction where greedy tends to over-concentrate on high-EV-but-overlapping cards.
+
+**Important H2H methodology fix:** Discovered that `H2hMain --iterations` flag overrides engine registry configs. Previous 500-iteration results (7.45) were actually running at 500 iterations even for `creator-5k-*` configs. Use `--iterations 0` to preserve registry defaults.
+
+### 7.45 — CreatorRollout v2: Data-driven rollout policy optimization (TODO #29)
+
+**Rollout policy benchmark.** Profiled CreatorScorer (8-dimension composite ~1054µs per scoreAll) vs lightweight contextualCardEvPerRound (~0.2µs per card). Full scorer in rollouts would cause ~550x slowdown (~26s per rollout phase instead of ~45ms). Ran systematic H2H benchmarks comparing all four rollout policies (uniform, greedy, boltzmann T=0.7, creator-v1) across 100-game matches at both 500 and 5000 iterations against heuristic-ev-default. At 500 iterations all four policies perform approximately equally (Phase 1 heuristic seeding dominates). At 5000 iterations, greedy and uniform tied at ~62-63%, boltzmann dropped to 55%, and creator-v1 (with landmark skip) dropped to 46%. Direct head-to-head: greedy beats uniform 65-35% at 5000 iterations, confirming greedy as the best overall choice.
+
+**Default rollout changed from uniform to greedy.** Greedy wins or ties across all iteration counts and is the fastest policy (~596ms avg eval at 5k vs ~749ms uniform, ~1458ms creator-v1). The previous comment claiming "Creator's smart rollout is too deterministic — uniform preserves variance" was disproved by H2H benchmarking.
+
+**CreatorRollout v2: Removed landmark-skip logic.** The v1 Bahnhof/Freizeitpark skip heuristic (skip Bahnhof without 7-12 cards, skip Freizeitpark without Bahnhof) was intended to avoid wasteful landmark purchases. H2H data showed it hurt performance at both iteration counts — rollouts explore the natural synergy path where early Bahnhof → 7-12 cards → 2d6 emerges organically. v2 reverts to cheapest-landmark-first (matching GreedyRollout's proven pattern). Direct comparison confirmed v2 is functionally identical to GreedyRollout (48-52% head-to-head at 5000 iterations).
+
 ### 7.44 — Creator Engine: Bürohaus swap bait bonus (TODO #35)
 
 **CreatorScorer: Bürohaus-aware purchase scoring.** When the Creator Engine owns Bürohaus, cheap low-EV cards now receive a scoring bonus as "swap bait" — they maximize the swap delta on roll=6 (opponent's best card EV minus our worst card EV). Two cases: (A) when owning Bürohaus and the player's worst card was swapped away, new cheap cards get a bonus to incentivize restocking bait; (B) when evaluating Bürohaus for purchase, a bonus reflects the future swap value that ownership would unlock. Both cases include a quality guard that discounts the bonus when the swap bait card would be valuable to the opponent (we don't want to empower them). The bonus uses card-alone `contextualCardEvPerRound` (not portfolio EV) for correct comparison against `BürohausLogic.findCandidates()`. Configurable via `wBurohausSwap` parameter (default 1.5). Swap context is precomputed once per `scoreAll()` call via the existing `BürohausLogic.findCandidates()` scan.

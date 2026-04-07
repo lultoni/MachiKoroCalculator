@@ -170,11 +170,13 @@ function computeDiceFortune(game: H2hGameLog, playerCount: number): DiceFortune 
   return { ownIncome, oppIncome, ownIncomeFreq, oppIncomeFreq };
 }
 
-/** Render a sparkline string from an array of values. */
-function sparkline(values: number[]): string {
+/** Render a sparkline string from an array of values.
+ *  If globalMin/globalMax are provided, use them for normalization
+ *  instead of per-array min/max (ensures consistent scale across charts). */
+function sparkline(values: number[], globalMin?: number, globalMax?: number): string {
   if (values.length === 0) return '';
-  const min = Math.min(...values);
-  const max = Math.max(...values);
+  const min = globalMin ?? Math.min(...values);
+  const max = globalMax ?? Math.max(...values);
   const range = max - min || 1;
   return values.map(v => {
     const idx = Math.min(7, Math.floor(((v - min) / range) * 7.99));
@@ -758,43 +760,53 @@ export function H2hGameReplay({ game, engines, matchId, projects, language, onBa
                 );
               })()}
               {/* Col 2: Own turns sparklines */}
-              <div>
-                <div className="text-center text-machi-text-dim/60 text-[10px] mb-1">{language === 'en' ? 'Own turns' : 'Eigene Züge'}</div>
-                <div className="space-y-1.5">
-                  {engines.map((_eng, i) => (
-                    <div key={i} className="flex items-end gap-1" title={fortune.ownIncome[i].join(', ')}>
-                      <span className={`font-mono text-[10px] flex-shrink-0 ${i === 0 ? 'text-machi-accent' : 'text-fuchsia-400'}`}>P{i + 1}</span>
-                      <div className="font-mono text-xl leading-none tracking-[-0.02em] flex-1 text-center overflow-hidden">
-                        {sparkline(fortune.ownIncome[i])}
+              {(() => {
+                // Compute shared min/max across all 4 sparkline series for consistent scale
+                const allValues = [...fortune.ownIncome, ...fortune.oppIncome].flat();
+                const globalMin = allValues.length > 0 ? Math.min(...allValues) : 0;
+                const globalMax = allValues.length > 0 ? Math.max(...allValues) : 1;
+                return (
+                  <>
+                    <div>
+                      <div className="text-center text-machi-text-dim/60 text-[10px] mb-1">{language === 'en' ? 'Own turns' : 'Eigene Züge'}</div>
+                      <div className="space-y-1.5">
+                        {engines.map((_eng, i) => (
+                          <div key={i} className="flex items-end gap-1" title={fortune.ownIncome[i].join(', ')}>
+                            <span className={`font-mono text-[10px] flex-shrink-0 ${i === 0 ? 'text-machi-accent' : 'text-fuchsia-400'}`}>P{i + 1}</span>
+                            <div className="font-mono text-xl leading-none tracking-[-0.02em] flex-1 text-center overflow-hidden">
+                              {sparkline(fortune.ownIncome[i], globalMin, globalMax)}
+                            </div>
+                            <span className="text-[9px] text-machi-text-dim/50 flex-shrink-0">
+                              Ø{fortune.ownIncome[i].length > 0
+                                ? (fortune.ownIncome[i].reduce((a, b) => a + b, 0) / fortune.ownIncome[i].length).toFixed(1)
+                                : '0'}
+                            </span>
+                          </div>
+                        ))}
                       </div>
-                      <span className="text-[9px] text-machi-text-dim/50 flex-shrink-0">
-                        Ø{fortune.ownIncome[i].length > 0
-                          ? (fortune.ownIncome[i].reduce((a, b) => a + b, 0) / fortune.ownIncome[i].length).toFixed(1)
-                          : '0'}
-                      </span>
                     </div>
-                  ))}
-                </div>
-              </div>
-              {/* Col 3: Opponent turns sparklines */}
-              <div>
-                <div className="text-center text-machi-text-dim/60 text-[10px] mb-1">{language === 'en' ? 'Opponent turns' : 'Gegnerische Züge'}</div>
-                <div className="space-y-1.5">
-                  {engines.map((_eng, i) => (
-                    <div key={i} className="flex items-end gap-1" title={fortune.oppIncome[i].join(', ')}>
-                      <span className={`font-mono text-[10px] flex-shrink-0 ${i === 0 ? 'text-machi-accent' : 'text-fuchsia-400'}`}>P{i + 1}</span>
-                      <div className="font-mono text-xl leading-none tracking-[-0.02em] flex-1 text-center overflow-hidden">
-                        {sparkline(fortune.oppIncome[i])}
+                    {/* Col 3: Opponent turns sparklines */}
+                    <div>
+                      <div className="text-center text-machi-text-dim/60 text-[10px] mb-1">{language === 'en' ? 'Opponent turns' : 'Gegnerische Züge'}</div>
+                      <div className="space-y-1.5">
+                        {engines.map((_eng, i) => (
+                          <div key={i} className="flex items-end gap-1" title={fortune.oppIncome[i].join(', ')}>
+                            <span className={`font-mono text-[10px] flex-shrink-0 ${i === 0 ? 'text-machi-accent' : 'text-fuchsia-400'}`}>P{i + 1}</span>
+                            <div className="font-mono text-xl leading-none tracking-[-0.02em] flex-1 text-center overflow-hidden">
+                              {sparkline(fortune.oppIncome[i], globalMin, globalMax)}
+                            </div>
+                            <span className="text-[9px] text-machi-text-dim/50 flex-shrink-0">
+                              Ø{fortune.oppIncome[i].length > 0
+                                ? (fortune.oppIncome[i].reduce((a, b) => a + b, 0) / fortune.oppIncome[i].length).toFixed(1)
+                                : '0'}
+                            </span>
+                          </div>
+                        ))}
                       </div>
-                      <span className="text-[9px] text-machi-text-dim/50 flex-shrink-0">
-                        Ø{fortune.oppIncome[i].length > 0
-                          ? (fortune.oppIncome[i].reduce((a, b) => a + b, 0) / fortune.oppIncome[i].length).toFixed(1)
-                          : '0'}
-                      </span>
                     </div>
-                  ))}
-                </div>
-              </div>
+                  </>
+                );
+              })()}
             </div>
           </div>
           {/* Event Timeline (inside Game Insights) */}

@@ -21,10 +21,15 @@ import java.util.concurrent.ThreadLocalRandom;
  *
  * <p>Uses a lightweight heuristic for purchase decisions during rollouts — NOT the
  * full {@link CreatorScorer} (which is too expensive for rollout-speed requirements).
- * The key difference from {@link engine.mcts.GreedyRollout} is that landmarks are
- * evaluated by marginal EV contribution rather than always buying cheapest-first.
- * A landmark that doesn't help the current portfolio (e.g., Bahnhof with no 7-12 cards)
- * is skipped in favor of income-building cards.
+ *
+ * <p>v3 (7.46): Added coverage bonus and save-toward-landmark logic. Coverage bonus
+ * rewards cards that activate on roll values the player doesn't currently cover
+ * (portfolio diversification). Save-toward-landmark prevents buying marginal cards
+ * when close to affording the next landmark. H2H benchmarks showed +4% vs MCTS v1,
+ * +1% vs heuristic-ev compared to plain GreedyRollout. Now the default rollout policy.
+ *
+ * <p>v2 (7.45): Removed v1 landmark-skip logic (hurt performance) and reverted to
+ * cheapest-landmark-first ordering matching GreedyRollout.
  *
  * <h2>Decision policy</h2>
  * <ul>
@@ -32,9 +37,9 @@ import java.util.concurrent.ThreadLocalRandom;
  *   <li><b>Funkturm</b>: keep if income ≥ expected reroll EV.</li>
  *   <li><b>Bürohaus</b>: greedy best swap via {@link BürohausLogic#executeSwap}.</li>
  *   <li><b>Purchase (instant-win)</b>: always buy winning landmark.</li>
- *   <li><b>Purchase (landmark)</b>: buy highest-value landmark where value = marginal EV.
- *       Skip landmarks with marginal EV below a threshold.</li>
- *   <li><b>Purchase (card)</b>: highest {@code contextualCardEvPerRound × geometricSum − cost}.</li>
+ *   <li><b>Purchase (landmark)</b>: buy cheapest affordable landmark.</li>
+ *   <li><b>Purchase (card)</b>: highest {@code contextualCardEvPerRound × geometricSum − cost + coverageBonus}.</li>
+ *   <li><b>Save-toward-landmark</b>: save if within 4 coins of next landmark and best card is marginal.</li>
  *   <li><b>Save</b>: if no card has positive net value.</li>
  * </ul>
  *
@@ -47,6 +52,10 @@ public final class CreatorRollout {
     private static final int    HORIZON  = 5;
     private static final double DISCOUNT = 0.95;
     private static final int    EV_CACHE_REFRESH = 40;
+    /** Bonus multiplier per new roll coverage: net += newCoverage * COVERAGE_BONUS * ev. */
+    private static final double COVERAGE_BONUS = 0.15;
+    /** If card net EV is below this fraction of next-landmark cost, prefer saving. */
+    private static final double SAVE_THRESHOLD_RATIO = 0.3;
 
     private CreatorRollout() {}
 
@@ -147,12 +156,17 @@ public final class CreatorRollout {
     // =====================================================================
 
     /**
-     * Creator purchase policy: instant-win → cheapest affordable landmark → best net-EV card → save.
+     * Creator purchase policy: instant-win → cheapest affordable landmark →
+     * best net-EV card (with save-toward-landmark check) → save.
      *
-     * <p>Landmarks use cheapest-first ordering (like GreedyRollout) with a coverage check:
-     * Bahnhof is skipped if the player has no non-red cards activating on 7-12. This avoids
-     * the expensive per-turn marginal-EV analysis while preserving the key Creator insight
-     * that Bahnhof without high-range cards is wasteful.
+     * <p>v2: Always buys cheapest landmark (no skip logic). H2H benchmarks (7.45) showed
+     * that skipping Bahnhof/Freizeitpark based on current portfolio state hurt performance
+     * because rollouts need to explore the natural synergy path where early Bahnhof
+     * acquisition leads to buying 7-12 cards that synergize with it.
+     *
+     * <p>v3: Added coverage bonus and save-toward-landmark. If the best card's net EV
+     * is marginal relative to the next landmark's cost, the player saves to reach the
+     * landmark faster. This prevents wasteful purchases that delay landmark progression.
      */
     private static void applyPurchase(GameState state, SupplyTracker.MutableSupplyTracker supply,
                                       int activePlayer, EvCache evCache) {
@@ -167,17 +181,18 @@ public final class CreatorRollout {
             return;
         }
 
-        // 2. Cheapest affordable landmark (skip Bahnhof without 7-12 coverage)
+        // 2. Cheapest affordable landmark
         Project bestLandmark = null;
         int bestCost = Integer.MAX_VALUE;
+        int nextLandmarkCost = Integer.MAX_VALUE; // cheapest unowned landmark (even unaffordable)
         for (String lmId : LANDMARK_IDS) {
             if (active.hasProject(lmId)) continue;
             Project lm = ProjectLoader.getProject(lmId).orElse(null);
-            if (lm == null || coins < lm.getCost()) continue;
-            // Skip Bahnhof if no non-red 7-12 cards
-            if ("bahnhof".equals(lmId) && !hasHigh7to12Card(active)) continue;
-            // Skip Freizeitpark if player doesn't own Bahnhof (doubles only with 2d6)
-            if ("freizeitpark".equals(lmId) && !active.hasProject("bahnhof")) continue;
+            if (lm == null) continue;
+            if (lm.getCost() < nextLandmarkCost) {
+                nextLandmarkCost = lm.getCost();
+            }
+            if (coins < lm.getCost()) continue;
             if (lm.getCost() < bestCost) {
                 bestCost = lm.getCost();
                 bestLandmark = lm;
@@ -190,20 +205,50 @@ public final class CreatorRollout {
             return;
         }
 
-        // 3. Best non-landmark card by net EV
+        // 3. Best non-landmark card by net EV + coverage bonus
+        // The coverage bonus rewards cards that activate on rolls the player
+        // doesn't currently cover, promoting portfolio diversification.
         Project bestCard = null;
         double bestScore = 0.0;
+        boolean hasBahnhof = active.hasProject("bahnhof");
+        long coveredRolls = computeCoveredRolls(active);
+
         for (Project p : state.getUnbuilt_projects()) {
             if (!supply.canPurchase(p.getId())) continue;
             if (coins < p.getCost()) continue;
             if ("lila".equals(p.getColor()) && active.hasProject(p.getId())) continue;
             double ev = evCache.getOrRefresh(state, activePlayer, p.getId());
             double net = ev * Calcs.geometricSum(HORIZON, DISCOUNT) - p.getCost();
+
+            // Coverage bonus: count how many NEW roll values this card covers
+            int newCoverage = 0;
+            for (int act : p.getDice_activation()) {
+                // Only count rolls the player can actually reach
+                if (!hasBahnhof && act > 6) continue;
+                if ((coveredRolls & (1L << act)) == 0) newCoverage++;
+            }
+            if (newCoverage > 0) {
+                net += newCoverage * COVERAGE_BONUS * ev;
+            }
+
             if (net > bestScore) {
                 bestScore = net;
                 bestCard = p;
             }
         }
+
+        // 4. Save-toward-landmark check: if best card's net value is marginal
+        // compared to the next landmark cost, save to reach the landmark faster.
+        // This prevents buying a 1-coin card with net=0.3 when saving 2 more turns
+        // would reach a 10-coin landmark that unlocks much more value.
+        if (bestCard != null && nextLandmarkCost < Integer.MAX_VALUE) {
+            int gap = nextLandmarkCost - coins;
+            if (gap > 0 && gap <= 4 && bestScore < nextLandmarkCost * SAVE_THRESHOLD_RATIO) {
+                // Save: gap is small and best card is marginal
+                return;
+            }
+        }
+
         if (bestCard != null) {
             active.setCoins(coins - bestCard.getCost());
             active.addProject(bestCard);
@@ -254,6 +299,23 @@ public final class CreatorRollout {
     // =====================================================================
     // Helpers
     // =====================================================================
+
+    /**
+     * Returns a bitmask of roll values (1-12) that produce income for this player.
+     * Bit i is set if the player has at least one non-landmark card activating on roll i.
+     * Excludes red cards from coverage since they only activate on opponent turns.
+     */
+    private static long computeCoveredRolls(Player player) {
+        long mask = 0;
+        for (Project card : player.getOwned_projects()) {
+            if ("gelb".equals(card.getColor())) continue; // landmarks
+            if ("rot".equals(card.getColor())) continue;  // red = opponent turns only
+            for (int act : card.getDice_activation()) {
+                mask |= (1L << act);
+            }
+        }
+        return mask;
+    }
 
     private static boolean hasHigh7to12Card(Player p) {
         for (Project card : p.getOwned_projects()) {

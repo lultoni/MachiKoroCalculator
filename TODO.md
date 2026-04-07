@@ -15,7 +15,7 @@ Priorisiere in deiner Abarbeitung die wichtigsten Features. Erkenne Abhänigkeit
 | 26 | Add in 3 Player and 4 Player Testing Scenarios in H2H Testing | Are Elo-Calc adjustments needed for this? I would want seperate leaderboards maybe and then a overall leaderboard. |
 | 27 | Creator Engine: Adaptive opponent modeling | Track actual opponent purchase patterns across turns to adjust rollout behavior and threat assessment. Requires stateful session tracking (interface layer, not engine-level). |
 | 28 | Creator Engine: Automated H2H weight sweep | Script/tool that runs H2H tournaments varying Creator Engine parameter vectors (31 knobs), records win rates, and converges on optimal weights via grid search or Bayesian optimization. Is there a way to implement the Match Insights that the H2H Game Replay shows for this as well? (Or do those calcs only get made in the ui and not the backend?) |
-| 29 | Creator Engine: CreatorRollout v2 | Full CreatorScorer heuristic in rollouts (once performance is validated). Add a "rollout-mode" fast-path in CreatorScorer that skips expensive metrics. Profile first to identify bottleneck dimensions. |
+| 39 | From the Ground up reimagine how we can make the game core work so it is as efficient as possible. | So maybe this is something like using bitmaps or whatnot where every game position is just a single binary number which we can use to manipulate and check via bitwise operations to improve performance and shit |
 
 ## Done
 
@@ -23,6 +23,7 @@ Moved here when completed. Full history in CHANGELOG.md.
 
 | # | Task |
 |---|------|
+| 29 | Creator Engine: CreatorRollout v2 — data-driven rollout policy optimization via H2H benchmarking. |
 | 35 | Creator Engine: Bürohaus swap bait bonus — incentivize cheap cards when Bürohaus is owned. |
 | 37 | H2H: Stop button with live progress feedback — cancel running matches from UI. |
 | 38 | All engines: tempo tiebreaker when options score identically (landmarks first, cost DESC). |

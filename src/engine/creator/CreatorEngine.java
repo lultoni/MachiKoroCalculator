@@ -268,19 +268,21 @@ public final class CreatorEngine implements SimulationEngine {
     // =====================================================================
 
     private RolloutFn selectRolloutFn(EngineConfig config) {
-        // Default: uniform (MctsRollout). The Creator's smart rollout policy is too deterministic
-        // for flat MC differentiation — all candidates converge to the same win rate because
-        // the one-card difference is swamped by identical greedy play over ~50+ turns.
-        // Uniform rollouts preserve enough variance to differentiate candidates.
-        String policy = config.extra != null ? config.extra.getOrDefault("rolloutPolicy", "uniform") : "uniform";
+        // Default: creator (CreatorRollout). H2H benchmarks (7.46) show CreatorRollout v3
+        // matches or beats GreedyRollout across all opponents (+4% vs MCTS v1, +1% vs
+        // heuristic-ev, tie vs Flat MC). CreatorRollout adds coverage bonus (portfolio
+        // diversification) and save-toward-landmark (prevents wasteful marginal purchases).
+        // Greedy and uniform are retained as configurable alternatives.
+        String policy = config.extra != null ? config.extra.getOrDefault("rolloutPolicy", "creator") : "creator";
         switch (policy) {
-            case "greedy":    return GreedyRollout::simulate;
             case "creator":   return CreatorRollout::simulate;
             case "boltzmann": {
                 double temp = CreatorScorer.readDouble(config, "rolloutTemperature", 0.7);
                 return BoltzmannRollout.withTemperature(temp);
             }
-            default:          return MctsRollout::simulate;
+            case "uniform":   return MctsRollout::simulate;
+            case "greedy":    return GreedyRollout::simulate;
+            default:          return CreatorRollout::simulate;
         }
     }
 

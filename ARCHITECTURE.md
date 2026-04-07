@@ -321,7 +321,11 @@ Each weight has a situational multiplier: `effectiveWeight = baseWeight × (low 
 - **Win-sprint ramp**: Gradual with configurable `sprintHorizon` (default 6) and `sprintSharpness` (default 1.0). Boosts tempo/winProb, suppresses income/risk.
 - **Threat-response ramp**: Gradual with configurable `threatHorizon` (default 8) and `threatSharpness` (default 1.0). Detects approaching opponents early.
 
-**CreatorRollout:** Custom rollout policy that evaluates landmarks by marginal EV contribution (not cheapest-first). Dice/Funkturm/Burohaus logic follows proven greedy patterns.
+**CreatorRollout v3:** Custom rollout policy for Creator Engine's MC validation phase. Builds on GreedyRollout's proven cheapest-landmark-first, deterministic dice/Funkturm/Bürohaus patterns, and adds two Creator-specific enhancements:
+- **Coverage bonus** (`COVERAGE_BONUS=0.15`): Cards that activate on roll values the player doesn't currently cover receive a bonus proportional to `newCoverage × 0.15 × cardEV`. Uses bitmask (`computeCoveredRolls`) to track which rolls produce income, excluding red/landmark cards. Promotes portfolio diversification.
+- **Save-toward-landmark** (`SAVE_THRESHOLD_RATIO=0.3`): When the player is within 4 coins of the next unowned landmark and the best card's net value is below 30% of that landmark's cost, the rollout saves instead of buying a marginal card. Prevents wasteful purchases that delay landmark progression.
+
+H2H benchmarks (7.46, 100 games at 5000 iterations): CreatorRollout v3 wins 74% vs MCTS-v1 (greedy: 70%), 67% vs heuristic-ev (greedy: 66%), 61% vs Flat MC (greedy: 61%). Now the default rollout policy for CreatorEngine.
 
 **Bürohaus Swap Bonus:** Post-composite bonus (not a 9th dimension) applied when Bürohaus is relevant:
 - **Case A (owns Bürohaus):** Cheap low-EV cards get a bonus as swap bait when they would lower the player's worst-card EV below the current worst. `bonus = P(roll=6) × swapDeltaGain × swapQuality × wBurohausSwap`. `swapQuality` discounts when the bait card is valuable to the opponent. Uses card-alone `contextualCardEvPerRound`, not portfolio EV.
@@ -331,7 +335,7 @@ Each weight has a situational multiplier: `effectiveWeight = baseWeight × (low 
 
 **31 configurable knobs** via `EngineConfig.extra` for H2H sweep optimization: 4 situation weights, 8 base weights, 1 sigmoid steepness, 4 gravity well parameters, 1 save discount, rollout policy + temperature, plus multiplier endpoints.
 
-**Config:** `iterations` (iteration budget), `timeBudgetMs` (anytime mode), `rolloutPolicy` ("creator"/"greedy"/"uniform"/"boltzmann"). Registry: 3 entries (fast/balanced/deep).
+**Config:** `iterations` (iteration budget), `timeBudgetMs` (anytime mode), `rolloutPolicy` ("creator" default / "greedy" / "uniform" / "boltzmann"). Default changed from greedy to creator in 7.46 after CreatorRollout v3 (coverage bonus + save-toward-landmark) matched or beat greedy across all opponents. Registry: 3 entries (fast/balanced/deep).
 
 ---
 

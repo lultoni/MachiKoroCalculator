@@ -1,5 +1,6 @@
 package server;
 
+import engine.creator.CreatorEngine;
 import engine.expectimax.ExpectimaxEngine;
 import engine.flat.FlatMcEngine;
 import engine.heuristic.HeuristicEvEngine;
@@ -40,11 +41,12 @@ public final class ServerMain {
         orchestrator.register(new FlatMcEngine());
         orchestrator.register(new HeuristicEvEngine());
         orchestrator.register(new ExpectimaxEngine());
+        orchestrator.register(new CreatorEngine());
 
         ApiServer server = new ApiServer(orchestrator);
         server.start();
 
-        System.out.println("[ServerMain] MCTS v1 + Variants A-E + Flat MC + Heuristic EV + Expectimax registered. Server running.");
+        System.out.println("[ServerMain] MCTS v1 + Variants A-E + Flat MC + Heuristic EV + Expectimax + Creator registered. Server running.");
         System.out.println("[ServerMain] Press Ctrl+C to stop.");
 
         // Keep the main thread alive until interrupted

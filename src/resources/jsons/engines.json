@@ -338,5 +338,39 @@
       "maxDepthRounds": "2",
       "leafEval": "composite"
     }
+  },
+  {
+    "id": "creator-fast",
+    "engineClass": "creator",
+    "description": "Creator Engine — fast mode (~500 iterations)",
+    "default": false,
+    "tier": "fast",
+    "config": {
+      "iterations": "500",
+      "rolloutPolicy": "creator"
+    }
+  },
+  {
+    "id": "creator-balanced",
+    "engineClass": "creator",
+    "description": "Creator Engine — balanced mode (~5000 iterations)",
+    "default": false,
+    "tier": "balanced",
+    "config": {
+      "iterations": "5000",
+      "rolloutPolicy": "creator"
+    }
+  },
+  {
+    "id": "creator-deep",
+    "engineClass": "creator",
+    "description": "Creator Engine — deep mode (5s time budget)",
+    "default": false,
+    "tier": "deep",
+    "config": {
+      "iterations": "0",
+      "timeBudgetMs": "5000",
+      "rolloutPolicy": "creator"
+    }
   }
 ]

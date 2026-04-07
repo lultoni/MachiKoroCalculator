@@ -6,6 +6,24 @@ Implementation history: what was built, why, and which design decisions were mad
 
 ## Phase 7: Iteration
 
+### 7.37 — Creator Engine (TODO #21)
+
+**New engine: CreatorEngine** — a custom strategy engine encoding a low-risk, income-first, adaptive philosophy with decisive endgame execution. Uses a novel **seeded Flat Monte Carlo** architecture: a fast heuristic pre-ranks candidates (~2-5ms), then MC rollouts validate and refine with biased allocation (50%/30%/20% by heuristic rank).
+
+**CreatorScorer** (`engine/creator/CreatorScorer.java`): Holistic situation assessment [0,1] combining income capacity (30%), landmark progress (30%), coin proximity (15%), and tempo (25%) — not just landmark count. 8 scoring dimensions (income, risk, coverage, tempo, winProb, landmark, urgency, roi) with sigmoid-modulated multipliers that shift with game situation. Three gravity wells: instant-win snap (hard override), win-sprint ramp (gradual with configurable sharpness), threat-response ramp (gradual). Full explainability: every candidate produces 20+ metric keys and top-3 contributing dimensions. **31 configurable knobs** via `EngineConfig.extra` for H2H sweep optimization.
+
+**CreatorRollout** (`engine/creator/CreatorRollout.java`): Custom rollout policy that evaluates landmarks by marginal EV contribution (not cheapest-first like GreedyRollout). Inline EvCache for thread-safe performance. Dice/Funkturm/Burohaus logic follows proven greedy patterns.
+
+**CreatorEngine** (`engine/creator/CreatorEngine.java`): Implements `SimulationEngine` with id `"creator"`. Supports anytime computation (timeBudgetMs or iteration count), heuristic-only mode (budget=0), and configurable rollout policies (creator/greedy/uniform/boltzmann).
+
+**Registry:** 3 new entries — `creator-fast` (500 iterations), `creator-balanced` (5000 iterations), `creator-deep` (5s time budget). Total: 35 registry entries across 10 engine classes.
+
+**Tests:** 12 Creator-specific tests + Engine Compliance registration. All 37 Creator tests pass, 231 Engine Compliance assertions pass.
+
+**Follow-up TODOs added:** #27 (adaptive opponent modeling), #28 (automated H2H weight sweep), #29 (CreatorRollout v2).
+
+**Files:** `CreatorScorer.java` (new), `CreatorRollout.java` (new), `CreatorEngine.java` (new), `engines.json`, `ServerMain.java`, `RuntimeTester.java`.
+
 ### 7.36 — Engine Performance Optimization + BenchmarkMain CLI (TODO #23, #25)
 
 **RolloutEvCache optimization (TODO #23):** Replaced `Calcs.evPerRound()` (~2ms/card) with `CardIncome.contextualCardEvPerRound()` (~0.01ms/card) in `RolloutEvCache.rebuild()`. Pre-computes `PlayerStats` and opponent coins once per cache refresh. Greedy/Boltzmann rollout engines dropped from ~500ms to ~50-80ms per 500-iteration evaluation — a **~6-10x speedup**.

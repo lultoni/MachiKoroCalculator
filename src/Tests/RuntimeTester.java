@@ -365,6 +365,21 @@ public class RuntimeTester {
             test_glicko2_rating_calculator();
         });
 
+        runSection("Creator Engine Tests", () -> {
+            test_creator_instant_win_detection();
+            test_creator_heuristic_only_valid_result();
+            test_creator_anytime_valid();
+            test_creator_scores_descending();
+            test_creator_includes_save();
+            test_creator_win_sprint_gravity_well();
+            test_creator_threat_response_ramp();
+            test_creator_save_scoring();
+            test_creator_metrics_present();
+            test_creator_registry_entries();
+            test_creator_evaluate_full_turn();
+            test_creator_config_override();
+        });
+
         runSection("Engine Compliance", () -> {
             // Discover all engine classes from the registry and run the generic compliance suite.
             // This ensures any newly added engine passes the universal contract tests.
@@ -378,6 +393,7 @@ public class RuntimeTester {
             orch.register(new engine.flat.FlatMcEngine());
             orch.register(new engine.heuristic.HeuristicEvEngine());
             orch.register(new engine.expectimax.ExpectimaxEngine());
+            orch.register(new engine.creator.CreatorEngine());
 
             // Group registry entries by engineClass to avoid running the same engine multiple times
             Map<String, List<EngineRegistryEntry>> byClass = new HashMap<>();
@@ -3565,5 +3581,222 @@ public class RuntimeTester {
                     + " — expected " + expected + " ±" + tol + ", got " + actual);
             failed++;
         }
+    }
+
+    // =========================================================================
+    // Creator Engine Tests
+    // =========================================================================
+
+    private static void test_creator_instant_win_detection() {
+        // Player has 3 landmarks + enough coins for 4th → must buy winning landmark
+        core.GameState gs = core.GameState.initial(2);
+        core.Player p = gs.getPlayers()[0];
+        p.setCoins(30);
+        p.addProject(core.ProjectLoader.getProject("bahnhof").orElseThrow());
+        p.addProject(core.ProjectLoader.getProject("einkaufszentrum").orElseThrow());
+        p.addProject(core.ProjectLoader.getProject("freizeitpark").orElseThrow());
+        // Missing: funkturm (cost 22, player has 30 coins)
+
+        engine.creator.CreatorEngine engine = new engine.creator.CreatorEngine();
+        EngineConfig config = EngineConfig.ofIterations(100);
+        EngineResult result = engine.evaluate(gs, 0, config);
+
+        assertTrue("Creator instant-win: top recommendation is funkturm",
+                "funkturm".equals(result.topRecommendation().project.getId()));
+        assertTrue("Creator instant-win: score is MAX_VALUE",
+                result.topRecommendation().score == Double.MAX_VALUE);
+    }
+
+    private static void test_creator_heuristic_only_valid_result() {
+        // Budget = 0 → heuristic only, should complete in <50ms
+        core.GameState gs = core.GameState.initial(2);
+        gs.getPlayers()[0].setCoins(10);
+        engine.creator.CreatorEngine engine = new engine.creator.CreatorEngine();
+        EngineConfig config = new EngineConfig(0, 0, 0.0, null);
+
+        long start = System.currentTimeMillis();
+        EngineResult result = engine.evaluate(gs, 0, config);
+        long elapsed = System.currentTimeMillis() - start;
+
+        assertTrue("Creator heuristic-only: result is non-null", result != null);
+        assertTrue("Creator heuristic-only: has ranked options", !result.rankedOptions.isEmpty());
+        assertTrue("Creator heuristic-only: completes in <50ms", elapsed < 50);
+        assertTrue("Creator heuristic-only: 0 iterations used", result.iterationsUsed == 0);
+    }
+
+    private static void test_creator_anytime_valid() {
+        // Valid results at 10, 100, 1000 iterations
+        core.GameState gs = core.GameState.initial(2);
+        gs.getPlayers()[0].setCoins(5);
+        engine.creator.CreatorEngine engine = new engine.creator.CreatorEngine();
+
+        for (int iter : new int[]{10, 100, 1000}) {
+            EngineConfig config = EngineConfig.ofIterations(iter);
+            EngineResult result = engine.evaluate(gs, 0, config);
+            assertTrue("Creator anytime @" + iter + ": non-null result", result != null);
+            assertTrue("Creator anytime @" + iter + ": has options", !result.rankedOptions.isEmpty());
+        }
+    }
+
+    private static void test_creator_scores_descending() {
+        core.GameState gs = core.GameState.initial(2);
+        gs.getPlayers()[0].setCoins(5);
+        engine.creator.CreatorEngine engine = new engine.creator.CreatorEngine();
+        EngineResult result = engine.evaluate(gs, 0, EngineConfig.ofIterations(200));
+
+        boolean descending = true;
+        for (int i = 1; i < result.rankedOptions.size(); i++) {
+            if (result.rankedOptions.get(i).score > result.rankedOptions.get(i - 1).score) {
+                descending = false;
+                break;
+            }
+        }
+        assertTrue("Creator: scores are in descending order", descending);
+    }
+
+    private static void test_creator_includes_save() {
+        core.GameState gs = core.GameState.initial(2);
+        engine.creator.CreatorEngine engine = new engine.creator.CreatorEngine();
+        EngineResult result = engine.evaluate(gs, 0, EngineConfig.ofIterations(50));
+
+        boolean hasSave = result.rankedOptions.stream()
+                .anyMatch(o -> "_wait_".equals(o.project.getId()));
+        assertTrue("Creator: includes save (_wait_) option", hasSave);
+    }
+
+    private static void test_creator_win_sprint_gravity_well() {
+        // Player with 3 landmarks, reasonable income, close to winning
+        // The win-sprint should ramp up (not binary)
+        core.GameState gs = core.GameState.initial(2);
+        core.Player p = gs.getPlayers()[0];
+        p.setCoins(15); // close to funkturm (22) but not there yet
+        p.addProject(core.ProjectLoader.getProject("bahnhof").orElseThrow());
+        p.addProject(core.ProjectLoader.getProject("einkaufszentrum").orElseThrow());
+        p.addProject(core.ProjectLoader.getProject("freizeitpark").orElseThrow());
+        // Add some income cards
+        p.addProject(core.ProjectLoader.getProject("bergwerk").orElseThrow());
+        p.addProject(core.ProjectLoader.getProject("wald").orElseThrow());
+        p.addProject(core.ProjectLoader.getProject("wald").orElseThrow());
+
+        engine.mcts.SupplyTracker supply = engine.mcts.SupplyTracker.fromGameState(gs);
+        EngineConfig config = new EngineConfig(0, 0, 0.0, null);
+        java.util.List<engine.creator.CreatorScorer.ScoredCandidate> scored =
+                engine.creator.CreatorScorer.scoreAll(gs, 0, supply, config);
+
+        // Find the metrics from any scored candidate to check gravity well
+        boolean wellActivated = scored.stream()
+                .anyMatch(sc -> sc.metrics.containsKey("activeGravityWell")
+                        && !"none".equals(sc.metrics.get("activeGravityWell")));
+        assertTrue("Creator win-sprint: gravity well activates near endgame", wellActivated);
+    }
+
+    private static void test_creator_threat_response_ramp() {
+        // Opponent has 3 landmarks and high income → threat should register
+        core.GameState gs = core.GameState.initial(2);
+        core.Player p0 = gs.getPlayers()[0];
+        p0.setCoins(5);
+
+        core.Player p1 = gs.getPlayers()[1];
+        p1.setCoins(20);
+        p1.addProject(core.ProjectLoader.getProject("bahnhof").orElseThrow());
+        p1.addProject(core.ProjectLoader.getProject("einkaufszentrum").orElseThrow());
+        p1.addProject(core.ProjectLoader.getProject("freizeitpark").orElseThrow());
+        // Give opponent income cards too
+        p1.addProject(core.ProjectLoader.getProject("bergwerk").orElseThrow());
+        p1.addProject(core.ProjectLoader.getProject("molkerei").orElseThrow());
+
+        engine.mcts.SupplyTracker supply = engine.mcts.SupplyTracker.fromGameState(gs);
+        EngineConfig config = new EngineConfig(0, 0, 0.0, null);
+        java.util.List<engine.creator.CreatorScorer.ScoredCandidate> scored =
+                engine.creator.CreatorScorer.scoreAll(gs, 0, supply, config);
+
+        // The threat-response well should be active (opponent has 3 landmarks)
+        boolean threatActive = scored.stream()
+                .anyMatch(sc -> "threat-response".equals(sc.metrics.get("activeGravityWell")));
+        assertTrue("Creator threat-response: detects threatening opponent", threatActive);
+    }
+
+    private static void test_creator_save_scoring() {
+        // With good affordable options available, save should not be the top pick
+        core.GameState gs = core.GameState.initial(2);
+        gs.getPlayers()[0].setCoins(5);
+        engine.creator.CreatorEngine engine = new engine.creator.CreatorEngine();
+        EngineResult result = engine.evaluate(gs, 0, new EngineConfig(0, 0, 0.0, null));
+
+        String topId = result.topRecommendation().project.getId();
+        assertTrue("Creator save: save is not top pick with affordable options",
+                !"_wait_".equals(topId));
+    }
+
+    private static void test_creator_metrics_present() {
+        core.GameState gs = core.GameState.initial(2);
+        gs.getPlayers()[0].setCoins(5);
+        engine.creator.CreatorEngine engine = new engine.creator.CreatorEngine();
+        EngineResult result = engine.evaluate(gs, 0, new EngineConfig(0, 0, 0.0, null));
+
+        // Check a non-save option for expected metric keys
+        EngineResult.Option nonSave = result.rankedOptions.stream()
+                .filter(o -> !"_wait_".equals(o.project.getId()))
+                .findFirst().orElse(null);
+
+        assertTrue("Creator metrics: non-save option exists", nonSave != null);
+        if (nonSave != null) {
+            String[] expectedKeys = {"compositeScore", "situation", "activeGravityWell",
+                    "evPerRound", "portfolioDeltaEV", "roiOverHorizon", "cvar_10pct",
+                    "tempoAdvantage", "winProbDelta", "coverageDensity", "cost",
+                    "heuristicScore"};
+            for (String key : expectedKeys) {
+                assertTrue("Creator metrics: contains '" + key + "'",
+                        nonSave.metrics.containsKey(key));
+            }
+        }
+    }
+
+    private static void test_creator_registry_entries() {
+        assertTrue("Creator registry: creator-fast exists",
+                iface.EngineRegistry.findById("creator-fast").isPresent());
+        assertTrue("Creator registry: creator-balanced exists",
+                iface.EngineRegistry.findById("creator-balanced").isPresent());
+        assertTrue("Creator registry: creator-deep exists",
+                iface.EngineRegistry.findById("creator-deep").isPresent());
+    }
+
+    private static void test_creator_evaluate_full_turn() {
+        core.GameState gs = core.GameState.initial(2);
+        gs.getPlayers()[0].setCoins(5);
+        engine.creator.CreatorEngine eng = new engine.creator.CreatorEngine();
+        engine.TurnPlan plan = eng.evaluateFullTurn(gs, 0, EngineConfig.ofIterations(50));
+
+        assertTrue("Creator TurnPlan: non-null", plan != null);
+        assertTrue("Creator TurnPlan: valid diceCount (1 or 2)",
+                plan.diceCount == 1 || plan.diceCount == 2);
+        assertTrue("Creator TurnPlan: purchase is non-null", plan.purchase != null);
+    }
+
+    private static void test_creator_config_override() {
+        // Changing a base weight via config.extra should change the composite score
+        core.GameState gs = core.GameState.initial(2);
+        gs.getPlayers()[0].setCoins(5);
+        engine.mcts.SupplyTracker supply = engine.mcts.SupplyTracker.fromGameState(gs);
+
+        // Default config
+        EngineConfig defaultConfig = new EngineConfig(0, 0, 0.0, null);
+        java.util.List<engine.creator.CreatorScorer.ScoredCandidate> defaultScored =
+                engine.creator.CreatorScorer.scoreAll(gs, 0, supply, defaultConfig);
+
+        // Config with massively increased income weight
+        java.util.Map<String, String> extras = new java.util.HashMap<>();
+        extras.put("wIncome", "100.0");
+        EngineConfig overrideConfig = new EngineConfig(0, 0, 0.0, extras);
+        java.util.List<engine.creator.CreatorScorer.ScoredCandidate> overrideScored =
+                engine.creator.CreatorScorer.scoreAll(gs, 0, supply, overrideConfig);
+
+        // The scores should differ
+        boolean scoresDiffer = false;
+        if (!defaultScored.isEmpty() && !overrideScored.isEmpty()) {
+            scoresDiffer = Math.abs(defaultScored.get(0).compositeScore
+                    - overrideScored.get(0).compositeScore) > 0.01;
+        }
+        assertTrue("Creator config override: changing wIncome changes scores", scoresDiffer);
     }
 }

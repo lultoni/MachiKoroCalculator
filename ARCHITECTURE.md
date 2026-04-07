@@ -244,7 +244,7 @@ Six engine variants are implemented:
 - **Variant D (depth-limited)**: Stop rollout after N turns, evaluate position via `WinProbability.computeBaselineWinProb`. Faster, quality depends on heuristic.
 - **Variant E (adaptive budget)**: Survey phase (iterations/5), then concentrate remaining budget on close races. Focused subtree exploration via `MctsTree.runIterationsFromNode`.
 
-Each variant has fast/balanced/deep configurations. Total: 32 registry entries across 9 engine classes (6 MCTS in `engine.mcts` + FlatMc in `engine.flat` + HeuristicEv in `engine.heuristic` + Expectimax in `engine.expectimax`).
+Each variant has fast/balanced/deep configurations. Total: 35 registry entries across 10 engine classes (6 MCTS in `engine.mcts` + FlatMc in `engine.flat` + HeuristicEv in `engine.heuristic` + Expectimax in `engine.expectimax` + Creator in `engine.creator`).
 
 ### 6.4 Expectimax Engine
 
@@ -271,6 +271,52 @@ Deterministic minimax engine with probability-weighted chance nodes. No random r
 **Config:** `maxDepthRounds` (default 2), `leafEval` ("winprob" or "composite").
 
 **Performance:** depth-1 ≈ 8–60ms, depth-2 ≈ 1.3–1.5s, depth-3 ≈ 17 min (impractical). Registry: 4 entries (d1/d2 × winprob/composite).
+
+### 6.5 Creator Engine
+
+Custom strategy engine encoding a low-risk, income-first, adaptive philosophy with decisive endgame execution. Uses a **seeded Flat Monte Carlo** architecture: a fast heuristic pre-ranks candidates, then MC rollouts validate and refine with biased allocation.
+
+**Architecture — Two-Phase Seeded FlatMC:**
+
+1. **Phase 1: Heuristic Seeding (~2-5ms)** — `CreatorScorer` scores all candidates using a holistic situation assessment and 8 weighted dimensions.
+2. **Phase 2: MC Validation (budget-dependent)** — Biased FlatMC sampling with 50%/30%/20% allocation by heuristic rank. If budget=0, returns heuristic-only result.
+
+**Situation Assessment** (replaces simple landmark-count progress):
+
+```
+situation = 0.30 × (landmarks / 4)
+          + 0.30 × clamp01(evPerRound / targetEv)
+          + 0.15 × clamp01(coins / remainingLandmarkCost)
+          + 0.25 × clamp01(1 − ETW / maxETW)
+```
+
+All four weights configurable via `EngineConfig.extra` (`sitLandmark`, `sitIncome`, `sitCoins`, `sitTempo`).
+
+**8 Scoring Dimensions** (all configurable base weights + sigmoid multipliers):
+
+| Dimension | Default base | Source |
+|-----------|-------------|--------|
+| income | 2.5 | evPerRound + portfolioDeltaEV |
+| risk | 2.0 | CVaR(10%) + probNoIncome + correlation diversity |
+| coverage | 1.5 | incomeEntropy + coverage density |
+| tempo | 2.0 | tempoAdvantage |
+| winProb | 3.0 | estimateWinProbDelta |
+| landmark | 2.0 | dynamic landmark value (EV-based) |
+| urgency | 1.0 | purchaseUrgency (scarcity) |
+| roi | 1.5 | roiOverHorizon(horizon=5, γ=0.95) |
+
+Each weight has a situational multiplier: `effectiveWeight = baseWeight × (low + (high − low) × sigmoid(k × (situation − 0.5)))`. Multipliers shift with game situation (e.g., income emphasis decreases as situation rises).
+
+**Gravity Wells:**
+- **Instant-win snap**: Hard override — `Double.MAX_VALUE` when `findInstantWinLandmark()` succeeds.
+- **Win-sprint ramp**: Gradual with configurable `sprintHorizon` (default 6) and `sprintSharpness` (default 1.0). Boosts tempo/winProb, suppresses income/risk.
+- **Threat-response ramp**: Gradual with configurable `threatHorizon` (default 8) and `threatSharpness` (default 1.0). Detects approaching opponents early.
+
+**CreatorRollout:** Custom rollout policy that evaluates landmarks by marginal EV contribution (not cheapest-first). Dice/Funkturm/Burohaus logic follows proven greedy patterns.
+
+**31 configurable knobs** via `EngineConfig.extra` for H2H sweep optimization: 4 situation weights, 8 base weights, 1 sigmoid steepness, 4 gravity well parameters, 1 save discount, rollout policy + temperature, plus multiplier endpoints.
+
+**Config:** `iterations` (iteration budget), `timeBudgetMs` (anytime mode), `rolloutPolicy` ("creator"/"greedy"/"uniform"/"boltzmann"). Registry: 3 entries (fast/balanced/deep).
 
 ---
 

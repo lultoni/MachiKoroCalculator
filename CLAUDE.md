@@ -40,12 +40,13 @@ UI (React 19 SPA) --HTTP--> Interface --> Engines --> Calcs --> Core
 | | `engine/expectimax/` | ExpectimaxEngine. |
 | | `engine/flat/` | FlatMcEngine. |
 | | `engine/heuristic/` | HeuristicEvEngine. |
+| | `engine/creator/` | CreatorEngine (seeded FlatMC + CreatorScorer + CreatorRollout). |
 | Interface | `iface/` | Engine registry (JSON), routing, result formatting. |
 | Server | `server/` | Java HTTP API (21 endpoints), session management, pre-computation. |
 | H2H | `h2h/` | Engine comparison: match runner, tournament, Glicko-2 ratings, game logging. |
 | UI | `web/` | React 19 + TypeScript + Vite 8 + Tailwind CSS 4. 17 components, 8 hooks, DE/EN. |
 
-**Engine classes (9 classes, 32 registry configs):** MctsV1 (base) + 5 variants (A-E) in `engine.mcts`, FlatMcEngine in `engine.flat`, HeuristicEvEngine in `engine.heuristic`, ExpectimaxEngine in `engine.expectimax`.
+**Engine classes (10 classes, 35 registry configs):** MctsV1 (base) + 5 variants (A-E) in `engine.mcts`, FlatMcEngine in `engine.flat`, HeuristicEvEngine in `engine.heuristic`, ExpectimaxEngine in `engine.expectimax`, CreatorEngine in `engine.creator`.
 
 ## Build & Run
 

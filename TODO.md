@@ -12,8 +12,10 @@ Priorisiere in deiner Abarbeitung die wichtigsten Features. Erkenne Abhänigkeit
 |---|------|-------|
 | 5 | Expansion card support. | Out of scope until core is perfected. |
 | 9 | Custom engine builder screen. | UI to compose engine configs (base class + params), save to registry with duplicate detection. |
-| 21 | Creator Engine Brainstorm | The Creator of the Calc want to make his own engine that does what he thinks are the best decision. He want to Brainstorm the exact decisions that this engine should do, the way it works, the params it has and so on and so forth. |
 | 26 | Add in 3 Player and 4 Player Testing Scenarios in H2H Testing | Are Elo-Calc adjustments needed for this? I would want seperate leaderboards maybe and then a overall leaderboard. |
+| 27 | Creator Engine: Adaptive opponent modeling | Track actual opponent purchase patterns across turns to adjust rollout behavior and threat assessment. Requires stateful session tracking (interface layer, not engine-level). |
+| 28 | Creator Engine: Automated H2H weight sweep | Script/tool that runs H2H tournaments varying Creator Engine parameter vectors (31 knobs), records win rates, and converges on optimal weights via grid search or Bayesian optimization. |
+| 29 | Creator Engine: CreatorRollout v2 | Full CreatorScorer heuristic in rollouts (once performance is validated). Add a "rollout-mode" fast-path in CreatorScorer that skips expensive metrics. Profile first to identify bottleneck dimensions. |
 
 ## Done
 
@@ -21,6 +23,7 @@ Moved here when completed. Full history in CHANGELOG.md.
 
 | # | Task |
 |---|------|
+| 21 | Creator Engine: custom strategy engine (seeded FlatMC + CreatorScorer + CreatorRollout). |
 | 24 | All Engines get a "can win" check to prevent games from going on too long. |
 | 25 | Check which Engines still don't have a rating and make them play the best one. |
 | 23 | Engine performance analysis & optimization. |

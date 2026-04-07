@@ -6,6 +6,23 @@ Implementation history: what was built, why, and which design decisions were mad
 
 ## Phase 7: Iteration
 
+### 7.40 — H2H Replay Engine Decision Details + Affordable Purchase Fix (TODO #33)
+
+**Engine decision details in H2H replay (TODO #33):** Each turn in the H2H game replay now has a collapsible "Decision detail" / "Entscheidungsdetails" section showing the top-5 buy alternatives the engine evaluated, with score bars, chosen-option highlighting, iteration count, and confidence (when available). Works for all 10 engine classes:
+
+- **Non-MCTS engines** (FlatMc, Creator, Heuristic, Expectimax): The full `EngineResult` is now carried through `TurnPlan.engineResult` and converted to a compact `TurnLog.DecisionDetail` in MatchRunner.
+- **MCTS engines** (MctsV1 + 5 variants): Buy alternatives are extracted from the `BuyDecisionNode` tree children using a new `TurnPlan.getMctsBuyAlternatives()` method that counts card diffs (handles duplicate card IDs correctly).
+
+**Data model:** New nested classes in `TurnLog`: `DecisionDetail` (top-N options, iterations, confidence) and `DecisionOption` (cardId, score, chosen). Serialized to JSON via Gson alongside existing turn data. Backward-compatible (null for old logs).
+
+**UI:** CSS Grid layout with fixed column widths (rank, name, bar, score, chosen indicator) for consistent bar alignment across all options. Confidence shown inline when available (non-MCTS only).
+
+**Bug fix: non-MCTS engines picking unaffordable cards in H2H.** `evaluateFullTurn()` for all 4 non-MCTS engines previously called `topRecommendation()` which returns the absolute top option regardless of affordability. If an unaffordable card scored highest, the engine would "choose" it, but MatchRunner couldn't execute the purchase, causing silent saves. Fixed by switching to new `EngineResult.topAffordableRecommendation()` which iterates ranked options to find the best one the player can actually buy. This is a real gameplay fix that should improve non-MCTS engine H2H performance.
+
+**Match ID display:** Game replay header now shows the match UUID so users can find the corresponding JSON file in `data/h2h-gamelogs/`.
+
+**Files:** `TurnPlan.java`, `TurnLog.java`, `MatchRunner.java`, `EngineResult.java`, `FlatMcEngine.java`, `CreatorEngine.java`, `HeuristicEvEngine.java`, `ExpectimaxEngine.java`, `H2hGameReplay.tsx`, `H2hOverview.tsx`, `types.ts`, `TODO.md`.
+
 ### 7.39 — H2H Replay Bürohaus Swap Display + Greedy Fallback (TODO #34)
 
 **Bürohaus swap display in H2H replay (TODO #34):** Swap actions now show localized card names with category icons and color coding instead of raw card IDs. Declined swaps show "declined"/"abgelehnt" label. New `bürohausActivated` field in TurnLog tracks whether Bürohaus was triggered.

@@ -71,12 +71,12 @@ public final class CreatorEngine implements SimulationEngine {
         long start = System.currentTimeMillis();
         int diceCount = Calcs.optimalDiceCount(state, playerIndex);
         EngineResult result = evaluate(state, playerIndex, config);
-        EngineResult.Option top = result.topRecommendation();
+        EngineResult.Option top = result.topAffordableRecommendation();
         Project purchase = "_wait_".equals(top.project.getId()) ? null : top.project;
         long elapsed = System.currentTimeMillis() - start;
         return TurnPlan.staticPlan(diceCount,
                 purchase != null ? purchase : RankEntry.WAIT_SENTINEL,
-                top.score, result.iterationsUsed, elapsed);
+                top.score, result.iterationsUsed, elapsed, result);
     }
 
     @Override

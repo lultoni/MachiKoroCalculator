@@ -72,6 +72,9 @@ public final class TurnPlan {
     /** Computation time in ms. */
     public long computeTimeMs;
 
+    /** Optional full evaluation result (non-MCTS engines only). Null for MCTS tree plans. */
+    public EngineResult engineResult;
+
     // ---- Internal ----
     private final MctsTree tree;
     private MctsNode currentNode; // tracks our position in the tree
@@ -100,9 +103,26 @@ public final class TurnPlan {
     public static TurnPlan staticPlan(int diceCount, Project purchase,
                                        double purchaseWinRate, int iterationsUsed,
                                        long computeTimeMs) {
+        return staticPlan(diceCount, purchase, purchaseWinRate, iterationsUsed, computeTimeMs, null);
+    }
+
+    /**
+     * Creates a TurnPlan with pre-populated decisions and the full EngineResult.
+     *
+     * @param diceCount       1 or 2
+     * @param purchase        card to buy, or {@link RankEntry#WAIT_SENTINEL} for save
+     * @param purchaseWinRate engine's confidence / score for the purchase
+     * @param iterationsUsed  0 for heuristic engines
+     * @param computeTimeMs   wall-clock computation time
+     * @param result          optional full evaluation result for decision detail logging
+     */
+    public static TurnPlan staticPlan(int diceCount, Project purchase,
+                                       double purchaseWinRate, int iterationsUsed,
+                                       long computeTimeMs, EngineResult result) {
         TurnPlan plan = new TurnPlan(diceCount, iterationsUsed, computeTimeMs);
         plan.purchase = purchase;
         plan.purchaseWinRate = purchaseWinRate;
+        plan.engineResult = result;
         return plan;
     }
 
@@ -306,5 +326,80 @@ public final class TurnPlan {
             if (!before.getOwned_projects().contains(p)) return p;
         }
         return RankEntry.WAIT_SENTINEL;
+    }
+
+    // -------------------------------------------------------------------------
+    // MCTS buy alternatives extraction (for H2H decision detail logging)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Represents one buy option from the MCTS tree with its card ID and win rate.
+     */
+    public record BuyAlternative(String cardId, double winRate, int visits) {}
+
+    /**
+     * Extracts the top-N buy alternatives from the MCTS tree's BuyDecisionNode.
+     * Returns null if this is a static plan (non-MCTS) or the BuyDecisionNode is
+     * not reachable. Results are sorted by win rate descending.
+     *
+     * @param maxResults maximum number of alternatives to return
+     */
+    public List<BuyAlternative> getMctsBuyAlternatives(int maxResults) {
+        if (tree == null) return null;
+
+        BuyDecisionNode buyNode = findBuyDecisionNode();
+        if (buyNode == null || !buyNode.expanded) return null;
+
+        List<BuyAlternative> alts = new java.util.ArrayList<>();
+        for (MctsNode child : buyNode.getChildren()) {
+            double wr = child.visitCount > 0 ? child.totalScore / child.visitCount : 0.0;
+            String cardId = inferCardId(buyNode, child);
+            alts.add(new BuyAlternative(cardId, wr, child.visitCount));
+        }
+
+        alts.sort((a, b) -> Double.compare(b.winRate, a.winRate));
+        return alts.size() > maxResults ? alts.subList(0, maxResults) : alts;
+    }
+
+    /** Walks the tree to find the BuyDecisionNode in the navigated path. */
+    private BuyDecisionNode findBuyDecisionNode() {
+        MctsNode node = currentNode;
+        // currentNode might be a child of BuyDecisionNode (purchase was made)
+        // or the BuyDecisionNode itself (if not expanded)
+        if (node instanceof BuyDecisionNode bn) return bn;
+        // Walk up through parent chain
+        while (node != null && node.parent != null) {
+            if (node.parent instanceof BuyDecisionNode bn) return bn;
+            node = node.parent;
+        }
+        // Walk forward from tree root through best children
+        return findBuyDecisionNodeForward(tree.fullTurnRoot);
+    }
+
+    /** Forward-walk through the tree following best children to find BuyDecisionNode. */
+    private BuyDecisionNode findBuyDecisionNodeForward(MctsNode node) {
+        if (node == null) return null;
+        if (node instanceof BuyDecisionNode bn) return bn;
+        if (!node.expanded || node.getChildren().isEmpty()) return null;
+        MctsNode best = MctsTree.bestChild(node);
+        if (best != null) return findBuyDecisionNodeForward(best);
+        return findBuyDecisionNodeForward(node.getChildren().get(0));
+    }
+
+    private String inferCardId(BuyDecisionNode buyNode, MctsNode child) {
+        Player before = buyNode.state.getPlayers()[buyNode.activePlayer];
+        Player after = child.state.getPlayers()[buyNode.activePlayer];
+        // Compare card counts to detect the purchased card (handles duplicates like Bäckerei).
+        java.util.Map<String, Integer> counts = new java.util.HashMap<>();
+        for (Project p : before.getOwned_projects()) {
+            counts.merge(p.getId(), 1, Integer::sum);
+        }
+        for (Project p : after.getOwned_projects()) {
+            counts.merge(p.getId(), -1, Integer::sum);
+        }
+        for (var entry : counts.entrySet()) {
+            if (entry.getValue() < 0) return entry.getKey(); // count increased → this card was bought
+        }
+        return "_wait_";
     }
 }

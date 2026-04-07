@@ -7,6 +7,7 @@ import { CardTooltip } from './CardTooltip';
 interface Props {
   game: H2hGameLog;
   engines: string[];
+  matchId?: string;
   projects: { byId: (id: string) => ProjectDef | undefined; projects: ProjectDef[] };
   language: 'de' | 'en';
   onBack: () => void;
@@ -115,9 +116,10 @@ function cardBgClass(color?: string): string {
   }
 }
 
-export function H2hGameReplay({ game, engines, projects, language, onBack }: Props) {
+export function H2hGameReplay({ game, engines, matchId, projects, language, onBack }: Props) {
   const { t } = useLocale();
   const [turnIdx, setTurnIdx] = useState(0);
+  const [showDetail, setShowDetail] = useState(false);
   const nameKey = `name_${language}` as 'name_de' | 'name_en';
   const landmarkAbbr = language === 'en' ? LANDMARK_ABBR_EN : LANDMARK_ABBR_DE;
 
@@ -201,6 +203,7 @@ export function H2hGameReplay({ game, engines, projects, language, onBack }: Pro
           </h1>
           <span className="ml-auto text-sm text-machi-text-dim">
             P{game.winnerIndex + 1} {t('h2h.won')} · {game.totalTurns} {t('h2h.turns')}
+            {matchId && <span className="ml-2 font-mono text-xs text-machi-text-dim/50">{matchId}</span>}
           </span>
         </div>
 
@@ -374,6 +377,67 @@ export function H2hGameReplay({ game, engines, projects, language, onBack }: Pro
                   </div>
                 );
               })()}
+
+              {/* Decision Detail (engine "why") */}
+              {turn.decisionDetail && turn.decisionDetail.options.length > 0 && (
+                <div className="mt-3 border-t border-machi-border/30 pt-2">
+                  <button
+                    onClick={() => setShowDetail(d => !d)}
+                    className="text-xs text-machi-text-dim hover:text-machi-text transition flex items-center gap-1"
+                  >
+                    <span className={`inline-block transform transition-transform ${showDetail ? 'rotate-90' : ''}`}>▶</span>
+                    {language === 'en' ? 'Decision detail' : 'Entscheidungsdetails'}
+                    <span className="font-mono text-machi-text-dim/50 ml-1">
+                      ({turn.decisionDetail.iterations} iter{turn.decisionDetail.confidence >= 0
+                        ? `, ${(turn.decisionDetail.confidence * 100).toFixed(1)}% conf`
+                        : ''})
+                    </span>
+                  </button>
+                  {showDetail && (
+                    <div className="mt-2 space-y-0.5">
+                      {turn.decisionDetail.options.map((opt, i) => {
+                        const isSave = opt.cardId === '_wait_';
+                        const proj = isSave ? undefined : projects.byId(opt.cardId);
+                        const name = isSave
+                          ? (language === 'en' ? 'Save' : 'Sparen')
+                          : (proj?.[nameKey] ?? proj?.name_de ?? opt.cardId);
+                        const topScore = turn.decisionDetail!.options[0]?.score || 1;
+                        const barWidth = Math.max(0, Math.min(100, topScore <= 1
+                          ? opt.score * 100
+                          : (opt.score / topScore) * 100
+                        ));
+                        return (
+                          <div key={opt.cardId + '-' + i}
+                            className="grid text-xs rounded px-2 py-1"
+                            style={{ gridTemplateColumns: '16px 120px 1fr 52px 16px', gap: '6px', alignItems: 'center',
+                              background: opt.chosen ? 'rgba(56,189,248,0.08)' : undefined }}
+                          >
+                            <span className="text-center text-machi-text-dim font-mono">{i + 1}</span>
+                            <span className="flex items-center gap-1 truncate">
+                              {!isSave && categoryIconPath(proj?.category) && (
+                                <img src={categoryIconPath(proj?.category)} alt="" className="w-3 h-3 flex-shrink-0" />
+                              )}
+                              <span className={`truncate ${isSave ? 'text-machi-text-dim italic' : cardTextClass(proj?.color)}`}>
+                                {name}
+                              </span>
+                            </span>
+                            <div className="h-3 bg-machi-bg rounded-full overflow-hidden">
+                              <div
+                                className={`h-full rounded-full ${opt.chosen ? 'bg-machi-accent/60' : 'bg-machi-text-dim/20'}`}
+                                style={{ width: `${barWidth}%` }}
+                              />
+                            </div>
+                            <span className="font-mono text-right">
+                              {opt.score <= 1 ? `${(opt.score * 100).toFixed(1)}%` : opt.score.toFixed(1)}
+                            </span>
+                            <span className="text-center">{opt.chosen ? <span className="text-machi-accent">←</span> : ''}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             </div>
           )})()}

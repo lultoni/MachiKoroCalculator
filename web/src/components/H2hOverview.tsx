@@ -208,6 +208,7 @@ export function H2hOverview({ onBack, projects, language }: Props) {
       <H2hGameReplay
         game={h2h.selectedGame}
         engines={h2h.selectedResult.config.engineIds}
+        matchId={h2h.selectedResult.id}
         projects={projects}
         language={language}
         onBack={h2h.clearGame}

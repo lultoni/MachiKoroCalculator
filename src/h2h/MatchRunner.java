@@ -4,6 +4,7 @@ import calcs.RankEntry;
 import calcs.WinProbability;
 import core.*;
 import engine.EngineConfig;
+import engine.EngineResult;
 import engine.SimulationEngine;
 import engine.TurnPlan;
 import engine.mcts.SupplyTracker;
@@ -336,12 +337,82 @@ public final class MatchRunner {
 
         int coinsAfterPurchase = state.getPlayers()[activePlayer].getCoins();
 
+        // 8. Build decision detail from engine evaluation
+        TurnLog.DecisionDetail detail = buildDecisionDetail(plan, purchasedCardId);
+
         return new TurnLog(
                 activePlayer, diceCount, roll, doubles,
                 deltas, purchasedCardId, plan.purchaseWinRate,
                 coinsAfterPurchase, bürohausSwap, bürohausActivated, funkturmRerolled,
-                plan.computeTimeMs
+                plan.computeTimeMs, detail
         );
+    }
+
+    /**
+     * Builds a compact DecisionDetail from the engine's evaluation.
+     * For non-MCTS engines, uses the stored EngineResult. For MCTS engines,
+     * extracts buy alternatives from the BuyDecisionNode tree.
+     */
+    private TurnLog.DecisionDetail buildDecisionDetail(TurnPlan plan, String chosenCardId) {
+        // Non-MCTS engines carry the full EngineResult
+        if (plan.engineResult != null) {
+            return buildDetailFromEngineResult(plan.engineResult, chosenCardId);
+        }
+        // MCTS engines: extract from tree
+        java.util.List<TurnPlan.BuyAlternative> alts = plan.getMctsBuyAlternatives(5);
+        if (alts != null && !alts.isEmpty()) {
+            return buildDetailFromMctsAlternatives(alts, chosenCardId, plan.iterationsUsed);
+        }
+        return null;
+    }
+
+    private TurnLog.DecisionDetail buildDetailFromEngineResult(EngineResult result, String chosenCardId) {
+        java.util.List<TurnLog.DecisionOption> options = new java.util.ArrayList<>();
+        String chosenKey = chosenCardId != null ? chosenCardId : "_wait_";
+        boolean chosenIncluded = false;
+        for (EngineResult.Option opt : result.rankedOptions) {
+            // Only include affordable options (save is always "affordable")
+            if (!opt.affordable) continue;
+            double score = sanitizeDouble(opt.score);
+            String cardId = opt.project.getId();
+            boolean chosen = cardId.equals(chosenKey);
+            if (chosen) chosenIncluded = true;
+            options.add(new TurnLog.DecisionOption(cardId, score, chosen));
+            if (options.size() >= 5 && chosenIncluded) break;
+        }
+        // Ensure chosen option is always present (may have been outside top 5)
+        if (!chosenIncluded) {
+            for (EngineResult.Option opt : result.rankedOptions) {
+                if (!opt.affordable) continue;
+                if (opt.project.getId().equals(chosenKey)) {
+                    options.add(new TurnLog.DecisionOption(
+                            opt.project.getId(), sanitizeDouble(opt.score), true));
+                    break;
+                }
+            }
+        }
+        // Trim to 5 + chosen
+        if (options.size() > 6) {
+            options = new java.util.ArrayList<>(options.subList(0, 6));
+        }
+        double conf = sanitizeDouble(result.confidence);
+        return new TurnLog.DecisionDetail(options, result.iterationsUsed, conf);
+    }
+
+    private TurnLog.DecisionDetail buildDetailFromMctsAlternatives(
+            java.util.List<TurnPlan.BuyAlternative> alts, String chosenCardId, int iterations) {
+        java.util.List<TurnLog.DecisionOption> options = new java.util.ArrayList<>();
+        String chosenKey = chosenCardId != null ? chosenCardId : "_wait_";
+        for (TurnPlan.BuyAlternative alt : alts) {
+            boolean chosen = alt.cardId().equals(chosenKey);
+            options.add(new TurnLog.DecisionOption(alt.cardId(), sanitizeDouble(alt.winRate()), chosen));
+        }
+        return new TurnLog.DecisionDetail(options, iterations, -1.0);
+    }
+
+    /** Replaces NaN, Infinity, -Infinity with -1 for JSON serialization safety. */
+    private static double sanitizeDouble(double v) {
+        return Double.isFinite(v) ? v : -1.0;
     }
 
     // -------------------------------------------------------------------------

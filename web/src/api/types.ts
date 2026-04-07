@@ -226,6 +226,18 @@ export interface H2hStatusResponse {
   resultId?: string;
 }
 
+export interface H2hDecisionOption {
+  cardId: string;
+  score: number;
+  chosen: boolean;
+}
+
+export interface H2hDecisionDetail {
+  options: H2hDecisionOption[];
+  iterations: number;
+  confidence: number;
+}
+
 export interface H2hTurnLog {
   playerIndex: number;
   diceCount: number;
@@ -239,6 +251,7 @@ export interface H2hTurnLog {
   bürohausActivated?: boolean;
   funkturmRerolled: boolean;
   evaluateTimeMs: number;
+  decisionDetail?: H2hDecisionDetail | null;
 }
 
 export interface H2hGameLog {

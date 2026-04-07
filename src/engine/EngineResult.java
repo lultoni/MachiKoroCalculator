@@ -198,4 +198,15 @@ public final class EngineResult {
     public Option topRecommendation() {
         return rankedOptions.get(0);
     }
+
+    /**
+     * Returns the top-ranked AFFORDABLE option.
+     * Falls back to the save sentinel if no affordable card exists.
+     */
+    public Option topAffordableRecommendation() {
+        for (Option opt : rankedOptions) {
+            if (opt.affordable) return opt;
+        }
+        return rankedOptions.get(rankedOptions.size() - 1); // save sentinel (always last or present)
+    }
 }

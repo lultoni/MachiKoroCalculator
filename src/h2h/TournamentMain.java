@@ -36,8 +36,8 @@ public final class TournamentMain {
     // Key = engine class, Value = {baseline iterations, ms per game at that iteration count}
     private static final Map<String, long[]> MS_PER_GAME_BASELINE = Map.of(
             "mcts-v1",                  new long[]{500, 8000},      // ~58ms/eval × 140
-            "mcts-v1-greedy-rollout",   new long[]{500, 500000},    // ~3600ms/eval × 140
-            "mcts-v1-boltzmann-rollout", new long[]{500, 500000},   // ~3600ms/eval × 140
+            "mcts-v1-greedy-rollout",   new long[]{500, 12000},     // ~85ms/eval × 140 (post-optimization)
+            "mcts-v1-boltzmann-rollout", new long[]{500, 12000},    // ~85ms/eval × 140 (post-optimization)
             "mcts-v1-greedy-tree",      new long[]{500, 8000},      // similar to v1
             "mcts-v1-depth-limited",    new long[]{2000, 1400},     // ~10ms/eval × 140
             "mcts-v1-adaptive",         new long[]{500, 8000}       // similar to v1

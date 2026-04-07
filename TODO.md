@@ -13,8 +13,6 @@ Priorisiere in deiner Abarbeitung die wichtigsten Features. Erkenne Abhänigkeit
 | 5 | Expansion card support. | Out of scope until core is perfected. |
 | 9 | Custom engine builder screen. | UI to compose engine configs (base class + params), save to registry with duplicate detection. |
 | 21 | Creator Engine Brainstorm | The Creator of the Calc want to make his own engine that does what he thinks are the best decision. He want to Brainstorm the exact decisions that this engine should do, the way it works, the params it has and so on and so forth. |
-| 23 | Engine performance analysis & optimization | Profile all engines to find performance bottlenecks. Some "fast" tier engines are too slow. Deep analysis of each engine class needed. |
-| 25 | Check which Engines still don't have a rating and make them play the best one | Creates a kind of "benchmark baseline" from which the speed of engines or the strengths and weaknesses can be determined. |
 | 26 | Add in 3 Player and 4 Player Testing Scenarios in H2H Testing | Are Elo-Calc adjustments needed for this? I would want seperate leaderboards maybe and then a overall leaderboard. |
 
 ## Done
@@ -24,6 +22,8 @@ Moved here when completed. Full history in CHANGELOG.md.
 | # | Task |
 |---|------|
 | 24 | All Engines get a "can win" check to prevent games from going on too long. |
+| 25 | Check which Engines still don't have a rating and make them play the best one. |
+| 23 | Engine performance analysis & optimization. |
 | 17 | H2H UI: expose maxTurnsPerGame, seatSwap, configOverrides (CLI parity). |
 | 18 | H2H engine param tooltips/dropdowns for known parameters. |
 | 15 | Glicko-2 ratings view as separate tab in H2H UI with confidence badges. |

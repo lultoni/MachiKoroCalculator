@@ -927,20 +927,32 @@ public class MctsV1Engine implements SimulationEngine {
         sb.append("mcts-v1: ").append(iterationsUsed).append(" iterations");
         sb.append(", root-children=").append(tree.root.getChildren().size());
 
-        // Count node types in first two levels for transparency
+        // Scan from fullTurnRoot (DiceChoice/ChanceNode) when available,
+        // otherwise from root (BuyDecisionNode). Scan 3 levels deep to detect
+        // special nodes: FunkturmNode, BürohausNode, bonus-turn DiceChoice/ChanceNode.
+        MctsNode scanRoot = tree.fullTurnRoot != null ? tree.fullTurnRoot : tree.root;
         boolean seenFunkturm = false;
         boolean seenBürohaus = false;
         boolean seenBonus    = false;
         int maxVisits = 0;
 
-        for (MctsNode child : tree.root.getChildren()) {
+        for (MctsNode child : scanRoot.getChildren()) {
             if (child.visitCount > maxVisits) maxVisits = child.visitCount;
-            // Expand and look for special nodes
+            if (child instanceof FunkturmNode) seenFunkturm = true;
+            if (child instanceof BürohausNode) seenBürohaus = true;
+            if (child instanceof DiceChoiceNode dc && dc.isBonusTurn) seenBonus = true;
+            if (child instanceof ChanceNode cn && cn.isBonusTurn) seenBonus = true;
             for (MctsNode grandchild : child.getChildren()) {
                 if (grandchild instanceof FunkturmNode) seenFunkturm = true;
                 if (grandchild instanceof BürohausNode) seenBürohaus = true;
-                if (grandchild instanceof DiceChoiceNode dc && dc.isBonusTurn) seenBonus = true;
-                if (grandchild instanceof ChanceNode cn && cn.isBonusTurn) seenBonus = true;
+                if (grandchild instanceof DiceChoiceNode dc2 && dc2.isBonusTurn) seenBonus = true;
+                if (grandchild instanceof ChanceNode cn2 && cn2.isBonusTurn) seenBonus = true;
+                for (MctsNode ggchild : grandchild.getChildren()) {
+                    if (ggchild instanceof FunkturmNode) seenFunkturm = true;
+                    if (ggchild instanceof BürohausNode) seenBürohaus = true;
+                    if (ggchild instanceof DiceChoiceNode dc3 && dc3.isBonusTurn) seenBonus = true;
+                    if (ggchild instanceof ChanceNode cn3 && cn3.isBonusTurn) seenBonus = true;
+                }
             }
         }
         if (seenFunkturm) sb.append(", Funkturm/keep+reroll explored");

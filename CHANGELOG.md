@@ -6,6 +6,26 @@ Implementation history: what was built, why, and which design decisions were mad
 
 ## Phase 7: Iteration
 
+### 7.36 — Engine Performance Optimization + BenchmarkMain CLI (TODO #23, #25)
+
+**RolloutEvCache optimization (TODO #23):** Replaced `Calcs.evPerRound()` (~2ms/card) with `CardIncome.contextualCardEvPerRound()` (~0.01ms/card) in `RolloutEvCache.rebuild()`. Pre-computes `PlayerStats` and opponent coins once per cache refresh. Greedy/Boltzmann rollout engines dropped from ~500ms to ~50-80ms per 500-iteration evaluation — a **~6-10x speedup**.
+
+**Player.copy() optimization:** Added package-private copy constructor that accepts pre-computed `landmarkFlags` and `landmarkCount`, bypassing the O(k) `recomputeLandmarkFlags()` scan on every copy. Saves ~2000-4000 iterations per MCTS search.
+
+**Boltzmann array pre-allocation:** `BoltzmannRollout.applyPurchaseBoltzmann()` now uses ThreadLocal pre-allocated buffers for `candidates[]` and `scores[]` arrays, eliminating ~100K small allocations per evaluation.
+
+**EV cache refresh interval:** Increased from 20 to 40 turns in both `GreedyRollout` and `BoltzmannRollout`, reducing rebuild frequency while preserving ranking accuracy.
+
+**TournamentMain time estimates:** Updated `MS_PER_GAME_BASELINE` for greedy-rollout and boltzmann-rollout from 500000ms to 12000ms post-optimization.
+
+**BenchmarkMain CLI (TODO #25):** New `h2h.BenchmarkMain` tool that auto-discovers engines with zero H2H match history, identifies the highest-rated champion, and runs each unrated engine against it. Features: `--games`, `--tier`, `--champion`, `--estimate`, `--maxTurns` flags. Registers all 9 engine classes including ExpectimaxEngine. Prints time estimates per match and saves results after each match via H2hResultStore.
+
+**Test fixes:** Fixed 4 pre-existing MCTS test failures:
+- `buildDebugInfo` now scans from `fullTurnRoot` (not `root`) and goes 3 levels deep, correctly detecting FunkturmNode, BürohausNode, and bonus-turn nodes in full-turn trees.
+- Replaced incorrect `affordable flag matches coins >= cost` test with `save option is always affordable` — the correct invariant for full-turn tree affordable semantics.
+
+**Files:** `RolloutEvCache.java`, `GreedyRollout.java`, `BoltzmannRollout.java`, `Player.java`, `CardIncome.java`, `MctsV1Engine.java`, `TournamentMain.java`, `BenchmarkMain.java` (new), `RuntimeTester.java`.
+
 ### 7.35 — Engine Package Reorganisation + Instant-Win Rollout Fix (TODO #24)
 
 **Engine package reorganisation:** Moved all 9 engine implementations into thematic subpackages for better readability. Root `engine/` now contains only the 4 public API classes (SimulationEngine, EngineConfig, EngineResult, TurnPlan).

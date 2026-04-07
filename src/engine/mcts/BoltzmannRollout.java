@@ -36,9 +36,16 @@ public final class BoltzmannRollout {
     private static final int    BOLTZMANN_HORIZON  = 5;
     private static final double BOLTZMANN_DISCOUNT = 0.95;
     /** Number of turns between cache refreshes in the EV cache. */
-    private static final int EV_CACHE_REFRESH = 20;
+    private static final int EV_CACHE_REFRESH = 40;
 
     private BoltzmannRollout() {}
+
+    /** Max candidate count for pre-allocated buffers (15 non-landmark + 4 landmark + 1 save). */
+    private static final int MAX_CANDIDATES = 20;
+    private static final ThreadLocal<Project[]> CANDIDATES_BUF =
+            ThreadLocal.withInitial(() -> new Project[MAX_CANDIDATES]);
+    private static final ThreadLocal<double[]> SCORES_BUF =
+            ThreadLocal.withInitial(() -> new double[MAX_CANDIDATES]);
 
     /**
      * Creates a {@link RolloutFn} that uses the Boltzmann policy with the given temperature.
@@ -179,8 +186,16 @@ public final class BoltzmannRollout {
             candidateCount++;
         }
 
-        Project[] candidates = new Project[candidateCount];
-        double[] scores      = new double[candidateCount];
+        // Use pre-allocated ThreadLocal buffers when possible, fall back to allocation
+        Project[] candidates;
+        double[] scores;
+        if (candidateCount <= MAX_CANDIDATES) {
+            candidates = CANDIDATES_BUF.get();
+            scores = SCORES_BUF.get();
+        } else {
+            candidates = new Project[candidateCount];
+            scores = new double[candidateCount];
+        }
         candidates[0] = null; // save sentinel (null = save)
         scores[0]     = 0.0;
 

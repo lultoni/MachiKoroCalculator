@@ -187,7 +187,7 @@ public class CardIncome {
         }
 
         /** Returns a copy of this stats with additional projects applied. */
-        PlayerStats withExtra(Project... extras) {
+        public PlayerStats withExtra(Project... extras) {
             PlayerStats s = new PlayerStats();
             s.hasEinkaufszentrum = this.hasEinkaufszentrum;
             s.hasBahnhof         = this.hasBahnhof;

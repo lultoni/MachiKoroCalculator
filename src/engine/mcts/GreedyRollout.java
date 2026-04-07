@@ -38,7 +38,7 @@ public final class GreedyRollout {
     private static final double GREEDY_DISCOUNT = 0.95;
 
     /** Number of turns between cache refreshes in the EV cache. */
-    private static final int EV_CACHE_REFRESH = 20;
+    private static final int EV_CACHE_REFRESH = 40;
 
     private GreedyRollout() {}
 

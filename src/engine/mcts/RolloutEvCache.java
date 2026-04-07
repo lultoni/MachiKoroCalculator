@@ -1,7 +1,8 @@
 package engine.mcts;
 
-import calcs.Calcs;
+import core.CardIncome;
 import core.GameState;
+import core.Player;
 import core.Project;
 
 import java.util.HashMap;
@@ -9,13 +10,14 @@ import java.util.HashMap;
 /**
  * Caches per-card EV scores for use in greedy/Boltzmann rollout purchase decisions.
  *
- * <p>Without caching, {@link Calcs#evPerRound} is called for every affordable card on
- * every turn of a rollout (~10 cards × 200 turns = 2000 calls at ~2ms each = ~4s).
- * This cache precomputes EV once per unique card type and refreshes every {@code refreshInterval}
- * turns, reducing the total to ~10 refreshes × 15 cards × 2ms = ~300ms.
+ * <p>Uses {@link CardIncome#contextualCardEvPerRound} for fast synergy-aware per-card
+ * marginal EV, with {@link CardIncome.PlayerStats} and opponent coins computed once per
+ * refresh. This is dramatically cheaper than the full {@code Calcs.evPerRound()} (which
+ * includes coin projection, opponent-turn tracking, and repeated roll-gain cache building)
+ * while preserving relative ranking accuracy for greedy/Boltzmann purchase decisions.
  *
- * <p>Between refreshes the scores may be slightly stale (the portfolio changes by 1 card/turn),
- * but relative ordering rarely shifts, preserving the greedy/Boltzmann policy character.
+ * <p>Between refreshes the scores may be slightly stale (the portfolio changes by ~1 card
+ * every 2 turns), but relative ordering rarely shifts, preserving the policy character.
  */
 final class RolloutEvCache {
 
@@ -70,11 +72,25 @@ final class RolloutEvCache {
         turnsUntilRefresh = refreshInterval;
     }
 
+    /**
+     * Rebuilds all card scores using {@link CardIncome#contextualCardEvPerRound}.
+     *
+     * <p>PlayerStats and opponent coins are computed once, then each card is evaluated
+     * with {@code stats.withExtra(candidate)} to capture synergy contributions (e.g.
+     * Markthalle's income depends on food count including the candidate itself).
+     */
     private void rebuild(GameState state, int activePlayer) {
         scores.clear();
+        Player player = state.getPlayers()[activePlayer];
+        CardIncome.PlayerStats baseStats = CardIncome.PlayerStats.of(player);
+        int numPlayers = state.getPlayers().length;
+        int[] oppCoins = CardIncome.buildOpponentCoins(state.getPlayers(), activePlayer);
+
         for (Project p : state.getUnbuilt_projects()) {
             if (!scores.containsKey(p.getId())) {
-                scores.put(p.getId(), Calcs.evPerRound(state, activePlayer, p));
+                CardIncome.PlayerStats withCandidate = baseStats.withExtra(p);
+                scores.put(p.getId(),
+                        CardIncome.contextualCardEvPerRound(p, withCandidate, numPlayers, oppCoins));
             }
         }
     }

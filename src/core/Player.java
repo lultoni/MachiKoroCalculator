@@ -32,6 +32,23 @@ public class Player {
     }
 
     /**
+     * Package-private copy constructor: transfers pre-computed landmark flags directly,
+     * avoiding the O(k) {@link #recomputeLandmarkFlags()} scan on every copy.
+     *
+     * <p><b>Caller must guarantee</b> that {@code landmarkFlags} and {@code landmarkCount}
+     * are consistent with the projects in {@code owned_projects}. Only used by {@link #copy()}.
+     */
+    Player(String name, int coins, ArrayList<Project> owned_projects,
+           int landmarkFlags, int landmarkCount) {
+        this.name = Objects.requireNonNull(name, "name must not be null");
+        if (coins < 0) throw new IllegalArgumentException("coins must be >= 0, got: " + coins);
+        this.coins = coins;
+        this.owned_projects = Objects.requireNonNull(owned_projects, "owned_projects must not be null");
+        this.landmarkFlags = landmarkFlags;
+        this.landmarkCount = landmarkCount;
+    }
+
+    /**
      * Returns the player's display name.
      */
     public String getName() {
@@ -117,11 +134,12 @@ public class Player {
     }
 
     /**
-     * Returns a new Player with the same name and coins, and a new ArrayList containing
-     * the same Project references. This is a safe defensive copy because Project is immutable.
+     * Returns a new Player with the same name, coins, and landmark state, and a new ArrayList
+     * containing the same Project references. Safe because Project is immutable.
+     * Uses the package-private constructor to skip landmark recomputation.
      */
     public Player copy() {
-        return new Player(name, coins, new ArrayList<>(owned_projects));
+        return new Player(name, coins, new ArrayList<>(owned_projects), landmarkFlags, landmarkCount);
     }
 
     // -------------------------------------------------------------------------

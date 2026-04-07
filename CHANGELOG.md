@@ -6,6 +6,12 @@ Implementation history: what was built, why, and which design decisions were mad
 
 ## Phase 7: Iteration
 
+### 7.42 — Fix save-then-buy pattern + expanded Game Insights (TODO #32)
+
+**Creator Engine: Fix heuristic-only score normalization (TODO #32):** Replaced softmax normalization with linear min-max scaling for heuristic-only mode. Softmax compressed differences between save (0.0) and cards with small positive scores (e.g., 0.01), making them nearly indistinguishable. Linear scaling preserves the natural ordering: save at 0.0 loses to any positive-scored card. With delta-based scoring (#30), cards that genuinely add value now have clearly positive scores and reliably beat save.
+
+**H2H Game Insights expansion:** Moved events timeline inside the Game Insights section. Added per-player metrics: red card losses, average income/turn, best single-turn income, 1d6/2d6 dice choice breakdown, landmark purchase turn timeline. Replaced plain dots with distinct colored icon badges for event types (★ landmark, ⇄ bürohaus, ↻ funkturm, ⚖ close decision).
+
 ### 7.41 — Creator Engine: Delta-based risk/coverage + 7-12 activation guard (TODO #30, #31)
 
 **Fix risk/coverage dimension baseline inflation (TODO #30):** CreatorScorer's `riskTerm` and `coverageTerm` now compute **delta-based** values (after minus before adding the card) instead of absolute portfolio metrics. Baselines are computed once per `scoreAll()` call using `WAIT_SENTINEL`:

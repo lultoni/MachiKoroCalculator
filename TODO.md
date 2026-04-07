@@ -16,7 +16,6 @@ Priorisiere in deiner Abarbeitung die wichtigsten Features. Erkenne Abhänigkeit
 | 27 | Creator Engine: Adaptive opponent modeling | Track actual opponent purchase patterns across turns to adjust rollout behavior and threat assessment. Requires stateful session tracking (interface layer, not engine-level). |
 | 28 | Creator Engine: Automated H2H weight sweep | Script/tool that runs H2H tournaments varying Creator Engine parameter vectors (31 knobs), records win rates, and converges on optimal weights via grid search or Bayesian optimization. |
 | 29 | Creator Engine: CreatorRollout v2 | Full CreatorScorer heuristic in rollouts (once performance is validated). Add a "rollout-mode" fast-path in CreatorScorer that skips expensive metrics. Profile first to identify bottleneck dimensions. |
-| 32 | Creator Engine: Fix early-game save-then-buy pattern | Engine saves on turn N when an affordable card exists, then buys that same card on turn N+2. Root cause: save scores 0.0 (fixed from old discount bug), but some affordable cards also score near 0 or slightly negative due to risk/coverage baseline inflation (#30). When MC validation runs, the save option is excluded from MC but card scores come back as MC win rates — if those MC rates are very close together (e.g., 0.48 vs 0.49), the top pick can flip between save and buy across turns. Fix depends on #30 (making dimension scores properly delta-based will spread card scores apart). Additionally consider: if the best affordable card has a positive heuristic score, save should be suppressed. |
 | 35 | Creator Engine soll, wenn es ein Bürohaus besitzt immer eine Low Value Cheap Karte besitzen, sodass es bei einem potentiellen Tausch gut benefittet. | Hier muss aber darauf geachtet werden, dass diese karte für den gegner nicht gut wäre und man selber von der getaschten karte profitiert. |
 | 37 | H2H: Add stop button with live progress feedback | Currently running matches can't be stopped from the UI. Add a cancel button that stops the match mid-run and shows partial results (games completed so far). |
 | 38 | Expectimax/MCTS tiebreaker when all options score 100%/0% | When all buy options score 1.0 (certain win) or 0.0 (certain loss), there's no differentiation. Add a tiebreaker based on tempo (turns-to-win estimate, cost efficiency) so the engine picks the fastest winning move / slowest losing move instead of arbitrary ordering. Observed in expectimax-d1-composite buying random cards instead of landmarks at 100%. |
@@ -27,6 +26,7 @@ Moved here when completed. Full history in CHANGELOG.md.
 
 | # | Task |
 |---|------|
+| 32 | Creator Engine: Fix early-game save-then-buy pattern — linear normalization replaces softmax. |
 | 30 | Creator Engine: Fix risk/coverage dimension baseline inflation — delta-based scoring. |
 | 31 | Creator Engine: Penalize 7-12 cards without Bahnhof + activation guard + opponent 2d6 check. |
 | 33 | H2H Game Replay: Show engine decision details + fix non-MCTS affordable purchase bug. |

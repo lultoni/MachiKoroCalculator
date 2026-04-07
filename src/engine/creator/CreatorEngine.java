@@ -296,17 +296,26 @@ public final class CreatorEngine implements SimulationEngine {
         // Score assignment strategy:
         // - Instant-win: 1.0
         // - MC-sampled candidates: MC win rate (already in [0,1])
-        // - Save (when MC active): 0.0 (last resort — only wins if no card has positive value)
-        // - Non-MC candidates when MC is OFF: softmax-normalize heuristic scores to [0,1]
-        // - Unaffordable candidates: softmax-normalize alongside above
-        double softmaxDenom = 0.0;
+        // - Save (when MC active): 0.0 (last resort — only wins if no card has positive MC value)
+        // - Heuristic-only mode: linear normalization of raw heuristic scores to [0,1]
+        //   using max-min range. Save at 0.0 naturally beats negative-scored cards and loses
+        //   to positive-scored cards. (Previously used softmax which compressed differences.)
+        // - Unaffordable/guarded when MC is active: -1.0
         boolean heuristicOnly = !usedMC;
+
+        // For heuristic-only: linear normalization [min, max] → [0, 1]
+        double heuristicMax = Double.NEGATIVE_INFINITY;
+        double heuristicMin = Double.POSITIVE_INFINITY;
         if (heuristicOnly) {
             for (CandidateOption c : candidates) {
                 if (c.isInstantWin) continue;
-                softmaxDenom += Math.exp(c.heuristicScore);
+                if (c.activationGuard <= 0.0 && !c.isSave) continue; // exclude guarded
+                double s = c.heuristicScore;
+                if (s > heuristicMax) heuristicMax = s;
+                if (s < heuristicMin) heuristicMin = s;
             }
         }
+        double heuristicRange = heuristicMax - heuristicMin;
 
         for (CandidateOption c : candidates) {
             double finalScore;
@@ -314,11 +323,16 @@ public final class CreatorEngine implements SimulationEngine {
                 finalScore = 1.0;
             } else if (usedMC && c.samples > 0) {
                 finalScore = c.winRate();
-            } else if (heuristicOnly && softmaxDenom > 0) {
-                finalScore = Math.exp(c.heuristicScore) / softmaxDenom;
-                // Apply activation guard: cards that can't activate get score pushed below save
+            } else if (heuristicOnly) {
+                // Apply activation guard: cards that can't activate score below save
                 if (c.activationGuard <= 0.0 && !c.isSave) {
                     finalScore = -1.0;
+                } else if (heuristicRange > 1e-12) {
+                    // Linear normalization: min → 0, max → 1
+                    finalScore = (c.heuristicScore - heuristicMin) / heuristicRange;
+                } else {
+                    // All scores identical — equal ranking
+                    finalScore = 0.5;
                 }
             } else if (c.isSave) {
                 // Save when MC is active: score 0.0 (last resort)

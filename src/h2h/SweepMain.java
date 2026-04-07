@@ -63,29 +63,44 @@ public final class SweepMain {
 
     static final TpeSampler.ParamDef[] PARAMS = {
         // Base dimension weights (8)
-        new TpeSampler.ParamDef("wIncome",   0.5, 5.0, 2.5),
-        new TpeSampler.ParamDef("wRisk",     0.3, 4.0, 2.0),
-        new TpeSampler.ParamDef("wCoverage", 0.3, 3.0, 1.5),
-        new TpeSampler.ParamDef("wTempo",    0.3, 4.0, 2.0),
-        new TpeSampler.ParamDef("wWinProb",  0.5, 6.0, 3.0),
-        new TpeSampler.ParamDef("wLandmark", 0.5, 4.0, 2.0),
-        new TpeSampler.ParamDef("wUrgency",  0.2, 3.0, 1.0),
-        new TpeSampler.ParamDef("wRoi",      0.3, 3.0, 1.5),
+        // Weights multiply situation-dependent multipliers (0.3–2.0) and raw dimension values.
+        // Raw value magnitudes vary widely (tempo ~20, winProbDelta ~0.3), so weights must
+        // compensate. Allow 0.0 to let TPE disable any dimension entirely.
+        new TpeSampler.ParamDef("wIncome",   0.0, 8.0, 2.5),
+        new TpeSampler.ParamDef("wRisk",     0.0, 6.0, 2.0),
+        new TpeSampler.ParamDef("wCoverage", 0.0, 6.0, 1.5),
+        new TpeSampler.ParamDef("wTempo",    0.0, 6.0, 2.0),
+        new TpeSampler.ParamDef("wWinProb",  0.0, 10.0, 3.0),
+        new TpeSampler.ParamDef("wLandmark", 0.0, 8.0, 2.0),
+        new TpeSampler.ParamDef("wUrgency",  0.0, 6.0, 1.0),
+        new TpeSampler.ParamDef("wRoi",      0.0, 6.0, 1.5),
         // Situation assessment (6)
-        new TpeSampler.ParamDef("sitLandmark",      0.05, 0.60, 0.30),
-        new TpeSampler.ParamDef("sitIncome",         0.05, 0.60, 0.30),
-        new TpeSampler.ParamDef("sitCoins",          0.05, 0.40, 0.15),
-        new TpeSampler.ParamDef("sitTempo",          0.05, 0.50, 0.25),
-        new TpeSampler.ParamDef("targetEvPerRound",  2.0,  8.0,  4.0),
-        new TpeSampler.ParamDef("maxETW",           20.0, 80.0, 50.0),
+        // Each sit weight scales a [0,1] signal into the situation composite. No normalization,
+        // so the sum can exceed 1.0 (sigmoid handles saturation). Allow 0.0 to disable a signal,
+        // allow 1.0 to let one signal dominate the situation assessment entirely.
+        new TpeSampler.ParamDef("sitLandmark",      0.0, 1.0, 0.30),
+        new TpeSampler.ParamDef("sitIncome",         0.0, 1.0, 0.30),
+        new TpeSampler.ParamDef("sitCoins",          0.0, 1.0, 0.15),
+        new TpeSampler.ParamDef("sitTempo",          0.0, 1.0, 0.25),
+        // targetEvPerRound: incomeFrac = clamp01(evPerRound / target). Typical evPerRound 1–6.
+        // Low values saturate early ("any income is enough"), high values keep it low ("never enough").
+        new TpeSampler.ParamDef("targetEvPerRound",  1.0, 15.0, 4.0),
+        // maxETW: tempoFrac = clamp01(1 - etw / maxETW). Typical ETW 5–100.
+        // Low = always feels late, high = never feels late.
+        new TpeSampler.ParamDef("maxETW",           10.0, 150.0, 50.0),
         // Sigmoid + gravity wells (5)
-        new TpeSampler.ParamDef("sigmoidK",          2.0, 12.0, 6.0),
-        new TpeSampler.ParamDef("sprintHorizon",     3.0, 12.0, 6.0),
-        new TpeSampler.ParamDef("sprintSharpness",   0.3,  3.0, 1.0),
-        new TpeSampler.ParamDef("threatHorizon",     4.0, 16.0, 8.0),
-        new TpeSampler.ParamDef("threatSharpness",   0.3,  3.0, 1.0),
-        // Bürohaus swap (1)
-        new TpeSampler.ParamDef("wBurohausSwap",     0.5,  4.0, 1.5),
+        // sigmoidK: controls how sharply weights shift between early/late game.
+        // Low k (~0.5) = nearly linear, high k (~20) = nearly binary step.
+        new TpeSampler.ParamDef("sigmoidK",          0.5, 20.0, 6.0),
+        // sprintHorizon/threatHorizon: ETW threshold where gravity well kicks in.
+        // Low = only activates very close to winning, high = activates broadly.
+        new TpeSampler.ParamDef("sprintHorizon",     2.0, 25.0, 6.0),
+        // sharpness: pow(raw, 1/sharpness). Low = very suppressed, high = very sensitive.
+        new TpeSampler.ParamDef("sprintSharpness",   0.1,  5.0, 1.0),
+        new TpeSampler.ParamDef("threatHorizon",     2.0, 25.0, 8.0),
+        new TpeSampler.ParamDef("threatSharpness",   0.1,  5.0, 1.0),
+        // Bürohaus swap bonus weight. 0.0 = disabled, high = heavily prioritize swap bait.
+        new TpeSampler.ParamDef("wBurohausSwap",     0.0,  8.0, 1.5),
     };
 
     // =====================================================================
@@ -177,10 +192,13 @@ public final class SweepMain {
         String oppDisplay = opponentList.size() == 1
                 ? opponentList.get(0)
                 : "[" + String.join(", ", opponentList) + "]";
-        System.out.printf("[SWEEP] %s vs %s — %s trials (%d startup), %d games/trial, seed=%d%n",
+        String gamesDesc = opponentList.size() == 1
+                ? String.format("%d games/trial", games)
+                : String.format("%d games/opponent × %d opponents", games, opponentList.size());
+        System.out.printf("[SWEEP] %s vs %s — %s trials (%d startup), %s, seed=%d%n",
                 creatorId, oppDisplay,
                 infinite ? "∞" : String.valueOf(trials),
-                startup, games, seed);
+                startup, gamesDesc, seed);
         if (priorCount > 0) {
             System.out.printf("[SWEEP] Resuming from %d existing trials%n", priorCount);
         }
@@ -237,9 +255,6 @@ public final class SweepMain {
 
         for (int t = 0; t < trials; t++) {
             int trialIdx = startIdx + t;
-
-            // Pick opponent for this trial (round-robin when multiple)
-            String currentOpponent = opponentList.get(t % opponentList.size());
 
             // Choose parameter vector
             double[] paramValues;
@@ -300,25 +315,45 @@ public final class SweepMain {
             overrides[0] = creatorOverrides;
             overrides[1] = Map.of();
 
-            MatchConfig matchConfig = new MatchConfig(
-                    new String[]{creatorId, currentOpponent}, games, 200, iterations, true, overrides);
-
-            // Run the match
+            // Play against ALL opponents and average the win rate.
+            // This makes the objective unbiased across opponent strengths.
             long matchStart = System.currentTimeMillis();
-            final boolean verb = verbose;
-            final int totalGames = games;
-            MatchResult result = runner.runMatch(matchConfig, verbose ? (gameIdx, log) -> {
-                if (verb && ((gameIdx + 1) % 10 == 0 || totalGames <= 20)) {
-                    System.out.printf("    Game %d/%d: winner=P%d, turns=%d%s%n",
-                            gameIdx + 1, totalGames,
-                            log.winnerIndex + 1, log.totalTurns,
-                            log.timeoutWin ? " (timeout)" : "");
-                }
-            } : null);
-            long matchTime = System.currentTimeMillis() - matchStart;
+            double winRateSum = 0.0;
+            int totalWins = 0;
+            int totalLosses = 0;
 
-            double winRate = result.winRates[0];
-            SweepResult.Trial trial = new SweepResult.Trial(trialIdx, paramMap, winRate, games, matchTime);
+            for (int oi = 0; oi < opponentList.size(); oi++) {
+                String currentOpponent = opponentList.get(oi);
+                MatchConfig matchConfig = new MatchConfig(
+                        new String[]{creatorId, currentOpponent}, games, 200, iterations, true, overrides);
+
+                final boolean verb = verbose;
+                final int totalGames = games;
+                final int oppIdx = oi;
+                MatchResult result = runner.runMatch(matchConfig, verbose ? (gameIdx, log) -> {
+                    if (verb && ((gameIdx + 1) % 10 == 0 || totalGames <= 20)) {
+                        System.out.printf("    [opp %d] Game %d/%d: winner=P%d, turns=%d%s%n",
+                                oppIdx + 1, gameIdx + 1, totalGames,
+                                log.winnerIndex + 1, log.totalTurns,
+                                log.timeoutWin ? " (timeout)" : "");
+                    }
+                } : null);
+
+                winRateSum += result.winRates[0];
+                totalWins += result.wins[0];
+                totalLosses += result.wins[1];
+
+                if (verbose && opponentList.size() > 1) {
+                    System.out.printf("    vs %-30s: %d-%d (%.1f%%)%n",
+                            currentOpponent, result.wins[0], result.wins[1],
+                            result.winRates[0] * 100);
+                }
+            }
+
+            long matchTime = System.currentTimeMillis() - matchStart;
+            double winRate = winRateSum / opponentList.size();
+            int totalGamesPlayed = games * opponentList.size();
+            SweepResult.Trial trial = new SweepResult.Trial(trialIdx, paramMap, winRate, totalGamesPlayed, matchTime);
             newTrials.add(trial);
             trialsOnExit[0] = newTrials.size();
 
@@ -330,16 +365,15 @@ public final class SweepMain {
             String trialLabel = infinite
                     ? String.format("Trial %d", t + 1)
                     : String.format("Trial %d/%d", t + 1, trials);
-            String oppSuffix = opponentList.size() > 1 ? " vs " + currentOpponent : "";
-            System.out.printf("  %s (%s)%s: WR=%.1f%%  [best: %.1f%% @ #%d]  (%.1fs)%n",
-                    trialLabel, source, oppSuffix, winRate * 100,
-                    bestWinRate * 100, bestTrialIdx, matchTime / 1000.0);
-
-            if (verbose) {
-                System.out.printf("    Match details: %d-%d (%.0f%%-%.0f%%), avg %.0f turns, avg eval %.1fms%n",
-                        result.wins[0], result.wins[1],
-                        result.winRates[0] * 100, result.winRates[1] * 100,
-                        result.avgGameLength, result.avgEvalTimeMs);
+            if (opponentList.size() > 1) {
+                System.out.printf("  %s (%s): avgWR=%.1f%% (%d-%d across %d opponents)  [best: %.1f%% @ #%d]  (%.1fs)%n",
+                        trialLabel, source, winRate * 100,
+                        totalWins, totalLosses, opponentList.size(),
+                        bestWinRate * 100, bestTrialIdx, matchTime / 1000.0);
+            } else {
+                System.out.printf("  %s (%s): WR=%.1f%%  [best: %.1f%% @ #%d]  (%.1fs)%n",
+                        trialLabel, source, winRate * 100,
+                        bestWinRate * 100, bestTrialIdx, matchTime / 1000.0);
             }
 
             // Save after every trial so Ctrl+C never loses completed work.
@@ -468,7 +502,7 @@ public final class SweepMain {
         System.out.println("  --games N            Games per trial match (default: 50)");
         System.out.println("  --creator <id>       Creator engine ID (default: creator-fast)");
         System.out.println("  --opponent <id>      Single opponent engine ID (default: heuristic-ev-default)");
-        System.out.println("  --opponents <a,b,c>  Comma-separated opponent list; round-robined per trial");
+        System.out.println("  --opponents <a,b,c>  Comma-separated opponent list; each trial plays ALL, WR averaged");
         System.out.println("  --iterations N       Override iterations (0 = registry default)");
         System.out.println("  --startup N          Random trials before TPE (default: 20)");
         System.out.println("  --gamma F            TPE good/bad split (default: 0.25)");

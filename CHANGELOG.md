@@ -6,6 +6,25 @@ Implementation history: what was built, why, and which design decisions were mad
 
 ## Phase 7: Iteration
 
+### 7.49 — Sweep: multi-opponent per trial + widened parameter ranges
+
+**Multi-opponent: each trial plays ALL opponents.** Changed `--opponents a,b,c` from round-robin (one opponent per trial — biased toward weak opponents) to all-opponents-per-trial. Each trial now runs a match against every opponent and uses the **averaged win rate** as the TPE objective. This eliminates bias: a parameter vector that wins 80% vs heuristic but 40% vs MCTS depth3 now correctly scores 60%, not alternating between 80% and 40% in separate trials. Progress output shows per-opponent breakdown in verbose mode.
+
+**Widened parameter ranges after mathematical analysis of CreatorScorer.** Read through the full scoring pipeline to understand how each parameter flows into the composite score, then widened ranges to avoid clipping potential optima:
+
+| Parameter group | Old range | New range | Rationale |
+|----------------|-----------|-----------|-----------|
+| Base weights (8) | [0.2–0.5, 3–6] | [0.0, 6–10] | Allow 0.0 to fully disable any dimension; widen max for small-magnitude dims (winProb raw ~0.3 needs higher weight to compete with tempo raw ~20) |
+| Situation assess. (4) | [0.05, 0.4–0.6] | [0.0, 1.0] | Each scales a [0,1] signal; no normalization, so sigmoid handles saturation. Allow full disable or full domination |
+| targetEvPerRound | [2, 8] | [1, 15] | Low saturates incomeFrac early, high keeps it permanently low. Both valid extremes |
+| maxETW | [20, 80] | [10, 150] | ETW can reach 100+; allow very aggressive (10) and very conservative (150) tempo normalization |
+| sigmoidK | [2, 12] | [0.5, 20] | 0.5 ≈ linear multiplier, 20 ≈ binary step. Both interesting search regions |
+| sprint/threat horizon | [3–4, 12–16] | [2, 25] | Allow very tight (2 turns) or very broad (25 turns) gravity well activation |
+| sprint/threat sharpness | [0.3, 3.0] | [0.1, 5.0] | 0.1 makes well nearly invisible unless at 100%; 5.0 makes weak signals trigger strongly via pow(raw, 1/5) |
+| wBurohausSwap | [0.5, 4.0] | [0.0, 8.0] | Allow full disable (0.0) or heavy swap-bait strategy (8.0) |
+
+**engines.json snippet:** tier and iterations are now derived from the registry entry for the `--creator` engine, so `--creator creator-balanced` correctly outputs `tier: "balanced"`, `iterations: "5000"`, `id: "creator-balanced-tuned"`.
+
 ### 7.48 — Sweep: infinite mode, per-trial checkpointing, shutdown hook; README revamp
 
 **SweepMain: run indefinitely with safe Ctrl+C.** Added `--infinite` flag (also `--trials 0`) that sets trials to `Integer.MAX_VALUE`. A JVM shutdown hook prints the top-results summary and flushes in-progress state when the process is interrupted. The `saveIntermediateResults()` stub (previously a no-op print) is replaced by calling `SweepResult.saveOrUpdate()` after **every completed trial** — so Ctrl+C never loses work regardless of when it fires.

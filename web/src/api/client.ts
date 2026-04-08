@@ -189,6 +189,22 @@ export const h2hAutoStop = () =>
 export const h2hAutoStatus = () =>
   json<AutoBattleStatusResponse>('/api/h2h/auto/status');
 
+// ─── Custom Engines ──────────────────────────────────────────────
+
+export const saveCustomEngine = (entry: {
+  id: string;
+  engineClass: string;
+  description: string;
+  tier: string;
+  config: Record<string, string>;
+}) => post<EngineRegistryEntry>('/api/engines/custom', entry);
+
+export async function deleteCustomEngine(id: string): Promise<{ status: string; id: string }> {
+  return json<{ status: string; id: string }>(`/api/engines/custom/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  });
+}
+
 // ─── Sweep Results ────────────────────────────────────────────────
 
 export const sweepResults = () =>

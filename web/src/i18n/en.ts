@@ -227,6 +227,30 @@ const en: Record<string, string> = {
   'sweep.importanceWeak': 'Weak (< 0.15)',
   'sweep.observedRange': 'Observed range (actual min–max across all trials)',
   'sweep.topTrialValues': 'Top trial values (hover for details)',
+
+  // Engine Builder
+  'builder.nav': 'Engine Builder',
+  'builder.title': 'Engine Builder',
+  'builder.create': 'Create Custom Engine',
+  'builder.update': 'Update',
+  'builder.engineClass': 'Engine Class',
+  'builder.id': 'Engine ID',
+  'builder.idHint': 'Unique ID — used in H2H results, sweep configs, and save files.',
+  'builder.description': 'Description',
+  'builder.tier': 'Performance Tier',
+  'builder.params': 'Parameters',
+  'builder.save': 'Save Engine',
+  'builder.saved': 'Engine saved successfully.',
+  'builder.updated': 'Engine updated successfully.',
+  'builder.delete': 'Delete',
+  'builder.edit': 'Edit',
+  'builder.cancel': 'Cancel',
+  'builder.confirmDelete': 'Delete custom engine "{id}"?',
+  'builder.deleted': 'Engine deleted.',
+  'builder.duplicateId': 'This ID conflicts with a built-in engine entry.',
+  'builder.errorId': 'Engine ID is required.',
+  'builder.customEngines': 'Custom Engines',
+  'builder.noCustom': 'No custom engines yet. Create one using the form.',
 };
 
 export default en;

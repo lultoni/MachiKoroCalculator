@@ -81,6 +81,7 @@ export interface EngineRegistryEntry {
   iterations: number;
   timeBudgetMs: number;
   isDefault: boolean;
+  custom?: boolean;
   extra: Record<string, string>;
   config: {
     iterations: number;

@@ -17,6 +17,7 @@ import java.util.Map;
  * @param isDefault   true if this entry is the default for normal play
  * @param tier        performance tier: "fast", "balanced", or "deep"
  * @param config      parsed {@link EngineConfig} built from the JSON {@code config} object
+ * @param custom      true if this entry was created via the Engine Builder UI (stored in custom-engines.json)
  */
 public record EngineRegistryEntry(
         String id,
@@ -24,7 +25,8 @@ public record EngineRegistryEntry(
         String description,
         boolean isDefault,
         String tier,
-        EngineConfig config
+        EngineConfig config,
+        boolean custom
 ) {
     /**
      * Builds an {@link EngineConfig} from the raw key-value map parsed from JSON.
@@ -32,7 +34,7 @@ public record EngineRegistryEntry(
      * <p>The {@code iterations} and {@code timeBudgetMs} keys are treated as integer fields
      * on {@link EngineConfig}; all other keys are passed through as {@link EngineConfig#extra}.
      */
-    static EngineConfig buildConfig(Map<String, String> raw) {
+    public static EngineConfig buildConfig(Map<String, String> raw) {
         int iterations   = parseIntOr(raw, "iterations",   0);
         int timeBudgetMs = parseIntOr(raw, "timeBudgetMs", 0);
         double riskWeight = parseDoubleOr(raw, "riskToleranceWeight", 0.0);

@@ -6,6 +6,26 @@ Implementation history: what was built, why, and which design decisions were mad
 
 ## Phase 7: Iteration
 
+### 7.52 — Custom engine builder UI (#9)
+
+**New Engine Builder sub-view on the H2H page.** Accessible via "Engine Builder" button in the H2H header. Create, edit, and delete custom engine configurations without touching JSON files.
+
+**Backend — custom engine persistence:**
+- Custom engines stored in `data/custom-engines.json` (separate from built-in `engines.json` classpath resource).
+- `EngineRegistryEntry` record gains `boolean custom` field.
+- `EngineRegistry` merges built-in + custom entries at load time, with `saveCustom()` / `deleteCustom()` methods.
+- `EnginesHandler` extended: `POST /api/engines/custom` (create/update), `DELETE /api/engines/custom/{id}` (delete with built-in collision guard).
+
+**Frontend — engine builder component:**
+- Two-column layout: create/edit form (left) + custom engines list (right).
+- Engine class dropdown (all 10 classes), auto-suggested ID, description, tier selector.
+- Dynamic parameter section grouped by category with per-param min/max range hints.
+- Full parameter schema in `engineParamSchema.ts` covering all 10 engine classes. Creator engine has all 23 params with ranges from SweepMain.
+- Edit pre-fills form from entry config. Delete with confirmation dialog.
+- Duplicate ID detection: rejects IDs that collide with built-in entries.
+
+**DE/EN localization** for all builder strings (18 keys each).
+
 ### 7.51 — Sweep visualization UI (#43)
 
 **New Sweep Results tab on the H2H page.** Accessible via "Sweep Results" button in the H2H header. Reads `data/sweep-results.json` via new `GET /api/h2h/sweep/results` endpoint.

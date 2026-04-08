@@ -30,17 +30,12 @@ Priorisiere in deiner Abarbeitung die wichtigsten Features. Erkenne Abhänigkeit
 |---|------|-------|
 | 42 | Sweep progressive refinement | Two-phase: Phase 1 = wide LHS exploration (100 trials), Phase 2 = local search around top-5 regions (CMA-ES or coordinate descent). TPE currently handles both, but explicit local refinement may extract more. |
 
-### UI
-
-| # | Task | Notes |
-|---|------|-------|
-| 9 | Custom engine builder screen | UI to compose engine configs (base class + params (params having a min and max value if available)), save to registry with duplicate detection. |
-
 ### Infrastructure
 
 | # | Task | Notes |
 |---|------|-------|
 | 44 | GPU-accelerated calculations | Run large-scale match simulations on GPU (RTX 4070). |
+| 47 | Extract engine parameter definitions into shared JSON resource | Single source of truth for param schemas (min/max/default/type/description per engine class). Currently duplicated in: (1) `web/src/components/engineParamSchema.ts` — hardcoded TS param defs for Engine Builder UI, (2) `src/h2h/SweepMain.java` lines 114–154 — hardcoded `PARAMS` list with min/max/default for Creator sweep, (3) individual engine `.java` files — implicit `config.extra.getOrDefault(...)` calls define which params exist. **Target:** Create `src/resources/jsons/engine-params.json` with structure like `{"mcts-v1": [{"key":"explorationConstant","type":"number","min":0.1,"max":5.0,"default":"1.4142","description":"UCT exploration constant"},...]}`. **Affected code:** (a) `EngineRegistry.java` or new `EngineParamRegistry.java` — load and serve the JSON, (b) new `GET /api/engine-params` endpoint or embed in `GET /api/engines` response, (c) `SweepMain.java` — read param ranges from JSON instead of hardcoding `PARAMS`, (d) `engineParamSchema.ts` — delete hardcoded defs, fetch from API instead, (e) `H2hEngineBuilder.tsx` — load schema from API on mount. This also enables future features like auto-generating sweep configs from the UI. |
 
 ## Done
 
@@ -55,6 +50,7 @@ Moved here when completed. Full history in CHANGELOG.md.
 | 6 | Die h2h-results.json pushen |
 | 7 | Project-Categorie-Icons in UI |
 | 8 | Säubere UI-BUGS.md |
+| 9 | Custom engine builder screen |
 | 10 | Remove/Update Legacy Features/Code: dead runAdaptiveFocusedPhase(), misleading rolloutPolicy config. |
 | 11 | Heuristic review: ARCHITECTURE.md Section 7.2 fixes (#2-#5, A-F) |
 | 12 | Standardise card display across all UI components (CardTooltip, icons, color, locale). |

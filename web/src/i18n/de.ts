@@ -227,6 +227,30 @@ const de: Record<string, string> = {
   'sweep.importanceWeak': 'Schwach (< 0.15)',
   'sweep.observedRange': 'Beobachteter Bereich (tatsächliches Min–Max aller Versuche)',
   'sweep.topTrialValues': 'Top-Versuchswerte (Hover für Details)',
+
+  // Engine Builder
+  'builder.nav': 'Engine-Baukasten',
+  'builder.title': 'Engine-Baukasten',
+  'builder.create': 'Neue Custom Engine',
+  'builder.update': 'Aktualisieren',
+  'builder.engineClass': 'Engine-Klasse',
+  'builder.id': 'Engine-ID',
+  'builder.idHint': 'Eindeutige ID — wird in H2H-Ergebnissen, Sweep-Configs und Speicherdateien verwendet.',
+  'builder.description': 'Beschreibung',
+  'builder.tier': 'Leistungsstufe',
+  'builder.params': 'Parameter',
+  'builder.save': 'Engine speichern',
+  'builder.saved': 'Engine erfolgreich gespeichert.',
+  'builder.updated': 'Engine erfolgreich aktualisiert.',
+  'builder.delete': 'Löschen',
+  'builder.edit': 'Bearbeiten',
+  'builder.cancel': 'Abbrechen',
+  'builder.confirmDelete': 'Custom Engine „{id}" löschen?',
+  'builder.deleted': 'Engine gelöscht.',
+  'builder.duplicateId': 'Diese ID kollidiert mit einer eingebauten Engine.',
+  'builder.errorId': 'Engine-ID ist erforderlich.',
+  'builder.customEngines': 'Custom Engines',
+  'builder.noCustom': 'Noch keine Custom Engines. Erstelle eine über das Formular.',
 };
 
 export default de;

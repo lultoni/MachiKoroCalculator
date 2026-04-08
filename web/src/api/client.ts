@@ -11,6 +11,7 @@ import type {
   InsightsResponse,
   ProjectDef,
   EngineRegistryEntry,
+  EngineParamSchema,
   SaveEntry,
   H2hStartRequest,
   H2hStartResponse,
@@ -60,6 +61,8 @@ export const getProjects = () => json<ProjectDef[]>('/api/projects');
 // ─── Engines ─────────────────────────────────────────────────────────────
 
 export const getEngines = () => json<EngineRegistryEntry[]>('/api/engines');
+
+export const getEngineParams = () => json<EngineParamSchema>('/api/engine-params');
 
 // ─── Evaluate ────────────────────────────────────────────────────────────
 

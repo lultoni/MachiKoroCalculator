@@ -35,7 +35,6 @@ Priorisiere in deiner Abarbeitung die wichtigsten Features. Erkenne Abhänigkeit
 | # | Task | Notes |
 |---|------|-------|
 | 44 | GPU-accelerated calculations | Run large-scale match simulations on GPU (RTX 4070). |
-| 47 | Extract engine parameter definitions into shared JSON resource | Single source of truth for param schemas (min/max/default/type/description per engine class). Currently duplicated in: (1) `web/src/components/engineParamSchema.ts` — hardcoded TS param defs for Engine Builder UI, (2) `src/h2h/SweepMain.java` lines 114–154 — hardcoded `PARAMS` list with min/max/default for Creator sweep, (3) individual engine `.java` files — implicit `config.extra.getOrDefault(...)` calls define which params exist. **Target:** Create `src/resources/jsons/engine-params.json` with structure like `{"mcts-v1": [{"key":"explorationConstant","type":"number","min":0.1,"max":5.0,"default":"1.4142","description":"UCT exploration constant"},...]}`. **Affected code:** (a) `EngineRegistry.java` or new `EngineParamRegistry.java` — load and serve the JSON, (b) new `GET /api/engine-params` endpoint or embed in `GET /api/engines` response, (c) `SweepMain.java` — read param ranges from JSON instead of hardcoding `PARAMS`, (d) `engineParamSchema.ts` — delete hardcoded defs, fetch from API instead, (e) `H2hEngineBuilder.tsx` — load schema from API on mount. This also enables future features like auto-generating sweep configs from the UI. |
 
 ## Done
 
@@ -81,3 +80,4 @@ Moved here when completed. Full history in CHANGELOG.md.
 | 41 | Creator Engine: Multi-opponent sweep — `--opponents` CLI flag, averaged WR across all opponents per trial. |
 | 43 | Sweep visualization in UI — Recharts-based Sweep Results tab with convergence, importance, parallel coords, param ranges. |
 | 46 | Adjust SweepMain starting params from sweep analysis — seeded from best old-run results. |
+| 47 | Extract engine parameter definitions into shared JSON resource. |

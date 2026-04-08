@@ -11,6 +11,7 @@ import engine.mcts.MctsGreedyRolloutEngine;
 import engine.mcts.MctsGreedyTreeEngine;
 import engine.mcts.MctsV1Engine;
 import iface.EngineOrchestrator;
+import iface.EngineParamRegistry;
 import iface.EngineRegistry;
 import iface.EngineRegistryEntry;
 
@@ -111,47 +112,18 @@ public final class SweepMain {
     },
     */
 
-    static final TpeSampler.ParamDef[] PARAMS = {
-        // Base dimension weights (8)
-        // Weights multiply situation-dependent multipliers (0.3–2.0) and raw dimension values.
-        // Raw value magnitudes vary widely (tempo ~20, winProbDelta ~0.3), so weights must
-        // compensate. Allow 0.0 to let TPE disable any dimension entirely.
-        new TpeSampler.ParamDef("wIncome",   0.0, 8.0, 0.5),
-        new TpeSampler.ParamDef("wRisk",     0.0, 6.0, 1.034159692421214),
-        new TpeSampler.ParamDef("wCoverage", 0.0, 6.0, 0.3418816081193578),
-        new TpeSampler.ParamDef("wTempo",    0.0, 6.0, 1.2975187412307696),
-        new TpeSampler.ParamDef("wWinProb",  0.0, 10.0, 4.601562040526129),
-        new TpeSampler.ParamDef("wLandmark", 0.0, 8.0, 2.9785906332662893),
-        new TpeSampler.ParamDef("wUrgency",  0.0, 6.0, 2.475601860309849),
-        new TpeSampler.ParamDef("wRoi",      0.0, 6.0, 1.1465292262045277),
-        // Situation assessment (6)
-        // Each sit weight scales a [0,1] signal into the situation composite. No normalization,
-        // so the sum can exceed 1.0 (sigmoid handles saturation). Allow 0.0 to disable a signal,
-        // allow 1.0 to let one signal dominate the situation assessment entirely.
-        new TpeSampler.ParamDef("sitLandmark",      0.0, 1.0, 0.3974390936978679),
-        new TpeSampler.ParamDef("sitIncome",         0.0, 1.0, 0.052984962276980865),
-        new TpeSampler.ParamDef("sitCoins",          0.0, 1.0, 0.3792443332612002),
-        new TpeSampler.ParamDef("sitTempo",          0.0, 1.0, 0.3229663161861425),
-        // targetEvPerRound: incomeFrac = clamp01(evPerRound / target). Typical evPerRound 1–6.
-        // Low values saturate early ("any income is enough"), high values keep it low ("never enough").
-        new TpeSampler.ParamDef("targetEvPerRound",  1.0, 15.0, 2.4074532126136887),
-        // maxETW: tempoFrac = clamp01(1 - etw / maxETW). Typical ETW 5–100.
-        // Low = always feels late, high = never feels late.
-        new TpeSampler.ParamDef("maxETW",           10.0, 100.0, 45.594286541222274), // i changed high to 100 thinking it would be better, but it seems the engines want to go even hihger here (delete this comment on change)
-        // Sigmoid + gravity wells (5)
-        // sigmoidK: controls how sharply weights shift between early/late game.
-        // Low k (~0.5) = nearly linear, high k (~20) = nearly binary step.
-        new TpeSampler.ParamDef("sigmoidK",          0.5, 20.0, 10.43656136642734),
-        // sprintHorizon/threatHorizon: ETW threshold where gravity well kicks in.
-        // Low = only activates very close to winning, high = activates broadly.
-        new TpeSampler.ParamDef("sprintHorizon",     2.0, 25.0, 9.129449138031692),
-        // sharpness: pow(raw, 1/sharpness). Low = very suppressed, high = very sensitive.
-        new TpeSampler.ParamDef("sprintSharpness",   0.1,  5.0, 1.0128301603669694),
-        new TpeSampler.ParamDef("threatHorizon",     2.0, 25.0, 4.327211831669695),
-        new TpeSampler.ParamDef("threatSharpness",   0.1,  5.0, 1.2187182469370976),
-        // Bürohaus swap bonus weight. 0.0 = disabled, high = heavily prioritize swap bait.
-        new TpeSampler.ParamDef("wBurohausSwap",     0.0,  8.0, 2.7319287177692937),
-    };
+    /**
+     * Sweep parameter space — built from {@code engine-params.json} via {@link EngineParamRegistry}.
+     * Only includes Creator engine params that have sweepLow/sweepHigh defined.
+     */
+    static final TpeSampler.ParamDef[] PARAMS = buildSweepParams();
+
+    private static TpeSampler.ParamDef[] buildSweepParams() {
+        return EngineParamRegistry.getForClass("creator").stream()
+                .filter(e -> e.sweepLow() != null && e.sweepHigh() != null && e.sweepDefault() != null)
+                .map(e -> new TpeSampler.ParamDef(e.key(), e.sweepLow(), e.sweepHigh(), e.sweepDefault()))
+                .toArray(TpeSampler.ParamDef[]::new);
+    }
 
     // =====================================================================
     // Main

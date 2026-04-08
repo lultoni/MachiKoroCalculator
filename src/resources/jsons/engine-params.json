@@ -1,0 +1,69 @@
+{
+  "standard": [
+    { "key": "iterations", "description": "Simulation iterations (0 = use time budget)", "type": "number", "min": 0, "max": 100000, "step": 100, "default": "500", "category": "Standard" },
+    { "key": "timeBudgetMs", "description": "Time budget in ms (0 = no limit)", "type": "number", "min": 0, "max": 60000, "step": 100, "default": "0", "category": "Standard" },
+    { "key": "riskToleranceWeight", "description": "Risk tolerance weight [0.0-1.0]", "type": "number", "min": 0, "max": 1.0, "step": 0.05, "default": "0", "category": "Standard" }
+  ],
+  "engines": {
+    "mcts-v1": [
+      { "key": "explorationConstant", "description": "UCT exploration constant (sqrt(2) = 1.414)", "type": "number", "min": 0.1, "max": 5.0, "step": 0.1, "default": "1.4142", "category": "MCTS" },
+      { "key": "profile", "description": "Enable MCTS profiling output", "type": "boolean", "default": "false", "internal": true },
+      { "key": "skipEnrichment", "description": "Skip result enrichment", "type": "boolean", "default": "false", "internal": true }
+    ],
+    "mcts-v1-greedy-rollout": [
+      { "key": "explorationConstant", "description": "UCT exploration constant (sqrt(2) = 1.414)", "type": "number", "min": 0.1, "max": 5.0, "step": 0.1, "default": "1.4142", "category": "MCTS" },
+      { "key": "profile", "description": "Enable MCTS profiling output", "type": "boolean", "default": "false", "internal": true },
+      { "key": "skipEnrichment", "description": "Skip result enrichment", "type": "boolean", "default": "false", "internal": true }
+    ],
+    "mcts-v1-boltzmann-rollout": [
+      { "key": "explorationConstant", "description": "UCT exploration constant (sqrt(2) = 1.414)", "type": "number", "min": 0.1, "max": 5.0, "step": 0.1, "default": "1.4142", "category": "MCTS" },
+      { "key": "rolloutTemperature", "description": "Boltzmann rollout temperature", "type": "number", "min": 0.01, "max": 10.0, "step": 0.1, "default": "0.7", "category": "Rollout" },
+      { "key": "profile", "description": "Enable MCTS profiling output", "type": "boolean", "default": "false", "internal": true },
+      { "key": "skipEnrichment", "description": "Skip result enrichment", "type": "boolean", "default": "false", "internal": true }
+    ],
+    "mcts-v1-greedy-tree": [
+      { "key": "explorationConstant", "description": "UCT exploration constant (sqrt(2) = 1.414)", "type": "number", "min": 0.1, "max": 5.0, "step": 0.1, "default": "1.4142", "category": "MCTS" },
+      { "key": "profile", "description": "Enable MCTS profiling output", "type": "boolean", "default": "false", "internal": true },
+      { "key": "skipEnrichment", "description": "Skip result enrichment", "type": "boolean", "default": "false", "internal": true }
+    ],
+    "mcts-v1-depth-limited": [
+      { "key": "explorationConstant", "description": "UCT exploration constant (sqrt(2) = 1.414)", "type": "number", "min": 0.1, "max": 5.0, "step": 0.1, "default": "1.4142", "category": "MCTS" },
+      { "key": "maxRolloutDepth", "description": "Maximum rollout depth in turns", "type": "number", "min": 1, "max": 50, "step": 1, "default": "10", "category": "Depth" },
+      { "key": "profile", "description": "Enable MCTS profiling output", "type": "boolean", "default": "false", "internal": true },
+      { "key": "skipEnrichment", "description": "Skip result enrichment", "type": "boolean", "default": "false", "internal": true }
+    ],
+    "mcts-v1-adaptive": [
+      { "key": "explorationConstant", "description": "UCT exploration constant (sqrt(2) = 1.414)", "type": "number", "min": 0.1, "max": 5.0, "step": 0.1, "default": "1.4142", "category": "MCTS" }
+    ],
+    "flat-mc": [],
+    "heuristic-ev": [],
+    "expectimax": [
+      { "key": "maxDepthRounds", "description": "Search depth in full rounds", "type": "number", "min": 1, "max": 4, "step": 1, "default": "2", "category": "Search" },
+      { "key": "leafEval", "description": "Leaf node evaluation function", "type": "select", "default": "winprob", "options": ["winprob", "composite"], "category": "Search" }
+    ],
+    "creator": [
+      { "key": "rolloutPolicy", "description": "Rollout policy for FlatMC simulations", "type": "select", "default": "creator", "options": ["creator", "greedy", "uniform", "boltzmann"], "category": "Rollout" },
+      { "key": "rolloutTemperature", "description": "Boltzmann temperature (only for boltzmann rollout)", "type": "number", "min": 0.01, "max": 10.0, "step": 0.1, "default": "0.7", "category": "Rollout" },
+      { "key": "wIncome", "description": "Income dimension weight", "type": "number", "min": 0.0, "max": 8.0, "step": 0.1, "default": "2.5", "category": "Base weights", "sweepLow": 0.0, "sweepHigh": 8.0, "sweepDefault": 0.5 },
+      { "key": "wRisk", "description": "Risk/variance dimension weight", "type": "number", "min": 0.0, "max": 6.0, "step": 0.1, "default": "2.0", "category": "Base weights", "sweepLow": 0.0, "sweepHigh": 6.0, "sweepDefault": 1.034159692421214 },
+      { "key": "wCoverage", "description": "Dice coverage dimension weight", "type": "number", "min": 0.0, "max": 6.0, "step": 0.1, "default": "1.5", "category": "Base weights", "sweepLow": 0.0, "sweepHigh": 6.0, "sweepDefault": 0.3418816081193578 },
+      { "key": "wTempo", "description": "Tempo/speed dimension weight", "type": "number", "min": 0.0, "max": 6.0, "step": 0.1, "default": "2.0", "category": "Base weights", "sweepLow": 0.0, "sweepHigh": 6.0, "sweepDefault": 1.2975187412307696 },
+      { "key": "wWinProb", "description": "Win probability dimension weight", "type": "number", "min": 0.0, "max": 10.0, "step": 0.1, "default": "3.0", "category": "Base weights", "sweepLow": 0.0, "sweepHigh": 10.0, "sweepDefault": 4.601562040526129 },
+      { "key": "wLandmark", "description": "Landmark progression weight", "type": "number", "min": 0.0, "max": 8.0, "step": 0.1, "default": "2.0", "category": "Base weights", "sweepLow": 0.0, "sweepHigh": 8.0, "sweepDefault": 2.9785906332662893 },
+      { "key": "wUrgency", "description": "Urgency (react to threats) weight", "type": "number", "min": 0.0, "max": 6.0, "step": 0.1, "default": "1.0", "category": "Base weights", "sweepLow": 0.0, "sweepHigh": 6.0, "sweepDefault": 2.475601860309849 },
+      { "key": "wRoi", "description": "Return on investment weight", "type": "number", "min": 0.0, "max": 6.0, "step": 0.1, "default": "1.5", "category": "Base weights", "sweepLow": 0.0, "sweepHigh": 6.0, "sweepDefault": 1.1465292262045277 },
+      { "key": "sitLandmark", "description": "Situation: landmark proximity factor", "type": "number", "min": 0.0, "max": 1.0, "step": 0.05, "default": "0.30", "category": "Situation", "sweepLow": 0.0, "sweepHigh": 1.0, "sweepDefault": 0.3974390936978679 },
+      { "key": "sitIncome", "description": "Situation: income sufficiency factor", "type": "number", "min": 0.0, "max": 1.0, "step": 0.05, "default": "0.30", "category": "Situation", "sweepLow": 0.0, "sweepHigh": 1.0, "sweepDefault": 0.052984962276980865 },
+      { "key": "sitCoins", "description": "Situation: coin reserves factor", "type": "number", "min": 0.0, "max": 1.0, "step": 0.05, "default": "0.15", "category": "Situation", "sweepLow": 0.0, "sweepHigh": 1.0, "sweepDefault": 0.3792443332612002 },
+      { "key": "sitTempo", "description": "Situation: tempo/speed factor", "type": "number", "min": 0.0, "max": 1.0, "step": 0.05, "default": "0.25", "category": "Situation", "sweepLow": 0.0, "sweepHigh": 1.0, "sweepDefault": 0.3229663161861425 },
+      { "key": "targetEvPerRound", "description": "Target EV per round (income goal)", "type": "number", "min": 1.0, "max": 15.0, "step": 0.5, "default": "4.0", "category": "Thresholds", "sweepLow": 1.0, "sweepHigh": 15.0, "sweepDefault": 2.4074532126136887 },
+      { "key": "maxETW", "description": "Max estimated turns to win", "type": "number", "min": 10.0, "max": 100.0, "step": 5, "default": "50.0", "category": "Thresholds", "sweepLow": 10.0, "sweepHigh": 100.0, "sweepDefault": 45.594286541222274 },
+      { "key": "sigmoidK", "description": "Sigmoid steepness for score normalization", "type": "number", "min": 0.5, "max": 20.0, "step": 0.5, "default": "6.0", "category": "Sigmoid & gravity", "sweepLow": 0.5, "sweepHigh": 20.0, "sweepDefault": 10.43656136642734 },
+      { "key": "sprintHorizon", "description": "Sprint gravity well horizon (turns)", "type": "number", "min": 2.0, "max": 25.0, "step": 0.5, "default": "6.0", "category": "Sigmoid & gravity", "sweepLow": 2.0, "sweepHigh": 25.0, "sweepDefault": 9.129449138031692 },
+      { "key": "sprintSharpness", "description": "Sprint gravity well sharpness", "type": "number", "min": 0.1, "max": 5.0, "step": 0.1, "default": "1.0", "category": "Sigmoid & gravity", "sweepLow": 0.1, "sweepHigh": 5.0, "sweepDefault": 1.0128301603669694 },
+      { "key": "threatHorizon", "description": "Threat gravity well horizon (turns)", "type": "number", "min": 2.0, "max": 25.0, "step": 0.5, "default": "8.0", "category": "Sigmoid & gravity", "sweepLow": 2.0, "sweepHigh": 25.0, "sweepDefault": 4.327211831669695 },
+      { "key": "threatSharpness", "description": "Threat gravity well sharpness", "type": "number", "min": 0.1, "max": 5.0, "step": 0.1, "default": "1.0", "category": "Sigmoid & gravity", "sweepLow": 0.1, "sweepHigh": 5.0, "sweepDefault": 1.2187182469370976 },
+      { "key": "wBurohausSwap", "description": "Bürohaus swap bait bonus weight", "type": "number", "min": 0.0, "max": 8.0, "step": 0.1, "default": "1.5", "category": "Bürohaus", "sweepLow": 0.0, "sweepHigh": 8.0, "sweepDefault": 2.7319287177692937 }
+    ]
+  }
+}

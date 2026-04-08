@@ -302,6 +302,25 @@ export interface H2hImportResponse {
   skipped: number;
 }
 
+// ─── Engine Parameter Schema ─────────────────────────────────────────
+
+export interface ParamDef {
+  key: string;
+  description: string;
+  type: 'number' | 'select' | 'boolean';
+  min?: number;
+  max?: number;
+  step?: number;
+  default?: string;
+  options?: string[];
+  category?: string;
+}
+
+export interface EngineParamSchema {
+  standard: ParamDef[];
+  engines: Record<string, ParamDef[]>;
+}
+
 // ─── Sweep Results ──────────────────────────────────────────────────────
 
 export interface SweepTrial {

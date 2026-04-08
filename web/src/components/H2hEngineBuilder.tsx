@@ -1,9 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useLocale } from '../i18n/useLocale';
 import * as api from '../api/client';
-import type { EngineRegistryEntry } from '../api/types';
-import { ENGINE_PARAMS, ENGINE_CLASS_IDS, groupByCategory } from './engineParamSchema';
-import type { ParamDef } from './engineParamSchema';
+import type { EngineRegistryEntry, ParamDef } from '../api/types';
+import { useEngineParams, groupByCategory } from '../hooks/useEngineParams';
 
 interface Props {
   onBack: () => void;
@@ -17,6 +16,7 @@ function suggestId(engineClass: string, tier: string): string {
 
 export function H2hEngineBuilder({ onBack, onEnginesChanged }: Props) {
   const { t } = useLocale();
+  const { getForClass, engineClassIds, loading: schemaLoading } = useEngineParams();
   const [engines, setEngines] = useState<EngineRegistryEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -25,11 +25,19 @@ export function H2hEngineBuilder({ onBack, onEnginesChanged }: Props) {
 
   // Form state
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [engineClass, setEngineClass] = useState(ENGINE_CLASS_IDS[0]);
-  const [id, setId] = useState(suggestId(ENGINE_CLASS_IDS[0], 'fast'));
+  const [engineClass, setEngineClass] = useState('');
+  const [id, setId] = useState('');
   const [description, setDescription] = useState('');
   const [tier, setTier] = useState('fast');
   const [paramValues, setParamValues] = useState<Record<string, string>>({});
+
+  // Initialize engine class when schema loads
+  useEffect(() => {
+    if (engineClassIds.length > 0 && !engineClass) {
+      setEngineClass(engineClassIds[0]);
+      setId(suggestId(engineClassIds[0], 'fast'));
+    }
+  }, [engineClassIds, engineClass]);
 
   const loadEngines = () => {
     api.getEngines().then(list => {
@@ -43,7 +51,7 @@ export function H2hEngineBuilder({ onBack, onEnginesChanged }: Props) {
   const customEngines = useMemo(() => engines.filter(e => e.custom), [engines]);
 
   // Current schema based on selected engine class
-  const schema = ENGINE_PARAMS[engineClass] ?? [];
+  const schema = useMemo(() => getForClass(engineClass), [getForClass, engineClass]);
   const groupedSchema = useMemo(() => groupByCategory(schema), [schema]);
 
   // Initialize param values with defaults when engine class changes
@@ -65,8 +73,9 @@ export function H2hEngineBuilder({ onBack, onEnginesChanged }: Props) {
 
   const resetForm = () => {
     setEditingId(null);
-    setEngineClass(ENGINE_CLASS_IDS[0]);
-    setId(suggestId(ENGINE_CLASS_IDS[0], 'fast'));
+    const firstClass = engineClassIds[0] ?? '';
+    setEngineClass(firstClass);
+    setId(suggestId(firstClass, 'fast'));
     setDescription('');
     setTier('fast');
     setParamValues({});
@@ -194,7 +203,7 @@ export function H2hEngineBuilder({ onBack, onEnginesChanged }: Props) {
     );
   };
 
-  if (loading) {
+  if (loading || schemaLoading) {
     return (
       <div className="min-h-screen bg-machi-bg text-machi-text p-6">
         <p className="text-machi-text-dim">{t('sweep.loading')}</p>
@@ -229,7 +238,7 @@ export function H2hEngineBuilder({ onBack, onEnginesChanged }: Props) {
                 disabled={!!editingId}
                 className="w-full bg-machi-bg border border-machi-border rounded-lg px-3 py-2 text-sm font-mono disabled:opacity-50"
               >
-                {ENGINE_CLASS_IDS.map(cls => (
+                {engineClassIds.map(cls => (
                   <option key={cls} value={cls}>{cls}</option>
                 ))}
               </select>

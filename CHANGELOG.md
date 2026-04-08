@@ -6,6 +6,22 @@ Implementation history: what was built, why, and which design decisions were mad
 
 ## Phase 7: Iteration
 
+### 7.53 — Shared engine parameter schema (#47)
+
+**Single source of truth for engine parameter definitions.** New `src/resources/jsons/engine-params.json` defines all params for all 10 engine classes with min/max/step/default/description/category, plus sweep-specific fields (sweepLow/sweepHigh/sweepDefault) for Creator params.
+
+**Backend:**
+- `EngineParamRegistry` (new class in `iface/`) loads the JSON from classpath, provides `getStandard()`, `getForClass(engineClass)`, `getEngineClassIds()`.
+- `GET /api/engine-params` endpoint serves the schema (filters out internal and sweep-only fields).
+- `SweepMain.PARAMS` now reads from `EngineParamRegistry` instead of hardcoding 20 Creator params. Same bounds and defaults — just sourced from JSON.
+
+**Frontend:**
+- `useEngineParams` hook fetches schema once from API, caches at module level.
+- `H2hEngineBuilder` uses the hook instead of hardcoded `engineParamSchema.ts` (deleted).
+- `ParamDef` and `EngineParamSchema` types added to `api/types.ts`.
+
+**Eliminates duplication** between: TS hardcoded schema, Java SweepMain PARAMS, and engine code defaults.
+
 ### 7.52 — Custom engine builder UI (#9)
 
 **New Engine Builder sub-view on the H2H page.** Accessible via "Engine Builder" button in the H2H header. Create, edit, and delete custom engine configurations without touching JSON files.

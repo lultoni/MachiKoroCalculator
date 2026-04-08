@@ -42,7 +42,7 @@ UI (React 19 SPA) --HTTP--> Interface --> Engines --> Calcs --> Core
 | | `engine/heuristic/` | HeuristicEvEngine. |
 | | `engine/creator/` | CreatorEngine (seeded FlatMC + CreatorScorer + CreatorRollout). |
 | Interface | `iface/` | Engine registry (JSON), routing, result formatting. |
-| Server | `server/` | Java HTTP API (25 endpoints), session management, pre-computation. |
+| Server | `server/` | Java HTTP API (26 endpoints), session management, pre-computation. |
 | H2H | `h2h/` | Engine comparison: match runner, tournament, Glicko-2 ratings, sweep optimization, game logging. |
 | UI | `web/` | React 19 + TypeScript + Vite 8 + Recharts + Tailwind CSS 4. 19 components, 8 hooks, DE/EN. |
 

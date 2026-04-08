@@ -93,6 +93,7 @@ public final class ApiServer {
         httpServer.createContext("/api/health",   new HealthHandler());
         httpServer.createContext("/api/projects", new ProjectsHandler());
         httpServer.createContext("/api/engines",  new EnginesHandler());
+        httpServer.createContext("/api/engine-params", new EngineParamsHandler());
         httpServer.createContext("/api/roll",     new RollHandler());
         httpServer.createContext("/api/evaluate", new EvaluateHandler(orchestrator, precomputeCache));
         httpServer.createContext("/api/evaluate/precompute", new PrecomputeHandler(precomputeCache));

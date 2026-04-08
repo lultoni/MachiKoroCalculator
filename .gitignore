@@ -32,6 +32,7 @@ bin/
 ### MachiKoro ###
 saves/
 data/sweep-results.json
+data/sweep-results-old-01.json
 data/h2h-summaries.json
 data/h2h-gamelogs/
 web/node_modules/

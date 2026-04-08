@@ -61,46 +61,96 @@ public final class SweepMain {
     // Parameter space — all CreatorScorer configurable knobs
     // =====================================================================
 
+    /*
+    --- List of best params from old run against only heuristic-ev as starting point (creator-balanced) --- 
+    "params": {
+      "wIncome": 0.5,
+      "wRisk": 1.034159692421214,
+      "wCoverage": 0.3418816081193578,
+      "wTempo": 1.2975187412307696,
+      "wWinProb": 4.601562040526129,
+      "wLandmark": 2.9785906332662893,
+      "wUrgency": 2.475601860309849,
+      "wRoi": 1.1465292262045277,
+      "sitLandmark": 0.3974390936978679,
+      "sitIncome": 0.052984962276980865,
+      "sitCoins": 0.3792443332612002,
+      "sitTempo": 0.3229663161861425,
+      "targetEvPerRound": 2.4074532126136887,
+      "maxETW": 45.594286541222274,
+      "sigmoidK": 10.43656136642734,
+      "sprintHorizon": 9.129449138031692,
+      "sprintSharpness": 1.0128301603669694,
+      "threatHorizon": 4.327211831669695,
+      "threatSharpness": 1.2187182469370976,
+      "wBurohausSwap": 2.7319287177692937
+    },
+
+    --- List of best params from best trial against 4 engines (creator balanced) --- 
+    "params": {
+      "wIncome": 4.762482484660718,
+      "wRisk": 2.823735005567347,
+      "wCoverage": 5.731904027594611,
+      "wTempo": 6.0,
+      "wWinProb": 4.061873486638532,
+      "wLandmark": 2.508174101853229,
+      "wUrgency": 4.831647513788628,
+      "wRoi": 0.4554705437172182,
+      "sitLandmark": 0.9030080702976719,
+      "sitIncome": 0.0,
+      "sitCoins": 0.14951468785641275,
+      "sitTempo": 0.560019980411893,
+      "targetEvPerRound": 3.6282739670732607,
+      "maxETW": 100.0,
+      "sigmoidK": 15.074706493392714,
+      "sprintHorizon": 15.48556792767432,
+      "sprintSharpness": 2.743122679603714,
+      "threatHorizon": 10.084568459486619,
+      "threatSharpness": 1.356505476878349,
+      "wBurohausSwap": 1.454001790944752
+    },
+    */
+
     static final TpeSampler.ParamDef[] PARAMS = {
         // Base dimension weights (8)
         // Weights multiply situation-dependent multipliers (0.3–2.0) and raw dimension values.
         // Raw value magnitudes vary widely (tempo ~20, winProbDelta ~0.3), so weights must
         // compensate. Allow 0.0 to let TPE disable any dimension entirely.
-        new TpeSampler.ParamDef("wIncome",   0.0, 8.0, 2.5),
-        new TpeSampler.ParamDef("wRisk",     0.0, 6.0, 2.0),
-        new TpeSampler.ParamDef("wCoverage", 0.0, 6.0, 1.5),
-        new TpeSampler.ParamDef("wTempo",    0.0, 6.0, 2.0),
-        new TpeSampler.ParamDef("wWinProb",  0.0, 10.0, 3.0),
-        new TpeSampler.ParamDef("wLandmark", 0.0, 8.0, 2.0),
-        new TpeSampler.ParamDef("wUrgency",  0.0, 6.0, 1.0),
-        new TpeSampler.ParamDef("wRoi",      0.0, 6.0, 1.5),
+        new TpeSampler.ParamDef("wIncome",   0.0, 8.0, 0.5),
+        new TpeSampler.ParamDef("wRisk",     0.0, 6.0, 1.034159692421214),
+        new TpeSampler.ParamDef("wCoverage", 0.0, 6.0, 0.3418816081193578),
+        new TpeSampler.ParamDef("wTempo",    0.0, 6.0, 1.2975187412307696),
+        new TpeSampler.ParamDef("wWinProb",  0.0, 10.0, 4.601562040526129),
+        new TpeSampler.ParamDef("wLandmark", 0.0, 8.0, 2.9785906332662893),
+        new TpeSampler.ParamDef("wUrgency",  0.0, 6.0, 2.475601860309849),
+        new TpeSampler.ParamDef("wRoi",      0.0, 6.0, 1.1465292262045277),
         // Situation assessment (6)
         // Each sit weight scales a [0,1] signal into the situation composite. No normalization,
         // so the sum can exceed 1.0 (sigmoid handles saturation). Allow 0.0 to disable a signal,
         // allow 1.0 to let one signal dominate the situation assessment entirely.
-        new TpeSampler.ParamDef("sitLandmark",      0.0, 1.0, 0.30),
-        new TpeSampler.ParamDef("sitIncome",         0.0, 1.0, 0.30),
-        new TpeSampler.ParamDef("sitCoins",          0.0, 1.0, 0.15),
-        new TpeSampler.ParamDef("sitTempo",          0.0, 1.0, 0.25),
+        new TpeSampler.ParamDef("sitLandmark",      0.0, 1.0, 0.3974390936978679),
+        new TpeSampler.ParamDef("sitIncome",         0.0, 1.0, 0.052984962276980865),
+        new TpeSampler.ParamDef("sitCoins",          0.0, 1.0, 0.3792443332612002),
+        new TpeSampler.ParamDef("sitTempo",          0.0, 1.0, 0.3229663161861425),
         // targetEvPerRound: incomeFrac = clamp01(evPerRound / target). Typical evPerRound 1–6.
         // Low values saturate early ("any income is enough"), high values keep it low ("never enough").
-        new TpeSampler.ParamDef("targetEvPerRound",  1.0, 15.0, 4.0),
+        new TpeSampler.ParamDef("targetEvPerRound",  1.0, 15.0, 2.4074532126136887),
         // maxETW: tempoFrac = clamp01(1 - etw / maxETW). Typical ETW 5–100.
         // Low = always feels late, high = never feels late.
-        new TpeSampler.ParamDef("maxETW",           10.0, 150.0, 50.0),
+        new TpeSampler.ParamDef("maxETW",           10.0, 100.0, 45.594286541222274), // i changed high to 100 thinking it would be better, but it seems the engines want to go even hihger here (delete this comment on change)
         // Sigmoid + gravity wells (5)
         // sigmoidK: controls how sharply weights shift between early/late game.
         // Low k (~0.5) = nearly linear, high k (~20) = nearly binary step.
-        new TpeSampler.ParamDef("sigmoidK",          0.5, 20.0, 6.0),
+        new TpeSampler.ParamDef("sigmoidK",          0.5, 20.0, 10.43656136642734),
         // sprintHorizon/threatHorizon: ETW threshold where gravity well kicks in.
         // Low = only activates very close to winning, high = activates broadly.
-        new TpeSampler.ParamDef("sprintHorizon",     2.0, 25.0, 6.0),
+        new TpeSampler.ParamDef("sprintHorizon",     2.0, 25.0, 9.129449138031692),
         // sharpness: pow(raw, 1/sharpness). Low = very suppressed, high = very sensitive.
-        new TpeSampler.ParamDef("sprintSharpness",   0.1,  5.0, 1.0),
-        new TpeSampler.ParamDef("threatHorizon",     2.0, 25.0, 8.0),
-        new TpeSampler.ParamDef("threatSharpness",   0.1,  5.0, 1.0),
+        new TpeSampler.ParamDef("sprintSharpness",   0.1,  5.0, 1.0128301603669694),
+        new TpeSampler.ParamDef("threatHorizon",     2.0, 25.0, 4.327211831669695),
+        new TpeSampler.ParamDef("threatSharpness",   0.1,  5.0, 1.2187182469370976),
         // Bürohaus swap bonus weight. 0.0 = disabled, high = heavily prioritize swap bait.
-        new TpeSampler.ParamDef("wBurohausSwap",     0.0,  8.0, 1.5),
+        new TpeSampler.ParamDef("wBurohausSwap",     0.0,  8.0, 2.7319287177692937),
     };
 
     // =====================================================================
@@ -362,8 +412,8 @@ public final class SweepMain {
             }
 
             String trialLabel = infinite
-                    ? String.format("Trial %d", t + 1)
-                    : String.format("Trial %d/%d", t + 1, trials);
+                    ? String.format("Trial %d", trialIdx + 1)
+                    : String.format("Trial %d/%d", trialIdx + 1, trials);
             if (opponentList.size() > 1) {
                 System.out.printf("  %s (%s): avgWR=%.1f%% (%s)  [best: %.1f%% @ #%d]  (%.1fs)%n",
                         trialLabel, source, winRate * 100,

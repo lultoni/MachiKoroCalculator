@@ -369,5 +369,35 @@
       "iterations": "0",
       "timeBudgetMs": "5000"
     }
+  },
+  {
+    "id": "creator-balanced-tuned",
+    "engineClass": "creator",
+    "description": "Creator Engine — TPE-tuned balanced (WR=88.0% vs heuristic-ev-default+flat-mc-fast+mcts-v1-depth3+mcts-v1-fast)",
+    "default": false,
+    "tier": "balanced",
+    "config": {
+      "iterations": "5000",
+      "maxETW": "100.0000",
+      "sigmoidK": "15.0747",
+      "sitCoins": "0.1495",
+      "sitIncome": "0.0000",
+      "sitLandmark": "0.9030",
+      "sitTempo": "0.5600",
+      "sprintHorizon": "15.4856",
+      "sprintSharpness": "2.7431",
+      "targetEvPerRound": "3.6283",
+      "threatHorizon": "10.0846",
+      "threatSharpness": "1.3565",
+      "wBurohausSwap": "1.4540",
+      "wCoverage": "5.7319",
+      "wIncome": "4.7625",
+      "wLandmark": "2.5082",
+      "wRisk": "2.8237",
+      "wRoi": "0.4555",
+      "wTempo": "6.0000",
+      "wUrgency": "4.8316",
+      "wWinProb": "4.0619"
+    }
   }
 ]

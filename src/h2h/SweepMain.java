@@ -319,8 +319,7 @@ public final class SweepMain {
             // This makes the objective unbiased across opponent strengths.
             long matchStart = System.currentTimeMillis();
             double winRateSum = 0.0;
-            int totalWins = 0;
-            int totalLosses = 0;
+            StringBuilder perOpp = new StringBuilder();
 
             for (int oi = 0; oi < opponentList.size(); oi++) {
                 String currentOpponent = opponentList.get(oi);
@@ -340,8 +339,8 @@ public final class SweepMain {
                 } : null);
 
                 winRateSum += result.winRates[0];
-                totalWins += result.wins[0];
-                totalLosses += result.wins[1];
+                if (oi > 0) perOpp.append(", ");
+                perOpp.append(result.wins[0]).append("-").append(result.wins[1]);
 
                 if (verbose && opponentList.size() > 1) {
                     System.out.printf("    vs %-30s: %d-%d (%.1f%%)%n",
@@ -366,9 +365,9 @@ public final class SweepMain {
                     ? String.format("Trial %d", t + 1)
                     : String.format("Trial %d/%d", t + 1, trials);
             if (opponentList.size() > 1) {
-                System.out.printf("  %s (%s): avgWR=%.1f%% (%d-%d across %d opponents)  [best: %.1f%% @ #%d]  (%.1fs)%n",
+                System.out.printf("  %s (%s): avgWR=%.1f%% (%s)  [best: %.1f%% @ #%d]  (%.1fs)%n",
                         trialLabel, source, winRate * 100,
-                        totalWins, totalLosses, opponentList.size(),
+                        perOpp,
                         bestWinRate * 100, bestTrialIdx, matchTime / 1000.0);
             } else {
                 System.out.printf("  %s (%s): WR=%.1f%%  [best: %.1f%% @ #%d]  (%.1fs)%n",

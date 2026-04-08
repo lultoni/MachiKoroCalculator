@@ -6,6 +6,28 @@ Implementation history: what was built, why, and which design decisions were mad
 
 ## Phase 7: Iteration
 
+### 7.51 — Sweep visualization UI (#43)
+
+**New Sweep Results tab on the H2H page.** Accessible via "Sweep Results" button in the H2H header. Reads `data/sweep-results.json` via new `GET /api/h2h/sweep/results` endpoint.
+
+**Smart run grouping:** Runs with the same `creatorEngine + opponent` are merged (matching `--resume` logic). Dropdown selector for choosing which group to view.
+
+**Four visualizations:**
+1. **Convergence plot** — per-trial win rate (gray scatter) with best-so-far line (amber). Recharts LineChart.
+2. **Parameter importance** — horizontal bar chart of |Pearson r| between each of the 20 params and win rate. Color-coded: strong (amber, >0.3), moderate (gray, 0.15–0.3), weak (dark, <0.15).
+3. **Parallel coordinates** — custom SVG chart with one vertical axis per parameter. Top-N trials rendered as colored polylines, normalized to [0,1] within each param's range.
+4. **Parameter ranges** — grouped by category (Base weights, Situation, Thresholds, Sigmoid & gravity, Bürohaus). Each param shows full range bar with observed range highlight and colored dots for top-N trials.
+
+**Configurable top-N slider** (1–20) controls which trials are highlighted in charts 3 & 4, with a color legend.
+
+**Added Recharts** dependency for LineChart/BarChart. Existing CSS progress bars left as-is (not worth migrating).
+
+**DE/EN localization** for all new UI strings (23 keys each).
+
+### 7.50 — TODO cleanup + SweepMain param update
+
+Categorized TODO.md open tasks, sorted done list, moved completed items (#28, #41, #46) to Done.
+
 ### 7.49 — Sweep: multi-opponent per trial + widened parameter ranges
 
 **Multi-opponent: each trial plays ALL opponents.** Changed `--opponents a,b,c` from round-robin (one opponent per trial — biased toward weak opponents) to all-opponents-per-trial. Each trial now runs a match against every opponent and uses the **averaged win rate** as the TPE objective. This eliminates bias: a parameter vector that wins 80% vs heuristic but 40% vs MCTS depth3 now correctly scores 60%, not alternating between 80% and 40% in separate trials. Progress output shows per-opponent breakdown in verbose mode.

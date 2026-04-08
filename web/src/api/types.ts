@@ -300,3 +300,26 @@ export interface H2hImportResponse {
   imported: number;
   skipped: number;
 }
+
+// ─── Sweep Results ──────────────────────────────────────────────────────
+
+export interface SweepTrial {
+  index: number;
+  params: Record<string, number>;
+  winRate: number;
+  games: number;
+  timeMs: number;
+}
+
+export interface SweepRun {
+  id: string;
+  date: string;
+  creatorEngine: string;
+  opponent: string;
+  gamesPerTrial: number;
+  totalTrials: number;
+  startupTrials: number;
+  gamma: number;
+  trials: SweepTrial[];
+  totalTimeMs: number;
+}

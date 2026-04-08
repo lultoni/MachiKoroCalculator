@@ -108,6 +108,8 @@ final class H2hHandler implements HttpHandler {
                 handleAutoStop(exchange);
             } else if (path.equals("/api/h2h/auto/status") && "GET".equals(method)) {
                 handleAutoStatus(exchange);
+            } else if (path.equals("/api/h2h/sweep/results") && "GET".equals(method)) {
+                handleSweepResults(exchange);
             } else {
                 ApiUtils.sendError(exchange, 404, "Not found: " + path);
             }
@@ -507,6 +509,15 @@ final class H2hHandler implements HttpHandler {
             map.put(key, obj.get(key).getAsString());
         }
         return map;
+    }
+
+    // -------------------------------------------------------------------------
+    // Sweep results
+    // -------------------------------------------------------------------------
+
+    private void handleSweepResults(HttpExchange exchange) throws IOException {
+        List<SweepResult.SweepRun> runs = SweepResult.loadAll();
+        ApiUtils.sendJson(exchange, 200, runs);
     }
 
     // -------------------------------------------------------------------------

@@ -29,7 +29,6 @@ Priorisiere in deiner Abarbeitung die wichtigsten Features. Erkenne Abhänigkeit
 | # | Task | Notes |
 |---|------|-------|
 | 42 | Sweep progressive refinement | Two-phase: Phase 1 = wide LHS exploration (100 trials), Phase 2 = local search around top-5 regions (CMA-ES or coordinate descent). TPE currently handles both, but explicit local refinement may extract more. |
-| 43 | Sweep visualization in UI | Sweep Results tab on H2H page. (1) Convergence plot (best WR over trials), (2) parameter importance (correlation with WR), (3) parallel coordinates of top-10 vectors, (4) param range visualization showing min/max of each param definition with top-N trial points connected as lines. Consider moving param definitions to JSON for better usability. Data source: `data/sweep-results.json`. |
 
 ### UI
 
@@ -84,4 +83,5 @@ Moved here when completed. Full history in CHANGELOG.md.
 | 37 | H2H: Stop button with live progress feedback — cancel running matches from UI. |
 | 38 | All engines: tempo tiebreaker when options score identically (landmarks first, cost DESC). |
 | 41 | Creator Engine: Multi-opponent sweep — `--opponents` CLI flag, averaged WR across all opponents per trial. |
+| 43 | Sweep visualization in UI — Recharts-based Sweep Results tab with convergence, importance, parallel coords, param ranges. |
 | 46 | Adjust SweepMain starting params from sweep analysis — seeded from best old-run results. |

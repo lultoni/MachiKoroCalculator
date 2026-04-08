@@ -6,6 +6,7 @@ import type { EngineRegistryEntry, ProjectDef } from '../api/types';
 import { H2hMatchDetail } from './H2hMatchDetail';
 import { H2hGameReplay } from './H2hGameReplay';
 import { H2hRatings } from './H2hRatings';
+import { H2hSweepResults } from './H2hSweepResults';
 
 interface Props {
   onBack: () => void;
@@ -72,7 +73,7 @@ export function H2hOverview({ onBack, projects, language }: Props) {
   const [seatSwap, setSeatSwap] = useState(true);
   const [fieldsA, setFieldsA] = useState<{ key: string; value: string }[]>([]);
   const [fieldsB, setFieldsB] = useState<{ key: string; value: string }[]>([]);
-  const [view, setView] = useState<'overview' | 'ratings'>('overview');
+  const [view, setView] = useState<'overview' | 'ratings' | 'sweep'>('overview');
 
   // Auto Battle state
   const [autoStatus, setAutoStatus] = useState<api.AutoBattleStatusResponse | null>(null);
@@ -202,6 +203,11 @@ export function H2hOverview({ onBack, projects, language }: Props) {
     return <H2hRatings onBack={() => setView('overview')} />;
   }
 
+  // Sweep results view
+  if (view === 'sweep') {
+    return <H2hSweepResults onBack={() => setView('overview')} />;
+  }
+
   // Game replay view
   if (h2h.selectedGame && h2h.selectedResult) {
     return (
@@ -260,6 +266,12 @@ export function H2hOverview({ onBack, projects, language }: Props) {
             className="ml-auto text-sm text-machi-text-dim hover:text-machi-accent transition-colors"
           >
             {t('h2h.ratingsNav')}
+          </button>
+          <button
+            onClick={() => setView('sweep')}
+            className="text-sm text-machi-text-dim hover:text-machi-accent transition-colors"
+          >
+            {t('sweep.nav')}
           </button>
         </div>
 

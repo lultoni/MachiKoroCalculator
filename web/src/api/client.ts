@@ -20,6 +20,7 @@ import type {
   H2hGameLog,
   RatingsResponse,
   H2hImportResponse,
+  SweepRun,
 } from './types';
 
 const BASE = '';  // same-origin; Vite proxy handles /api → :8080
@@ -187,3 +188,8 @@ export const h2hAutoStop = () =>
 
 export const h2hAutoStatus = () =>
   json<AutoBattleStatusResponse>('/api/h2h/auto/status');
+
+// ─── Sweep Results ────────────────────────────────────────────────
+
+export const sweepResults = () =>
+  json<SweepRun[]>('/api/h2h/sweep/results');

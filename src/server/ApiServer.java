@@ -119,6 +119,7 @@ public final class ApiServer {
         httpServer.createContext("/api/h2h/export",  h2hHandler);
         httpServer.createContext("/api/h2h/import",  h2hHandler);
         httpServer.createContext("/api/h2h/auto",    h2hHandler);
+        httpServer.createContext("/api/h2h/sweep",   h2hHandler);
 
         // Static file serving (SPA fallback)
         httpServer.createContext("/", new StaticFileHandler(Path.of("web", "dist")));

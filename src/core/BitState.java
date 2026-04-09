@@ -311,9 +311,11 @@ public final class BitState {
         // it does NOT subtract from opponents. This is a known simplification in the
         // object-based model (purple cards treated as "from bank" in simulations).
         // BitState must match this behavior for equivalence.
-        // CRITICAL: RollResolver uses freshOpponentCoins = buildOpponentCoins(players, activePlayer)
-        // which reads players[i].getCoins() — the BASE pre-delta coins, NOT base+delta.
-        // So opponent coins here must be getCoins(p), not getCoins(p)+deltas[p].
+        // Opponent coins below use getCoins(p) (base, pre-delta) to match RollResolver.
+        // This is correct for the base game because no red/blue/green card activates on
+        // roll 6. TODO(expansions): Harbor expansion adds Flower Shop (roll 6) and Loan
+        // Office (rolls 5-6) — when those are added, use getCoins(p)+deltas[p] here and
+        // fix RollResolver to match.
         if (roll == 6) {
             // Stadion
             if (hasPurple(activePlayer, 0)) { // stadion = purple idx 0

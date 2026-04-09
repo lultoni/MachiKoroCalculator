@@ -87,6 +87,11 @@ public final class RollResolver {
                 active.getCoins(), opponentCoins);
         for (Project p : active.getOwned_projects()) {
             if ("lila".equals(p.getColor())) {
+                // TODO(expansions): freshOpponentCoins reads base coins (player.getCoins()),
+                // ignoring red/blue/green deltas already accumulated this roll. Correct for
+                // the base game because no red/blue/green card activates on roll 6. Breaks
+                // with Harbor expansion (Flower Shop on 6, Loan Office on 5-6). Fix: use
+                // players[i].getCoins() + deltas[i] instead of players[i].getCoins().
                 int[] freshOpponentCoins = CardIncome.buildOpponentCoins(players, activePlayer);
                 deltas[activePlayer] += CardIncome.get_I(roll, p.getId(), true,
                         activeStats.hasEinkaufszentrum,

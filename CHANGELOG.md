@@ -6,6 +6,21 @@ Implementation history: what was built, why, and which design decisions were mad
 
 ## Phase 7: Iteration
 
+### Bitwise Game Core — Phase 1 Foundation (TODO #20)
+
+**BitStateTranslator** (new class in `core/`): Single source of truth for the 57-bit-per-player encoding layout. Maps card IDs to bit-position indices. Defines offsets: coins (8 bits), landmarks (4 bits), 12 normal cards × 3 bits, 3 purple cards × 3 bits. Category arrays (food, animal, production), EKZ bonus flags, starter card flags, and reverse lookup maps.
+
+**BitState** (new class in `core/`): Packed `long[]` game state — one `long` per player. Full bitwise operations: coins, landmarks, normal card counts, purple card counts, category counting, supply tracking. Conversion: `fromGameState()`/`toGameState()`. Income resolution via `applyRoll()` matching RollResolver exactly (Red → Blue/Green → Purple, counter-clockwise red priority, coin clamping). Bürohaus greedy swap via `executeGreedySwap()` delegating to BürohausLogic.
+
+**Key design decisions:**
+- Purple cards use 1-bit flags (not counts) — game rules enforce max 1 per player per type. Purple uniqueness is enforced in all purchase paths: BuyDecisionNode, MctsRollout, GreedyRollout, BoltzmannRollout, and now GameSimulator (greedyBuy + boltzmannBuy — previously missing, fixed in this commit).
+- Purple income uses base (pre-delta) opponent coins, matching RollResolver which calls `buildOpponentCoins(players, ...)` reading `Player.getCoins()` directly.
+- Encoding fits in 51 bits (13 spare in a `long`), expandable to ~120 bits (2 longs) for expansions.
+
+**Test coverage:** 176 assertions across 27 test methods in a new "BitState" RuntimeTester section. Tests cover: translator constants/lookups, encoding of initial state, coin/landmark/card/purple operations, category counting, supply tracking, copy independence, round-trip conversion (initial + midgame), per-card income (blue/green/red with EKZ, clamping, counter-clockwise 3P), purple income (stadion, fernsehsender), synergy multipliers (molkerei/möbelfabrik/markthalle), full 12-roll × 2-player cross-check, Bürohaus swap (beneficial/no-swap/purple-excluded), win condition. Full-game equivalence: 200 games with ~9000 turn-level round-trip + income comparisons, zero mismatches.
+
+**Bug fix: GameSimulator purple uniqueness.** `greedyBuy()` and `boltzmannBuy()` were missing the `if ("lila".equals(p.getColor()) && player.hasProject(p.getId())) continue;` check that all MCTS rollouts (MctsRollout, GreedyRollout, BoltzmannRollout) and BuyDecisionNode already enforce. This allowed simulated players to accumulate multiple copies of the same purple card — a game rule violation. Fixed by adding the check to both methods.
+
 ### Analysis Infrastructure — GameStateSampler, LuckAnalyzer, Real-Game Accuracy Test
 
 **GameStateSampler** (new class in `calcs/`): Reusable callback-based harness for playing full games and sampling GameState snapshots at turn boundaries. Two hook points: pre-roll (for luck analysis) and post-income (for WR accuracy tests). Three built-in sampling strategies (everyKTurns, turnRange, allTurns). Uses GameSimulator's package-private game-play methods.

@@ -188,6 +188,7 @@ public class GameSimulator {
             if (p.isIs_grossprojekt()) continue;
             if (player.getCoins() < p.getCost()) continue;
             if (supply.getOrDefault(p.getId(), 0) <= 0) continue;
+            if ("lila".equals(p.getColor()) && player.hasProject(p.getId())) continue;
             double ev = CardIncome.contextualCardEvPerRound(p, playerStats, n, oppCoins);
             double roi = ev * ROI_GEOMETRIC_SUM - p.getCost();
             if (roi > bestROI) { bestROI = roi; best = p; }
@@ -223,6 +224,7 @@ public class GameSimulator {
             if (p.isIs_grossprojekt()) continue;
             if (player.getCoins() < p.getCost()) continue;
             if (supply.getOrDefault(p.getId(), 0) <= 0) continue;
+            if ("lila".equals(p.getColor()) && player.hasProject(p.getId())) continue;
             double ev = CardIncome.contextualCardEvPerRound(p, playerStats, n, oppCoins);
             double roi = ev * ROI_GEOMETRIC_SUM - p.getCost();
             cards.add(p);

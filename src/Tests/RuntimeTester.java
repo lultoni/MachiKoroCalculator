@@ -38,6 +38,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Random;
 import java.util.Set;
 
 public class RuntimeTester {
@@ -436,6 +437,36 @@ public class RuntimeTester {
 
         runSection("Per-Roll Luck Analysis", () -> {
             runPerRollLuckTest();
+        });
+
+        runSection("BitState", () -> {
+            test_bitstate_translator_constants();
+            test_bitstate_translator_lookups();
+            test_bitstate_encoding_initial_state();
+            test_bitstate_coin_ops();
+            test_bitstate_landmark_ops();
+            test_bitstate_card_count_ops();
+            test_bitstate_purple_ops();
+            test_bitstate_category_counts();
+            test_bitstate_supply_remaining();
+            test_bitstate_copy_independence();
+            test_bitstate_round_trip_initial();
+            test_bitstate_round_trip_midgame();
+            test_bitstate_income_blue_cards();
+            test_bitstate_income_green_cards();
+            test_bitstate_income_green_ekz_bonus();
+            test_bitstate_income_red_cards();
+            test_bitstate_income_red_coin_clamping();
+            test_bitstate_income_red_counter_clockwise();
+            test_bitstate_income_purple_stadion();
+            test_bitstate_income_purple_fernsehsender();
+            test_bitstate_income_synergy_multipliers();
+            test_bitstate_income_full_roll_vs_resolver();
+            test_bitstate_burohaus_greedy_swap();
+            test_bitstate_burohaus_no_swap_when_not_beneficial();
+            test_bitstate_burohaus_purple_excluded();
+            test_bitstate_has_won();
+            test_bitstate_equivalence_full_games();
         });
 
         System.out.println("\n--- Results: " + passed + " passed, " + failed + " failed ---");
@@ -4528,5 +4559,587 @@ public class RuntimeTester {
             boolean hasSwapBonus = burohausSc.metrics.containsKey("burohausSwapBonus");
             assertTrue("Creator Bürohaus purchase: bürohaus has burohausSwapBonus metric", hasSwapBonus);
         }
+    }
+
+    // =========================================================================
+    // BitState tests — written BEFORE BitState/BitStateTranslator implementation
+    // =========================================================================
+
+    private static void test_bitstate_translator_constants() {
+        assertEq("Translator: NUM_NORMAL_CARDS", 12, BitStateTranslator.NUM_NORMAL_CARDS);
+        assertEq("Translator: NUM_PURPLE_CARDS", 3, BitStateTranslator.NUM_PURPLE_CARDS);
+        assertEq("Translator: NUM_LANDMARKS", 4, BitStateTranslator.NUM_LANDMARKS);
+        assertEq("Translator: COINS_OFFSET", 0, BitStateTranslator.COINS_OFFSET);
+        assertEq("Translator: LANDMARKS_OFFSET", 8, BitStateTranslator.LANDMARKS_OFFSET);
+        assertEq("Translator: NORMAL_CARDS_OFFSET", 12, BitStateTranslator.NORMAL_CARDS_OFFSET);
+        assertEq("Translator: PURPLE_CARDS_OFFSET", 48, BitStateTranslator.PURPLE_CARDS_OFFSET);
+        assertEq("Translator: BITS_PER_PLAYER", 51, BitStateTranslator.BITS_PER_PLAYER);
+        assertEq("Translator: NORMAL_CARD_IDS length", 12, BitStateTranslator.NORMAL_CARD_IDS.length);
+        assertEq("Translator: PURPLE_CARD_IDS length", 3, BitStateTranslator.PURPLE_CARD_IDS.length);
+        assertEq("Translator: LANDMARK_IDS length", 4, BitStateTranslator.LANDMARK_IDS.length);
+        // Category arrays
+        assertEq("Translator: FOOD_CARD_INDICES length", 2, BitStateTranslator.FOOD_CARD_INDICES.length);
+        assertEq("Translator: ANIMAL_CARD_INDICES length", 1, BitStateTranslator.ANIMAL_CARD_INDICES.length);
+        assertEq("Translator: PRODUCTION_CARD_INDICES length", 2, BitStateTranslator.PRODUCTION_CARD_INDICES.length);
+    }
+
+    private static void test_bitstate_translator_lookups() {
+        // Normal card lookups
+        assertEq("Translator: normalCardIndex(weizenfeld)", 0, BitStateTranslator.normalCardIndex("weizenfeld"));
+        assertEq("Translator: normalCardIndex(bäckerei)", 1, BitStateTranslator.normalCardIndex("bäckerei"));
+        assertEq("Translator: normalCardIndex(markthalle)", 11, BitStateTranslator.normalCardIndex("markthalle"));
+        assertEq("Translator: normalCardIndex(stadion) = -1", -1, BitStateTranslator.normalCardIndex("stadion"));
+        // Purple card lookups
+        assertEq("Translator: purpleCardIndex(stadion)", 0, BitStateTranslator.purpleCardIndex("stadion"));
+        assertEq("Translator: purpleCardIndex(bürohaus)", 2, BitStateTranslator.purpleCardIndex("bürohaus"));
+        assertEq("Translator: purpleCardIndex(weizenfeld) = -1", -1, BitStateTranslator.purpleCardIndex("weizenfeld"));
+        // Landmark lookups
+        assertEq("Translator: landmarkIndex(bahnhof)", 0, BitStateTranslator.landmarkIndex("bahnhof"));
+        assertEq("Translator: landmarkIndex(funkturm)", 3, BitStateTranslator.landmarkIndex("funkturm"));
+        // All normal IDs map to unique 0-11
+        Set<Integer> normalIndices = new HashSet<>();
+        for (String id : BitStateTranslator.NORMAL_CARD_IDS) normalIndices.add(BitStateTranslator.normalCardIndex(id));
+        assertEq("Translator: 12 unique normal indices", 12, normalIndices.size());
+        // All purple IDs map to unique 0-2
+        Set<Integer> purpleIndices = new HashSet<>();
+        for (String id : BitStateTranslator.PURPLE_CARD_IDS) purpleIndices.add(BitStateTranslator.purpleCardIndex(id));
+        assertEq("Translator: 3 unique purple indices", 3, purpleIndices.size());
+        // All landmark IDs map to unique 0-3
+        Set<Integer> lmIndices = new HashSet<>();
+        for (String id : BitStateTranslator.LANDMARK_IDS) lmIndices.add(BitStateTranslator.landmarkIndex(id));
+        assertEq("Translator: 4 unique landmark indices", 4, lmIndices.size());
+    }
+
+    private static void test_bitstate_encoding_initial_state() {
+        GameState gs = GameState.initial(2);
+        BitState bs = BitState.fromGameState(gs);
+        for (int p = 0; p < 2; p++) {
+            assertEq("Initial P" + p + " coins", 3, bs.getCoins(p));
+            assertEq("Initial P" + p + " landmarks", 0, bs.getLandmarkCount(p));
+            assertEq("Initial P" + p + " weizenfeld count", 1, bs.getCardCount(p, BitStateTranslator.normalCardIndex("weizenfeld")));
+            assertEq("Initial P" + p + " bäckerei count", 1, bs.getCardCount(p, BitStateTranslator.normalCardIndex("bäckerei")));
+            // All other normal cards should be 0
+            for (int c = 0; c < BitStateTranslator.NUM_NORMAL_CARDS; c++) {
+                String cardId = BitStateTranslator.NORMAL_CARD_IDS[c];
+                if (!"weizenfeld".equals(cardId) && !"bäckerei".equals(cardId)) {
+                    assertEq("Initial P" + p + " " + cardId + " count", 0, bs.getCardCount(p, c));
+                }
+            }
+            // No purples
+            for (int c = 0; c < BitStateTranslator.NUM_PURPLE_CARDS; c++) {
+                assertTrue("Initial P" + p + " no purple " + c, !bs.hasPurple(p, c));
+            }
+        }
+    }
+
+    private static void test_bitstate_coin_ops() {
+        BitState bs = new BitState(2);
+        assertEq("Coin ops: initial 0", 0, bs.getCoins(0));
+        bs.setCoins(0, 42);
+        assertEq("Coin ops: set 42", 42, bs.getCoins(0));
+        assertEq("Coin ops: P1 independent", 0, bs.getCoins(1));
+        bs.setCoins(0, 255);
+        assertEq("Coin ops: max 255", 255, bs.getCoins(0));
+        bs.setCoins(0, 0);
+        assertEq("Coin ops: back to 0", 0, bs.getCoins(0));
+    }
+
+    private static void test_bitstate_landmark_ops() {
+        BitState bs = new BitState(2);
+        assertTrue("Landmark: initially no bahnhof", !bs.hasLandmark(0, BitStateTranslator.LM_BAHNHOF));
+        assertEq("Landmark: initial count 0", 0, bs.getLandmarkCount(0));
+        bs.setLandmark(0, BitStateTranslator.LM_BAHNHOF);
+        assertTrue("Landmark: has bahnhof after set", bs.hasLandmark(0, BitStateTranslator.LM_BAHNHOF));
+        assertEq("Landmark: count 1 after bahnhof", 1, bs.getLandmarkCount(0));
+        // Set all 4
+        bs.setLandmark(0, BitStateTranslator.LM_EKZ);
+        bs.setLandmark(0, BitStateTranslator.LM_FZP);
+        bs.setLandmark(0, BitStateTranslator.LM_FT);
+        assertEq("Landmark: count 4 after all", 4, bs.getLandmarkCount(0));
+        assertTrue("Landmark: hasWon with 4", bs.hasWon(0));
+        // P1 unaffected
+        assertEq("Landmark: P1 still 0", 0, bs.getLandmarkCount(1));
+        assertTrue("Landmark: P1 not won", !bs.hasWon(1));
+    }
+
+    private static void test_bitstate_card_count_ops() {
+        BitState bs = new BitState(2);
+        int wIdx = BitStateTranslator.normalCardIndex("weizenfeld");
+        int bIdx = BitStateTranslator.normalCardIndex("bäckerei");
+        assertEq("Card count: initial 0", 0, bs.getCardCount(0, wIdx));
+        bs.addCard(0, wIdx);
+        assertEq("Card count: 1 after add", 1, bs.getCardCount(0, wIdx));
+        bs.addCard(0, wIdx);
+        assertEq("Card count: 2 after second add", 2, bs.getCardCount(0, wIdx));
+        // Add up to 7 (max for 3 bits)
+        for (int i = 0; i < 5; i++) bs.addCard(0, wIdx);
+        assertEq("Card count: 7 is max", 7, bs.getCardCount(0, wIdx));
+        bs.removeCard(0, wIdx);
+        assertEq("Card count: 6 after remove", 6, bs.getCardCount(0, wIdx));
+        // Other card unaffected
+        assertEq("Card count: bäckerei still 0", 0, bs.getCardCount(0, bIdx));
+        // P1 unaffected
+        assertEq("Card count: P1 weizenfeld still 0", 0, bs.getCardCount(1, wIdx));
+    }
+
+    private static void test_bitstate_purple_ops() {
+        BitState bs = new BitState(2);
+        int stadionIdx = BitStateTranslator.purpleCardIndex("stadion");
+        int fsIdx = BitStateTranslator.purpleCardIndex("fernsehsender");
+        assertTrue("Purple: no stadion initially", !bs.hasPurple(0, stadionIdx));
+        bs.setPurple(0, stadionIdx);
+        assertTrue("Purple: has stadion after set", bs.hasPurple(0, stadionIdx));
+        assertTrue("Purple: fernsehsender still absent", !bs.hasPurple(0, fsIdx));
+        assertTrue("Purple: P1 no stadion", !bs.hasPurple(1, stadionIdx));
+        // setPurple is idempotent (OR operation)
+        bs.setPurple(0, stadionIdx);
+        assertTrue("Purple: stadion still set after second setPurple", bs.hasPurple(0, stadionIdx));
+    }
+
+    private static void test_bitstate_category_counts() {
+        BitState bs = new BitState(2);
+        int wIdx = BitStateTranslator.normalCardIndex("weizenfeld");      // food
+        int bhIdx = BitStateTranslator.normalCardIndex("bauernhof");      // food + animal
+        int apIdx = BitStateTranslator.normalCardIndex("apfelplantage");  // food
+        int waldIdx = BitStateTranslator.normalCardIndex("wald");         // production
+        int bergIdx = BitStateTranslator.normalCardIndex("bergwerk");     // production
+        // Add: 2 weizenfeld, 1 bauernhof, 3 apfelplantage, 1 wald, 2 bergwerk
+        bs.addCard(0, wIdx); bs.addCard(0, wIdx);
+        bs.addCard(0, bhIdx);
+        bs.addCard(0, apIdx); bs.addCard(0, apIdx); bs.addCard(0, apIdx);
+        bs.addCard(0, waldIdx);
+        bs.addCard(0, bergIdx); bs.addCard(0, bergIdx);
+        assertEq("Category: foodCount = 5", 5, bs.foodCount(0));       // 2 weizenfeld + 3 apfelplantage (bauernhof is animal, not food)
+        assertEq("Category: animalCount = 1", 1, bs.animalCount(0));   // 1
+        assertEq("Category: productionCount = 3", 3, bs.productionCount(0)); // 1+2
+    }
+
+    private static void test_bitstate_supply_remaining() {
+        GameState gs = GameState.initial(2);
+        BitState bs = BitState.fromGameState(gs);
+        int wIdx = BitStateTranslator.normalCardIndex("weizenfeld");
+        int waldIdx = BitStateTranslator.normalCardIndex("wald");
+        // Initial 2P: each player has 1 weizenfeld (starter) → supply should be 6 (starters outside pool)
+        assertEq("Supply: weizenfeld initial = 6", 6, bs.supplyRemaining(wIdx));
+        // Buy 1 more weizenfeld for player 0 → supply = 5
+        bs.addCard(0, wIdx);
+        assertEq("Supply: weizenfeld after 1 purchase = 5", 5, bs.supplyRemaining(wIdx));
+        // Wald (no starter): add 3 across players
+        bs.addCard(0, waldIdx); bs.addCard(0, waldIdx); bs.addCard(1, waldIdx);
+        assertEq("Supply: wald after 3 owned = 3", 3, bs.supplyRemaining(waldIdx));
+    }
+
+    private static void test_bitstate_copy_independence() {
+        BitState original = new BitState(2);
+        original.setCoins(0, 10);
+        original.addCard(0, 0);
+        BitState copy = original.copy();
+        // Modify original
+        original.setCoins(0, 99);
+        original.addCard(0, 0);
+        assertEq("Copy independence: copy coins unchanged", 10, copy.getCoins(0));
+        assertEq("Copy independence: copy card count unchanged", 1, copy.getCardCount(0, 0));
+        // Modify copy
+        copy.setCoins(1, 50);
+        assertEq("Copy independence: original P1 coins unchanged", 0, original.getCoins(1));
+    }
+
+    private static void test_bitstate_round_trip_initial() {
+        GameState gs1 = GameState.initial(2);
+        BitState bs = BitState.fromGameState(gs1);
+        GameState gs2 = bs.toGameState();
+        assertEq("Round-trip initial: structuralHash match",
+                gs1.structuralHash(), gs2.structuralHash());
+        for (int p = 0; p < 2; p++) {
+            assertEq("Round-trip initial: P" + p + " coins",
+                    gs1.getPlayers()[p].getCoins(), gs2.getPlayers()[p].getCoins());
+            assertEq("Round-trip initial: P" + p + " landmark count",
+                    gs1.getPlayers()[p].getLandmarkCount(), gs2.getPlayers()[p].getLandmarkCount());
+            assertEq("Round-trip initial: P" + p + " owned count",
+                    gs1.getPlayers()[p].getOwned_projects().size(),
+                    gs2.getPlayers()[p].getOwned_projects().size());
+        }
+    }
+
+    private static void test_bitstate_round_trip_midgame() {
+        // Player 0: 15 coins, bahnhof+ekz, 3 extra weizenfeld, 2 bauernhof, 1 molkerei, 1 mini-markt, stadion
+        // Player 1: 8 coins, bahnhof, 2 extra bäckerei, 1 café, 1 bergwerk, fernsehsender
+        GameState gs1 = buildDiagState(
+                new String[][]{
+                    {"weizenfeld", "weizenfeld", "weizenfeld", "bauernhof", "bauernhof", "molkerei", "mini-markt", "stadion"},
+                    {"bäckerei", "bäckerei", "café", "bergwerk", "fernsehsender"}
+                },
+                new int[]{15, 8},
+                new String[][]{
+                    {"bahnhof", "einkaufszentrum"},
+                    {"bahnhof"}
+                }
+        );
+        BitState bs = BitState.fromGameState(gs1);
+        GameState gs2 = bs.toGameState();
+        assertEq("Round-trip midgame: structuralHash match",
+                gs1.structuralHash(), gs2.structuralHash());
+        // Spot-check specific values
+        assertEq("Round-trip midgame: P0 coins", 15, gs2.getPlayers()[0].getCoins());
+        assertEq("Round-trip midgame: P1 coins", 8, gs2.getPlayers()[1].getCoins());
+        assertTrue("Round-trip midgame: P0 has bahnhof", gs2.getPlayers()[0].hasProject("bahnhof"));
+        assertTrue("Round-trip midgame: P0 has ekz", gs2.getPlayers()[0].hasProject("einkaufszentrum"));
+        assertTrue("Round-trip midgame: P1 has bahnhof", gs2.getPlayers()[1].hasProject("bahnhof"));
+    }
+
+    // --- Income tests: compare BitState.applyRoll vs RollResolver ---
+
+    /** Helper: build GameState and BitState, apply roll to both, compare final coins.
+     *  Object side applies deltas + clamping + Bürohaus swap (same as GameSimulator.applyRoll).
+     *  BitState side uses BitState.applyRoll which does the same. */
+    private static void assertIncomeEquivalent(String label, GameState gs, int activePlayer, int roll) {
+        // Object-based: apply full roll (deltas + clamp + Bürohaus swap)
+        GameState gsCopy = gs.copy();
+        int[] deltas = RollResolver.computeAllDeltasForRoll(gsCopy, activePlayer, roll);
+        for (int i = 0; i < gsCopy.getPlayers().length; i++) {
+            gsCopy.getPlayers()[i].setCoins(Math.max(0, gsCopy.getPlayers()[i].getCoins() + deltas[i]));
+        }
+        if (roll == 6 && gsCopy.getPlayers()[activePlayer].hasProject("bürohaus")) {
+            BürohausLogic.executeSwap(gsCopy, activePlayer);
+        }
+
+        // BitState-based
+        BitState bs = BitState.fromGameState(gs);
+        bs.applyRoll(activePlayer, roll);
+
+        // Compare final coins for all players
+        for (int i = 0; i < gsCopy.getPlayers().length; i++) {
+            int objFinal = gsCopy.getPlayers()[i].getCoins();
+            int bitFinal = bs.getCoins(i);
+            assertEq(label + " P" + i + " roll=" + roll + " active=" + activePlayer, objFinal, bitFinal);
+        }
+    }
+
+    private static void test_bitstate_income_blue_cards() {
+        // Player 0 has 2 extra weizenfeld (3 total). Player 1 active. Roll 1.
+        GameState gs = buildDiagState(
+                new String[][]{{"weizenfeld", "weizenfeld"}, {}},
+                new int[]{10, 10}, null);
+        assertIncomeEquivalent("Blue weizenfeld×3", gs, 1, 1);
+
+        // Player 0 has bergwerk. Roll 9.
+        gs = buildDiagState(new String[][]{{"bergwerk"}, {}}, new int[]{10, 10}, null);
+        assertIncomeEquivalent("Blue bergwerk", gs, 0, 9);
+        assertIncomeEquivalent("Blue bergwerk opp-turn", gs, 1, 9);
+
+        // Player 0 has apfelplantage. Roll 10.
+        gs = buildDiagState(new String[][]{{"apfelplantage"}, {}}, new int[]{10, 10}, null);
+        assertIncomeEquivalent("Blue apfelplantage", gs, 0, 10);
+
+        // bauernhof × 3, roll 2
+        gs = buildDiagState(new String[][]{{"bauernhof", "bauernhof", "bauernhof"}, {}}, new int[]{10, 10}, null);
+        assertIncomeEquivalent("Blue bauernhof×3", gs, 1, 2);
+    }
+
+    private static void test_bitstate_income_green_cards() {
+        // Player 0 active, 2 extra bäckerei (3 total), no EKZ. Roll 2.
+        GameState gs = buildDiagState(
+                new String[][]{{"bäckerei", "bäckerei"}, {}},
+                new int[]{10, 10}, null);
+        assertIncomeEquivalent("Green bäckerei×3 own-turn", gs, 0, 2);
+
+        // Green doesn't fire on opponent turn
+        assertIncomeEquivalent("Green bäckerei×3 opp-turn", gs, 1, 2);
+
+        // mini-markt, roll 4
+        gs = buildDiagState(new String[][]{{"mini-markt"}, {}}, new int[]{10, 10}, null);
+        assertIncomeEquivalent("Green mini-markt own-turn", gs, 0, 4);
+        assertIncomeEquivalent("Green mini-markt opp-turn", gs, 1, 4);
+    }
+
+    private static void test_bitstate_income_green_ekz_bonus() {
+        // Player 0 active, 2 extra bäckerei (3 total) + EKZ. Roll 2.
+        GameState gs = buildDiagState(
+                new String[][]{{"bäckerei", "bäckerei"}, {}},
+                new int[]{10, 10},
+                new String[][]{{"einkaufszentrum"}, {}});
+        assertIncomeEquivalent("Green bäckerei+EKZ", gs, 0, 2);
+
+        // mini-markt + EKZ, roll 4
+        gs = buildDiagState(
+                new String[][]{{"mini-markt"}, {}},
+                new int[]{10, 10},
+                new String[][]{{"einkaufszentrum"}, {}});
+        assertIncomeEquivalent("Green mini-markt+EKZ", gs, 0, 4);
+
+        // café + EKZ (red card, but EKZ applies to owner's gain)
+        gs = buildDiagState(
+                new String[][]{{"café"}, {}},
+                new int[]{10, 10},
+                new String[][]{{"einkaufszentrum"}, {}});
+        // P1 active (roller), P0 owns café+EKZ. Roll 3.
+        assertIncomeEquivalent("Red café+EKZ owner gain", gs, 1, 3);
+    }
+
+    private static void test_bitstate_income_red_cards() {
+        // P1 has 1 café. P0 active, roll 3, P0 has 10 coins.
+        GameState gs = buildDiagState(
+                new String[][]{{}, {"café"}},
+                new int[]{10, 10}, null);
+        assertIncomeEquivalent("Red café", gs, 0, 3);
+
+        // P1 has familienrestaurant. P0 active, roll 9.
+        gs = buildDiagState(
+                new String[][]{{}, {"familienrestaurant"}},
+                new int[]{10, 10}, null);
+        assertIncomeEquivalent("Red familienrestaurant r=9", gs, 0, 9);
+        assertIncomeEquivalent("Red familienrestaurant r=10", gs, 0, 10);
+
+        // P1 has café + EKZ. P0 active, roll 3.
+        gs = buildDiagState(
+                new String[][]{{}, {"café"}},
+                new int[]{10, 10},
+                new String[][]{{}, {"einkaufszentrum"}});
+        assertIncomeEquivalent("Red café+EKZ", gs, 0, 3);
+    }
+
+    private static void test_bitstate_income_red_coin_clamping() {
+        // P1 has familienrestaurant + EKZ (demands 3). P0 active with 1 coin, roll 9.
+        GameState gs = buildDiagState(
+                new String[][]{{}, {"familienrestaurant"}},
+                new int[]{1, 10},
+                new String[][]{{}, {"einkaufszentrum"}});
+        assertIncomeEquivalent("Red clamping: 1 coin vs 3 demand", gs, 0, 9);
+
+        // P0 with 0 coins, P1 has café, roll 3
+        gs = buildDiagState(
+                new String[][]{{}, {"café"}},
+                new int[]{0, 10}, null);
+        assertIncomeEquivalent("Red clamping: 0 coins", gs, 0, 3);
+    }
+
+    private static void test_bitstate_income_red_counter_clockwise() {
+        // 3-player game. Build manually since buildDiagState is 2P only.
+        GameState gs3 = GameState.initial(3);
+        Player[] p3 = gs3.getPlayers();
+        p3[0].setCoins(5);
+        p3[1].setCoins(10);
+        p3[2].setCoins(10);
+        // P2 gets familienrestaurant (CCW first from P0)
+        p3[2].addProject(ProjectLoader.getProject("familienrestaurant").orElseThrow());
+        // P1 gets familienrestaurant (CCW second)
+        p3[1].addProject(ProjectLoader.getProject("familienrestaurant").orElseThrow());
+        // P0 active, roll 9. P2 gets paid first (2), P1 second (2). P0 has 5→3→1.
+        assertIncomeEquivalent("Red CCW 3P: 5 coins", gs3, 0, 9);
+
+        // Same but P0 has only 3 coins
+        GameState gs3b = GameState.initial(3);
+        Player[] p3b = gs3b.getPlayers();
+        p3b[0].setCoins(3);
+        p3b[1].setCoins(10);
+        p3b[2].setCoins(10);
+        p3b[2].addProject(ProjectLoader.getProject("familienrestaurant").orElseThrow());
+        p3b[1].addProject(ProjectLoader.getProject("familienrestaurant").orElseThrow());
+        // P0 active, roll 9. P2 gets 2, P0 left with 1, P1 gets 1 (clamped from 2).
+        assertIncomeEquivalent("Red CCW 3P: 3 coins (clamped)", gs3b, 0, 9);
+    }
+
+    private static void test_bitstate_income_purple_stadion() {
+        // 3P: P0 active, has stadion. Roll 6. P1 has 5 coins, P2 has 1 coin.
+        GameState gs = GameState.initial(3);
+        Player[] ps = gs.getPlayers();
+        ps[0].setCoins(10);
+        ps[0].addProject(ProjectLoader.getProject("stadion").orElseThrow());
+        ps[1].setCoins(5);
+        ps[2].setCoins(1);
+        assertIncomeEquivalent("Purple stadion 3P", gs, 0, 6);
+    }
+
+    private static void test_bitstate_income_purple_fernsehsender() {
+        // 2P: P0 active, has fernsehsender. Roll 6. P1 has 8 coins.
+        GameState gs = buildDiagState(
+                new String[][]{{"fernsehsender"}, {}},
+                new int[]{10, 8}, null);
+        assertIncomeEquivalent("Purple fernsehsender rich opp", gs, 0, 6);
+
+        // P1 has 3 coins
+        gs = buildDiagState(
+                new String[][]{{"fernsehsender"}, {}},
+                new int[]{10, 3}, null);
+        assertIncomeEquivalent("Purple fernsehsender poor opp", gs, 0, 6);
+    }
+
+    private static void test_bitstate_income_synergy_multipliers() {
+        // Molkerei: P0 active, 2 bauernhof (animal=2) + 1 molkerei. Roll 7.
+        // Expected: molkerei = 3×2=6, bauernhof blue on roll 2 → no (roll is 7). Just molkerei.
+        GameState gs = buildDiagState(
+                new String[][]{{"bauernhof", "bauernhof", "molkerei"}, {}},
+                new int[]{10, 10}, null);
+        assertIncomeEquivalent("Synergy molkerei×animal", gs, 0, 7);
+
+        // Möbelfabrik: P0 active, 1 wald + 2 bergwerk (production=3) + 1 möbelfabrik. Roll 8.
+        gs = buildDiagState(
+                new String[][]{{"wald", "bergwerk", "bergwerk", "möbelfabrik"}, {}},
+                new int[]{10, 10}, null);
+        assertIncomeEquivalent("Synergy möbelfabrik×production", gs, 0, 8);
+
+        // Markthalle: P0 active, 3 extra weizenfeld + 1 apfelplantage + 1 bauernhof (food=6) + 1 markthalle.
+        // Roll 11.
+        gs = buildDiagState(
+                new String[][]{{"weizenfeld", "weizenfeld", "weizenfeld", "apfelplantage", "bauernhof", "markthalle"}, {}},
+                new int[]{10, 10}, null);
+        assertIncomeEquivalent("Synergy markthalle×food", gs, 0, 11);
+        assertIncomeEquivalent("Synergy markthalle×food r=12", gs, 0, 12);
+    }
+
+    private static void test_bitstate_income_full_roll_vs_resolver() {
+        // Complex midgame: diverse cards, landmarks, different coins
+        GameState gs = buildDiagState(
+                new String[][]{
+                    {"weizenfeld", "weizenfeld", "bauernhof", "molkerei", "mini-markt", "café", "stadion"},
+                    {"bäckerei", "bäckerei", "bergwerk", "familienrestaurant", "markthalle", "wald", "fernsehsender"}
+                },
+                new int[]{20, 15},
+                new String[][]{
+                    {"bahnhof", "einkaufszentrum"},
+                    {"bahnhof"}
+                }
+        );
+
+        int mismatches = 0;
+        for (int roll = 1; roll <= 12; roll++) {
+            for (int active = 0; active < 2; active++) {
+                // Object-based: apply full roll (deltas + clamp + Bürohaus swap)
+                GameState gsCopy = gs.copy();
+                int[] objDeltas = RollResolver.computeAllDeltasForRoll(gsCopy, active, roll);
+                for (int p = 0; p < 2; p++) {
+                    gsCopy.getPlayers()[p].setCoins(Math.max(0, gsCopy.getPlayers()[p].getCoins() + objDeltas[p]));
+                }
+                if (roll == 6 && gsCopy.getPlayers()[active].hasProject("bürohaus")) {
+                    BürohausLogic.executeSwap(gsCopy, active);
+                }
+                // BitState-based
+                BitState bs = BitState.fromGameState(gs);
+                bs.applyRoll(active, roll);
+                for (int p = 0; p < 2; p++) {
+                    if (gsCopy.getPlayers()[p].getCoins() != bs.getCoins(p)) mismatches++;
+                }
+            }
+        }
+        assertEq("Full roll cross-check: 0 mismatches in 24 scenarios", 0, mismatches);
+    }
+
+    private static void test_bitstate_burohaus_greedy_swap() {
+        // P0 has bürohaus + weizenfeld(low EV). P1 has bergwerk(high EV).
+        GameState gsObj = buildDiagState(
+                new String[][]{{"bürohaus"}, {"bergwerk"}},
+                new int[]{10, 10}, null);
+        // Apply Bürohaus via object model
+        BürohausLogic.executeSwap(gsObj, 0);
+
+        // Same state via BitState
+        GameState gsForBit = buildDiagState(
+                new String[][]{{"bürohaus"}, {"bergwerk"}},
+                new int[]{10, 10}, null);
+        BitState bs = BitState.fromGameState(gsForBit);
+        bs.executeGreedySwap(0);
+        GameState gsFromBit = bs.toGameState();
+
+        assertEq("Bürohaus swap: structuralHash match",
+                gsObj.structuralHash(), gsFromBit.structuralHash());
+    }
+
+    private static void test_bitstate_burohaus_no_swap_when_not_beneficial() {
+        // Both players have only weizenfeld + bäckerei (similar low-EV).
+        GameState gs = GameState.initial(2);
+        gs.getPlayers()[0].setCoins(10);
+        gs.getPlayers()[1].setCoins(10);
+        gs.getPlayers()[0].addProject(ProjectLoader.getProject("bürohaus").orElseThrow());
+
+        BitState bsBefore = BitState.fromGameState(gs);
+        BitState bsAfter = BitState.fromGameState(gs);
+        bsAfter.executeGreedySwap(0);
+        // State should be unchanged (no beneficial swap: both have same cards)
+        assertEq("Bürohaus no-swap: P0 raw unchanged", bsBefore.raw(0), bsAfter.raw(0));
+        assertEq("Bürohaus no-swap: P1 raw unchanged", bsBefore.raw(1), bsAfter.raw(1));
+    }
+
+    private static void test_bitstate_burohaus_purple_excluded() {
+        // P1 has stadion (purple, high EV). P0 has bürohaus + weizenfeld.
+        // Swap should NOT take stadion (purple excluded).
+        GameState gsForBit = buildDiagState(
+                new String[][]{{"bürohaus"}, {"stadion"}},
+                new int[]{10, 10}, null);
+        BitState bs = BitState.fromGameState(gsForBit);
+        bs.executeGreedySwap(0);
+        // Stadion should still be with P1
+        assertTrue("Bürohaus purple excluded: P1 still has stadion",
+                bs.hasPurple(1, BitStateTranslator.purpleCardIndex("stadion")));
+        assertTrue("Bürohaus purple excluded: P0 does NOT have stadion",
+                !bs.hasPurple(0, BitStateTranslator.purpleCardIndex("stadion")));
+    }
+
+    private static void test_bitstate_has_won() {
+        BitState bs = new BitState(2);
+        assertTrue("hasWon: 0 landmarks = false", !bs.hasWon(0));
+        bs.setLandmark(0, BitStateTranslator.LM_BAHNHOF);
+        bs.setLandmark(0, BitStateTranslator.LM_EKZ);
+        bs.setLandmark(0, BitStateTranslator.LM_FZP);
+        assertTrue("hasWon: 3 landmarks = false", !bs.hasWon(0));
+        bs.setLandmark(0, BitStateTranslator.LM_FT);
+        assertTrue("hasWon: 4 landmarks = true", bs.hasWon(0));
+    }
+
+    private static void test_bitstate_equivalence_full_games() {
+        int NUM_GAMES = 200;
+        int turnMismatches = 0;
+        int roundTripErrors = 0;
+        int totalTurnsChecked = 0;
+
+        // Play games using GameStateSampler, and at each sampled turn verify:
+        // 1. BitState round-trip preserves structuralHash
+        // 2. BitState.applyRoll produces same coin changes as RollResolver
+        final int[] mismatchCount = {0};
+        final int[] rtErrorCount = {0};
+        final int[] turnsChecked = {0};
+
+        GameStateSampler.runGames(NUM_GAMES, 2, 0.0,
+                GameStateSampler.everyKTurns(1),
+                // Pre-roll evaluator: test income equivalence
+                snapshot -> {
+                    GameState gs = snapshot.state();
+                    int active = snapshot.activePlayer();
+                    int roll = snapshot.roll();
+
+                    // Test 1: Round-trip conversion preserves state
+                    BitState bs = BitState.fromGameState(gs);
+                    GameState gs2 = bs.toGameState();
+                    if (gs.structuralHash() != gs2.structuralHash()) {
+                        synchronized (mismatchCount) {
+                            rtErrorCount[0]++;
+                        }
+                    }
+
+                    // Test 2: applyRoll produces same final coins as object-based
+                    // Object: compute deltas, apply with clamping, then Bürohaus swap
+                    GameState gsCopy = gs.copy();
+                    int[] objDeltas = RollResolver.computeAllDeltasForRoll(gsCopy, active, roll);
+                    for (int p = 0; p < gsCopy.getPlayers().length; p++) {
+                        gsCopy.getPlayers()[p].setCoins(Math.max(0, gsCopy.getPlayers()[p].getCoins() + objDeltas[p]));
+                    }
+                    if (roll == 6 && gsCopy.getPlayers()[active].hasProject("bürohaus")) {
+                        BürohausLogic.executeSwap(gsCopy, active);
+                    }
+                    BitState bsCopy = BitState.fromGameState(gs);
+                    bsCopy.applyRoll(active, roll);
+                    for (int p = 0; p < gsCopy.getPlayers().length; p++) {
+                        if (gsCopy.getPlayers()[p].getCoins() != bsCopy.getCoins(p)) {
+                            synchronized (mismatchCount) { mismatchCount[0]++; }
+                        }
+                    }
+                    synchronized (mismatchCount) { turnsChecked[0]++; }
+                },
+                null // no post-income evaluator needed
+        );
+
+        System.out.println("  Equivalence: checked " + turnsChecked[0] + " turns across " + NUM_GAMES + " games");
+        assertEq("Full-game equivalence: 0 income mismatches", 0, mismatchCount[0]);
+        assertEq("Full-game equivalence: 0 round-trip errors", 0, rtErrorCount[0]);
+        assertTrue("Full-game equivalence: checked substantial turns", turnsChecked[0] > 1000);
     }
 }

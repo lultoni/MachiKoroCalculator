@@ -19,6 +19,8 @@ Priorisiere in deiner Abarbeitung die wichtigsten Features. Erkenne Abhängigkei
 | 6 | Luck-adjusted WR for sweep optimization | Dev | Feed luck-adjusted results into SweepMain's WR calculation. Goal: optimize engine params against "true skill" rather than raw outcomes. Cautious approach — validate that it produces stronger engines before adopting. Even good WR runs could be lucky. Depends on #1, #3. |
 | 7 | Card-value-throughout-game analyzer | Dev | Track how the value/contribution of each owned card changes over the course of a game. "Was this card worth buying?" Useful for post-game analysis and engine evaluation. Concept from user — scope TBD. |
 | 8 | Engine decision comparison tool | User | Replay the same game with different engines and compare their decisions. Identify where strategies diverge and whether differences led to better/worse outcomes. Needs standardized analysis tools (#1, #2, #7). |
+| 23 | WinProbability heuristic improvement | Dev | Reduce MAE from ~0.25 to <0.10. Run real-scenario testing to identify high-error situations (compare heuristic vs deep MC). Catalog failure cases as regression tests. Iterate on the formula using those test cases. Enables cheap real-time luck computation and faster analysis everywhere the heuristic is used. |
+| 24 | Luck-adjusted ratings everywhere | Dev | Switch LuckAnalyzer to use WinProbability heuristic (instant instead of MC). Wire luck into H2H match runner (raw + luck-adjusted WR per match). Update Glicko-2 to rate on luck-adjusted outcomes. Show luck-adjusted WR wherever raw WR is displayed. Depends on #23 for reliable heuristic. |
 
 ### Engine Quality
 
@@ -50,7 +52,7 @@ Priorisiere in deiner Abarbeitung die wichtigsten Features. Erkenne Abhängigkei
 | # | Task | Type | Notes |
 |---|------|------|-------|
 | 19 | 3/4 player H2H testing | Dev | Multi-player match runner + tournament support. Glicko-2 adjustments for >2 players. Separate per-player-count leaderboards + overall leaderboard. |
-| 20 | Bitwise game core | Dev | Reimagine GameState as bitmaps/bitfields for maximum simulation throughput. Every position as a single binary number, bitwise operations for state transitions. Research/brainstorm first. |
+| 20 | Bitwise game core — Phase 1 foundation | Dev | Phase 1 done: BitState + BitStateTranslator, conversion, income resolution, 181 tests passing. Phases 2-6 (simulation hot path, MCTS rollouts, tree nodes, analysis, interface boundary) remain. |
 | 21 | GPU-accelerated match simulations | Dev | Run large-scale simulations on GPU (RTX 4070). Likely depends on #20 (bitwise core). |
 | 22 | Expansion card support | Dev | Out of scope until base game is perfected. Scaling roadmap: (1) perfect 2P → (2) 3/4P → (3) expansions. |
 

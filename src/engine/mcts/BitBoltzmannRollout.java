@@ -54,11 +54,16 @@ public final class BitBoltzmannRollout {
 
     /**
      * BitState-native rollout entry point with explicit temperature.
-     * Copies the state internally — callers do not need to pre-copy.
+     *
+     * <p><b>Copies state and supply at entry</b> — the caller's BitState and supply array
+     * are NOT mutated. This is critical when called from MctsTree, FlatMcEngine, or
+     * CreatorEngine where the same state/supply is reused across multiple rollouts.
      */
     public static double simulateBit(BitState bs, int[] supply,
                                      int startingPlayer, int playerPerspective,
                                      double temperature) {
+        bs = bs.copy();
+        supply = java.util.Arrays.copyOf(supply, supply.length);
         int n = bs.getNumPlayers();
         ThreadLocalRandom rng = ThreadLocalRandom.current();
         int activePlayer = startingPlayer;

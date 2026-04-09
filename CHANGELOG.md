@@ -18,6 +18,10 @@ Implementation history: what was built, why, and which design decisions were mad
 
 **Test coverage:** 479 engine + 27 MCTS + 40 Creator tests pass. 3 pre-existing flaky MCTS debugInfo failures (low iteration budget).
 
+### Fix: Rollout state mutation bug (critical regression from Phase 5)
+
+All four Bit* rollout functions (BitMctsRollout, BitGreedyRollout, BitBoltzmannRollout, BitCreatorRollout) mutate BitState and supply[] in-place during simulation. When Phase 5 eliminated the GameState conversion boundary (which implicitly created copies), MctsTree, FlatMcEngine, and CreatorEngine started passing their own state references directly — rollouts then destroyed tree node state and candidate state. Symptom: engines never bought anything, all H2H games timed out at 200 turns. Fix: `bs.copy()` + `Arrays.copyOf(supply)` at entry of every rollout's public entry point (simulateBit/simulate/withMaxDepth). Added as invariant #11 to CLAUDE.md.
+
 ### Bitwise Game Core — Phase 4: MCTS Tree Nodes + All Engines (TODO #20)
 
 **MCTS tree nodes now store `BitState` + `int[]` supply.** MctsNode base class changed from `GameState state` + `SupplyTracker supply` to `BitState state` + `int[] supply`. Lazy `toGameState()` added for API boundary (cached). All 6 node types updated: DiceChoiceNode (trivial), ChanceNode (income-only resolution without Bürohaus swap via `applyRollIncomeOnly()`), FunkturmNode (removed `supplyBeforeRoll` — supply unchanged by rolls), BürohausNode (card-index iteration, bitwise swaps), BuyDecisionNode (`CANDIDATE_ITERATION_ORDER`, `Arrays.copyOf` for supply).

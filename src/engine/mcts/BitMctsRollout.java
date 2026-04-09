@@ -58,7 +58,8 @@ public final class BitMctsRollout {
      */
     public static BitRolloutFn withMaxDepth(int maxDepth) {
         return (bs, supply, startingPlayer, playerPerspective) ->
-                simulateInternal(bs, supply, bs.getNumPlayers(), startingPlayer, playerPerspective, Math.max(1, maxDepth));
+                simulateInternal(bs.copy(), Arrays.copyOf(supply, supply.length),
+                        bs.getNumPlayers(), startingPlayer, playerPerspective, Math.max(1, maxDepth));
     }
 
     // -------------------------------------------------------------------------
@@ -70,11 +71,15 @@ public final class BitMctsRollout {
 
     /**
      * BitState-native rollout entry point matching {@link BitRolloutFn}.
-     * Copies the state internally — callers do not need to pre-copy.
+     *
+     * <p><b>Copies state and supply at entry</b> — the caller's BitState and supply array
+     * are NOT mutated. This is critical when called from MctsTree, FlatMcEngine, or
+     * CreatorEngine where the same state/supply is reused across multiple rollouts.
      */
     public static double simulateBit(BitState bs, int[] supply,
                                      int startingPlayer, int playerPerspective) {
-        return simulateInternal(bs, supply, bs.getNumPlayers(), startingPlayer, playerPerspective, MAX_TURNS);
+        return simulateInternal(bs.copy(), Arrays.copyOf(supply, supply.length),
+                bs.getNumPlayers(), startingPlayer, playerPerspective, MAX_TURNS);
     }
 
     private static double simulateInternal(BitState bs, int[] supply, int n,

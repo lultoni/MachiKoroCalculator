@@ -7,7 +7,6 @@ import core.BitState;
 import core.BitStateTranslator;
 import core.CardIncome;
 import core.GameState;
-import core.Player;
 import core.Project;
 import core.ProjectLoader;
 import engine.EngineConfig;
@@ -775,15 +774,15 @@ public final class ExpectimaxEngine implements SimulationEngine {
     // -------------------------------------------------------------------------
 
     /**
-     * Evaluates a position at the depth limit. Converts to GameState only when needed
-     * for heuristic scoring functions that require Player objects.
+     * Evaluates a position at the depth limit. Uses BitState overloads for
+     * heuristic scoring; converts to GameState only in composite evaluation.
      */
     private double leafEval(BitState bs, int perspective, String evalFn) {
         if ("composite".equals(evalFn)) {
             return leafEvalComposite(bs, perspective);
         }
         return Math.max(0.0, Math.min(1.0,
-                WinProbability.computeBaselineWinProb(bs.toGameState(), perspective)));
+                WinProbability.computeBaselineWinProb(bs, perspective)));
     }
 
     /**
@@ -805,15 +804,10 @@ public final class ExpectimaxEngine implements SimulationEngine {
     }
 
     /**
-     * Raw position score: uses lazy GameState conversion for CardIncome.playerEvPerRound.
+     * Raw position score: uses CardIncome.playerEvPerRound(BitState) overload.
      */
     private double positionScore(BitState bs, int playerIndex) {
-        // Convert to GameState for CardIncome computation (leaf nodes only)
-        GameState gs = bs.toGameState();
-        Player player = gs.getPlayers()[playerIndex];
-        int n = gs.getPlayers().length;
-        int[] oppCoins = CardIncome.buildOpponentCoins(gs.getPlayers(), playerIndex);
-        double evPerRound = CardIncome.playerEvPerRound(player, n, oppCoins);
+        double evPerRound = CardIncome.playerEvPerRound(bs, playerIndex);
 
         int landmarkCount = bs.getLandmarkCount(playerIndex);
 

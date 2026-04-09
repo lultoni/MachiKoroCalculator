@@ -12,8 +12,8 @@ import java.util.concurrent.ThreadLocalRandom;
 /**
  * Greedy rollout policy using {@link BitState} internally.
  *
- * <p>Drop-in replacement for {@link GreedyRollout}: satisfies the {@link RolloutFn} signature
- * and converts to BitState at entry. All turn-level mutation is bitwise.
+ * <p>Satisfies the {@link BitRolloutFn} interface directly via {@link #simulateBit}.
+ * All turn-level mutation is bitwise.
  *
  * <h2>Greedy decisions</h2>
  * <ul>
@@ -32,20 +32,18 @@ public final class BitGreedyRollout {
     private BitGreedyRollout() {}
 
     /**
-     * Runs a greedy rollout from {@code startState} until the game ends or
-     * {@link MctsRollout#MAX_TURNS} is reached.
+     * BitState-native rollout entry point matching {@link BitRolloutFn}.
+     * Copies the state internally — callers do not need to pre-copy.
      */
-    public static double simulate(GameState startState, SupplyTracker startSupply,
-                                  int startingPlayer, int playerPerspective) {
-        BitState bs = BitState.fromGameState(startState);
-        int[] supply = bs.buildSupplyArray();
-        int n = startState.getPlayers().length;
+    public static double simulateBit(BitState bs, int[] supply,
+                                     int startingPlayer, int playerPerspective) {
+        int n = bs.getNumPlayers();
         ThreadLocalRandom rng = ThreadLocalRandom.current();
         int activePlayer = startingPlayer;
         int turnCount = 0;
         BitRolloutEvCache evCache = new BitRolloutEvCache(bs, startingPlayer, n, EV_CACHE_REFRESH);
 
-        while (turnCount < MctsRollout.MAX_TURNS) {
+        while (turnCount < BitMctsRollout.MAX_TURNS) {
             evCache.tickTurn();
 
             // ---- Dice: greedy ----
@@ -109,7 +107,17 @@ public final class BitGreedyRollout {
             turnCount++;
         }
 
-        return WinProbability.computeBaselineWinProb(bs.toGameState(), playerPerspective);
+        return WinProbability.computeBaselineWinProb(bs, playerPerspective);
+    }
+
+    /**
+     * Runs a greedy rollout from {@code startState}. Retained for backward compatibility.
+     */
+    public static double simulate(GameState startState, SupplyTracker startSupply,
+                                  int startingPlayer, int playerPerspective) {
+        BitState bs = BitState.fromGameState(startState);
+        int[] supply = bs.buildSupplyArray();
+        return simulateBit(bs, supply, startingPlayer, playerPerspective);
     }
 
     // -------------------------------------------------------------------------

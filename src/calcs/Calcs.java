@@ -659,6 +659,13 @@ public final class Calcs {
         return (ev2 - ev1 > 1e-6) ? 2 : 1;
     }
 
+    /**
+     * BitState overload — converts to GameState internally.
+     */
+    public static int optimalDiceCount(core.BitState bs, int playerIndex) {
+        return optimalDiceCount(bs.toGameState(), playerIndex);
+    }
+
     // -------------------------------------------------------------------------
     // Win probability (analytical softmax)
     // -------------------------------------------------------------------------

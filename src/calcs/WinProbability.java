@@ -63,6 +63,17 @@ public final class WinProbability {
     }
 
     /**
+     * BitState overload — converts to GameState internally.
+     *
+     * @param bs          current bitwise game state
+     * @param playerIndex the player whose win probability to estimate
+     * @return estimated win probability in [0, 1]
+     */
+    public static double computeBaselineWinProb(core.BitState bs, int playerIndex) {
+        return computeBaselineWinProb(bs.toGameState(), playerIndex);
+    }
+
+    /**
      * Estimates the change in win probability for {@code playerIndex} from buying {@code candidate}.
      *
      * <p>Uses the analytical softmax heuristic only (no Monte Carlo).

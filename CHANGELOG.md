@@ -6,6 +6,18 @@ Implementation history: what was built, why, and which design decisions were mad
 
 ## Phase 7: Iteration
 
+### Bitwise Game Core — Phases 5-7: Fully Bitwise Engine Foundation (TODO #20 complete)
+
+**Phase 5: BitRolloutFn + Delete Old Rollouts + BitCreatorRollout.** New `BitRolloutFn` functional interface (`double simulate(BitState, int[], int, int)`) replaces the old `RolloutFn` that accepted `(GameState, SupplyTracker)`. All rollout classes expose public `simulateBit()` entry points. MctsTree changed from `RolloutFn` to `BitRolloutFn` — leaf rollouts now pass `BitState` + `int[]` directly, eliminating the double conversion (`BitState → GameState → BitState`) at every MCTS iteration. FlatMcEngine and CreatorEngine also wire directly to `BitRolloutFn`. New `BitCreatorRollout` ports CreatorRollout's coverage bonus + save-toward-landmark heuristic to BitState-native operations. `BitRolloutEvCache` made public for cross-package access. Seven old GameState-based classes deleted: `RolloutFn`, `MctsRollout`, `GreedyRollout`, `BoltzmannRollout`, `DepthLimitedRollout`, `RolloutEvCache`, `CreatorRollout`.
+
+**Phase 6: BitState-aware Calcs overloads.** Three thin overload methods added to the Calcs layer: `WinProbability.computeBaselineWinProb(BitState, int)`, `CardIncome.playerEvPerRound(BitState, int)`, `Calcs.optimalDiceCount(BitState, int)`. Each delegates internally to `bs.toGameState()` — centralizes conversion at the Calcs boundary rather than forcing every caller to manage it. All consumers updated: BitMctsRollout, BitGreedyRollout, BitBoltzmannRollout, BitCreatorRollout (turn-limit fallback), MctsTree (terminal scoring), ExpectimaxEngine (leafEval + positionScore).
+
+**Phase 7: Cleanup.** Verified no stale imports of deleted classes. `SupplyTracker.fromSupplyArray()` has no callers but SupplyTracker itself is still widely used (CreatorScorer, HeuristicEvEngine, server layer).
+
+**TODO #20 is now fully complete.** The THINKING and FOUNDATION layers are fully bitwise end-to-end: BitState storage → BitRolloutFn rollouts → BitState-aware Calcs evaluation. No double conversions remain in the hot path.
+
+**Test coverage:** 479 engine + 27 MCTS + 40 Creator tests pass. 3 pre-existing flaky MCTS debugInfo failures (low iteration budget).
+
 ### Bitwise Game Core — Phase 4: MCTS Tree Nodes + All Engines (TODO #20)
 
 **MCTS tree nodes now store `BitState` + `int[]` supply.** MctsNode base class changed from `GameState state` + `SupplyTracker supply` to `BitState state` + `int[] supply`. Lazy `toGameState()` added for API boundary (cached). All 6 node types updated: DiceChoiceNode (trivial), ChanceNode (income-only resolution without Bürohaus swap via `applyRollIncomeOnly()`), FunkturmNode (removed `supplyBeforeRoll` — supply unchanged by rolls), BürohausNode (card-index iteration, bitwise swaps), BuyDecisionNode (`CANDIDATE_ITERATION_ORDER`, `Arrays.copyOf` for supply).

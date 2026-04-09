@@ -6,6 +6,45 @@ This file indexes concepts and components removed during the restructure. The ac
 
 ---
 
+## Engine Rollout Layer (Deleted in Bitwise Phase 5)
+
+### `RolloutFn` (Functional Interface)
+**What it did:** `@FunctionalInterface` for rollout policies: `double simulate(GameState, SupplyTracker, int startingPlayer, int perspective)`. Used by MctsTree to inject different rollout strategies.
+**Why removed:** Replaced by `BitRolloutFn` which accepts `(BitState, int[], int, int)` directly, eliminating the double conversion at every MCTS leaf.
+**Last existed in:** Commit before Phase 5 (`src/engine/mcts/RolloutFn.java`)
+
+### `MctsRollout` (Uniform Random Rollout)
+**What it did:** Full-game uniform random rollout for MCTS. 50/50 dice choice, 50/50 Funkturm, uniform random Bürohaus swap, uniform random purchase.
+**Why removed:** Replaced by `BitMctsRollout` which does identical logic on BitState (zero allocation in hot loop).
+**Last existed in:** Commit before Phase 5 (`src/engine/mcts/MctsRollout.java`)
+
+### `GreedyRollout` (Greedy Purchase Rollout)
+**What it did:** Greedy rollout policy — optimal dice choice, income-based Funkturm, greedy Bürohaus swap, landmark-priority + best-ROI purchase.
+**Why removed:** Replaced by `BitGreedyRollout`.
+**Last existed in:** Commit before Phase 5 (`src/engine/mcts/GreedyRollout.java`)
+
+### `BoltzmannRollout` (Softmax Purchase Rollout)
+**What it did:** Boltzmann (softmax) purchase sampling with configurable temperature. P(card_i) ∝ exp(roi_i / T).
+**Why removed:** Replaced by `BitBoltzmannRollout`.
+**Last existed in:** Commit before Phase 5 (`src/engine/mcts/BoltzmannRollout.java`)
+
+### `DepthLimitedRollout` (Depth-Limited Uniform Rollout)
+**What it did:** Wrapper around MctsRollout that stopped after N turns and used WinProbability heuristic for leaf evaluation.
+**Why removed:** Replaced by `BitMctsRollout.withMaxDepth(int)` which returns a `BitRolloutFn` with turn counting.
+**Last existed in:** Commit before Phase 5 (`src/engine/mcts/DepthLimitedRollout.java`)
+
+### `RolloutEvCache` (GameState-based EV Cache)
+**What it did:** Cached per-card EV scores for greedy/Boltzmann rollout purchase decisions. Refreshed every N turns.
+**Why removed:** Replaced by `BitRolloutEvCache` which operates on BitState.
+**Last existed in:** Commit before Phase 5 (`src/engine/mcts/RolloutEvCache.java`)
+
+### `CreatorRollout` (Creator Custom Rollout)
+**What it did:** Custom rollout policy with coverage bonus and save-toward-landmark heuristic for portfolio diversification.
+**Why removed:** Replaced by `BitCreatorRollout` in `engine.creator` package.
+**Last existed in:** Commit before Phase 5 (`src/engine/creator/CreatorRollout.java`)
+
+---
+
 ## Strategy / Ranking Layer
 
 ### `RolloutTree` (Expectimax Rollout Tree)

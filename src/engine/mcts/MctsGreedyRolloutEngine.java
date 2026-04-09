@@ -33,7 +33,7 @@ public final class MctsGreedyRolloutEngine extends MctsV1Engine {
                                  int activePlayer, int playerPerspective,
                                  double explorationConstant) {
         return new MctsTree(bs, supply, activePlayer, playerPerspective,
-                explorationConstant, BitGreedyRollout::simulate);
+                explorationConstant, BitGreedyRollout::simulateBit);
     }
 
     @Override
@@ -41,6 +41,6 @@ public final class MctsGreedyRolloutEngine extends MctsV1Engine {
                                           int activePlayer, int playerPerspective,
                                           double explorationConstant) {
         return new MctsTree(bs, supply, activePlayer, playerPerspective,
-                explorationConstant, BitGreedyRollout::simulate, false, true);
+                explorationConstant, BitGreedyRollout::simulateBit, false, true);
     }
 }

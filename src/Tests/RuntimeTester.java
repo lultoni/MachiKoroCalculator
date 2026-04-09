@@ -3648,7 +3648,7 @@ public class RuntimeTester {
     }
 
     /**
-     * MctsRollout.simulate must never produce a state where a player owns duplicate purple cards.
+     * BitMctsRollout.simulate must never produce a state where a player owns duplicate purple cards.
      * Run 100 short rollouts from a state where player 0 already owns all 3 purples.
      */
     private static void test_rollout_random_skips_owned_purple() {
@@ -3664,13 +3664,13 @@ public class RuntimeTester {
         // Run many rollouts; if the bug were present, the rollout would sometimes
         // buy a duplicate purple. The rollout runs to completion without error.
         for (int trial = 0; trial < 100; trial++) {
-            engine.mcts.MctsRollout.simulate(gs, supply, 0, 0);
+            engine.mcts.BitMctsRollout.simulate(gs, supply, 0, 0);
         }
-        assertTrue("MctsRollout completes 100 rollouts without error (player owns all purples)", true);
+        assertTrue("BitMctsRollout completes 100 rollouts without error (player owns all purples)", true);
     }
 
     /**
-     * GreedyRollout must skip purple cards the player already owns.
+     * BitGreedyRollout must skip purple cards the player already owns.
      */
     private static void test_greedy_rollout_skips_owned_purple() {
         core.GameState gs = core.GameState.initial(2);
@@ -3682,13 +3682,13 @@ public class RuntimeTester {
         SupplyTracker supply = SupplyTracker.fromGameState(gs);
 
         for (int trial = 0; trial < 50; trial++) {
-            engine.mcts.GreedyRollout.simulate(gs, supply, 0, 0);
+            engine.mcts.BitGreedyRollout.simulate(gs, supply, 0, 0);
         }
-        assertTrue("GreedyRollout completes without error when player owns all purples", true);
+        assertTrue("BitGreedyRollout completes without error when player owns all purples", true);
     }
 
     /**
-     * BoltzmannRollout must skip purple cards the player already owns.
+     * BitBoltzmannRollout must skip purple cards the player already owns.
      */
     private static void test_boltzmann_rollout_skips_owned_purple() {
         core.GameState gs = core.GameState.initial(2);
@@ -3697,13 +3697,14 @@ public class RuntimeTester {
         for (String pid : new String[]{"stadion", "fernsehsender", "bürohaus"}) {
             gs.getPlayers()[0].getOwned_projects().add(core.ProjectLoader.getProject(pid).orElseThrow());
         }
-        SupplyTracker supply = SupplyTracker.fromGameState(gs);
+
+        core.BitState bs = core.BitState.fromGameState(gs);
+        int[] supply = bs.buildSupplyArray();
 
         for (int trial = 0; trial < 50; trial++) {
-            engine.mcts.BoltzmannRollout.withTemperature(0.7)
-                    .simulate(gs, supply, 0, 0);
+            engine.mcts.BitBoltzmannRollout.simulateBit(bs, supply, 0, 0, 0.7);
         }
-        assertTrue("BoltzmannRollout completes without error when player owns all purples", true);
+        assertTrue("BitBoltzmannRollout completes without error when player owns all purples", true);
     }
 
     /**

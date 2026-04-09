@@ -11,8 +11,7 @@ import engine.EngineConfig;
 import engine.EngineResult;
 import engine.SimulationEngine;
 import engine.TurnPlan;
-import engine.mcts.MctsRollout;
-import engine.mcts.SupplyTracker;
+import engine.mcts.BitMctsRollout;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -205,11 +204,9 @@ public final class FlatMcEngine implements SimulationEngine {
 
     private void runSamples(CandidateOption candidate, int numSamples, int nextPlayer, int perspective) {
         if (candidate.isInstantWin) return; // already scored 1.0
-        // Convert at rollout boundary
-        GameState gs = candidate.postState.toGameState();
-        SupplyTracker st = SupplyTracker.fromSupplyArray(candidate.postSupply);
         for (int i = 0; i < numSamples; i++) {
-            double result = MctsRollout.simulate(gs, st, nextPlayer, perspective);
+            double result = BitMctsRollout.simulateBit(candidate.postState, candidate.postSupply,
+                    nextPlayer, perspective);
             candidate.samples++;
             candidate.wins += result;
         }

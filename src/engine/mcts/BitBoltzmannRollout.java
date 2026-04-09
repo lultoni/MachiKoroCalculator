@@ -5,15 +5,14 @@ import calcs.WinProbability;
 import core.BitState;
 import core.BitStateTranslator;
 import core.CardIncome;
-import core.GameState;
 
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Boltzmann (softmax) rollout policy using {@link BitState} internally.
  *
- * <p>Drop-in replacement for {@link BoltzmannRollout}: satisfies the {@link RolloutFn} signature
- * and converts to BitState at entry. All turn-level mutation is bitwise.
+ * <p>Satisfies the {@link BitRolloutFn} interface via {@link #withTemperature}.
+ * All turn-level mutation is bitwise.
  *
  * <h2>Policy</h2>
  * Dice, Funkturm, and Bürohaus decisions use the same greedy rules as {@link BitGreedyRollout}.
@@ -39,31 +38,34 @@ public final class BitBoltzmannRollout {
     private BitBoltzmannRollout() {}
 
     /**
-     * Creates a {@link RolloutFn} that uses the Boltzmann policy with the given temperature.
+     * Creates a {@link BitRolloutFn} that uses the Boltzmann policy with the given temperature.
      *
      * @param temperature Boltzmann temperature T (> 0)
-     * @return a RolloutFn suitable for passing to {@link MctsTree}
+     * @return a BitRolloutFn suitable for passing to {@link MctsTree}
      */
-    public static RolloutFn withTemperature(double temperature) {
-        return (state, supply, startingPlayer, playerPerspective) ->
-                simulate(state, supply, startingPlayer, playerPerspective, temperature);
+    public static BitRolloutFn withTemperature(double temperature) {
+        return (bs, supply, startingPlayer, playerPerspective) ->
+                simulateBit(bs, supply, startingPlayer, playerPerspective, temperature);
     }
 
     // -------------------------------------------------------------------------
     // Core simulation
     // -------------------------------------------------------------------------
 
-    static double simulate(GameState startState, SupplyTracker startSupply,
-                           int startingPlayer, int playerPerspective, double temperature) {
-        BitState bs = BitState.fromGameState(startState);
-        int[] supply = bs.buildSupplyArray();
-        int n = startState.getPlayers().length;
+    /**
+     * BitState-native rollout entry point with explicit temperature.
+     * Copies the state internally — callers do not need to pre-copy.
+     */
+    public static double simulateBit(BitState bs, int[] supply,
+                                     int startingPlayer, int playerPerspective,
+                                     double temperature) {
+        int n = bs.getNumPlayers();
         ThreadLocalRandom rng = ThreadLocalRandom.current();
         int activePlayer = startingPlayer;
         int turnCount = 0;
         BitRolloutEvCache evCache = new BitRolloutEvCache(bs, startingPlayer, n, EV_CACHE_REFRESH);
 
-        while (turnCount < MctsRollout.MAX_TURNS) {
+        while (turnCount < BitMctsRollout.MAX_TURNS) {
             evCache.tickTurn();
 
             // ---- Dice: greedy ----
@@ -127,7 +129,7 @@ public final class BitBoltzmannRollout {
             turnCount++;
         }
 
-        return WinProbability.computeBaselineWinProb(bs.toGameState(), playerPerspective);
+        return WinProbability.computeBaselineWinProb(bs, playerPerspective);
     }
 
     // -------------------------------------------------------------------------

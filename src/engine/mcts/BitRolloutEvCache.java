@@ -16,7 +16,7 @@ import java.util.HashMap;
  * <p>Between refreshes the scores may be slightly stale (the portfolio changes by ~1 card
  * every 2 turns), but relative ordering rarely shifts, preserving the policy character.
  */
-final class BitRolloutEvCache {
+public final class BitRolloutEvCache {
 
     private final HashMap<String, Double> scores = new HashMap<>();
     private final int refreshInterval;
@@ -30,14 +30,14 @@ final class BitRolloutEvCache {
      * @param numPlayers       total players
      * @param refreshInterval  number of turns between cache rebuilds
      */
-    BitRolloutEvCache(BitState bs, int activePlayer, int numPlayers, int refreshInterval) {
+    public BitRolloutEvCache(BitState bs, int activePlayer, int numPlayers, int refreshInterval) {
         this.refreshInterval = refreshInterval;
         this.turnsUntilRefresh = refreshInterval;
         rebuild(bs, activePlayer, numPlayers);
     }
 
     /** Call once per turn. When the counter hits zero, the next {@link #getOrRefresh} will rebuild. */
-    void tickTurn() {
+    public void tickTurn() {
         turnsUntilRefresh--;
     }
 
@@ -50,7 +50,7 @@ final class BitRolloutEvCache {
      * @param cardId       the card to look up
      * @return cached EV, or 0.0 if the card is unknown
      */
-    double getOrRefresh(BitState bs, int activePlayer, int numPlayers, String cardId) {
+    public double getOrRefresh(BitState bs, int activePlayer, int numPlayers, String cardId) {
         if (turnsUntilRefresh <= 0) {
             rebuild(bs, activePlayer, numPlayers);
             turnsUntilRefresh = refreshInterval;

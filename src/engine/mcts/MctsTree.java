@@ -28,9 +28,8 @@ import java.util.Map;
  * so the first is always selected first).
  *
  * <h2>Rollout</h2>
- * Delegates to the configured {@link RolloutFn}. The rollout function receives
- * a {@code GameState} + {@code SupplyTracker} (converted from the leaf's BitState
- * at the boundary).
+ * Delegates to the configured {@link BitRolloutFn}. The rollout function receives
+ * the leaf's {@link BitState} + {@code int[] supply} directly — no conversion needed.
  *
  * <h2>Backpropagation</h2>
  * Calls {@link MctsNode#backpropagate} on the selected leaf, walking up to root.
@@ -59,8 +58,8 @@ public final class MctsTree {
     /** Total iterations performed so far. */
     private int iterationsPerformed = 0;
 
-    /** Rollout strategy — defaults to the uniform-random MctsRollout. */
-    private final RolloutFn rolloutFn;
+    /** Rollout strategy — defaults to the uniform-random BitMctsRollout. */
+    private final BitRolloutFn rolloutFn;
 
     /**
      * When true, {@link BuyDecisionNode} child selection uses argmax over win rate
@@ -89,7 +88,7 @@ public final class MctsTree {
                     int activePlayer, int playerPerspective,
                     double explorationConstant) {
         this(rootState, rootSupply, activePlayer, playerPerspective, explorationConstant,
-                MctsRollout::simulate);
+                BitMctsRollout::simulateBit);
     }
 
     /**
@@ -99,7 +98,7 @@ public final class MctsTree {
      */
     public MctsTree(BitState rootState, int[] rootSupply,
                     int activePlayer, int playerPerspective,
-                    double explorationConstant, RolloutFn rolloutFn) {
+                    double explorationConstant, BitRolloutFn rolloutFn) {
         this(rootState, rootSupply, activePlayer, playerPerspective, explorationConstant,
                 rolloutFn, false);
     }
@@ -112,7 +111,7 @@ public final class MctsTree {
      */
     public MctsTree(BitState rootState, int[] rootSupply,
                     int activePlayer, int playerPerspective,
-                    double explorationConstant, RolloutFn rolloutFn,
+                    double explorationConstant, BitRolloutFn rolloutFn,
                     boolean greedyBuySelection) {
         this.explorationConstant = explorationConstant;
         this.playerPerspective   = playerPerspective;
@@ -142,7 +141,7 @@ public final class MctsTree {
      */
     public MctsTree(BitState rootState, int[] rootSupply,
                     int activePlayer, int playerPerspective,
-                    double explorationConstant, RolloutFn rolloutFn,
+                    double explorationConstant, BitRolloutFn rolloutFn,
                     boolean greedyBuySelection, boolean fullTurn) {
         this.explorationConstant = explorationConstant;
         this.playerPerspective   = playerPerspective;
@@ -273,10 +272,10 @@ public final class MctsTree {
         if (leaf.isTerminal()) {
             score = terminalScore(leaf);
         } else {
-            // Convert BitState → GameState + SupplyTracker at rollout boundary
+            // Call rollout directly with BitState — no conversion needed
             score = rolloutFn.simulate(
-                    leaf.toGameState(),
-                    SupplyTracker.fromSupplyArray(leaf.supply),
+                    leaf.state,
+                    leaf.supply,
                     getActivePlayerForNode(leaf),
                     playerPerspective);
         }
@@ -306,8 +305,8 @@ public final class MctsTree {
             score = terminalScore(leaf);
         } else {
             score = rolloutFn.simulate(
-                    leaf.toGameState(),
-                    SupplyTracker.fromSupplyArray(leaf.supply),
+                    leaf.state,
+                    leaf.supply,
                     getActivePlayerForNode(leaf),
                     playerPerspective);
         }
@@ -406,7 +405,7 @@ public final class MctsTree {
             }
         }
         // No winner found (shouldn't happen for isTerminal() nodes) → use heuristic
-        return WinProbability.computeBaselineWinProb(node.toGameState(), playerPerspective);
+        return WinProbability.computeBaselineWinProb(node.state, playerPerspective);
     }
 
     // -------------------------------------------------------------------------

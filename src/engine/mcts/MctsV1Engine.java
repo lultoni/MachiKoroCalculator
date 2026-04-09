@@ -30,7 +30,7 @@ import java.util.Set;
  * <h2>Algorithm</h2>
  * <ol>
  *   <li>Build the root {@link BuyDecisionNode} for the active player's purchase decision.</li>
- *   <li>Run UCT iterations: select → expand → rollout ({@link engine.mcts.MctsRollout}) → backprop.</li>
+ *   <li>Run UCT iterations: select → expand → rollout ({@link engine.mcts.BitMctsRollout}) → backprop.</li>
  *   <li>Collect win rates for each root child; sort descending; populate explanation factors
  *       and metrics using {@link Calcs} methods.</li>
  * </ol>
@@ -156,7 +156,7 @@ public class MctsV1Engine implements SimulationEngine {
                                           int activePlayer, int playerPerspective,
                                           double explorationConstant) {
         return new MctsTree(bs, supply, activePlayer, playerPerspective,
-                explorationConstant, BitMctsRollout::simulate, false, true);
+                explorationConstant, BitMctsRollout::simulateBit, false, true);
     }
 
     /**

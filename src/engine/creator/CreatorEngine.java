@@ -12,10 +12,10 @@ import engine.EngineConfig;
 import engine.EngineResult;
 import engine.SimulationEngine;
 import engine.TurnPlan;
-import engine.mcts.BoltzmannRollout;
-import engine.mcts.GreedyRollout;
-import engine.mcts.MctsRollout;
-import engine.mcts.RolloutFn;
+import engine.mcts.BitBoltzmannRollout;
+import engine.mcts.BitGreedyRollout;
+import engine.mcts.BitMctsRollout;
+import engine.mcts.BitRolloutFn;
 import engine.mcts.SupplyTracker;
 
 import java.util.ArrayList;
@@ -163,7 +163,7 @@ public final class CreatorEngine implements SimulationEngine {
 
         if (iterationBudget > 0 || timeBudgetMs > 0) {
             usedMC = true;
-            RolloutFn rolloutFn = selectRolloutFn(config);
+            BitRolloutFn rolloutFn = selectRolloutFn(config);
 
             // Separate affordable non-save candidates for MC sampling.
             // Save is excluded: its heuristic score (0.0) competes against MC win rates,
@@ -219,7 +219,7 @@ public final class CreatorEngine implements SimulationEngine {
      * @return total iterations actually run
      */
     private int allocateAndRun(List<CandidateOption> candidates, int totalIterations,
-                               int nextPlayer, int perspective, RolloutFn rolloutFn) {
+                               int nextPlayer, int perspective, BitRolloutFn rolloutFn) {
         int size = candidates.size();
         if (size == 0) return 0;
 
@@ -265,13 +265,11 @@ public final class CreatorEngine implements SimulationEngine {
     }
 
     private void runSamples(CandidateOption candidate, int numSamples,
-                            int nextPlayer, int perspective, RolloutFn rolloutFn) {
+                            int nextPlayer, int perspective, BitRolloutFn rolloutFn) {
         if (candidate.isInstantWin) return;
-        // Convert at rollout boundary
-        GameState gs = candidate.postState.toGameState();
-        SupplyTracker st = SupplyTracker.fromSupplyArray(candidate.postSupply);
         for (int i = 0; i < numSamples; i++) {
-            double result = rolloutFn.simulate(gs, st, nextPlayer, perspective);
+            double result = rolloutFn.simulate(candidate.postState, candidate.postSupply,
+                    nextPlayer, perspective);
             candidate.samples++;
             candidate.wins += result;
         }
@@ -281,22 +279,22 @@ public final class CreatorEngine implements SimulationEngine {
     // Rollout policy selection
     // =====================================================================
 
-    private RolloutFn selectRolloutFn(EngineConfig config) {
-        // Default: creator (CreatorRollout). H2H benchmarks (7.46) show CreatorRollout v3
+    private BitRolloutFn selectRolloutFn(EngineConfig config) {
+        // Default: creator (BitCreatorRollout). H2H benchmarks (7.46) show CreatorRollout v3
         // matches or beats GreedyRollout across all opponents (+4% vs MCTS v1, +1% vs
         // heuristic-ev, tie vs Flat MC). CreatorRollout adds coverage bonus (portfolio
         // diversification) and save-toward-landmark (prevents wasteful marginal purchases).
         // Greedy and uniform are retained as configurable alternatives.
         String policy = config.extra != null ? config.extra.getOrDefault("rolloutPolicy", "creator") : "creator";
         switch (policy) {
-            case "creator":   return CreatorRollout::simulate;
+            case "creator":   return BitCreatorRollout::simulate;
             case "boltzmann": {
                 double temp = CreatorScorer.readDouble(config, "rolloutTemperature", 0.7);
-                return BoltzmannRollout.withTemperature(temp);
+                return BitBoltzmannRollout.withTemperature(temp);
             }
-            case "uniform":   return MctsRollout::simulate;
-            case "greedy":    return GreedyRollout::simulate;
-            default:          return CreatorRollout::simulate;
+            case "uniform":   return BitMctsRollout::simulateBit;
+            case "greedy":    return BitGreedyRollout::simulateBit;
+            default:          return BitCreatorRollout::simulate;
         }
     }
 

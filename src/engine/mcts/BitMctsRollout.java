@@ -3,9 +3,6 @@ package engine.mcts;
 import calcs.WinProbability;
 import core.BitState;
 import core.BitStateTranslator;
-import core.GameState;
-import core.Project;
-import core.ProjectLoader;
 
 import java.util.Arrays;
 import java.util.concurrent.ThreadLocalRandom;
@@ -13,9 +10,8 @@ import java.util.concurrent.ThreadLocalRandom;
 /**
  * Uniform-random full-game rollout for MCTS, using {@link BitState} internally.
  *
- * <p>Drop-in replacement for {@link MctsRollout}: satisfies the {@link RolloutFn} signature
- * ({@code GameState, SupplyTracker, int, int → double}) and converts to BitState at entry.
- * All turn-level mutation is bitwise — zero object allocation in the hot loop.
+ * <p>All turn-level mutation is bitwise — zero object allocation in the hot loop.
+ * Satisfies the {@link BitRolloutFn} interface directly via {@link #simulateBit}.
  *
  * <h2>Decision policy (fully uniform random)</h2>
  * <ul>
@@ -35,9 +31,10 @@ public final class BitMctsRollout {
 
     /**
      * Runs a uniform-random rollout from {@code startState} until the game ends or
-     * {@link MctsRollout#MAX_TURNS} is reached.
+     * the turn limit is reached.
      *
      * <p>Converts to BitState at entry. The supplied GameState is NOT mutated.
+     * Retained for backward compatibility with external callers.
      *
      * @param startState        game state at the leaf node
      * @param startSupply       supply tracker (used only for initial conversion; supply is rebuilt from BitState)
@@ -45,41 +42,39 @@ public final class BitMctsRollout {
      * @param playerPerspective the player for whom we compute the score (root's playerIndex)
      * @return score in [0, 1] from playerPerspective's point of view
      */
-    public static double simulate(GameState startState, SupplyTracker startSupply,
+    public static double simulate(core.GameState startState, SupplyTracker startSupply,
                                   int startingPlayer, int playerPerspective) {
         BitState bs = BitState.fromGameState(startState);
         int[] supply = bs.buildSupplyArray();
-        return simulateBit(bs, supply, startState.getPlayers().length,
-                startingPlayer, playerPerspective);
+        return simulateInternal(bs, supply, startState.getPlayers().length,
+                startingPlayer, playerPerspective, MAX_TURNS);
     }
 
     /**
      * Creates a depth-limited rollout function.
      *
      * @param maxDepth maximum number of turns before applying the heuristic
-     * @return a RolloutFn suitable for {@link MctsTree}
+     * @return a BitRolloutFn suitable for {@link MctsTree}
      */
-    public static RolloutFn withMaxDepth(int maxDepth) {
-        return (state, supply, startingPlayer, playerPerspective) ->
-                simulateDepthLimited(state, startingPlayer, playerPerspective, maxDepth);
+    public static BitRolloutFn withMaxDepth(int maxDepth) {
+        return (bs, supply, startingPlayer, playerPerspective) ->
+                simulateInternal(bs, supply, bs.getNumPlayers(), startingPlayer, playerPerspective, Math.max(1, maxDepth));
     }
 
     // -------------------------------------------------------------------------
     // Core simulation
     // -------------------------------------------------------------------------
 
-    private static double simulateBit(BitState bs, int[] supply, int n,
-                                      int startingPlayer, int playerPerspective) {
-        return simulateInternal(bs, supply, n, startingPlayer, playerPerspective, MctsRollout.MAX_TURNS);
-    }
+    /** Maximum number of turns before falling back to the softmax heuristic. */
+    public static final int MAX_TURNS = 200;
 
-    private static double simulateDepthLimited(GameState startState,
-                                                int startingPlayer, int playerPerspective,
-                                                int maxDepth) {
-        BitState bs = BitState.fromGameState(startState);
-        int[] supply = bs.buildSupplyArray();
-        int n = startState.getPlayers().length;
-        return simulateInternal(bs, supply, n, startingPlayer, playerPerspective, Math.max(1, maxDepth));
+    /**
+     * BitState-native rollout entry point matching {@link BitRolloutFn}.
+     * Copies the state internally — callers do not need to pre-copy.
+     */
+    public static double simulateBit(BitState bs, int[] supply,
+                                     int startingPlayer, int playerPerspective) {
+        return simulateInternal(bs, supply, bs.getNumPlayers(), startingPlayer, playerPerspective, MAX_TURNS);
     }
 
     private static double simulateInternal(BitState bs, int[] supply, int n,
@@ -151,7 +146,7 @@ public final class BitMctsRollout {
         }
 
         // Turn/depth limit reached — use softmax heuristic
-        return WinProbability.computeBaselineWinProb(bs.toGameState(), playerPerspective);
+        return WinProbability.computeBaselineWinProb(bs, playerPerspective);
     }
 
     // -------------------------------------------------------------------------

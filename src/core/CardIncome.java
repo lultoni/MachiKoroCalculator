@@ -395,6 +395,21 @@ public class CardIncome {
     }
 
     /**
+     * BitState overload — converts to Player/GameState internally.
+     *
+     * @param bs          current bitwise game state
+     * @param playerIndex the player whose EV per round to estimate
+     * @return expected coins per round from all income sources
+     */
+    public static double playerEvPerRound(BitState bs, int playerIndex) {
+        core.GameState gs = bs.toGameState();
+        Player player = gs.getPlayers()[playerIndex];
+        int n = gs.getPlayers().length;
+        int[] oppCoins = buildOpponentCoins(gs.getPlayers(), playerIndex);
+        return playerEvPerRound(player, n, oppCoins);
+    }
+
+    /**
      * Computes total portfolio income for a single roll value, from the owner's perspective.
      *
      * @param player       the card owner

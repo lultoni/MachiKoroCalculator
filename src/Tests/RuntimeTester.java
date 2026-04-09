@@ -472,6 +472,7 @@ public class RuntimeTester {
             test_bitstate_find_instant_win_landmark();
             test_bitstate_build_player_stats();
             test_bitstate_build_supply_array();
+            test_bitstate_compute_active_player_roll_income();
             test_bitstate_equivalence_full_games();
         });
 
@@ -5291,6 +5292,50 @@ public class RuntimeTester {
         assertEq("After 2 bergwerk: supply=4", 4, supply2[8]);
         // Starter cards should still be 6 (buying more doesn't affect starter calculation)
         assertEq("Starters still at 6", 6, supply2[0]); // weizenfeld
+    }
+
+    private static void test_bitstate_compute_active_player_roll_income() {
+        // Test: computeActivePlayerRollIncome matches applyRoll's delta for the active player
+        GameState gs = GameState.initial(2);
+        // Give P0 some cards: 3× weizenfeld, bahnhof, café, bergwerk
+        Player p0 = gs.getPlayers()[0];
+        p0.addProject(ProjectLoader.getProject("weizenfeld").orElseThrow());
+        p0.addProject(ProjectLoader.getProject("weizenfeld").orElseThrow());
+        p0.addProject(ProjectLoader.getProject("bahnhof").orElseThrow());
+        p0.addProject(ProjectLoader.getProject("bergwerk").orElseThrow());
+
+        // Give P1 some cards: café, familienrestaurant, stadion
+        Player p1 = gs.getPlayers()[1];
+        p1.addProject(ProjectLoader.getProject("café").orElseThrow());
+        p1.addProject(ProjectLoader.getProject("familienrestaurant").orElseThrow());
+        p1.addProject(ProjectLoader.getProject("stadion").orElseThrow());
+        p1.setCoins(10);
+        p0.setCoins(8);
+
+        BitState bs = BitState.fromGameState(gs);
+
+        int mismatches = 0;
+        for (int activePlayer = 0; activePlayer < 2; activePlayer++) {
+            for (int roll = 1; roll <= 12; roll++) {
+                int predicted = bs.computeActivePlayerRollIncome(activePlayer, roll);
+
+                // Apply roll to a copy and measure actual delta
+                BitState copy = bs.copy();
+                int coinsBefore = copy.getCoins(activePlayer);
+                copy.applyRoll(activePlayer, roll);
+                int coinsAfter = copy.getCoins(activePlayer);
+                int actual = coinsAfter - coinsBefore;
+
+                // Note: applyRoll includes clamping to 0, computeActivePlayerRollIncome does not.
+                // If coinsBefore + predicted < 0, actual will be clamped but predicted won't.
+                // So compare: max(0, coinsBefore + predicted) - coinsBefore == actual
+                int clampedDelta = Math.max(0, coinsBefore + predicted) - coinsBefore;
+
+                if (clampedDelta != actual) mismatches++;
+            }
+        }
+        assertEq("computeActivePlayerRollIncome: 0 mismatches across 24 roll scenarios",
+                0, mismatches);
     }
 
     // =========================================================================

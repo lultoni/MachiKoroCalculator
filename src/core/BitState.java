@@ -460,6 +460,61 @@ public final class BitState {
     }
 
     // -------------------------------------------------------------------------
+    // Non-mutating income query (Phase 3 — Funkturm decision in rollouts)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Returns the net coin delta for the active player on this roll, without mutating state.
+     *
+     * <p>Follows the same resolution order as {@link #applyRoll}: Red → Blue → Green → Purple.
+     * Used by greedy/Boltzmann rollout Funkturm logic to evaluate "income from this roll"
+     * vs expected reroll income.
+     *
+     * @param activePlayer the rolling player
+     * @param roll         dice total (1-12)
+     * @return net coin change for the active player (may be negative due to red card payments)
+     */
+    public int computeActivePlayerRollIncome(int activePlayer, int roll) {
+        int delta = 0;
+        boolean activeHasEKZ = hasLandmark(activePlayer, BitStateTranslator.LM_EKZ);
+
+        // Red: roller pays opponents (counter-clockwise)
+        int rollerCoins = getCoins(activePlayer);
+        for (int step = 1; step < numPlayers; step++) {
+            int opp = (activePlayer - step + numPlayers) % numPlayers;
+            boolean oppHasEKZ = hasLandmark(opp, BitStateTranslator.LM_EKZ);
+            int redIncome = computeRedIncome(opp, oppHasEKZ, roll, rollerCoins);
+            delta -= redIncome;
+            rollerCoins -= redIncome;
+            if (rollerCoins < 0) rollerCoins = 0;
+        }
+
+        // Blue for active player
+        delta += computeBlueIncome(activePlayer, roll);
+
+        // Green for active player
+        delta += computeGreenIncome(activePlayer, activeHasEKZ, roll);
+
+        // Purple (stadion, fernsehsender — roll 6 only)
+        if (roll == 6) {
+            if (hasPurple(activePlayer, 0)) { // stadion
+                for (int p = 0; p < numPlayers; p++) {
+                    if (p != activePlayer) delta += Math.min(2, getCoins(p));
+                }
+            }
+            if (hasPurple(activePlayer, 1)) { // fernsehsender
+                int richest = 0;
+                for (int p = 0; p < numPlayers; p++) {
+                    if (p != activePlayer) richest = Math.max(richest, getCoins(p));
+                }
+                delta += Math.min(5, richest);
+            }
+        }
+
+        return delta;
+    }
+
+    // -------------------------------------------------------------------------
     // Simulation helpers (Phase 2)
     // -------------------------------------------------------------------------
 

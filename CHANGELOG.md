@@ -6,6 +6,18 @@ Implementation history: what was built, why, and which design decisions were mad
 
 ## Phase 7: Iteration
 
+### Bitwise Game Core — Phase 3: MCTS Rollout Migration (TODO #20)
+
+**All MCTS rollouts now use BitState internally.** Created `BitMctsRollout` (uniform random), `BitGreedyRollout` (greedy), `BitBoltzmannRollout` (softmax), and `BitRolloutEvCache` (BitState-based EV cache). Each satisfies the existing `RolloutFn` interface — converts `GameState → BitState` at entry, then all turn-level mutation is bitwise. No changes to MctsTree, tree nodes, or the `RolloutFn` interface itself.
+
+**Engine wiring:** MctsV1Engine → BitMctsRollout, MctsGreedyRolloutEngine → BitGreedyRollout, MctsBoltzmannRolloutEngine → BitBoltzmannRollout, MctsDepthLimitedEngine → BitMctsRollout.withMaxDepth(). MctsAdaptiveEngine inherits V1 automatically. Old object-based rollout classes (MctsRollout, GreedyRollout, BoltzmannRollout, DepthLimitedRollout) retained for backwards compatibility.
+
+**New BitState method:** `computeActivePlayerRollIncome(activePlayer, roll)` — non-mutating income computation for Funkturm keep-vs-reroll decision in greedy/Boltzmann rollouts.
+
+**Key design decision:** Option A — keep existing `RolloutFn` signature, convert at entry. The `BitState.fromGameState()` per-rollout cost is small vs the many `BitState.copy()` and `BitState.applyRoll()` savings per simulated game. No tree or node changes needed.
+
+**Test coverage:** 286+ assertions. New `computeActivePlayerRollIncome` correctness test (24 roll×player scenarios vs `applyRoll` delta). All 482 engine-level tests pass (MCTS V1, Greedy, Boltzmann, DepthLimited, Adaptive, Creator, Flat-MC, Heuristic-EV, Expectimax).
+
 ### Bitwise Game Core — Phase 2: GameSimulator Hot Path Migration (TODO #20)
 
 **GameSimulator now uses BitState internally** for `simulate()` and `mcWinRate()`. Conversion to BitState happens at public API entry; all state mutation during simulation uses bitwise operations. `mcWinRate()` converts to BitState template once, then `copy()` per simulation — eliminating `GameState.copy()` overhead (Player objects + ArrayLists + unbuilt list → `Arrays.copyOf(long[], 2)`).

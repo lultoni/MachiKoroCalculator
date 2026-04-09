@@ -152,7 +152,7 @@ public class MctsV1Engine implements SimulationEngine {
                                           int activePlayer, int playerPerspective,
                                           double explorationConstant) {
         return new MctsTree(state, supply, activePlayer, playerPerspective,
-                explorationConstant, MctsRollout::simulate, false, true);
+                explorationConstant, BitMctsRollout::simulate, false, true);
     }
 
     /**

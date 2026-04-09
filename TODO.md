@@ -52,7 +52,7 @@ Priorisiere in deiner Abarbeitung die wichtigsten Features. Erkenne Abhängigkei
 | # | Task | Type | Notes |
 |---|------|------|-------|
 | 19 | 3/4 player H2H testing | Dev | Multi-player match runner + tournament support. Glicko-2 adjustments for >2 players. Separate per-player-count leaderboards + overall leaderboard. |
-| 20 | Bitwise game core — Phase 2 simulation hot path | Dev | Phase 1 done: BitState + BitStateTranslator, conversion, income resolution. Phase 2 done: GameSimulator uses BitState internally (simulate, mcWinRate, greedyBuy, boltzmannBuy). 1500-game deterministic equivalence verified. Phases 3-6 (MCTS rollouts, tree nodes, analysis, interface boundary) remain. |
+| 20 | Bitwise game core — Phase 3 MCTS rollouts | Dev | Phase 1 done: BitState + BitStateTranslator, conversion, income resolution. Phase 2 done: GameSimulator uses BitState internally. Phase 3 done: All MCTS rollouts (BitMctsRollout, BitGreedyRollout, BitBoltzmannRollout, BitRolloutEvCache) use BitState. All engines wired. Phases 4-6 (tree nodes, analysis, interface boundary) remain. |
 | 21 | GPU-accelerated match simulations | Dev | Run large-scale simulations on GPU (RTX 4070). Likely depends on #20 (bitwise core). |
 | 22 | Expansion card support | Dev | Out of scope until base game is perfected. Scaling roadmap: (1) perfect 2P → (2) 3/4P → (3) expansions. |
 

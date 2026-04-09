@@ -60,7 +60,7 @@ public final class MctsDepthLimitedEngine extends MctsV1Engine {
                                  double explorationConstant) {
         int maxDepth = currentMaxDepth.get();
         return new MctsTree(state, supply, activePlayer, playerPerspective,
-                explorationConstant, DepthLimitedRollout.withMaxDepth(maxDepth));
+                explorationConstant, BitMctsRollout.withMaxDepth(maxDepth));
     }
 
     @Override
@@ -69,6 +69,6 @@ public final class MctsDepthLimitedEngine extends MctsV1Engine {
                                           double explorationConstant) {
         int maxDepth = currentMaxDepth.get();
         return new MctsTree(state, supply, activePlayer, playerPerspective,
-                explorationConstant, DepthLimitedRollout.withMaxDepth(maxDepth), false, true);
+                explorationConstant, BitMctsRollout.withMaxDepth(maxDepth), false, true);
     }
 }

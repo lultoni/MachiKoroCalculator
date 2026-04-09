@@ -38,7 +38,7 @@ public final class MctsBoltzmannRolloutEngine extends MctsV1Engine {
                                  double explorationConstant) {
         double temperature = currentTemperature.get();
         return new MctsTree(state, supply, activePlayer, playerPerspective,
-                explorationConstant, BoltzmannRollout.withTemperature(temperature));
+                explorationConstant, BitBoltzmannRollout.withTemperature(temperature));
     }
 
     @Override
@@ -47,7 +47,7 @@ public final class MctsBoltzmannRolloutEngine extends MctsV1Engine {
                                           double explorationConstant) {
         double temperature = currentTemperature.get();
         return new MctsTree(state, supply, activePlayer, playerPerspective,
-                explorationConstant, BoltzmannRollout.withTemperature(temperature), false, true);
+                explorationConstant, BitBoltzmannRollout.withTemperature(temperature), false, true);
     }
 
     // -------------------------------------------------------------------------

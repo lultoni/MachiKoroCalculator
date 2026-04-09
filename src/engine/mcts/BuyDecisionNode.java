@@ -1,13 +1,10 @@
 package engine.mcts;
 
 import calcs.RankEntry;
-import core.GameState;
-import core.Player;
-import core.Project;
-import core.ProjectLoader;
+import core.BitState;
+import core.BitStateTranslator;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Arrays;
 
 /**
  * Decision node for the purchase decision at the end of a player's turn.
@@ -17,22 +14,18 @@ import java.util.List;
  *
  * <h2>Children</h2>
  * <ul>
- *   <li>One "save" child using the {@link RankEntry#WAIT_SENTINEL} (cost 0, no supply check).</li>
+ *   <li>One "save" child (cost 0, no supply check).</li>
  *   <li>One child per card that satisfies:
  *     <ul>
- *       <li>Non-landmark: in {@link GameState#getUnbuilt_projects()} AND
- *           {@link SupplyTracker#canPurchase(String)} AND player's coins ≥ cost.</li>
+ *       <li>Normal card: {@code supply[ci] > 0} AND player's coins ≥ cost.</li>
+ *       <li>Purple card: not yet owned by the active player AND player's coins ≥ cost.</li>
  *       <li>Landmark: not yet owned by the active player AND player's coins ≥ cost
  *           (landmarks have no supply limit).</li>
  *     </ul>
  *   </li>
  * </ul>
- * Each purchase child has the cost deducted, the card added to owned_projects, and
- * (for non-landmarks) the supply decremented.
- *
- * <h2>Unaffordable cards</h2>
- * Cards the player cannot afford are NOT added as children. Exploring impossible moves
- * wastes the iteration budget.
+ * Each purchase child has the cost deducted, the card added, and (for normal cards)
+ * the supply decremented.
  *
  * <h2>Turn transition</h2>
  * After the purchase, the turn passes to {@link #nextPlayer}. The child node is either:
@@ -40,11 +33,8 @@ import java.util.List;
  *   <li>A {@link DiceChoiceNode} if {@code nextPlayer} owns Bahnhof in the child state.</li>
  *   <li>A {@link ChanceNode}(1d6) otherwise.</li>
  * </ul>
- * If the purchase wins the game ({@link GameState#hasWon}), the child is a terminal
+ * If the purchase wins the game ({@link BitState#hasWon}), the child is a terminal
  * {@link BuyDecisionNode} with no further children; its {@code isTerminal()} returns true.
- *
- * <h2>UCT</h2>
- * All children are explored and exploited via UCT.
  */
 public final class BuyDecisionNode extends MctsNode {
 
@@ -53,9 +43,6 @@ public final class BuyDecisionNode extends MctsNode {
 
     /** The player who acts next after this purchase (may differ from activePlayer only on bonus turns). */
     public final int nextPlayer;
-
-    // All 4 landmark IDs for the win-condition check and landmark purchase scan
-    private static final String[] LANDMARK_IDS = {"bahnhof", "einkaufszentrum", "freizeitpark", "funkturm"};
 
     /**
      * Index of a child that is an instant win for the active player, or -1 if none.
@@ -72,13 +59,13 @@ public final class BuyDecisionNode extends MctsNode {
     public int instantWinChildIndex = -1;
 
     /**
-     * @param state        game state after roll income applied (player can now buy)
-     * @param supply       supply tracker matching state
+     * @param state        bitwise game state after roll income applied (player can now buy)
+     * @param supply       supply array matching state
      * @param parent       parent node
      * @param activePlayer the buyer
      * @param nextPlayer   player index who acts after this purchase
      */
-    public BuyDecisionNode(GameState state, SupplyTracker supply, MctsNode parent,
+    public BuyDecisionNode(BitState state, int[] supply, MctsNode parent,
                            int activePlayer, int nextPlayer) {
         super(state, supply, parent);
         this.activePlayer = activePlayer;
@@ -94,84 +81,111 @@ public final class BuyDecisionNode extends MctsNode {
     public void expand() {
         if (expanded) return;
 
-        Player active = state.getPlayers()[activePlayer];
-        int coins = active.getCoins();
+        int coins = state.getCoins(activePlayer);
 
         // --- Save option (always present) ---
-        addChild(state, supply, RankEntry.WAIT_SENTINEL, false);
+        addSaveChild();
 
-        // --- Non-landmark cards from the unbuilt pool ---
-        for (Project p : state.getUnbuilt_projects()) {
-            if (supply.canPurchase(p.getId()) && coins >= p.getCost()) {
-                // Purple cards (lila) are unique — max 1 per player per type
-                if ("lila".equals(p.getColor()) && active.hasProject(p.getId())) continue;
-                addChild(state, supply, p, false);
+        // --- Non-landmark cards from CANDIDATE_ITERATION_ORDER ---
+        for (int ci : BitStateTranslator.CANDIDATE_ITERATION_ORDER) {
+            if (ci < BitStateTranslator.NUM_NORMAL_CARDS) {
+                // Normal card
+                if (supply[ci] <= 0) continue;
+                if (coins < BitStateTranslator.NORMAL_CARD_COSTS[ci]) continue;
+                addNormalCardChild(ci, coins);
+            } else {
+                // Purple card (ci >= NUM_NORMAL_CARDS)
+                int purpleIdx = ci - BitStateTranslator.NUM_NORMAL_CARDS;
+                if (state.hasPurple(activePlayer, purpleIdx)) continue; // uniqueness
+                if (coins < BitStateTranslator.PURPLE_CARD_COSTS[purpleIdx]) continue;
+                addPurpleCardChild(purpleIdx, coins);
             }
         }
 
         // --- Landmarks (no supply limit; each player can own at most one of each) ---
-        for (String landmarkId : LANDMARK_IDS) {
-            if (active.hasProject(landmarkId)) continue; // already owned
-            Project lm = ProjectLoader.getProject(landmarkId).orElse(null);
-            if (lm == null) continue;
-            if (coins >= lm.getCost()) {
-                addChild(state, supply, lm, true);
-            }
+        for (int li = 0; li < BitStateTranslator.NUM_LANDMARKS; li++) {
+            if (state.hasLandmark(activePlayer, li)) continue;
+            if (coins < BitStateTranslator.LANDMARK_COSTS[li]) continue;
+            addLandmarkChild(li, coins);
         }
 
         expanded = true;
     }
 
-    /**
-     * Creates a child for purchasing {@code card}:
-     * <ol>
-     *   <li>Clones the state</li>
-     *   <li>Applies the purchase (deduct coins, add to owned, decrement supply for non-landmarks)</li>
-     *   <li>If the purchase wins the game, adds a terminal {@link BuyDecisionNode}</li>
-     *   <li>Otherwise, appends the next-player's DiceChoiceNode / ChanceNode</li>
-     * </ol>
-     */
-    private void addChild(GameState parentState, SupplyTracker parentSupply,
-                          Project card, boolean isLandmark) {
-        GameState childState = parentState.copy();
-        SupplyTracker childSupply = parentSupply;
-        boolean isSave = (card == RankEntry.WAIT_SENTINEL);
+    private void addSaveChild() {
+        // Save: no mutation, share parent's state and supply
+        MctsNode nextTurnNode = buildNextTurnNode(state, supply);
+        children.add(nextTurnNode);
+    }
 
-        if (!isSave) {
-            Player childActive = childState.getPlayers()[activePlayer];
-            childActive.setCoins(childActive.getCoins() - card.getCost());
-            childActive.addProject(card);
-            if (!isLandmark) {
-                childSupply = childSupply.withPurchase(card.getId());
-            }
-        }
+    private void addNormalCardChild(int normalCardIndex, int coins) {
+        BitState childBS = state.copy();
+        childBS.setCoins(activePlayer, coins - BitStateTranslator.NORMAL_CARD_COSTS[normalCardIndex]);
+        childBS.addCard(activePlayer, normalCardIndex);
 
-        // Check win condition
-        if (!isSave && GameState.hasWon(childState.getPlayers()[activePlayer])) {
-            // Terminal node — no further children will be created
-            BuyDecisionNode terminal = new BuyDecisionNode(childState, childSupply, this,
+        int[] childSupply = Arrays.copyOf(supply, supply.length);
+        childSupply[normalCardIndex]--;
+
+        // Check win condition (normal cards can't win, but for safety)
+        if (childBS.hasWon(activePlayer)) {
+            BuyDecisionNode terminal = new BuyDecisionNode(childBS, childSupply, this,
                     nextPlayer, nextPlayer);
-            terminal.expanded = true; // no children, already "done"
+            terminal.expanded = true;
             children.add(terminal);
             instantWinChildIndex = children.size() - 1;
             return;
         }
 
-        // Build next-player's turn entry point
-        MctsNode nextTurnNode = buildNextTurnNode(childState, childSupply);
-        children.add(nextTurnNode);
+        children.add(buildNextTurnNode(childBS, childSupply));
+    }
+
+    private void addPurpleCardChild(int purpleIndex, int coins) {
+        BitState childBS = state.copy();
+        childBS.setCoins(activePlayer, coins - BitStateTranslator.PURPLE_CARD_COSTS[purpleIndex]);
+        childBS.setPurple(activePlayer, purpleIndex);
+
+        // Purple cards don't consume supply (uniqueness-limited, not pool-limited)
+
+        if (childBS.hasWon(activePlayer)) {
+            BuyDecisionNode terminal = new BuyDecisionNode(childBS, supply, this,
+                    nextPlayer, nextPlayer);
+            terminal.expanded = true;
+            children.add(terminal);
+            instantWinChildIndex = children.size() - 1;
+            return;
+        }
+
+        children.add(buildNextTurnNode(childBS, supply));
+    }
+
+    private void addLandmarkChild(int landmarkIndex, int coins) {
+        BitState childBS = state.copy();
+        childBS.setCoins(activePlayer, coins - BitStateTranslator.LANDMARK_COSTS[landmarkIndex]);
+        childBS.setLandmark(activePlayer, landmarkIndex);
+
+        // Landmarks don't consume supply
+
+        if (childBS.hasWon(activePlayer)) {
+            BuyDecisionNode terminal = new BuyDecisionNode(childBS, supply, this,
+                    nextPlayer, nextPlayer);
+            terminal.expanded = true;
+            children.add(terminal);
+            instantWinChildIndex = children.size() - 1;
+            return;
+        }
+
+        children.add(buildNextTurnNode(childBS, supply));
     }
 
     /**
      * Builds the first node for the next player's turn: DiceChoiceNode if they own Bahnhof,
      * ChanceNode(1d6) otherwise.
      */
-    private MctsNode buildNextTurnNode(GameState childState, SupplyTracker childSupply) {
-        Player nextP = childState.getPlayers()[nextPlayer];
-        if (nextP.hasProject("bahnhof")) {
-            return new DiceChoiceNode(childState, childSupply, this, nextPlayer, false);
+    private MctsNode buildNextTurnNode(BitState childBS, int[] childSupply) {
+        if (childBS.hasLandmark(nextPlayer, BitStateTranslator.LM_BAHNHOF)) {
+            return new DiceChoiceNode(childBS, childSupply, this, nextPlayer, false);
         } else {
-            return new ChanceNode(childState, childSupply, this, nextPlayer, false, false);
+            return new ChanceNode(childBS, childSupply, this, nextPlayer, false, false);
         }
     }
 

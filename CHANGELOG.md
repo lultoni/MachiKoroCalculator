@@ -6,7 +6,23 @@ Implementation history: what was built, why, and which design decisions were mad
 
 ## Phase 7: Iteration
 
-### Bitwise Game Core — Phase 3: MCTS Rollout Migration (TODO #20)
+### Bitwise Game Core — Phase 4: MCTS Tree Nodes + All Engines (TODO #20)
+
+**MCTS tree nodes now store `BitState` + `int[]` supply.** MctsNode base class changed from `GameState state` + `SupplyTracker supply` to `BitState state` + `int[] supply`. Lazy `toGameState()` added for API boundary (cached). All 6 node types updated: DiceChoiceNode (trivial), ChanceNode (income-only resolution without Bürohaus swap via `applyRollIncomeOnly()`), FunkturmNode (removed `supplyBeforeRoll` — supply unchanged by rolls), BürohausNode (card-index iteration, bitwise swaps), BuyDecisionNode (`CANDIDATE_ITERATION_ORDER`, `Arrays.copyOf` for supply).
+
+**MctsTree + all 6 MCTS engine variants updated.** Constructors accept `BitState` + `int[]`. Rollout boundary converts via `leaf.toGameState()` + `SupplyTracker.fromSupplyArray()`. Terminal scoring uses `node.state.hasWon(i)`. `buildTree()` / `buildFullTurnTree()` signatures updated in MctsV1Engine, MctsGreedyRolloutEngine, MctsGreedyTreeEngine, MctsBoltzmannRolloutEngine, MctsDepthLimitedEngine, MctsAdaptiveEngine.
+
+**TurnPlan BitState-native inference.** `inferPurchase()`, `inferCardId()`, `extractBürohausSwap()` use O(19) integer comparisons on BitState card counts (12 normal + 3 purple + 4 landmark). Zero allocation.
+
+**FlatMcEngine migrated to BitState.** Candidate enumeration uses `BitState.copy()` + card-index iteration via `CANDIDATE_ITERATION_ORDER`. `CandidateOption` stores `BitState` + `int[]`. Rollout boundary: `toGameState()` + `SupplyTracker.fromSupplyArray()`.
+
+**CreatorEngine migrated to BitState.** Post-purchase states built with `BitState.copy()` + card-index operations. Phase 1 heuristic scoring still uses `GameState` (CreatorScorer dependency). Phase 2 MC validation converts at rollout boundary.
+
+**ExpectimaxEngine fully migrated to BitState.** All recursive methods (`evaluateTurn`, `evaluateChanceNode`, `evaluatePostRollIncome`, `evaluateFunkturmNode`, `evaluateBürohausNode`, `evaluateBuyDecision`) operate on `BitState` + `int[]`. Hundreds of `GameState.copy()` per evaluate() replaced by `BitState.copy()`. Income resolution via `applyRollIncomeOnly()`. Bürohaus enumeration via card-index iteration. Leaf evaluation converts to `GameState` only when needed for heuristic scoring.
+
+**All 10 engine classes now use BitState internally.** MctsV1 + 5 variants, FlatMcEngine, CreatorEngine, ExpectimaxEngine, HeuristicEvEngine (excluded — zero-search, no copies).
+
+**Test coverage:** 482 engine tests pass. 30 MCTS tests pass. 286 BitState tests pass. H2H sanity: 10-game Creator vs MCTS match completed successfully.
 
 **All MCTS rollouts now use BitState internally.** Created `BitMctsRollout` (uniform random), `BitGreedyRollout` (greedy), `BitBoltzmannRollout` (softmax), and `BitRolloutEvCache` (BitState-based EV cache). Each satisfies the existing `RolloutFn` interface — converts `GameState → BitState` at entry, then all turn-level mutation is bitwise. No changes to MctsTree, tree nodes, or the `RolloutFn` interface itself.
 

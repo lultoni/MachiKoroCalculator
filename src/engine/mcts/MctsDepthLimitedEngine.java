@@ -1,5 +1,6 @@
 package engine.mcts;
 
+import core.BitState;
 import core.GameState;
 import engine.EngineConfig;
 import engine.EngineResult;
@@ -55,20 +56,20 @@ public final class MctsDepthLimitedEngine extends MctsV1Engine {
     }
 
     @Override
-    protected MctsTree buildTree(GameState state, SupplyTracker supply,
+    protected MctsTree buildTree(BitState bs, int[] supply,
                                  int activePlayer, int playerPerspective,
                                  double explorationConstant) {
         int maxDepth = currentMaxDepth.get();
-        return new MctsTree(state, supply, activePlayer, playerPerspective,
+        return new MctsTree(bs, supply, activePlayer, playerPerspective,
                 explorationConstant, BitMctsRollout.withMaxDepth(maxDepth));
     }
 
     @Override
-    protected MctsTree buildFullTurnTree(GameState state, SupplyTracker supply,
+    protected MctsTree buildFullTurnTree(BitState bs, int[] supply,
                                           int activePlayer, int playerPerspective,
                                           double explorationConstant) {
         int maxDepth = currentMaxDepth.get();
-        return new MctsTree(state, supply, activePlayer, playerPerspective,
+        return new MctsTree(bs, supply, activePlayer, playerPerspective,
                 explorationConstant, BitMctsRollout.withMaxDepth(maxDepth), false, true);
     }
 }

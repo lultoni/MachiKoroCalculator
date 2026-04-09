@@ -1,6 +1,6 @@
 package engine.mcts;
 
-import core.GameState;
+import core.BitState;
 
 /**
  * Decision node for the Bahnhof dice-count choice: 1d6 or 2d6.
@@ -35,13 +35,13 @@ public final class DiceChoiceNode extends MctsNode {
     public final boolean isBonusTurn;
 
     /**
-     * @param state       game state at the start of this dice-choice moment
-     * @param supply      supply tracker matching state
+     * @param state       bitwise game state at the start of this dice-choice moment
+     * @param supply      supply array matching state
      * @param parent      parent node in the tree
      * @param activePlayer index of the player who is choosing dice count
      * @param isBonusTurn true if this is a Freizeitpark bonus turn
      */
-    public DiceChoiceNode(GameState state, SupplyTracker supply, MctsNode parent,
+    public DiceChoiceNode(BitState state, int[] supply, MctsNode parent,
                           int activePlayer, boolean isBonusTurn) {
         super(state, supply, parent);
         this.activePlayer = activePlayer;

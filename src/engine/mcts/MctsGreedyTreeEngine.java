@@ -1,6 +1,6 @@
 package engine.mcts;
 
-import core.GameState;
+import core.BitState;
 
 /**
  * Variant C engine: MCTS with greedy tree selection at {@link engine.mcts.BuyDecisionNode}.
@@ -28,18 +28,18 @@ public final class MctsGreedyTreeEngine extends MctsV1Engine {
     }
 
     @Override
-    protected MctsTree buildTree(GameState state, SupplyTracker supply,
+    protected MctsTree buildTree(BitState bs, int[] supply,
                                  int activePlayer, int playerPerspective,
                                  double explorationConstant) {
-        return new MctsTree(state, supply, activePlayer, playerPerspective,
+        return new MctsTree(bs, supply, activePlayer, playerPerspective,
                 explorationConstant, MctsRollout::simulate, true /* greedyBuySelection */);
     }
 
     @Override
-    protected MctsTree buildFullTurnTree(GameState state, SupplyTracker supply,
+    protected MctsTree buildFullTurnTree(BitState bs, int[] supply,
                                           int activePlayer, int playerPerspective,
                                           double explorationConstant) {
-        return new MctsTree(state, supply, activePlayer, playerPerspective,
+        return new MctsTree(bs, supply, activePlayer, playerPerspective,
                 explorationConstant, MctsRollout::simulate, true, true);
     }
 }

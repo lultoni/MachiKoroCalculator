@@ -2,6 +2,8 @@ package engine.creator;
 
 import calcs.Calcs;
 import calcs.RankEntry;
+import core.BitState;
+import core.BitStateTranslator;
 import core.GameState;
 import core.Player;
 import core.Project;
@@ -17,6 +19,7 @@ import engine.mcts.RolloutFn;
 import engine.mcts.SupplyTracker;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -58,8 +61,6 @@ import java.util.Map;
  */
 public final class CreatorEngine implements SimulationEngine {
 
-    private static final String[] LANDMARK_IDS = {"bahnhof", "einkaufszentrum", "freizeitpark", "funkturm"};
-
     @Override
     public String id() { return "creator"; }
 
@@ -83,29 +84,29 @@ public final class CreatorEngine implements SimulationEngine {
     public EngineResult evaluate(GameState state, int playerIndex, EngineConfig config) {
         long startTime = System.currentTimeMillis();
 
-        Player active = state.getPlayers()[playerIndex];
-        int coins = active.getCoins();
+        int coins = state.getPlayers()[playerIndex].getCoins();
         int n = state.getPlayers().length;
         int nextPlayer = (playerIndex + 1) % n;
 
         SupplyTracker baseSupply = SupplyTracker.fromGameState(state);
+        BitState rootBS = BitState.fromGameState(state);
+        int[] rootSupplyArr = rootBS.buildSupplyArray();
 
         // ================================================================
-        // Phase 1: Heuristic seeding
+        // Phase 1: Heuristic seeding (still uses GameState for CreatorScorer)
         // ================================================================
 
         List<CreatorScorer.ScoredCandidate> scored = CreatorScorer.scoreAll(state, playerIndex, baseSupply, config);
         long phase1Ms = System.currentTimeMillis() - startTime;
 
-        // Build candidate options for MC phase
+        // Build candidate options with BitState post-purchase states for MC phase
         List<CandidateOption> candidates = new ArrayList<>();
         for (CreatorScorer.ScoredCandidate sc : scored) {
             boolean isSave = sc.card == RankEntry.WAIT_SENTINEL;
             boolean isInstantWin = sc.compositeScore == Double.MAX_VALUE;
 
             if (isSave) {
-                // Save option: excluded from MC — competes on heuristic score (0.0)
-                CandidateOption opt = new CandidateOption(sc.card, state, baseSupply, false, true,
+                CandidateOption opt = new CandidateOption(sc.card, rootBS, rootSupplyArr, false, true,
                         sc.compositeScore, sc.metrics, sc.factors, true, sc.activationGuard);
                 candidates.add(opt);
                 continue;
@@ -113,18 +114,29 @@ public final class CreatorEngine implements SimulationEngine {
 
             boolean canAfford = sc.affordable;
 
-            // Build post-purchase state for MC sampling
-            GameState childState = state.copy();
-            Player childActive = childState.getPlayers()[playerIndex];
-            if (canAfford) {
-                childActive.setCoins(childActive.getCoins() - sc.card.getCost());
+            // Build BitState post-purchase state
+            BitState childBS = rootBS.copy();
+            int[] childSupply = rootSupplyArr;
+
+            int normalIdx = BitStateTranslator.normalCardIndex(sc.card.getId());
+            int purpleIdx = BitStateTranslator.purpleCardIndex(sc.card.getId());
+            int landmarkIdx = BitStateTranslator.landmarkIndex(sc.card.getId());
+
+            if (normalIdx >= 0) {
+                if (canAfford) childBS.setCoins(playerIndex, coins - sc.card.getCost());
+                childBS.addCard(playerIndex, normalIdx);
+                childSupply = Arrays.copyOf(rootSupplyArr, rootSupplyArr.length);
+                childSupply[normalIdx]--;
+            } else if (purpleIdx >= 0) {
+                if (canAfford) childBS.setCoins(playerIndex, coins - sc.card.getCost());
+                childBS.setPurple(playerIndex, purpleIdx);
+            } else if (landmarkIdx >= 0) {
+                if (canAfford) childBS.setCoins(playerIndex, coins - sc.card.getCost());
+                childBS.setLandmark(playerIndex, landmarkIdx);
             }
-            childActive.addProject(sc.card);
-            SupplyTracker childSupply = sc.card.isIs_grossprojekt()
-                    ? baseSupply : baseSupply.withPurchase(sc.card.getId());
 
             if (isInstantWin) {
-                CandidateOption opt = new CandidateOption(sc.card, childState, childSupply, true, false,
+                CandidateOption opt = new CandidateOption(sc.card, childBS, childSupply, true, false,
                         sc.compositeScore, sc.metrics, sc.factors, canAfford, sc.activationGuard);
                 opt.wins = 1;
                 opt.samples = 1;
@@ -132,7 +144,7 @@ public final class CreatorEngine implements SimulationEngine {
                 continue;
             }
 
-            CandidateOption opt = new CandidateOption(sc.card, childState, childSupply, false, false,
+            CandidateOption opt = new CandidateOption(sc.card, childBS, childSupply, false, false,
                     sc.compositeScore, sc.metrics, sc.factors, canAfford, sc.activationGuard);
             opt.unaffordable = !canAfford;
             candidates.add(opt);
@@ -255,9 +267,11 @@ public final class CreatorEngine implements SimulationEngine {
     private void runSamples(CandidateOption candidate, int numSamples,
                             int nextPlayer, int perspective, RolloutFn rolloutFn) {
         if (candidate.isInstantWin) return;
+        // Convert at rollout boundary
+        GameState gs = candidate.postState.toGameState();
+        SupplyTracker st = SupplyTracker.fromSupplyArray(candidate.postSupply);
         for (int i = 0; i < numSamples; i++) {
-            double result = rolloutFn.simulate(candidate.postState, candidate.postSupply,
-                    nextPlayer, perspective);
+            double result = rolloutFn.simulate(gs, st, nextPlayer, perspective);
             candidate.samples++;
             candidate.wins += result;
         }
@@ -383,8 +397,8 @@ public final class CreatorEngine implements SimulationEngine {
 
     private static final class CandidateOption {
         final Project card;
-        final GameState postState;
-        final SupplyTracker postSupply;
+        final BitState postState;
+        final int[] postSupply;
         final boolean isInstantWin;
         final boolean isSave;
         final double heuristicScore;
@@ -396,7 +410,7 @@ public final class CreatorEngine implements SimulationEngine {
         int samples = 0;
         double wins = 0.0;
 
-        CandidateOption(Project card, GameState postState, SupplyTracker postSupply,
+        CandidateOption(Project card, BitState postState, int[] postSupply,
                         boolean isInstantWin, boolean isSave, double heuristicScore,
                         Map<String, String> metrics,
                         List<EngineResult.ExplanationFactor> structuredFactors,

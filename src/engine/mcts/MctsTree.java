@@ -1,8 +1,8 @@
 package engine.mcts;
 
 import calcs.WinProbability;
-import core.GameState;
-import core.Player;
+import core.BitState;
+import core.BitStateTranslator;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -28,7 +28,9 @@ import java.util.Map;
  * so the first is always selected first).
  *
  * <h2>Rollout</h2>
- * Delegates to {@link MctsRollout#simulate} for a uniform-random full-game simulation.
+ * Delegates to the configured {@link RolloutFn}. The rollout function receives
+ * a {@code GameState} + {@code SupplyTracker} (converted from the leaf's BitState
+ * at the boundary).
  *
  * <h2>Backpropagation</h2>
  * Calls {@link MctsNode#backpropagate} on the selected leaf, walking up to root.
@@ -77,13 +79,13 @@ public final class MctsTree {
     private long backpropNs;
 
     /**
-     * @param rootState           game state at the purchase decision point
-     * @param rootSupply          supply tracker matching rootState
+     * @param rootState           bitwise game state at the purchase decision point
+     * @param rootSupply          supply array matching rootState
      * @param activePlayer        the player making the purchase decision
      * @param playerPerspective   the player we are advising (score perspective)
      * @param explorationConstant C in UCB1 formula (typically √2 ≈ 1.4142)
      */
-    public MctsTree(GameState rootState, SupplyTracker rootSupply,
+    public MctsTree(BitState rootState, int[] rootSupply,
                     int activePlayer, int playerPerspective,
                     double explorationConstant) {
         this(rootState, rootSupply, activePlayer, playerPerspective, explorationConstant,
@@ -95,7 +97,7 @@ public final class MctsTree {
      *
      * @param rolloutFn custom rollout strategy (e.g. greedy, Boltzmann)
      */
-    public MctsTree(GameState rootState, SupplyTracker rootSupply,
+    public MctsTree(BitState rootState, int[] rootSupply,
                     int activePlayer, int playerPerspective,
                     double explorationConstant, RolloutFn rolloutFn) {
         this(rootState, rootSupply, activePlayer, playerPerspective, explorationConstant,
@@ -108,7 +110,7 @@ public final class MctsTree {
      * @param rolloutFn          custom rollout strategy
      * @param greedyBuySelection if true, {@link BuyDecisionNode} uses greedy (argmax) selection
      */
-    public MctsTree(GameState rootState, SupplyTracker rootSupply,
+    public MctsTree(BitState rootState, int[] rootSupply,
                     int activePlayer, int playerPerspective,
                     double explorationConstant, RolloutFn rolloutFn,
                     boolean greedyBuySelection) {
@@ -117,7 +119,7 @@ public final class MctsTree {
         this.activePlayer        = activePlayer;
         this.rolloutFn           = rolloutFn;
         this.greedyBuySelection  = greedyBuySelection;
-        int nextPlayer = (activePlayer + 1) % rootState.getPlayers().length;
+        int nextPlayer = (activePlayer + 1) % rootState.getNumPlayers();
         this.root = new BuyDecisionNode(rootState, rootSupply, null, activePlayer, nextPlayer);
         this.fullTurnRoot = null;
     }
@@ -129,8 +131,8 @@ public final class MctsTree {
      * <p>The {@code root} field is still a BuyDecisionNode for API compatibility, but
      * iterations run from {@code fullTurnRoot} instead.
      *
-     * @param rootState          game state at the start of the player's turn
-     * @param rootSupply         supply tracker
+     * @param rootState          bitwise game state at the start of the player's turn
+     * @param rootSupply         supply array
      * @param activePlayer       the player whose turn it is
      * @param playerPerspective  the player we are advising
      * @param explorationConstant UCB1 C value
@@ -138,7 +140,7 @@ public final class MctsTree {
      * @param greedyBuySelection if true, BuyDecisionNode uses greedy selection
      * @param fullTurn           must be true (distinguishes from other constructors)
      */
-    public MctsTree(GameState rootState, SupplyTracker rootSupply,
+    public MctsTree(BitState rootState, int[] rootSupply,
                     int activePlayer, int playerPerspective,
                     double explorationConstant, RolloutFn rolloutFn,
                     boolean greedyBuySelection, boolean fullTurn) {
@@ -148,7 +150,7 @@ public final class MctsTree {
         this.rolloutFn           = rolloutFn;
         this.greedyBuySelection  = greedyBuySelection;
 
-        boolean hasBahnhof = rootState.getPlayers()[activePlayer].hasProject("bahnhof");
+        boolean hasBahnhof = rootState.hasLandmark(activePlayer, BitStateTranslator.LM_BAHNHOF);
         if (hasBahnhof) {
             this.fullTurnRoot = new DiceChoiceNode(rootState, rootSupply, null, activePlayer, false);
         } else {
@@ -157,7 +159,7 @@ public final class MctsTree {
 
         // root field: not directly meaningful for full-turn trees, but set it to a dummy
         // to avoid null. The real tree navigation goes through fullTurnRoot.
-        int nextPlayer = (activePlayer + 1) % rootState.getPlayers().length;
+        int nextPlayer = (activePlayer + 1) % rootState.getNumPlayers();
         this.root = new BuyDecisionNode(rootState, rootSupply, null, activePlayer, nextPlayer);
     }
 
@@ -271,8 +273,10 @@ public final class MctsTree {
         if (leaf.isTerminal()) {
             score = terminalScore(leaf);
         } else {
+            // Convert BitState → GameState + SupplyTracker at rollout boundary
             score = rolloutFn.simulate(
-                    leaf.state, leaf.supply,
+                    leaf.toGameState(),
+                    SupplyTracker.fromSupplyArray(leaf.supply),
                     getActivePlayerForNode(leaf),
                     playerPerspective);
         }
@@ -302,7 +306,8 @@ public final class MctsTree {
             score = terminalScore(leaf);
         } else {
             score = rolloutFn.simulate(
-                    leaf.state, leaf.supply,
+                    leaf.toGameState(),
+                    SupplyTracker.fromSupplyArray(leaf.supply),
                     getActivePlayerForNode(leaf),
                     playerPerspective);
         }
@@ -395,13 +400,13 @@ public final class MctsTree {
     // -------------------------------------------------------------------------
 
     private double terminalScore(MctsNode node) {
-        for (int i = 0; i < node.state.getPlayers().length; i++) {
-            if (GameState.hasWon(node.state.getPlayers()[i])) {
+        for (int i = 0; i < node.state.getNumPlayers(); i++) {
+            if (node.state.hasWon(i)) {
                 return (i == playerPerspective) ? 1.0 : 0.0;
             }
         }
         // No winner found (shouldn't happen for isTerminal() nodes) → use heuristic
-        return WinProbability.computeBaselineWinProb(node.state, playerPerspective);
+        return WinProbability.computeBaselineWinProb(node.toGameState(), playerPerspective);
     }
 
     // -------------------------------------------------------------------------

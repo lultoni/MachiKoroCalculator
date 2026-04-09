@@ -1,7 +1,6 @@
 package engine.mcts;
 
-import core.GameState;
-import core.Player;
+import core.BitState;
 
 /**
  * Decision node for the Funkturm "keep or reroll" choice.
@@ -29,6 +28,11 @@ import core.Player;
  * The {@code afterKeepNode} is constructed by {@link ChanceNode#buildChild} with a null
  * parent, then re-parented to this {@code FunkturmNode} when {@link #expand()} inserts it
  * into children.  All other children are constructed with {@code this} as parent directly.
+ *
+ * <h2>Supply through rolls</h2>
+ * Supply does not change during rolls (no purchases), so the supply array is shared
+ * between pre-roll and post-roll nodes. {@code supplyBeforeRoll} was removed in the
+ * Phase 4 migration — {@code supply} from the parent suffices for the reroll branch.
  */
 public final class FunkturmNode extends MctsNode {
 
@@ -39,10 +43,7 @@ public final class FunkturmNode extends MctsNode {
     public final boolean twoDice;
 
     /** The state BEFORE the current roll's income was applied (used for the reroll branch). */
-    public final GameState stateBeforeRoll;
-
-    /** The supply tracker matching {@link #stateBeforeRoll}. */
-    public final SupplyTracker supplyBeforeRoll;
+    public final BitState stateBeforeRoll;
 
     /**
      * The node to attach as the "keep" child. Pre-built by the ChanceNode when building this
@@ -62,8 +63,8 @@ public final class FunkturmNode extends MctsNode {
     public final boolean isBonusTurn;
 
     /**
-     * @param stateAfterRoll  game state with current roll's income already applied
-     * @param supply          supply tracker matching stateAfterRoll
+     * @param stateAfterRoll  bitwise state with current roll's income already applied
+     * @param supply          supply array matching stateAfterRoll
      * @param parent          parent ChanceNode
      * @param activePlayer    the player who owns Funkturm
      * @param twoDice         true if the roll used 2 dice
@@ -71,13 +72,12 @@ public final class FunkturmNode extends MctsNode {
      * @param afterKeepNode   the node for the "keep" branch (Bürohaus, BuyDecision, or DiceChoice)
      * @param isBonusTurn     true if this is a Freizeitpark bonus turn
      */
-    public FunkturmNode(GameState stateAfterRoll, SupplyTracker supply, MctsNode parent,
+    public FunkturmNode(BitState stateAfterRoll, int[] supply, MctsNode parent,
                         int activePlayer, boolean twoDice, int keptRoll,
                         MctsNode afterKeepNode, boolean isBonusTurn) {
         super(stateAfterRoll, supply, parent);
         // stateBeforeRoll is the ChanceNode's pre-roll state — we reach it via parent
         this.stateBeforeRoll  = parent != null ? parent.state : stateAfterRoll;
-        this.supplyBeforeRoll = parent != null ? parent.supply : supply;
         this.activePlayer     = activePlayer;
         this.twoDice          = twoDice;
         this.keptRoll         = keptRoll;
@@ -97,8 +97,9 @@ public final class FunkturmNode extends MctsNode {
         MctsNode keepChild = reparent(afterKeepNode, this);
         children.add(keepChild);
 
-        // Child 1: reroll — new ChanceNode branching from the pre-roll state
-        children.add(new ChanceNode(stateBeforeRoll, supplyBeforeRoll, this,
+        // Child 1: reroll — new ChanceNode branching from the pre-roll state.
+        // Supply is unchanged through rolls, so use this.supply (same as parent's supply).
+        children.add(new ChanceNode(stateBeforeRoll, supply, this,
                 activePlayer, twoDice, isBonusTurn));
 
         expanded = true;

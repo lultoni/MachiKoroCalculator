@@ -1,5 +1,6 @@
 package engine.mcts;
 
+import core.BitState;
 import core.GameState;
 import engine.EngineConfig;
 import engine.EngineResult;
@@ -37,8 +38,9 @@ public final class MctsAdaptiveEngine extends MctsV1Engine {
         double explorationConstant = Double.parseDouble(
                 config.getExtra("explorationConstant", "1.4142"));
 
-        SupplyTracker supply = SupplyTracker.fromGameState(state);
-        MctsTree tree = buildFullTurnTree(state, supply, playerIndex, playerIndex, explorationConstant);
+        BitState bs = BitState.fromGameState(state);
+        int[] supply = bs.buildSupplyArray();
+        MctsTree tree = buildFullTurnTree(bs, supply, playerIndex, playerIndex, explorationConstant);
 
         int totalBudget     = config.iterations > 0 ? config.iterations : 100;
 
@@ -56,8 +58,9 @@ public final class MctsAdaptiveEngine extends MctsV1Engine {
         double explorationConstant = Double.parseDouble(
                 config.getExtra("explorationConstant", "1.4142"));
 
-        SupplyTracker supply = SupplyTracker.fromGameState(state);
-        MctsTree tree = buildFullTurnTree(state, supply, playerIndex, playerIndex, explorationConstant);
+        BitState bs = BitState.fromGameState(state);
+        int[] supply = bs.buildSupplyArray();
+        MctsTree tree = buildFullTurnTree(bs, supply, playerIndex, playerIndex, explorationConstant);
 
         int totalBudget = config.iterations > 0 ? config.iterations : 100;
 

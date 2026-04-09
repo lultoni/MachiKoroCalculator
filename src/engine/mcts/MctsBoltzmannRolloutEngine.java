@@ -1,5 +1,6 @@
 package engine.mcts;
 
+import core.BitState;
 import core.GameState;
 import engine.EngineConfig;
 import engine.EngineResult;
@@ -33,20 +34,20 @@ public final class MctsBoltzmannRolloutEngine extends MctsV1Engine {
     }
 
     @Override
-    protected MctsTree buildTree(GameState state, SupplyTracker supply,
+    protected MctsTree buildTree(BitState bs, int[] supply,
                                  int activePlayer, int playerPerspective,
                                  double explorationConstant) {
         double temperature = currentTemperature.get();
-        return new MctsTree(state, supply, activePlayer, playerPerspective,
+        return new MctsTree(bs, supply, activePlayer, playerPerspective,
                 explorationConstant, BitBoltzmannRollout.withTemperature(temperature));
     }
 
     @Override
-    protected MctsTree buildFullTurnTree(GameState state, SupplyTracker supply,
+    protected MctsTree buildFullTurnTree(BitState bs, int[] supply,
                                           int activePlayer, int playerPerspective,
                                           double explorationConstant) {
         double temperature = currentTemperature.get();
-        return new MctsTree(state, supply, activePlayer, playerPerspective,
+        return new MctsTree(bs, supply, activePlayer, playerPerspective,
                 explorationConstant, BitBoltzmannRollout.withTemperature(temperature), false, true);
     }
 

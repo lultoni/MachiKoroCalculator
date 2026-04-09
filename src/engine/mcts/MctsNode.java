@@ -1,5 +1,6 @@
 package engine.mcts;
 
+import core.BitState;
 import core.GameState;
 
 import java.util.ArrayList;
@@ -8,9 +9,9 @@ import java.util.List;
 /**
  * Abstract base for all MCTS tree nodes.
  *
- * <p>Each node stores the game state at that point in the tree, a reference to its parent,
- * and its children (populated during expansion). UCT statistics (visit count and total score)
- * are accumulated during backpropagation.
+ * <p>Each node stores a {@link BitState} (packed bitwise game state) and an {@code int[]}
+ * supply array. The {@link #toGameState()} method lazily converts back to {@link GameState}
+ * when needed at API boundaries (result extraction, TurnPlan).
  *
  * <p>The score convention throughout the tree is always from the perspective of the
  * root's {@code playerIndex}:
@@ -22,11 +23,14 @@ import java.util.List;
  */
 public abstract class MctsNode {
 
-    /** Game state at this node (post-action of the edge leading here). */
-    public final GameState state;
+    /** Bitwise game state at this node (post-action of the edge leading here). */
+    public final BitState state;
 
-    /** Supply tracker matching {@link #state} (tracks non-landmark copy counts). */
-    public final SupplyTracker supply;
+    /**
+     * Supply array matching {@link #state}: remaining market copies per normal card (indexed 0-11).
+     * Null is legal (e.g., shared reference when supply is unchanged through a roll).
+     */
+    public final int[] supply;
 
     /** Parent node; null for the root. */
     public final MctsNode parent;
@@ -46,10 +50,22 @@ public abstract class MctsNode {
     /** True if all children have been created (node is fully expanded). */
     public boolean expanded = false;
 
-    protected MctsNode(GameState state, SupplyTracker supply, MctsNode parent) {
+    /** Lazily cached GameState conversion (for API boundary: TurnPlan, result extraction). */
+    private GameState _cachedGameState;
+
+    protected MctsNode(BitState state, int[] supply, MctsNode parent) {
         this.state  = state;
         this.supply = supply;
         this.parent = parent;
+    }
+
+    /**
+     * Returns a {@link GameState} representation of this node's state.
+     * Lazily cached — the conversion is only done once per node.
+     */
+    public GameState toGameState() {
+        if (_cachedGameState == null) _cachedGameState = state.toGameState();
+        return _cachedGameState;
     }
 
     // -------------------------------------------------------------------------
@@ -129,8 +145,8 @@ public abstract class MctsNode {
      * Returns true if this node is a terminal state (someone has won).
      */
     public boolean isTerminal() {
-        for (core.Player p : state.getPlayers()) {
-            if (GameState.hasWon(p)) return true;
+        for (int p = 0; p < state.getNumPlayers(); p++) {
+            if (state.hasWon(p)) return true;
         }
         return false;
     }

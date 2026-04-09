@@ -1,8 +1,7 @@
 package engine.mcts;
 
-import core.GameState;
-import core.Player;
-import core.RollResolver;
+import core.BitState;
+import core.BitStateTranslator;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -21,8 +20,8 @@ import java.util.List;
  *       rolls 4, 6, 8, 10 get 2 children each: one doubles branch (1/36 probability) and one
  *       non-doubles branch ((totalWays−1)/36 probability).</li>
  * </ul>
- * For each outcome, the child's {@code GameState} has all coin deltas applied
- * via {@link RollResolver#computeAllDeltasForRoll}.
+ * For each outcome, the child's {@code BitState} has all coin deltas applied
+ * via {@link BitState#applyRoll}.
  *
  * <h2>Doubles and Freizeitpark</h2>
  * When rolling 2d6 and doubles are relevant, even roll totals are split into two
@@ -48,7 +47,7 @@ import java.util.List;
  *
  * <h2>Branch-Dependent Node Insertion</h2>
  * INVARIANT: Which special nodes (Funkturm, Bürohaus, Freizeitpark bonus) appear
- * depends on what the active player owns IN THAT BRANCH's GameState, not in the
+ * depends on what the active player owns IN THAT BRANCH's state, not in the
  * root state. Each branch may have different node structures because earlier
  * purchases change the player's portfolio.
  */
@@ -77,14 +76,14 @@ public final class ChanceNode extends MctsNode {
     List<Boolean> childIsDoubles;
 
     /**
-     * @param state        game state BEFORE the roll is applied (coins still pre-roll)
-     * @param supply       supply tracker matching state
+     * @param state        bitwise game state BEFORE the roll is applied (coins still pre-roll)
+     * @param supply       supply array matching state
      * @param parent       parent node
      * @param activePlayer index of the rolling player
      * @param twoDice      true for 2d6, false for 1d6
      * @param isBonusTurn  true if this is a Freizeitpark bonus turn
      */
-    public ChanceNode(GameState state, SupplyTracker supply, MctsNode parent,
+    public ChanceNode(BitState state, int[] supply, MctsNode parent,
                       int activePlayer, boolean twoDice, boolean isBonusTurn) {
         super(state, supply, parent);
         this.activePlayer = activePlayer;
@@ -107,7 +106,7 @@ public final class ChanceNode extends MctsNode {
         if (expanded) return;
 
         boolean doublesRelevant = twoDice
-                && state.getPlayers()[activePlayer].hasProject("freizeitpark")
+                && state.hasLandmark(activePlayer, BitStateTranslator.LM_FZP)
                 && !isBonusTurn;
 
         if (!twoDice) {
@@ -153,18 +152,16 @@ public final class ChanceNode extends MctsNode {
     }
 
     private void buildChild(int roll, boolean isDoubles) {
-        // 1. Apply roll to a copy of the game state
-        GameState childState = state.copy();
-        int[] deltas = RollResolver.computeAllDeltasForRoll(childState, activePlayer, roll);
-        Player[] players = childState.getPlayers();
-        for (int i = 0; i < players.length; i++) {
-            int newCoins = players[i].getCoins() + deltas[i];
-            players[i].setCoins(Math.max(0, newCoins));
-        }
+        // 1. Apply roll to a copy of the BitState
+        //    Note: applyRoll handles income resolution AND Bürohaus greedy swap.
+        //    But for tree nodes, Bürohaus is a decision node, not an automatic swap.
+        //    So we use applyRollNoSwap (income only), then build Bürohaus node if needed.
+        BitState childBS = state.copy();
+        applyRollIncomeOnly(childBS, activePlayer, roll);
 
-        boolean hasFunkturm  = players[activePlayer].hasProject("funkturm");
-        boolean hasBürohaus  = players[activePlayer].hasProject("bürohaus");
-        boolean hasFreizeit  = players[activePlayer].hasProject("freizeitpark");
+        boolean hasFunkturm  = childBS.hasLandmark(activePlayer, BitStateTranslator.LM_FT);
+        boolean hasBürohaus  = childBS.hasPurple(activePlayer, 2); // bürohaus = purple idx 2
+        boolean hasFreizeit  = childBS.hasLandmark(activePlayer, BitStateTranslator.LM_FZP);
 
         // 2. Determine next node in sequence:
         //    Funkturm → Bürohaus (on roll 6) → Buy; or bonus turn on doubles+Freizeitpark
@@ -172,21 +169,150 @@ public final class ChanceNode extends MctsNode {
 
         if (hasFunkturm) {
             // Funkturm: player may keep or reroll — creates a FunkturmNode
-            nextNode = buildFunkturmOrBeyond(childState, supply, roll,
+            nextNode = buildFunkturmOrBeyond(childBS, supply, roll,
                     hasBürohaus, hasFreizeit, isDoubles);
         } else if (hasBürohaus && roll == 6) {
             // No Funkturm but has Bürohaus and rolled 6
-            nextNode = new BürohausNode(childState, supply, this, activePlayer,
-                    buildBuyOrBonusNode(childState, supply, hasFreizeit, isDoubles));
+            nextNode = new BürohausNode(childBS, supply, this, activePlayer,
+                    buildBuyOrBonusNode(childBS, supply, hasFreizeit, isDoubles));
         } else if (hasFreizeit && isDoubles && !isBonusTurn) {
             // Doubles bonus turn (no Funkturm, no Bürohaus)
-            nextNode = buildBonusTurnNode(childState, supply);
+            nextNode = buildBonusTurnNode(childBS, supply);
         } else {
-            nextNode = new BuyDecisionNode(childState, supply, this, activePlayer,
-                    nextPlayerAfter(childState));
+            nextNode = new BuyDecisionNode(childBS, supply, this, activePlayer,
+                    nextPlayerAfter());
         }
 
         children.add(nextNode);
+    }
+
+    /**
+     * Applies income resolution to the BitState without the automatic Bürohaus swap.
+     *
+     * <p>This follows the same resolution order as {@link BitState#applyRoll}
+     * (Red → Blue → Green → Purple coins) but skips the Bürohaus swap because
+     * in the MCTS tree, Bürohaus is a decision node where the player chooses
+     * which cards to swap (rather than the greedy automatic swap used in rollouts).
+     */
+    private static void applyRollIncomeOnly(BitState bs, int activePlayer, int roll) {
+        int numPlayers = bs.getNumPlayers();
+        // We call applyRoll which does income + greedy swap. But we need income only.
+        // Since the tree handles Bürohaus via BürohausNode, we need to NOT auto-swap.
+        // Workaround: apply roll, then undo the swap if it happened.
+        // Better approach: replicate income logic without swap.
+        // For correctness, let's replicate the income logic here.
+
+        int[] deltas = new int[numPlayers];
+        boolean activeHasEKZ = bs.hasLandmark(activePlayer, BitStateTranslator.LM_EKZ);
+
+        // Step 1: Red card payments (counter-clockwise, sequential)
+        int rollerCoins = bs.getCoins(activePlayer);
+        for (int step = 1; step < numPlayers; step++) {
+            int oppIdx = (activePlayer - step + numPlayers) % numPlayers;
+            boolean oppHasEKZ = bs.hasLandmark(oppIdx, BitStateTranslator.LM_EKZ);
+            int oppRedIncome = computeRedIncome(bs, oppIdx, oppHasEKZ, roll, rollerCoins);
+            if (oppRedIncome > 0) {
+                deltas[activePlayer] -= oppRedIncome;
+                deltas[oppIdx] += oppRedIncome;
+                rollerCoins -= oppRedIncome;
+                if (rollerCoins < 0) rollerCoins = 0;
+            }
+        }
+
+        // Step 2: Blue card income for every player
+        for (int p = 0; p < numPlayers; p++) {
+            deltas[p] += computeBlueIncome(bs, p, roll);
+        }
+
+        // Step 3: Green income for active player only
+        deltas[activePlayer] += computeGreenIncome(bs, activePlayer, activeHasEKZ, roll);
+
+        // Step 4: Purple income for active player (stadion, fernsehsender — roll 6 only)
+        if (roll == 6) {
+            // Stadion
+            if (bs.hasPurple(activePlayer, 0)) {
+                int total = 0;
+                for (int p = 0; p < numPlayers; p++) {
+                    if (p == activePlayer) continue;
+                    total += Math.min(2, bs.getCoins(p));
+                }
+                deltas[activePlayer] += total;
+            }
+            // Fernsehsender
+            if (bs.hasPurple(activePlayer, 1)) {
+                int richest = 0;
+                for (int p = 0; p < numPlayers; p++) {
+                    if (p == activePlayer) continue;
+                    int oppCoins = bs.getCoins(p);
+                    if (oppCoins > richest) richest = oppCoins;
+                }
+                deltas[activePlayer] += Math.min(5, richest);
+            }
+        }
+
+        // Apply deltas with clamping
+        for (int p = 0; p < numPlayers; p++) {
+            bs.setCoins(p, Math.max(0, bs.getCoins(p) + deltas[p]));
+        }
+    }
+
+    private static int computeRedIncome(BitState bs, int oppIdx, boolean oppHasEKZ, int roll, int rollerCoins) {
+        int totalGain = 0;
+        // café (idx 5): activates on roll 3
+        if (roll == 3) {
+            int count = bs.getCardCount(oppIdx, 5);
+            if (count > 0) {
+                int perCopy = oppHasEKZ ? 2 : 1;
+                int demand = count * perCopy;
+                int actual = Math.min(demand, rollerCoins);
+                totalGain += actual;
+                rollerCoins -= actual;
+            }
+        }
+        // familienrestaurant (idx 10): activates on roll 9, 10
+        if (roll == 9 || roll == 10) {
+            int count = bs.getCardCount(oppIdx, 10);
+            if (count > 0) {
+                int perCopy = oppHasEKZ ? 3 : 2;
+                int demand = count * perCopy;
+                int actual = Math.min(demand, rollerCoins);
+                totalGain += actual;
+            }
+        }
+        return totalGain;
+    }
+
+    private static int computeBlueIncome(BitState bs, int player, int roll) {
+        int income = 0;
+        if (roll == 1) income += bs.getCardCount(player, 0);       // weizenfeld
+        if (roll == 2) income += bs.getCardCount(player, 2);       // bauernhof
+        if (roll == 5) income += bs.getCardCount(player, 3);       // wald
+        if (roll == 9) income += bs.getCardCount(player, 8) * 5;   // bergwerk
+        if (roll == 10) income += bs.getCardCount(player, 9) * 3;  // apfelplantage
+        return income;
+    }
+
+    private static int computeGreenIncome(BitState bs, int player, boolean hasEKZ, int roll) {
+        int income = 0;
+        if (roll == 2 || roll == 3) {
+            income += bs.getCardCount(player, 1) * (hasEKZ ? 2 : 1); // bäckerei
+        }
+        if (roll == 4) {
+            income += bs.getCardCount(player, 4) * (hasEKZ ? 4 : 3); // mini-markt
+        }
+        if (roll == 7) {
+            int count = bs.getCardCount(player, 6);                    // molkerei
+            if (count > 0) income += count * 3 * bs.animalCount(player);
+        }
+        if (roll == 8) {
+            int count = bs.getCardCount(player, 7);                    // möbelfabrik
+            if (count > 0) income += count * 3 * bs.productionCount(player);
+        }
+        if (roll == 11 || roll == 12) {
+            int count = bs.getCardCount(player, 11);                   // markthalle
+            if (count > 0) income += count * 2 * bs.foodCount(player);
+        }
+        return income;
     }
 
     /**
@@ -195,27 +321,27 @@ public final class ChanceNode extends MctsNode {
      * Inside the Funkturm "reroll" branch a new ChanceNode is inserted.
      */
     private MctsNode buildFunkturmOrBeyond(
-            GameState childState, SupplyTracker supply, int currentRoll,
+            BitState childBS, int[] supply, int currentRoll,
             boolean hasBürohaus, boolean hasFreizeit, boolean isDoubles) {
         // The "after Funkturm keep" node
         MctsNode afterFunkturm = buildBürohausOrBuyOrBonus(
-                childState, supply, currentRoll, hasBürohaus, hasFreizeit, isDoubles);
-        return new FunkturmNode(childState, supply, this, activePlayer, twoDice,
+                childBS, supply, currentRoll, hasBürohaus, hasFreizeit, isDoubles);
+        return new FunkturmNode(childBS, supply, this, activePlayer, twoDice,
                 currentRoll, afterFunkturm, isBonusTurn);
     }
 
     /** Builds the node that comes after Funkturm keep decision (Bürohaus or Buy or Bonus). */
     private MctsNode buildBürohausOrBuyOrBonus(
-            GameState childState, SupplyTracker supply, int roll,
+            BitState childBS, int[] supply, int roll,
             boolean hasBürohaus, boolean hasFreizeit, boolean isDoubles) {
         if (hasBürohaus && roll == 6) {
-            MctsNode afterSwap = buildBuyOrBonusNode(childState, supply, hasFreizeit, isDoubles);
-            return new BürohausNode(childState, supply, null /* parent set by FunkturmNode */, activePlayer, afterSwap);
+            MctsNode afterSwap = buildBuyOrBonusNode(childBS, supply, hasFreizeit, isDoubles);
+            return new BürohausNode(childBS, supply, null /* parent set by FunkturmNode */, activePlayer, afterSwap);
         } else if (hasFreizeit && isDoubles && !isBonusTurn) {
-            return buildBonusTurnNode(childState, supply);
+            return buildBonusTurnNode(childBS, supply);
         } else {
-            return new BuyDecisionNode(childState, supply, null /* parent set by FunkturmNode */, activePlayer,
-                    nextPlayerAfter(childState));
+            return new BuyDecisionNode(childBS, supply, null /* parent set by FunkturmNode */, activePlayer,
+                    nextPlayerAfter());
         }
     }
 
@@ -223,33 +349,32 @@ public final class ChanceNode extends MctsNode {
      * Builds the node after a Bürohaus swap decision: bonus turn or buy.
      */
     private MctsNode buildBuyOrBonusNode(
-            GameState childState, SupplyTracker supply,
+            BitState childBS, int[] supply,
             boolean hasFreizeit, boolean isDoubles) {
         if (hasFreizeit && isDoubles && !isBonusTurn) {
-            return buildBonusTurnNode(childState, supply);
+            return buildBonusTurnNode(childBS, supply);
         }
-        return new BuyDecisionNode(childState, supply, null /* parent assigned during expansion */,
-                activePlayer, nextPlayerAfter(childState));
+        return new BuyDecisionNode(childBS, supply, null /* parent assigned during expansion */,
+                activePlayer, nextPlayerAfter());
     }
 
     /**
      * Builds the Freizeitpark bonus turn node: DiceChoiceNode if the player owns Bahnhof,
      * otherwise ChanceNode(1d6). The bonus turn has {@code isBonusTurn=true}.
      */
-    private MctsNode buildBonusTurnNode(GameState childState, SupplyTracker supply) {
-        Player[] ps = childState.getPlayers();
-        if (ps[activePlayer].hasProject("bahnhof")) {
-            return new DiceChoiceNode(childState, supply, this, activePlayer, true);
+    private MctsNode buildBonusTurnNode(BitState childBS, int[] supply) {
+        if (childBS.hasLandmark(activePlayer, BitStateTranslator.LM_BAHNHOF)) {
+            return new DiceChoiceNode(childBS, supply, this, activePlayer, true);
         } else {
-            return new ChanceNode(childState, supply, this, activePlayer, false, true);
+            return new ChanceNode(childBS, supply, this, activePlayer, false, true);
         }
     }
 
     /**
      * Returns the player index who acts next after the current player completes their turn.
      */
-    private int nextPlayerAfter(GameState childState) {
-        return (activePlayer + 1) % childState.getPlayers().length;
+    private int nextPlayerAfter() {
+        return (activePlayer + 1) % state.getNumPlayers();
     }
 
     @Override

@@ -1,6 +1,6 @@
 package engine.mcts;
 
-import core.GameState;
+import core.BitState;
 
 import java.util.List;
 
@@ -29,18 +29,18 @@ public final class MctsGreedyRolloutEngine extends MctsV1Engine {
     }
 
     @Override
-    protected MctsTree buildTree(GameState state, SupplyTracker supply,
+    protected MctsTree buildTree(BitState bs, int[] supply,
                                  int activePlayer, int playerPerspective,
                                  double explorationConstant) {
-        return new MctsTree(state, supply, activePlayer, playerPerspective,
+        return new MctsTree(bs, supply, activePlayer, playerPerspective,
                 explorationConstant, BitGreedyRollout::simulate);
     }
 
     @Override
-    protected MctsTree buildFullTurnTree(GameState state, SupplyTracker supply,
+    protected MctsTree buildFullTurnTree(BitState bs, int[] supply,
                                           int activePlayer, int playerPerspective,
                                           double explorationConstant) {
-        return new MctsTree(state, supply, activePlayer, playerPerspective,
+        return new MctsTree(bs, supply, activePlayer, playerPerspective,
                 explorationConstant, BitGreedyRollout::simulate, false, true);
     }
 }

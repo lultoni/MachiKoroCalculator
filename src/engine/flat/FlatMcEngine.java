@@ -1,7 +1,8 @@
 package engine.flat;
 
-import calcs.Calcs;
 import calcs.RankEntry;
+import core.BitState;
+import core.BitStateTranslator;
 import core.GameState;
 import core.Player;
 import core.Project;
@@ -14,6 +15,7 @@ import engine.mcts.MctsRollout;
 import engine.mcts.SupplyTracker;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -44,8 +46,6 @@ import java.util.Map;
  */
 public final class FlatMcEngine implements SimulationEngine {
 
-    private static final String[] LANDMARK_IDS = {"bahnhof", "einkaufszentrum", "freizeitpark", "funkturm"};
-
     /** Top-K options to focus on after survey phase. */
     private static final int FOCUS_TOP_K = 5;
 
@@ -72,19 +72,18 @@ public final class FlatMcEngine implements SimulationEngine {
         long startTime = System.currentTimeMillis();
         int totalIterations = config.iterations > 0 ? config.iterations : 500;
 
-        Player active = state.getPlayers()[playerIndex];
-        int coins = active.getCoins();
-        int n = state.getPlayers().length;
+        BitState bs = BitState.fromGameState(state);
+        int coins = bs.getCoins(playerIndex);
+        int n = bs.getNumPlayers();
         int nextPlayer = (playerIndex + 1) % n;
-
-        SupplyTracker baseSupply = SupplyTracker.fromGameState(state);
+        int[] rootSupply = bs.buildSupplyArray();
 
         // ---- Enumerate purchase options ----
-        List<CandidateOption> candidates = enumerateOptions(state, baseSupply, playerIndex);
+        List<CandidateOption> candidates = enumerateOptions(bs, rootSupply, playerIndex, coins);
 
         if (candidates.isEmpty()) {
             // Should never happen — save is always present. Defensive fallback.
-            candidates.add(new CandidateOption(RankEntry.WAIT_SENTINEL, state, baseSupply, false));
+            candidates.add(new CandidateOption(RankEntry.WAIT_SENTINEL, bs, rootSupply, false));
         }
 
         // ---- Survey phase: 20% of budget, evenly distributed ----
@@ -113,59 +112,86 @@ public final class FlatMcEngine implements SimulationEngine {
 
         // ---- Build result ----
         long computeTimeMs = System.currentTimeMillis() - startTime;
-        return buildResult(state, playerIndex, candidates, coins, n, usedIterations, computeTimeMs);
+        return buildResult(candidates, coins, n, usedIterations, computeTimeMs);
     }
 
     // -------------------------------------------------------------------------
-    // Option enumeration
+    // Option enumeration (BitState-native)
     // -------------------------------------------------------------------------
 
-    private List<CandidateOption> enumerateOptions(GameState state, SupplyTracker supply, int playerIndex) {
-        Player active = state.getPlayers()[playerIndex];
-        int coins = active.getCoins();
+    private List<CandidateOption> enumerateOptions(BitState bs, int[] supply, int playerIndex, int coins) {
         List<CandidateOption> candidates = new ArrayList<>();
 
         // Save option
-        candidates.add(new CandidateOption(RankEntry.WAIT_SENTINEL, state, supply, false));
+        candidates.add(new CandidateOption(RankEntry.WAIT_SENTINEL, bs, supply, false));
 
-        // Non-landmark cards — include all valid cards (affordable or not)
-        for (Project p : state.getUnbuilt_projects()) {
-            if (!supply.canPurchase(p.getId())) continue;
-            if ("lila".equals(p.getColor()) && active.hasProject(p.getId())) continue;
-            boolean canAfford = coins >= p.getCost();
-            GameState childState = state.copy();
-            Player childActive = childState.getPlayers()[playerIndex];
-            if (canAfford) {
-                childActive.setCoins(childActive.getCoins() - p.getCost());
+        // Non-landmark cards via CANDIDATE_ITERATION_ORDER
+        for (int entry : BitStateTranslator.CANDIDATE_ITERATION_ORDER) {
+            if (entry < BitStateTranslator.NUM_NORMAL_CARDS) {
+                // Normal card
+                int ci = entry;
+                if (supply[ci] <= 0) continue;
+                int cost = BitStateTranslator.NORMAL_CARD_COSTS[ci];
+                boolean canAfford = coins >= cost;
+
+                BitState childBS = bs.copy();
+                if (canAfford) {
+                    childBS.setCoins(playerIndex, coins - cost);
+                }
+                childBS.addCard(playerIndex, ci);
+                int[] childSupply = Arrays.copyOf(supply, supply.length);
+                childSupply[ci]--;
+
+                CandidateOption opt = new CandidateOption(
+                        BitStateTranslator.NORMAL_CARD_PROJECTS[ci], childBS, childSupply, false);
+                opt.unaffordable = !canAfford;
+                candidates.add(opt);
+            } else {
+                // Purple card
+                int pi = entry - BitStateTranslator.NUM_NORMAL_CARDS;
+                if (bs.hasPurple(playerIndex, pi)) continue; // uniqueness
+                int cost = BitStateTranslator.PURPLE_CARD_COSTS[pi];
+                boolean canAfford = coins >= cost;
+
+                BitState childBS = bs.copy();
+                if (canAfford) {
+                    childBS.setCoins(playerIndex, coins - cost);
+                }
+                childBS.setPurple(playerIndex, pi);
+
+                CandidateOption opt = new CandidateOption(
+                        BitStateTranslator.PURPLE_CARD_PROJECTS[pi], childBS, supply, false);
+                opt.unaffordable = !canAfford;
+                candidates.add(opt);
             }
-            childActive.addProject(p);
-            SupplyTracker childSupply = supply.withPurchase(p.getId());
-            CandidateOption opt = new CandidateOption(p, childState, childSupply, false);
-            opt.unaffordable = !canAfford;
-            candidates.add(opt);
         }
 
-        // Landmarks — include all unowned landmarks (affordable or not)
-        for (String lmId : LANDMARK_IDS) {
-            if (active.hasProject(lmId)) continue;
-            Project lm = ProjectLoader.getProject(lmId).orElse(null);
-            if (lm == null) continue;
-            boolean canAfford = coins >= lm.getCost();
-            GameState childState = state.copy();
-            Player childActive = childState.getPlayers()[playerIndex];
+        // Landmarks
+        for (int li = 0; li < BitStateTranslator.NUM_LANDMARKS; li++) {
+            if (bs.hasLandmark(playerIndex, li)) continue;
+            int cost = BitStateTranslator.LANDMARK_COSTS[li];
+            boolean canAfford = coins >= cost;
+
+            BitState childBS = bs.copy();
             if (canAfford) {
-                childActive.setCoins(childActive.getCoins() - lm.getCost());
+                childBS.setCoins(playerIndex, coins - cost);
             }
-            childActive.addProject(lm);
+            childBS.setLandmark(playerIndex, li);
+
             // Check instant win (only relevant if affordable)
-            if (canAfford && GameState.hasWon(childActive)) {
-                CandidateOption winOpt = new CandidateOption(lm, childState, supply, true);
+            if (canAfford && childBS.hasWon(playerIndex)) {
+                CandidateOption winOpt = new CandidateOption(
+                        ProjectLoader.getProject(BitStateTranslator.LANDMARK_IDS[li]).orElse(null),
+                        childBS, supply, true);
                 winOpt.wins = 1;
                 winOpt.samples = 1;
                 candidates.add(winOpt);
                 continue;
             }
-            CandidateOption opt = new CandidateOption(lm, childState, supply, false);
+
+            CandidateOption opt = new CandidateOption(
+                    ProjectLoader.getProject(BitStateTranslator.LANDMARK_IDS[li]).orElse(null),
+                    childBS, supply, false);
             opt.unaffordable = !canAfford;
             candidates.add(opt);
         }
@@ -179,9 +205,11 @@ public final class FlatMcEngine implements SimulationEngine {
 
     private void runSamples(CandidateOption candidate, int numSamples, int nextPlayer, int perspective) {
         if (candidate.isInstantWin) return; // already scored 1.0
+        // Convert at rollout boundary
+        GameState gs = candidate.postState.toGameState();
+        SupplyTracker st = SupplyTracker.fromSupplyArray(candidate.postSupply);
         for (int i = 0; i < numSamples; i++) {
-            double result = MctsRollout.simulate(candidate.postState, candidate.postSupply,
-                    nextPlayer, perspective);
+            double result = MctsRollout.simulate(gs, st, nextPlayer, perspective);
             candidate.samples++;
             candidate.wins += result;
         }
@@ -191,8 +219,7 @@ public final class FlatMcEngine implements SimulationEngine {
     // Result construction
     // -------------------------------------------------------------------------
 
-    private EngineResult buildResult(GameState state, int playerIndex,
-                                     List<CandidateOption> candidates, int coins, int n,
+    private EngineResult buildResult(List<CandidateOption> candidates, int coins, int n,
                                      int iterationsUsed, long computeTimeMs) {
         List<EngineResult.Option> options = new ArrayList<>();
 
@@ -229,14 +256,14 @@ public final class FlatMcEngine implements SimulationEngine {
 
     private static final class CandidateOption {
         final Project card;
-        final GameState postState;
-        final SupplyTracker postSupply;
+        final BitState postState;
+        final int[] postSupply;
         final boolean isInstantWin;
         boolean unaffordable = false;
         int samples = 0;
         double wins = 0.0;
 
-        CandidateOption(Project card, GameState postState, SupplyTracker postSupply, boolean isInstantWin) {
+        CandidateOption(Project card, BitState postState, int[] postSupply, boolean isInstantWin) {
             this.card = card;
             this.postState = postState;
             this.postSupply = postSupply;

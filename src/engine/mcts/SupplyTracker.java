@@ -88,6 +88,27 @@ public final class SupplyTracker {
     // -------------------------------------------------------------------------
 
     /**
+     * Creates a SupplyTracker from a raw supply array (for rollout boundary conversion).
+     *
+     * <p>Used when the MCTS tree stores supply as {@code int[]} (indexed by normal card index)
+     * and needs to pass it to rollout functions that accept {@code SupplyTracker}.
+     *
+     * @param supply array of remaining supply counts per normal card (indexed 0-11)
+     * @return immutable SupplyTracker
+     */
+    public static SupplyTracker fromSupplyArray(int[] supply) {
+        Map<String, Integer> counts = new HashMap<>();
+        for (int i = 0; i < core.BitStateTranslator.NUM_NORMAL_CARDS; i++) {
+            counts.put(core.BitStateTranslator.NORMAL_CARD_IDS[i], supply[i]);
+        }
+        // Purple cards: always available (uniqueness-limited, not pool-limited)
+        for (String purpleId : core.BitStateTranslator.PURPLE_CARD_IDS) {
+            counts.put(purpleId, GameState.SUPPLY_PER_CARD);
+        }
+        return new SupplyTracker(counts);
+    }
+
+    /**
      * Returns the number of remaining market copies of the given card, or 0 if
      * the card is a landmark or unknown.
      */

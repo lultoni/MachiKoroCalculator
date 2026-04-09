@@ -2558,11 +2558,13 @@ public class RuntimeTester {
         engine.mcts.SupplyTracker supply = engine.mcts.SupplyTracker.fromGameState(gs);
 
         // Create a dummy afterBuyNode (BuyDecisionNode) for the BürohausNode to reparent
+        core.BitState bs = core.BitState.fromGameState(gs);
+        int[] supplyArr = bs.buildSupplyArray();
         engine.mcts.BuyDecisionNode afterBuy = new engine.mcts.BuyDecisionNode(
-                gs, supply, null, 0, 1);
+                bs, supplyArr, null, 0, 1);
 
         engine.mcts.BürohausNode node = new engine.mcts.BürohausNode(
-                gs, supply, null, 0, afterBuy);
+                bs, supplyArr, null, 0, afterBuy);
         node.expand();
 
         // Expected: 1 (no-swap) + 2 (own types: weizenfeld, bäckerei) × 2 (opp types: bauernhof, bergwerk) = 5
@@ -3608,14 +3610,20 @@ public class RuntimeTester {
         SupplyTracker supply = SupplyTracker.fromGameState(gs);
 
         // Create a BuyDecisionNode for player 0
+        core.BitState bs = core.BitState.fromGameState(gs);
+        int[] supplyArr = bs.buildSupplyArray();
         engine.mcts.BuyDecisionNode bdn = new engine.mcts.BuyDecisionNode(
-                gs, supply, null, 0, 1);
+                bs, supplyArr, null, 0, 1);
         bdn.expand();
 
         // None of the children should lead to a state where player 0 owns 2 stadion
         boolean foundDuplicateStadion = false;
         for (engine.mcts.MctsNode child : bdn.getChildren()) {
-            long stadionCount = child.state.getPlayers()[0].getOwned_projects().stream()
+            // Check via BitState: purple index 0 = stadion
+            // In this test, parent already has stadion, so no child should add it again.
+            // Since BitState uses 1-bit flags for purples, it can't go above 1.
+            // But we check via toGameState for a faithful test.
+            long stadionCount = child.toGameState().getPlayers()[0].getOwned_projects().stream()
                     .filter(p -> "stadion".equals(p.getId())).count();
             if (stadionCount > 1) foundDuplicateStadion = true;
         }
@@ -3625,12 +3633,14 @@ public class RuntimeTester {
         core.Project burohaus = core.ProjectLoader.getProject("bürohaus").orElseThrow();
         gs.getPlayers()[0].getOwned_projects().add(burohaus);
         supply = SupplyTracker.fromGameState(gs);
+        core.BitState bs2 = core.BitState.fromGameState(gs);
+        int[] supplyArr2 = bs2.buildSupplyArray();
         engine.mcts.BuyDecisionNode bdn2 = new engine.mcts.BuyDecisionNode(
-                gs, supply, null, 0, 1);
+                bs2, supplyArr2, null, 0, 1);
         bdn2.expand();
         boolean foundDuplicateBurohaus = false;
         for (engine.mcts.MctsNode child : bdn2.getChildren()) {
-            long bCount = child.state.getPlayers()[0].getOwned_projects().stream()
+            long bCount = child.toGameState().getPlayers()[0].getOwned_projects().stream()
                     .filter(p -> "bürohaus".equals(p.getId())).count();
             if (bCount > 1) foundDuplicateBurohaus = true;
         }

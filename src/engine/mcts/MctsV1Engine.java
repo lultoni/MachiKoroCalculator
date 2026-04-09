@@ -3,6 +3,8 @@ package engine.mcts;
 import calcs.Calcs;
 import calcs.RankEntry;
 import calcs.WinProbability;
+import core.BitState;
+import core.BitStateTranslator;
 import core.BürohausLogic;
 import core.GameState;
 import core.Player;
@@ -70,8 +72,9 @@ public class MctsV1Engine implements SimulationEngine {
                 config.getExtra("explorationConstant", "1.4142"));
         boolean profile = "true".equals(config.getExtra("profile", "false"));
 
-        SupplyTracker supply = SupplyTracker.fromGameState(state);
-        MctsTree tree = buildFullTurnTree(state, supply, playerIndex, playerIndex, explorationConstant);
+        BitState bs = BitState.fromGameState(state);
+        int[] supply = bs.buildSupplyArray();
+        MctsTree tree = buildFullTurnTree(bs, supply, playerIndex, playerIndex, explorationConstant);
         if (profile) tree.enableProfiling();
 
         // Run iterations or time budget
@@ -114,8 +117,9 @@ public class MctsV1Engine implements SimulationEngine {
         double explorationConstant = Double.parseDouble(
                 config.getExtra("explorationConstant", "1.4142"));
 
-        SupplyTracker supply = SupplyTracker.fromGameState(state);
-        MctsTree tree = buildFullTurnTree(state, supply, playerIndex, playerIndex, explorationConstant);
+        BitState bs = BitState.fromGameState(state);
+        int[] supply = bs.buildSupplyArray();
+        MctsTree tree = buildFullTurnTree(bs, supply, playerIndex, playerIndex, explorationConstant);
 
         int iterationsUsed;
         if (config.iterations > 0) {
@@ -148,10 +152,10 @@ public class MctsV1Engine implements SimulationEngine {
      * Builds a full-turn MctsTree rooted at DiceChoiceNode or ChanceNode.
      * Overridable by subclasses to inject custom rollout functions.
      */
-    protected MctsTree buildFullTurnTree(GameState state, SupplyTracker supply,
+    protected MctsTree buildFullTurnTree(BitState bs, int[] supply,
                                           int activePlayer, int playerPerspective,
                                           double explorationConstant) {
-        return new MctsTree(state, supply, activePlayer, playerPerspective,
+        return new MctsTree(bs, supply, activePlayer, playerPerspective,
                 explorationConstant, BitMctsRollout::simulate, false, true);
     }
 
@@ -219,10 +223,10 @@ public class MctsV1Engine implements SimulationEngine {
      * Creates the MCTS tree used in {@link #evaluate}. Subclasses override this to inject
      * a different {@link engine.mcts.RolloutFn} (e.g. greedy, Boltzmann).
      */
-    protected MctsTree buildTree(GameState state, SupplyTracker supply,
+    protected MctsTree buildTree(BitState bs, int[] supply,
                                  int activePlayer, int playerPerspective,
                                  double explorationConstant) {
-        return new MctsTree(state, supply, activePlayer, playerPerspective, explorationConstant);
+        return new MctsTree(bs, supply, activePlayer, playerPerspective, explorationConstant);
     }
 
     // -------------------------------------------------------------------------
@@ -248,8 +252,9 @@ public class MctsV1Engine implements SimulationEngine {
             tree.root.expand();
         }
 
+        BitState rootBS = tree.root.state;
         for (MctsNode child : tree.root.getChildren()) {
-            Project purchased = inferPurchasedCard(state, playerIndex, child.state, playerIndex);
+            Project purchased = inferPurchasedCard(rootBS, playerIndex, child.state, playerIndex);
             if (purchased == null) continue;
 
             double winRate = child.visitCount > 0
@@ -409,11 +414,10 @@ public class MctsV1Engine implements SimulationEngine {
         if (node == null || !node.expanded) return;
 
         if (node instanceof BuyDecisionNode buyNode) {
-            GameState buyState = buyNode.state;
-            int coins = buyState.getPlayers()[playerIndex].getCoins();
+            int coins = buyNode.state.getCoins(playerIndex);
 
             for (MctsNode child : buyNode.getChildren()) {
-                Project purchased = inferPurchasedCard(buyState, playerIndex,
+                Project purchased = inferPurchasedCard(buyNode.state, playerIndex,
                         child.state, playerIndex);
                 if (purchased == null) continue;
 
@@ -446,8 +450,9 @@ public class MctsV1Engine implements SimulationEngine {
             tree.root.expand();
         }
 
+        BitState rootBS = tree.root.state;
         for (MctsNode child : tree.root.getChildren()) {
-            Project purchased = inferPurchasedCard(state, playerIndex, child.state, playerIndex);
+            Project purchased = inferPurchasedCard(rootBS, playerIndex, child.state, playerIndex);
             if (purchased == null) continue;
 
             double winRate = child.visitCount > 0
@@ -475,35 +480,33 @@ public class MctsV1Engine implements SimulationEngine {
     }
 
     /**
-     * Infers which card the player at {@code playerIdx} purchased to go from
-     * {@code beforeState} to {@code afterState}.
+     * Infers which card the player at {@code playerIdx} purchased by comparing
+     * BitState card counts between before and after states.
      * Returns {@link RankEntry#WAIT_SENTINEL} if no card was added (save action).
      *
-     * <p>Handles duplicate purchases correctly (e.g. buying a second Weizenfeld)
-     * by counting occurrences rather than using {@code List.contains}.
+     * <p>O(19) integer comparisons (12 normal + 3 purple + 4 landmark), zero allocation.
+     * Correctly handles duplicate purchases (e.g. buying a second Weizenfeld).
      */
     private static Project inferPurchasedCard(
-            GameState beforeState, int playerIdx,
-            GameState afterState, int afterPlayerIdx) {
-        List<Project> before = beforeState.getPlayers()[playerIdx].getOwned_projects();
-        List<Project> after  = afterState.getPlayers()[afterPlayerIdx].getOwned_projects();
-
-        // Count occurrences of each card ID in before state
-        java.util.Map<String, Integer> beforeCounts = new java.util.HashMap<>();
-        for (Project p : before) {
-            beforeCounts.merge(p.getId(), 1, Integer::sum);
+            BitState beforeState, int playerIdx,
+            BitState afterState, int afterPlayerIdx) {
+        // Normal cards (0-11): check count increase
+        for (int ci = 0; ci < BitStateTranslator.NUM_NORMAL_CARDS; ci++) {
+            if (afterState.getCardCount(afterPlayerIdx, ci) > beforeState.getCardCount(playerIdx, ci)) {
+                return BitStateTranslator.NORMAL_CARD_PROJECTS[ci];
+            }
         }
-
-        // Find the card whose count increased
-        java.util.Map<String, Integer> afterCounts = new java.util.HashMap<>();
-        for (Project p : after) {
-            afterCounts.merge(p.getId(), 1, Integer::sum);
+        // Purple cards (0-2): check flag set
+        for (int pi = 0; pi < BitStateTranslator.NUM_PURPLE_CARDS; pi++) {
+            if (afterState.hasPurple(afterPlayerIdx, pi) && !beforeState.hasPurple(playerIdx, pi)) {
+                return BitStateTranslator.PURPLE_CARD_PROJECTS[pi];
+            }
         }
-
-        for (Project p : after) {
-            int bc = beforeCounts.getOrDefault(p.getId(), 0);
-            int ac = afterCounts.getOrDefault(p.getId(), 0);
-            if (ac > bc) return p;
+        // Landmarks (0-3): check flag set
+        for (int li = 0; li < BitStateTranslator.NUM_LANDMARKS; li++) {
+            if (afterState.hasLandmark(afterPlayerIdx, li) && !beforeState.hasLandmark(playerIdx, li)) {
+                return ProjectLoader.getProject(BitStateTranslator.LANDMARK_IDS[li]).orElse(null);
+            }
         }
         return RankEntry.WAIT_SENTINEL;
     }

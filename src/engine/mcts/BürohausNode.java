@@ -1,15 +1,9 @@
 package engine.mcts;
 
-import core.GameState;
-import core.Player;
-import core.Project;
+import core.BitState;
+import core.BitStateTranslator;
 
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.Arrays;
 
 /**
  * Decision node for the Bürohaus card-swap choice (triggers on roll 6).
@@ -31,6 +25,10 @@ import java.util.Set;
  * </ol>
  * Each child proceeds to a copy of {@link #afterBuyNode} re-parented to the child.
  *
+ * <h2>Deduplication</h2>
+ * Card-index iteration gives implicit deduplication — each normal card type (index 0-11)
+ * appears at most once, regardless of how many copies the player owns.
+ *
  * <h2>UCT</h2>
  * All children (no-swap + all swap pairs) are explored and exploited via UCT.
  */
@@ -47,13 +45,13 @@ public final class BürohausNode extends MctsNode {
     final MctsNode afterBuyNode;
 
     /**
-     * @param state        game state after roll income applied (where Bürohaus swap is offered)
-     * @param supply       supply tracker matching state
+     * @param state        bitwise game state after roll income applied (where Bürohaus swap is offered)
+     * @param supply       supply array matching state
      * @param parent       parent node (ChanceNode or FunkturmNode's keep branch proxy)
      * @param activePlayer index of the Bürohaus owner
      * @param afterBuyNode node to proceed to after the swap decision
      */
-    public BürohausNode(GameState state, SupplyTracker supply, MctsNode parent,
+    public BürohausNode(BitState state, int[] supply, MctsNode parent,
                         int activePlayer, MctsNode afterBuyNode) {
         super(state, supply, parent);
         this.activePlayer = activePlayer;
@@ -63,53 +61,38 @@ public final class BürohausNode extends MctsNode {
     /**
      * Enumerates all valid swap pairs and the no-swap option, creates one child per option.
      * No-ops if already expanded.
+     *
+     * <p>Uses card-index iteration (0-11 for normal cards). Purple cards and landmarks
+     * are excluded by design — this iterates only normal card indices. Deduplication
+     * is implicit: each card index represents one card type.
      */
     public void expand() {
         if (expanded) return;
 
-        Player[] players = state.getPlayers();
-        Player active = players[activePlayer];
-
-        // Collect unique eligible own card types: non-landmark, non-purple.
-        // Deduplicate by ID — multiple copies of the same card produce identical swap states.
-        Map<String, Project> ownById = new LinkedHashMap<>();
-        for (Project p : active.getOwned_projects()) {
-            if (!p.isIs_grossprojekt() && !"lila".equals(p.getColor())) {
-                ownById.putIfAbsent(p.getId(), p);
-            }
-        }
-
-        // Collect unique eligible opponent card types per opponent, deduplicated by ID.
-        // Each entry: (oppPlayerIndex, oppCardId) → representative Project
-        record OppCard(int oppIdx, String cardId) {}
-        Map<OppCard, Project> oppCards = new LinkedHashMap<>();
-        for (int oppIdx = 0; oppIdx < players.length; oppIdx++) {
-            if (oppIdx == activePlayer) continue;
-            Set<String> seen = new LinkedHashSet<>();
-            for (Project p : players[oppIdx].getOwned_projects()) {
-                if (!p.isIs_grossprojekt() && !"lila".equals(p.getColor())) {
-                    if (seen.add(p.getId())) {
-                        oppCards.put(new OppCard(oppIdx, p.getId()), p);
-                    }
-                }
-            }
-        }
+        int numPlayers = state.getNumPlayers();
 
         // Child 0: no-swap — attach a re-parented copy of afterBuyNode
         children.add(reparentAfterBuy(state, supply, this));
 
-        // Children 1..N: one per unique (ownCardType × oppCardType) pair
-        for (Map.Entry<OppCard, Project> oppEntry : oppCards.entrySet()) {
-            int oppPlayerIdx = oppEntry.getKey().oppIdx;
-            Project oppCard = oppEntry.getValue();
-            for (Project ownCard : ownById.values()) {
-                GameState swapped = state.copy();
-                swapped.getPlayers()[activePlayer].getOwned_projects().remove(ownCard);
-                swapped.getPlayers()[oppPlayerIdx].getOwned_projects().remove(oppCard);
-                swapped.getPlayers()[activePlayer].addProject(oppCard);
-                swapped.getPlayers()[oppPlayerIdx].addProject(ownCard);
+        // Enumerate own normal cards (non-purple, non-landmark by definition of normal cards)
+        for (int ownCI = 0; ownCI < BitStateTranslator.NUM_NORMAL_CARDS; ownCI++) {
+            if (state.getCardCount(activePlayer, ownCI) == 0) continue;
 
-                children.add(reparentAfterBuy(swapped, supply, this));
+            // Enumerate opponent normal cards
+            for (int oppIdx = 0; oppIdx < numPlayers; oppIdx++) {
+                if (oppIdx == activePlayer) continue;
+                for (int oppCI = 0; oppCI < BitStateTranslator.NUM_NORMAL_CARDS; oppCI++) {
+                    if (state.getCardCount(oppIdx, oppCI) == 0) continue;
+
+                    // Execute swap via BitState
+                    BitState swapped = state.copy();
+                    swapped.removeCard(activePlayer, ownCI);
+                    swapped.removeCard(oppIdx, oppCI);
+                    swapped.addCard(activePlayer, oppCI);
+                    swapped.addCard(oppIdx, ownCI);
+
+                    children.add(reparentAfterBuy(swapped, supply, this));
+                }
             }
         }
 
@@ -121,7 +104,7 @@ public final class BürohausNode extends MctsNode {
      * using {@code childState} as the state. The afterBuyNode template provides the node
      * type; each swap child needs its own instance so their statistics are tracked independently.
      */
-    private MctsNode reparentAfterBuy(GameState childState, SupplyTracker childSupply,
+    private MctsNode reparentAfterBuy(BitState childState, int[] childSupply,
                                        MctsNode newParent) {
         if (afterBuyNode instanceof BuyDecisionNode bd) {
             return new BuyDecisionNode(childState, childSupply, newParent,
@@ -134,7 +117,7 @@ public final class BürohausNode extends MctsNode {
                     cn.activePlayer, cn.twoDice, cn.isBonusTurn);
         }
         // Fallback: BuyDecisionNode for next player
-        int nextPlayer = (activePlayer + 1) % childState.getPlayers().length;
+        int nextPlayer = (activePlayer + 1) % childState.getNumPlayers();
         return new BuyDecisionNode(childState, childSupply, newParent, activePlayer, nextPlayer);
     }
 

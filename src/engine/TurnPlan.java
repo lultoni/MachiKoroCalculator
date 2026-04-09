@@ -1,8 +1,10 @@
 package engine;
 
 import calcs.RankEntry;
-import core.Player;
+import core.BitState;
+import core.BitStateTranslator;
 import core.Project;
+import core.ProjectLoader;
 import engine.mcts.*;
 
 import java.util.List;
@@ -295,55 +297,64 @@ public final class TurnPlan {
     }
 
     private void extractBürohausSwap(BürohausNode bn, MctsNode bestChild) {
-        Player parentActive = bn.state.getPlayers()[bn.activePlayer];
-        Player childActive = bestChild.state.getPlayers()[bn.activePlayer];
+        BitState parentBS = bn.state;
+        BitState childBS = bestChild.state;
+        int active = bn.activePlayer;
 
-        for (Project p : parentActive.getOwned_projects()) {
-            if (!childActive.getOwned_projects().contains(p)) {
-                bürohausOwnCard = p;
+        // Find own card that was removed (count decreased)
+        for (int ci = 0; ci < BitStateTranslator.NUM_NORMAL_CARDS; ci++) {
+            if (childBS.getCardCount(active, ci) < parentBS.getCardCount(active, ci)) {
+                bürohausOwnCard = BitStateTranslator.NORMAL_CARD_PROJECTS[ci];
                 break;
             }
         }
-        for (Project p : childActive.getOwned_projects()) {
-            if (!parentActive.getOwned_projects().contains(p)) {
-                bürohausOppCard = p;
+        // Find opponent card that was gained (count increased for active player)
+        for (int ci = 0; ci < BitStateTranslator.NUM_NORMAL_CARDS; ci++) {
+            if (childBS.getCardCount(active, ci) > parentBS.getCardCount(active, ci)) {
+                bürohausOppCard = BitStateTranslator.NORMAL_CARD_PROJECTS[ci];
                 break;
             }
         }
-        for (int i = 0; i < bn.state.getPlayers().length; i++) {
-            if (i == bn.activePlayer) continue;
-            List<Project> parentOpp = bn.state.getPlayers()[i].getOwned_projects();
-            List<Project> childOpp = bestChild.state.getPlayers()[i].getOwned_projects();
-            if (parentOpp.size() != childOpp.size()
-                    || !parentOpp.containsAll(childOpp)) {
-                bürohausOppPlayer = i;
-                break;
+        // Find which opponent lost a card
+        for (int i = 0; i < parentBS.getNumPlayers(); i++) {
+            if (i == active) continue;
+            for (int ci = 0; ci < BitStateTranslator.NUM_NORMAL_CARDS; ci++) {
+                if (childBS.getCardCount(i, ci) < parentBS.getCardCount(i, ci)) {
+                    bürohausOppPlayer = i;
+                    return;
+                }
             }
         }
     }
 
     /**
-     * Infers which card was purchased by comparing before/after owned project lists.
+     * Infers which card was purchased by comparing BitState card counts between
+     * the BuyDecisionNode and its best child.
      *
-     * <p><b>INVARIANT: Uses count-based comparison, not contains().</b> Project.equals is
-     * id-based, so contains() cannot detect a second copy of a card the player already owns
-     * (e.g., buying a second Bäckerei when the starter copy exists). The count-based approach
-     * detects any card whose count increased, matching the logic in {@link #inferCardId}.
+     * <p><b>INVARIANT: Uses BitState card-count comparison, not contains().</b>
+     * O(19) integer comparisons (12 normal + 3 purple + 4 landmark), zero allocation.
      */
     private Project inferPurchase(BuyDecisionNode buyNode, MctsNode bestChild) {
-        Player before = buyNode.state.getPlayers()[buyNode.activePlayer];
-        Player after = bestChild.state.getPlayers()[buyNode.activePlayer];
-        // Count-based comparison: detect which card id has a higher count in "after".
-        java.util.Map<String, Integer> counts = new java.util.HashMap<>();
-        for (Project p : before.getOwned_projects()) {
-            counts.merge(p.getId(), 1, Integer::sum);
+        BitState before = buyNode.state;
+        BitState after = bestChild.state;
+        int player = buyNode.activePlayer;
+
+        // Normal cards
+        for (int ci = 0; ci < BitStateTranslator.NUM_NORMAL_CARDS; ci++) {
+            if (after.getCardCount(player, ci) > before.getCardCount(player, ci)) {
+                return BitStateTranslator.NORMAL_CARD_PROJECTS[ci];
+            }
         }
-        String purchasedId = null;
-        for (Project p : after.getOwned_projects()) {
-            int remaining = counts.merge(p.getId(), -1, Integer::sum);
-            if (remaining < 0) {
-                purchasedId = p.getId();
-                return p; // This is the newly added Project instance from the child state
+        // Purple cards
+        for (int pi = 0; pi < BitStateTranslator.NUM_PURPLE_CARDS; pi++) {
+            if (after.hasPurple(player, pi) && !before.hasPurple(player, pi)) {
+                return BitStateTranslator.PURPLE_CARD_PROJECTS[pi];
+            }
+        }
+        // Landmarks
+        for (int li = 0; li < BitStateTranslator.NUM_LANDMARKS; li++) {
+            if (after.hasLandmark(player, li) && !before.hasLandmark(player, li)) {
+                return ProjectLoader.getProject(BitStateTranslator.LANDMARK_IDS[li]).orElse(null);
             }
         }
         return RankEntry.WAIT_SENTINEL;
@@ -408,18 +419,27 @@ public final class TurnPlan {
     }
 
     private String inferCardId(BuyDecisionNode buyNode, MctsNode child) {
-        Player before = buyNode.state.getPlayers()[buyNode.activePlayer];
-        Player after = child.state.getPlayers()[buyNode.activePlayer];
-        // Compare card counts to detect the purchased card (handles duplicates like Bäckerei).
-        java.util.Map<String, Integer> counts = new java.util.HashMap<>();
-        for (Project p : before.getOwned_projects()) {
-            counts.merge(p.getId(), 1, Integer::sum);
+        BitState before = buyNode.state;
+        BitState after = child.state;
+        int player = buyNode.activePlayer;
+
+        // Normal cards
+        for (int ci = 0; ci < BitStateTranslator.NUM_NORMAL_CARDS; ci++) {
+            if (after.getCardCount(player, ci) > before.getCardCount(player, ci)) {
+                return BitStateTranslator.NORMAL_CARD_IDS[ci];
+            }
         }
-        for (Project p : after.getOwned_projects()) {
-            counts.merge(p.getId(), -1, Integer::sum);
+        // Purple cards
+        for (int pi = 0; pi < BitStateTranslator.NUM_PURPLE_CARDS; pi++) {
+            if (after.hasPurple(player, pi) && !before.hasPurple(player, pi)) {
+                return BitStateTranslator.PURPLE_CARD_IDS[pi];
+            }
         }
-        for (var entry : counts.entrySet()) {
-            if (entry.getValue() < 0) return entry.getKey(); // count increased → this card was bought
+        // Landmarks
+        for (int li = 0; li < BitStateTranslator.NUM_LANDMARKS; li++) {
+            if (after.hasLandmark(player, li) && !before.hasLandmark(player, li)) {
+                return BitStateTranslator.LANDMARK_IDS[li];
+            }
         }
         return "_wait_";
     }

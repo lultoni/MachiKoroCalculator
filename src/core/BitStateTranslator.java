@@ -128,16 +128,84 @@ public final class BitStateTranslator {
     }
 
     // -------------------------------------------------------------------------
+    // Cost arrays (from ProjectLoader, for buy-phase computation)
+    // -------------------------------------------------------------------------
+
+    /** Cost of each normal card, indexed 0-11. */
+    public static final int[] NORMAL_CARD_COSTS = new int[NUM_NORMAL_CARDS];
+
+    /** Cost of each purple card, indexed 0-2. */
+    public static final int[] PURPLE_CARD_COSTS = new int[NUM_PURPLE_CARDS];
+
+    /** Cost of each landmark, indexed 0-3. */
+    public static final int[] LANDMARK_COSTS = new int[NUM_LANDMARKS];
+
+    /** Project references for EV computation. Loaded from ProjectLoader at class-init time. */
+    public static final Project[] NORMAL_CARD_PROJECTS = new Project[NUM_NORMAL_CARDS];
+    public static final Project[] PURPLE_CARD_PROJECTS = new Project[NUM_PURPLE_CARDS];
+
+    /** True if any dice_activation value >= 7 (needs 2d6 / Bahnhof to reach). */
+    public static final boolean[] IS_HIGH_RANGE = new boolean[NUM_NORMAL_CARDS];
+
+    /** Landmark indices in purchase-priority order (cheapest first). */
+    public static final int[] LANDMARK_BUY_ORDER = {LM_BAHNHOF, LM_EKZ, LM_FZP, LM_FT};
+
+    /**
+     * Unified candidate iteration order matching {@code ProjectLoader.getAllProjects()}.
+     * Each entry is an index into the normal (0-11) or purple (offset by NUM_NORMAL_CARDS) arrays.
+     * Purple entries have index >= NUM_NORMAL_CARDS.
+     * This order must match the object-based iteration for Boltzmann sampling equivalence.
+     */
+    public static final int[] CANDIDATE_ITERATION_ORDER;
+
+    // -------------------------------------------------------------------------
     // Reverse lookups: card ID → index
+    // (Declared before the main static block so they can be populated first)
     // -------------------------------------------------------------------------
 
     private static final Map<String, Integer> NORMAL_INDEX_MAP = new HashMap<>();
     private static final Map<String, Integer> PURPLE_INDEX_MAP = new HashMap<>();
     private static final Map<String, Integer> LANDMARK_INDEX_MAP = new HashMap<>();
+
     static {
+        // Initialize reverse lookup maps FIRST (needed by iteration order building below)
         for (int i = 0; i < NORMAL_CARD_IDS.length; i++) NORMAL_INDEX_MAP.put(NORMAL_CARD_IDS[i], i);
         for (int i = 0; i < PURPLE_CARD_IDS.length; i++) PURPLE_INDEX_MAP.put(PURPLE_CARD_IDS[i], i);
         for (int i = 0; i < LANDMARK_IDS.length; i++) LANDMARK_INDEX_MAP.put(LANDMARK_IDS[i], i);
+
+        // Populate cost, project, and high-range arrays from ProjectLoader
+        for (int i = 0; i < NUM_NORMAL_CARDS; i++) {
+            Project p = ProjectLoader.getProject(NORMAL_CARD_IDS[i]).orElseThrow();
+            NORMAL_CARD_COSTS[i] = p.getCost();
+            NORMAL_CARD_PROJECTS[i] = p;
+            for (int da : p.getDice_activation()) {
+                if (da >= 7) { IS_HIGH_RANGE[i] = true; break; }
+            }
+        }
+        for (int i = 0; i < NUM_PURPLE_CARDS; i++) {
+            Project p = ProjectLoader.getProject(PURPLE_CARD_IDS[i]).orElseThrow();
+            PURPLE_CARD_COSTS[i] = p.getCost();
+            PURPLE_CARD_PROJECTS[i] = p;
+        }
+        for (int i = 0; i < NUM_LANDMARKS; i++) {
+            LANDMARK_COSTS[i] = ProjectLoader.getProject(LANDMARK_IDS[i]).orElseThrow().getCost();
+        }
+
+        // Build iteration order from ProjectLoader's order (matches unbuilt_projects iteration)
+        java.util.ArrayList<Integer> order = new java.util.ArrayList<>();
+        for (Project p : ProjectLoader.getAllProjects()) {
+            if (p.isIs_grossprojekt()) continue; // skip landmarks
+            int nIdx = normalCardIndex(p.getId());
+            if (nIdx >= 0) {
+                order.add(nIdx);
+                continue;
+            }
+            int pIdx = purpleCardIndex(p.getId());
+            if (pIdx >= 0) {
+                order.add(NUM_NORMAL_CARDS + pIdx);
+            }
+        }
+        CANDIDATE_ITERATION_ORDER = order.stream().mapToInt(Integer::intValue).toArray();
     }
 
     /** Returns the normal card index (0-11) for the given card ID, or -1 if not a normal card. */

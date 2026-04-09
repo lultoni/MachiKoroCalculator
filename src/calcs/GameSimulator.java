@@ -48,18 +48,27 @@ public class GameSimulator {
     // Public API
     // -------------------------------------------------------------------------
 
-    /** Simulates a complete game with greedy policy (temperature=0). State is mutated. */
+    /** Simulates a complete game with greedy policy (temperature=0). State is NOT mutated. */
     public static int simulate(GameState state, Random rng) {
         return simulate(state, rng, 0.0);
     }
 
     /**
      * Simulates a complete game with the specified Boltzmann temperature.
-     * The supplied state is mutated — pass a copy if the original must be preserved.
+     * Uses BitState internally for performance. The supplied state is NOT mutated.
      *
      * @return index of the winning player, or -1 on timeout
      */
     public static int simulate(GameState state, Random rng, double temperature) {
+        BitState bs = BitState.fromGameState(state);
+        return simulateBitState(bs, state.getPlayers().length, rng, temperature);
+    }
+
+    /**
+     * Object-based simulation path, kept for GameStateSampler and equivalence testing.
+     * The supplied state IS mutated — pass a copy if the original must be preserved.
+     */
+    public static int simulateObject(GameState state, Random rng, double temperature) {
         int n = state.getPlayers().length;
         Map<String, Integer> supply = buildSupply(state);
 
@@ -91,11 +100,15 @@ public class GameSimulator {
 
     /**
      * Runs numSims Monte Carlo simulations with specified temperature and returns win rate.
+     * Converts to BitState once, then copies per simulation for performance.
      */
     public static double mcWinRate(GameState state, int playerIndex, int numSims, double temperature) {
+        BitState template = BitState.fromGameState(state);
+        int n = state.getPlayers().length;
+
         int[] outcomes = IntStream.range(0, numSims)
                 .parallel()
-                .map(i -> simulate(state.copy(), ThreadLocalRandom.current(), temperature))
+                .map(i -> simulateBitState(template.copy(), n, ThreadLocalRandom.current(), temperature))
                 .toArray();
 
         long wins = 0;
@@ -276,6 +289,15 @@ public class GameSimulator {
         return false;
     }
 
+    /**
+     * Builds the remaining market supply for all non-landmark cards.
+     *
+     * <p><b>Starter card invariant:</b> Weizenfeld and Bäckerei given at game start are
+     * separate from the 6-copy market pool. Subtracting all owned copies then adding back
+     * {@code numPlayers} starter copies ensures the market supply is correct.
+     *
+     * @see GameState#starterCopies(String, int)
+     */
     static Map<String, Integer> buildSupply(GameState state) {
         Map<String, Integer> supply = new HashMap<>();
         for (Project p : ProjectLoader.getAllProjects()) {
@@ -286,6 +308,229 @@ public class GameSimulator {
                 if (!p.isIs_grossprojekt()) supply.merge(p.getId(), -1, Integer::sum);
             }
         }
+        // Add back starter copies — each player's starter weizenfeld/bäckerei was given
+        // outside the market pool, so those copies must not reduce market supply.
+        int numPlayers = state.getPlayers().length;
+        for (Project p : ProjectLoader.getAllProjects()) {
+            int starters = GameState.starterCopies(p.getId(), numPlayers);
+            if (starters > 0) supply.merge(p.getId(), starters, Integer::sum);
+        }
         return supply;
+    }
+
+    // -------------------------------------------------------------------------
+    // BitState simulation (Phase 2 hot path)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Simulates a complete game using BitState for all state mutation.
+     * The supplied BitState is mutated.
+     *
+     * @return index of the winning player, or -1 on timeout
+     */
+    private static int simulateBitState(BitState bs, int numPlayers, Random rng, double temperature) {
+        int[] supply = bs.buildSupplyArray();
+        int totalTurns = 0;
+        int activePlayer = 0;
+
+        while (totalTurns < MAX_TURNS) {
+            int roll = rollDiceBit(bs, activePlayer, rng);
+            bs.applyRoll(activePlayer, roll);
+
+            int winner = (temperature <= 0.0)
+                    ? greedyBuyBit(bs, activePlayer, numPlayers, supply)
+                    : boltzmannBuyBit(bs, activePlayer, numPlayers, supply, rng, temperature);
+            if (winner >= 0) return winner;
+
+            activePlayer = (activePlayer + 1) % numPlayers;
+            totalTurns++;
+        }
+
+        return -1;
+    }
+
+    /**
+     * BitState dice roll: decides 1d6 vs 2d6 based on Bahnhof + high-range cards.
+     * If doubles and Freizeitpark, applies bonus turn income via {@code bs.applyRoll}.
+     *
+     * @return the main roll value (caller must apply income for this roll)
+     */
+    private static int rollDiceBit(BitState bs, int activePlayer, Random rng) {
+        boolean hasBahnhof = bs.hasLandmark(activePlayer, BitStateTranslator.LM_BAHNHOF);
+
+        if (!hasBahnhof || !bs.hasHighRangeCard(activePlayer)) {
+            return 1 + rng.nextInt(6);
+        }
+
+        int d1 = 1 + rng.nextInt(6);
+        int d2 = 1 + rng.nextInt(6);
+        int roll2 = d1 + d2;
+
+        if (d1 == d2 && bs.hasLandmark(activePlayer, BitStateTranslator.LM_FZP)) {
+            int bonus = 1 + rng.nextInt(6) + 1 + rng.nextInt(6);
+            bs.applyRoll(activePlayer, bonus);
+        }
+
+        return roll2;
+    }
+
+    /**
+     * BitState greedy buy: landmarks first (cheapest), then best-ROI establishment.
+     *
+     * @return winning player index, or -1 if no one won
+     */
+    private static int greedyBuyBit(BitState bs, int activePlayer, int numPlayers, int[] supply) {
+        int coins = bs.getCoins(activePlayer);
+
+        // Landmark-first: iterate in buy order, find first unowned
+        for (int li : BitStateTranslator.LANDMARK_BUY_ORDER) {
+            if (!bs.hasLandmark(activePlayer, li)) {
+                // Skip Bahnhof if no high-range card
+                if (li == BitStateTranslator.LM_BAHNHOF && !bs.hasHighRangeCard(activePlayer)) break;
+                if (coins >= BitStateTranslator.LANDMARK_COSTS[li]) {
+                    bs.setCoins(activePlayer, coins - BitStateTranslator.LANDMARK_COSTS[li]);
+                    bs.setLandmark(activePlayer, li);
+                    if (bs.hasWon(activePlayer)) return activePlayer;
+                    coins = bs.getCoins(activePlayer);
+                }
+                break; // only consider first unowned landmark
+            }
+        }
+
+        // Establishment buy: best ROI, iterating in ProjectLoader order for consistency
+        CardIncome.PlayerStats stats = bs.buildPlayerStats(activePlayer);
+        int[] oppCoins = bs.buildOpponentCoins(activePlayer);
+        coins = bs.getCoins(activePlayer);
+
+        int bestCandIdx = -1;
+        double bestROI = -Double.MAX_VALUE;
+
+        for (int ci : BitStateTranslator.CANDIDATE_ITERATION_ORDER) {
+            boolean isPurple = ci >= BitStateTranslator.NUM_NORMAL_CARDS;
+            int idx = isPurple ? ci - BitStateTranslator.NUM_NORMAL_CARDS : ci;
+
+            if (isPurple) {
+                if (bs.hasPurple(activePlayer, idx)) continue;
+                if (coins < BitStateTranslator.PURPLE_CARD_COSTS[idx]) continue;
+                double ev = CardIncome.contextualCardEvPerRound(
+                        BitStateTranslator.PURPLE_CARD_PROJECTS[idx], stats, numPlayers, oppCoins);
+                double roi = ev * ROI_GEOMETRIC_SUM - BitStateTranslator.PURPLE_CARD_COSTS[idx];
+                if (roi > bestROI) { bestROI = roi; bestCandIdx = ci; }
+            } else {
+                if (supply[idx] <= 0) continue;
+                if (coins < BitStateTranslator.NORMAL_CARD_COSTS[idx]) continue;
+                double ev = CardIncome.contextualCardEvPerRound(
+                        BitStateTranslator.NORMAL_CARD_PROJECTS[idx], stats, numPlayers, oppCoins);
+                double roi = ev * ROI_GEOMETRIC_SUM - BitStateTranslator.NORMAL_CARD_COSTS[idx];
+                if (roi > bestROI) { bestROI = roi; bestCandIdx = ci; }
+            }
+        }
+
+        if (bestCandIdx >= 0) {
+            boolean isPurple = bestCandIdx >= BitStateTranslator.NUM_NORMAL_CARDS;
+            int idx = isPurple ? bestCandIdx - BitStateTranslator.NUM_NORMAL_CARDS : bestCandIdx;
+            if (isPurple) {
+                bs.setCoins(activePlayer, coins - BitStateTranslator.PURPLE_CARD_COSTS[idx]);
+                bs.setPurple(activePlayer, idx);
+            } else {
+                bs.setCoins(activePlayer, coins - BitStateTranslator.NORMAL_CARD_COSTS[idx]);
+                bs.addCard(activePlayer, idx);
+                supply[idx]--;
+            }
+        }
+
+        return -1;
+    }
+
+    /**
+     * BitState Boltzmann buy: landmarks first (greedy), then softmax-sampled establishment.
+     * Iterates candidates in ProjectLoader order for equivalence with object-based path.
+     *
+     * @return -1 (no winner from establishment purchase)
+     */
+    private static int boltzmannBuyBit(BitState bs, int activePlayer, int numPlayers,
+                                        int[] supply, Random rng, double temperature) {
+        int coins = bs.getCoins(activePlayer);
+
+        // Landmark-first (same greedy logic)
+        for (int li : BitStateTranslator.LANDMARK_BUY_ORDER) {
+            if (!bs.hasLandmark(activePlayer, li)) {
+                if (li == BitStateTranslator.LM_BAHNHOF && !bs.hasHighRangeCard(activePlayer)) break;
+                if (coins >= BitStateTranslator.LANDMARK_COSTS[li]) {
+                    bs.setCoins(activePlayer, coins - BitStateTranslator.LANDMARK_COSTS[li]);
+                    bs.setLandmark(activePlayer, li);
+                    if (bs.hasWon(activePlayer)) return activePlayer;
+                    coins = bs.getCoins(activePlayer);
+                }
+                break;
+            }
+        }
+
+        // Collect candidates with ROI scores, iterating in ProjectLoader order
+        CardIncome.PlayerStats stats = bs.buildPlayerStats(activePlayer);
+        int[] oppCoins = bs.buildOpponentCoins(activePlayer);
+        coins = bs.getCoins(activePlayer);
+
+        // Max 15 candidates (12 normal + 3 purple)
+        int[] candidateIdx = new int[15];
+        double[] scores = new double[15];
+        int count = 0;
+
+        for (int ci : BitStateTranslator.CANDIDATE_ITERATION_ORDER) {
+            boolean isPurple = ci >= BitStateTranslator.NUM_NORMAL_CARDS;
+            int idx = isPurple ? ci - BitStateTranslator.NUM_NORMAL_CARDS : ci;
+
+            if (isPurple) {
+                if (bs.hasPurple(activePlayer, idx)) continue;
+                if (coins < BitStateTranslator.PURPLE_CARD_COSTS[idx]) continue;
+                double ev = CardIncome.contextualCardEvPerRound(
+                        BitStateTranslator.PURPLE_CARD_PROJECTS[idx], stats, numPlayers, oppCoins);
+                candidateIdx[count] = ci;
+                scores[count] = ev * ROI_GEOMETRIC_SUM - BitStateTranslator.PURPLE_CARD_COSTS[idx];
+                count++;
+            } else {
+                if (supply[idx] <= 0) continue;
+                if (coins < BitStateTranslator.NORMAL_CARD_COSTS[idx]) continue;
+                double ev = CardIncome.contextualCardEvPerRound(
+                        BitStateTranslator.NORMAL_CARD_PROJECTS[idx], stats, numPlayers, oppCoins);
+                candidateIdx[count] = ci;
+                scores[count] = ev * ROI_GEOMETRIC_SUM - BitStateTranslator.NORMAL_CARD_COSTS[idx];
+                count++;
+            }
+        }
+
+        if (count == 0) return -1;
+
+        // Softmax sampling
+        double maxScore = scores[0];
+        for (int i = 1; i < count; i++) if (scores[i] > maxScore) maxScore = scores[i];
+
+        double[] weights = new double[count];
+        double total = 0.0;
+        for (int i = 0; i < count; i++) {
+            weights[i] = Math.exp((scores[i] - maxScore) / temperature);
+            total += weights[i];
+        }
+
+        double r = rng.nextDouble() * total;
+        int chosen = count - 1;
+        for (int i = 0; i < count; i++) {
+            r -= weights[i];
+            if (r <= 0) { chosen = i; break; }
+        }
+
+        int ci = candidateIdx[chosen];
+        boolean isPurple = ci >= BitStateTranslator.NUM_NORMAL_CARDS;
+        int idx = isPurple ? ci - BitStateTranslator.NUM_NORMAL_CARDS : ci;
+        if (isPurple) {
+            bs.setCoins(activePlayer, coins - BitStateTranslator.PURPLE_CARD_COSTS[idx]);
+            bs.setPurple(activePlayer, idx);
+        } else {
+            bs.setCoins(activePlayer, coins - BitStateTranslator.NORMAL_CARD_COSTS[idx]);
+            bs.addCard(activePlayer, idx);
+            supply[idx]--;
+        }
+
+        return -1;
     }
 }

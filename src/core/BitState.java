@@ -460,6 +460,74 @@ public final class BitState {
     }
 
     // -------------------------------------------------------------------------
+    // Simulation helpers (Phase 2)
+    // -------------------------------------------------------------------------
+
+    /** Returns true if the player owns any card that activates on roll >= 7. */
+    public boolean hasHighRangeCard(int player) {
+        for (int i = 0; i < BitStateTranslator.NUM_NORMAL_CARDS; i++) {
+            if (BitStateTranslator.IS_HIGH_RANGE[i] && getCardCount(player, i) > 0) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Returns the landmark index (0-3) of an affordable landmark whose purchase
+     * would make the player win, or -1 if no instant-win purchase exists.
+     *
+     * <p>Fast-path: returns -1 immediately if the player has fewer than 3 landmarks.
+     */
+    public int findInstantWinLandmark(int player) {
+        if (getLandmarkCount(player) != 3) return -1;
+        int coins = getCoins(player);
+        for (int li = 0; li < BitStateTranslator.NUM_LANDMARKS; li++) {
+            if (!hasLandmark(player, li) && coins >= BitStateTranslator.LANDMARK_COSTS[li]) {
+                return li;
+            }
+        }
+        return -1;
+    }
+
+    /** Builds a {@link CardIncome.PlayerStats} from bitwise landmark flags and category counts. */
+    public CardIncome.PlayerStats buildPlayerStats(int player) {
+        CardIncome.PlayerStats s = new CardIncome.PlayerStats();
+        s.hasBahnhof         = hasLandmark(player, BitStateTranslator.LM_BAHNHOF);
+        s.hasEinkaufszentrum = hasLandmark(player, BitStateTranslator.LM_EKZ);
+        s.hasFreizeitpark    = hasLandmark(player, BitStateTranslator.LM_FZP);
+        s.hasFunkturm        = hasLandmark(player, BitStateTranslator.LM_FT);
+        s.foodCount          = foodCount(player);
+        s.animalCount        = animalCount(player);
+        s.productionCount    = productionCount(player);
+        return s;
+    }
+
+    /** Returns an array of coins for all players except the excluded one. */
+    public int[] buildOpponentCoins(int excludePlayer) {
+        int[] result = new int[numPlayers - 1];
+        int idx = 0;
+        for (int p = 0; p < numPlayers; p++) {
+            if (p == excludePlayer) continue;
+            result[idx++] = getCoins(p);
+        }
+        return result;
+    }
+
+    /**
+     * Builds a supply array of length 12: normal card supply remaining.
+     *
+     * <p>Uses {@link #supplyRemaining(int)} which correctly handles starter cards.
+     * Purple cards are not supply-tracked — they are uniqueness-limited (1 per player),
+     * not pool-limited.
+     */
+    public int[] buildSupplyArray() {
+        int[] supply = new int[BitStateTranslator.NUM_NORMAL_CARDS];
+        for (int i = 0; i < BitStateTranslator.NUM_NORMAL_CARDS; i++) {
+            supply[i] = supplyRemaining(i);
+        }
+        return supply;
+    }
+
+    // -------------------------------------------------------------------------
     // Utility
     // -------------------------------------------------------------------------
 

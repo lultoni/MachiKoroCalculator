@@ -466,7 +466,21 @@ public class RuntimeTester {
             test_bitstate_burohaus_no_swap_when_not_beneficial();
             test_bitstate_burohaus_purple_excluded();
             test_bitstate_has_won();
+            test_bitstate_translator_costs();
+            test_bitstate_translator_high_range();
+            test_bitstate_has_high_range_card();
+            test_bitstate_find_instant_win_landmark();
+            test_bitstate_build_player_stats();
+            test_bitstate_build_supply_array();
             test_bitstate_equivalence_full_games();
+        });
+
+        runSection("BitState Simulation", () -> {
+            test_bitstate_sim_valid_winner();
+            test_bitstate_sim_deterministic();
+            test_bitstate_sim_equivalence_greedy();
+            test_bitstate_sim_equivalence_boltzmann();
+            test_bitstate_mc_win_rates_reasonable();
         });
 
         System.out.println("\n--- Results: " + passed + " passed, " + failed + " failed ---");
@@ -5141,5 +5155,202 @@ public class RuntimeTester {
         assertEq("Full-game equivalence: 0 income mismatches", 0, mismatchCount[0]);
         assertEq("Full-game equivalence: 0 round-trip errors", 0, rtErrorCount[0]);
         assertTrue("Full-game equivalence: checked substantial turns", turnsChecked[0] > 1000);
+    }
+
+    // =========================================================================
+    // BitState Phase 2 helper tests
+    // =========================================================================
+
+    private static void test_bitstate_translator_costs() {
+        // Verify costs match ProjectLoader
+        for (int i = 0; i < BitStateTranslator.NUM_NORMAL_CARDS; i++) {
+            Project p = ProjectLoader.getProject(BitStateTranslator.NORMAL_CARD_IDS[i]).orElseThrow();
+            assertEq("NORMAL_CARD_COSTS[" + i + "]=" + BitStateTranslator.NORMAL_CARD_IDS[i],
+                    p.getCost(), BitStateTranslator.NORMAL_CARD_COSTS[i]);
+            assertTrue("NORMAL_CARD_PROJECTS[" + i + "] non-null",
+                    BitStateTranslator.NORMAL_CARD_PROJECTS[i] != null);
+            assertEq("NORMAL_CARD_PROJECTS[" + i + "] id match",
+                    BitStateTranslator.NORMAL_CARD_IDS[i],
+                    BitStateTranslator.NORMAL_CARD_PROJECTS[i].getId());
+        }
+        for (int i = 0; i < BitStateTranslator.NUM_PURPLE_CARDS; i++) {
+            Project p = ProjectLoader.getProject(BitStateTranslator.PURPLE_CARD_IDS[i]).orElseThrow();
+            assertEq("PURPLE_CARD_COSTS[" + i + "]", p.getCost(), BitStateTranslator.PURPLE_CARD_COSTS[i]);
+            assertEq("PURPLE_CARD_PROJECTS[" + i + "] id match",
+                    BitStateTranslator.PURPLE_CARD_IDS[i],
+                    BitStateTranslator.PURPLE_CARD_PROJECTS[i].getId());
+        }
+        for (int i = 0; i < BitStateTranslator.NUM_LANDMARKS; i++) {
+            Project p = ProjectLoader.getProject(BitStateTranslator.LANDMARK_IDS[i]).orElseThrow();
+            assertEq("LANDMARK_COSTS[" + i + "]", p.getCost(), BitStateTranslator.LANDMARK_COSTS[i]);
+        }
+        // Spot-check known costs
+        assertEq("weizenfeld cost=1", 1, BitStateTranslator.NORMAL_CARD_COSTS[0]);
+        assertEq("bergwerk cost=6", 6, BitStateTranslator.NORMAL_CARD_COSTS[8]);
+        assertEq("stadion cost=6", 6, BitStateTranslator.PURPLE_CARD_COSTS[0]);
+        assertEq("bahnhof cost=4", 4, BitStateTranslator.LANDMARK_COSTS[0]);
+        assertEq("funkturm cost=22", 22, BitStateTranslator.LANDMARK_COSTS[3]);
+    }
+
+    private static void test_bitstate_translator_high_range() {
+        // Cards 0-5 (rolls 1-5) should be low-range, cards 6-11 (rolls 7+) should be high-range
+        for (int i = 0; i < 6; i++) {
+            assertTrue("IS_HIGH_RANGE[" + i + "]=false for " + BitStateTranslator.NORMAL_CARD_IDS[i],
+                    !BitStateTranslator.IS_HIGH_RANGE[i]);
+        }
+        for (int i = 6; i < BitStateTranslator.NUM_NORMAL_CARDS; i++) {
+            assertTrue("IS_HIGH_RANGE[" + i + "]=true for " + BitStateTranslator.NORMAL_CARD_IDS[i],
+                    BitStateTranslator.IS_HIGH_RANGE[i]);
+        }
+    }
+
+    private static void test_bitstate_has_high_range_card() {
+        BitState bs = new BitState(2);
+        bs.setCoins(0, 10);
+        assertTrue("No cards: hasHighRangeCard=false", !bs.hasHighRangeCard(0));
+
+        // Add weizenfeld (low-range)
+        bs.addCard(0, 0);
+        assertTrue("Only weizenfeld: hasHighRangeCard=false", !bs.hasHighRangeCard(0));
+
+        // Add bergwerk (high-range, idx 8)
+        bs.addCard(0, 8);
+        assertTrue("With bergwerk: hasHighRangeCard=true", bs.hasHighRangeCard(0));
+    }
+
+    private static void test_bitstate_find_instant_win_landmark() {
+        BitState bs = new BitState(2);
+        bs.setCoins(0, 30);
+
+        // 0 landmarks -> -1
+        assertEq("0 landmarks: no instant win", -1, bs.findInstantWinLandmark(0));
+
+        // 2 landmarks -> -1
+        bs.setLandmark(0, BitStateTranslator.LM_BAHNHOF);
+        bs.setLandmark(0, BitStateTranslator.LM_EKZ);
+        assertEq("2 landmarks: no instant win", -1, bs.findInstantWinLandmark(0));
+
+        // 3 landmarks, 30 coins -> should find funkturm (cost 22)
+        bs.setLandmark(0, BitStateTranslator.LM_FZP);
+        int winIdx = bs.findInstantWinLandmark(0);
+        assertEq("3 landmarks + 30 coins: finds funkturm", BitStateTranslator.LM_FT, winIdx);
+
+        // 3 landmarks, not enough coins for funkturm
+        bs.setCoins(0, 5);
+        assertEq("3 landmarks + 5 coins: can't afford funkturm", -1, bs.findInstantWinLandmark(0));
+
+        // 3 landmarks missing bahnhof, enough for bahnhof (4)
+        BitState bs2 = new BitState(2);
+        bs2.setCoins(0, 5);
+        bs2.setLandmark(0, BitStateTranslator.LM_EKZ);
+        bs2.setLandmark(0, BitStateTranslator.LM_FZP);
+        bs2.setLandmark(0, BitStateTranslator.LM_FT);
+        assertEq("Missing bahnhof, 5 coins: finds bahnhof", BitStateTranslator.LM_BAHNHOF, bs2.findInstantWinLandmark(0));
+    }
+
+    private static void test_bitstate_build_player_stats() {
+        // Build equivalent GameState and BitState, compare PlayerStats
+        GameState gs = GameState.initial(2);
+        Player player = gs.getPlayers()[0];
+        // Add some cards to player
+        player.addProject(ProjectLoader.getProject("bergwerk").orElseThrow());
+        player.addProject(ProjectLoader.getProject("molkerei").orElseThrow());
+        player.addProject(ProjectLoader.getProject("einkaufszentrum").orElseThrow());
+        player.addProject(ProjectLoader.getProject("bahnhof").orElseThrow());
+
+        CardIncome.PlayerStats objStats = CardIncome.PlayerStats.of(player);
+
+        BitState bs = BitState.fromGameState(gs);
+        CardIncome.PlayerStats bitStats = bs.buildPlayerStats(0);
+
+        assertEq("buildPlayerStats: hasBahnhof", objStats.hasBahnhof, bitStats.hasBahnhof);
+        assertEq("buildPlayerStats: hasEinkaufszentrum", objStats.hasEinkaufszentrum, bitStats.hasEinkaufszentrum);
+        assertEq("buildPlayerStats: hasFreizeitpark", objStats.hasFreizeitpark, bitStats.hasFreizeitpark);
+        assertEq("buildPlayerStats: hasFunkturm", objStats.hasFunkturm, bitStats.hasFunkturm);
+        assertEq("buildPlayerStats: foodCount", objStats.foodCount, bitStats.foodCount);
+        assertEq("buildPlayerStats: animalCount", objStats.animalCount, bitStats.animalCount);
+        assertEq("buildPlayerStats: productionCount", objStats.productionCount, bitStats.productionCount);
+    }
+
+    private static void test_bitstate_build_supply_array() {
+        // Initial state: all supply should be 6 (starters correctly handled)
+        GameState gs = GameState.initial(2);
+        BitState bs = BitState.fromGameState(gs);
+        int[] supply = bs.buildSupplyArray();
+        assertEq("buildSupplyArray length", 12, supply.length);
+        for (int i = 0; i < 12; i++) {
+            assertEq("Initial supply[" + i + "]=" + BitStateTranslator.NORMAL_CARD_IDS[i],
+                    GameState.SUPPLY_PER_CARD, supply[i]);
+        }
+
+        // After buying 2 bergwerk across players, supply should decrease
+        bs.addCard(0, 8); // bergwerk for player 0
+        bs.addCard(1, 8); // bergwerk for player 1
+        bs.setCoins(0, 0); bs.setCoins(1, 0); // don't care about coins
+        int[] supply2 = bs.buildSupplyArray();
+        assertEq("After 2 bergwerk: supply=4", 4, supply2[8]);
+        // Starter cards should still be 6 (buying more doesn't affect starter calculation)
+        assertEq("Starters still at 6", 6, supply2[0]); // weizenfeld
+    }
+
+    // =========================================================================
+    // BitState Simulation tests
+    // =========================================================================
+
+    private static void test_bitstate_sim_valid_winner() {
+        java.util.Random rng = new java.util.Random(42);
+        for (int i = 0; i < 10; i++) {
+            GameState gs = GameState.initial(2);
+            int winner = GameSimulator.simulate(gs.copy(), new java.util.Random(rng.nextLong()));
+            assertTrue("Valid winner index (got " + winner + ")", winner == 0 || winner == 1 || winner == -1);
+        }
+    }
+
+    private static void test_bitstate_sim_deterministic() {
+        long seed = 12345L;
+        int w1 = GameSimulator.simulate(GameState.initial(2).copy(), new java.util.Random(seed));
+        int w2 = GameSimulator.simulate(GameState.initial(2).copy(), new java.util.Random(seed));
+        assertEq("Same seed -> same winner", w1, w2);
+    }
+
+    private static void test_bitstate_sim_equivalence_greedy() {
+        int NUM_GAMES = 1000;
+        int mismatches = 0;
+        for (int i = 0; i < NUM_GAMES; i++) {
+            long seed = 1000 + i;
+            int bitWinner = GameSimulator.simulate(
+                    GameState.initial(2).copy(), new java.util.Random(seed), 0.0);
+            int objWinner = GameSimulator.simulateObject(
+                    GameState.initial(2).copy(), new java.util.Random(seed), 0.0);
+            if (bitWinner != objWinner) mismatches++;
+        }
+        System.out.println("  Greedy equivalence: " + mismatches + "/" + NUM_GAMES + " mismatches");
+        assertEq("BitState greedy sim equivalence: 0 mismatches", 0, mismatches);
+    }
+
+    private static void test_bitstate_sim_equivalence_boltzmann() {
+        int NUM_GAMES = 500;
+        int mismatches = 0;
+        double temperature = 0.7;
+        for (int i = 0; i < NUM_GAMES; i++) {
+            long seed = 5000 + i;
+            int bitWinner = GameSimulator.simulate(
+                    GameState.initial(2).copy(), new java.util.Random(seed), temperature);
+            int objWinner = GameSimulator.simulateObject(
+                    GameState.initial(2).copy(), new java.util.Random(seed), temperature);
+            if (bitWinner != objWinner) mismatches++;
+        }
+        System.out.println("  Boltzmann equivalence: " + mismatches + "/" + NUM_GAMES + " mismatches");
+        assertEq("BitState Boltzmann sim equivalence: 0 mismatches", 0, mismatches);
+    }
+
+    private static void test_bitstate_mc_win_rates_reasonable() {
+        GameState gs = GameState.initial(2);
+        double wr0 = GameSimulator.mcWinRate(gs, 0, 200);
+        double wr1 = GameSimulator.mcWinRate(gs, 1, 200);
+        System.out.println("  MC win rates: P0=" + String.format("%.3f", wr0) + " P1=" + String.format("%.3f", wr1));
+        assertTrue("P0 win rate > 0.1 (got " + wr0 + ")", wr0 > 0.1);
+        assertTrue("P1 win rate > 0.1 (got " + wr1 + ")", wr1 > 0.1);
+        assertTrue("P0+P1 win rates sum ~1.0 (got " + (wr0 + wr1) + ")", wr0 + wr1 > 0.8 && wr0 + wr1 < 1.15);
     }
 }

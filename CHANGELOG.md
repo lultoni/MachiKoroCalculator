@@ -6,6 +6,22 @@ Implementation history: what was built, why, and which design decisions were mad
 
 ## Phase 7: Iteration
 
+### Bitwise Game Core — Phase 2: GameSimulator Hot Path Migration (TODO #20)
+
+**GameSimulator now uses BitState internally** for `simulate()` and `mcWinRate()`. Conversion to BitState happens at public API entry; all state mutation during simulation uses bitwise operations. `mcWinRate()` converts to BitState template once, then `copy()` per simulation — eliminating `GameState.copy()` overhead (Player objects + ArrayLists + unbuilt list → `Arrays.copyOf(long[], 2)`).
+
+**New BitState simulation methods:** `simulateBitState()` (main loop), `rollDiceBit()` (dice choice with Bahnhof/Freizeitpark logic), `greedyBuyBit()` (landmark-first + best-ROI establishment), `boltzmannBuyBit()` (landmark-first + softmax-sampled establishment). All iterate candidates in `ProjectLoader.getAllProjects()` order via `CANDIDATE_ITERATION_ORDER` for exact deterministic equivalence with the object-based path.
+
+**New BitStateTranslator constants:** `NORMAL_CARD_COSTS`, `PURPLE_CARD_COSTS`, `LANDMARK_COSTS`, `NORMAL_CARD_PROJECTS`, `PURPLE_CARD_PROJECTS`, `IS_HIGH_RANGE`, `LANDMARK_BUY_ORDER`, `CANDIDATE_ITERATION_ORDER`.
+
+**New BitState helpers:** `hasHighRangeCard()`, `findInstantWinLandmark()`, `buildPlayerStats()`, `buildOpponentCoins()`, `buildSupplyArray()`.
+
+**Bug fix: GameSimulator.buildSupply starter card handling.** `buildSupply()` subtracted starter weizenfeld/bäckerei copies from the 6-copy market pool, but starter copies are outside the market supply (invariant #1). Fixed by adding back `numPlayers` starter copies after the subtraction loop.
+
+**Object-based path preserved:** `simulateObject()` (public) exposes the old simulation path for `GameStateSampler` and equivalence testing. All package-private methods (`rollDice`, `applyRoll`, `greedyBuy`, `boltzmannBuy`, `buildSupply`, `hasHighRangeCard`) remain unchanged for `GameStateSampler`.
+
+**Test coverage:** 301 assertions total. New "BitState Simulation" section: valid winner, deterministic seeding, 1000-game greedy equivalence (0 mismatches), 500-game Boltzmann equivalence (0 mismatches), MC win rate reasonableness. New helper tests: translator costs, high-range flags, hasHighRangeCard, findInstantWinLandmark, buildPlayerStats, buildSupplyArray.
+
 ### Bitwise Game Core — Phase 1 Foundation (TODO #20)
 
 **BitStateTranslator** (new class in `core/`): Single source of truth for the 57-bit-per-player encoding layout. Maps card IDs to bit-position indices. Defines offsets: coins (8 bits), landmarks (4 bits), 12 normal cards × 3 bits, 3 purple cards × 3 bits. Category arrays (food, animal, production), EKZ bonus flags, starter card flags, and reverse lookup maps.

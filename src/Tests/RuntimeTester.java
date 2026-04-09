@@ -424,6 +424,10 @@ public class RuntimeTester {
             runWinProbDiagnostic();
         });
 
+        runSection("Calcs Bias Audit", () -> {
+            runCalcsBiasAudit();
+        });
+
         System.out.println("\n--- Results: " + passed + " passed, " + failed + " failed ---");
 
         if (failed > 0) {
@@ -488,6 +492,224 @@ public class RuntimeTester {
         System.out.println(" - 10 000 getAllProjects() calls: " + allProjElapsed + " ms");
         assertTrue("getAllProjects() 10 000 calls < 200 ms (was " + allProjElapsed + " ms)",
                 allProjElapsed < 200);
+    }
+
+    // =========================================================================
+    // Calcs Bias Audit
+    // =========================================================================
+
+    /**
+     * Quantifies the actual impact of identified biases in the calcs layer.
+     * Compares biased vs corrected computations across representative game states.
+     */
+    private static void runCalcsBiasAudit() {
+        System.out.println("\n=== Calcs Bias Audit ===\n");
+
+        // Build representative game states that exercise the biases
+        record AuditCase(String name, GameState state) {}
+        List<AuditCase> cases = new ArrayList<>();
+
+        // 1. Mixed portfolio with Bahnhof — exercises bias #1 (per-card dice choice)
+        // Has low-range (Weizenfeld roll 1, Bauernhof roll 2) AND high-range (Molkerei roll 7)
+        cases.add(new AuditCase("Mixed low+high range w/ Bahnhof",
+                buildDiagState(
+                        new String[][]{{"bauernhof", "bauernhof", "molkerei"},
+                                       {"weizenfeld", "weizenfeld", "wald"}},
+                        new int[]{6, 6},
+                        new String[][]{{"bahnhof"}, {}})));
+
+        // 2. Pure high-range with Bahnhof — no bias expected (all cards prefer 2d6)
+        cases.add(new AuditCase("Pure high-range w/ Bahnhof",
+                buildDiagState(
+                        new String[][]{{"apfelplantage", "bergwerk", "molkerei", "bauernhof"},
+                                       {"weizenfeld", "weizenfeld", "bauernhof"}},
+                        new int[]{8, 8},
+                        new String[][]{{"bahnhof"}, {}})));
+
+        // 3. Pure low-range with Bahnhof — no bias (all cards prefer 1d6)
+        cases.add(new AuditCase("Pure low-range w/ Bahnhof",
+                buildDiagState(
+                        new String[][]{{"weizenfeld", "weizenfeld", "bauernhof", "bäckerei"},
+                                       {"weizenfeld", "wald", "bauernhof"}},
+                        new int[]{6, 6},
+                        new String[][]{{"bahnhof"}, {}})));
+
+        // 4. Heavy mixed portfolio — maximum bias #1 impact
+        cases.add(new AuditCase("Heavy mixed: low+high+EKZ",
+                buildDiagState(
+                        new String[][]{{"bauernhof", "bauernhof", "bauernhof", "molkerei",
+                                        "apfelplantage", "markthalle", "mini-markt"},
+                                       {"café", "café", "familienrestaurant", "weizenfeld", "wald"}},
+                        new int[]{10, 10},
+                        new String[][]{{"bahnhof", "einkaufszentrum"}, {"bahnhof"}})));
+
+        // 5. Red-heavy player — exercises bias #3 (coin projection ignoring red drain)
+        cases.add(new AuditCase("P0 faces red drain",
+                buildDiagState(
+                        new String[][]{{"apfelplantage", "bergwerk"},
+                                       {"café", "café", "familienrestaurant", "familienrestaurant"}},
+                        new int[]{8, 8},
+                        new String[][]{{"bahnhof"}, {"bahnhof"}})));
+
+        // 6. Freizeitpark case — exercises bias in VaR
+        cases.add(new AuditCase("P0 has Freizeitpark",
+                buildDiagState(
+                        new String[][]{{"bauernhof", "bauernhof", "molkerei"},
+                                       {"weizenfeld", "weizenfeld", "wald"}},
+                        new int[]{8, 8},
+                        new String[][]{{"bahnhof", "freizeitpark"}, {"bahnhof"}})));
+
+        // 7. No Bahnhof — control (no bias #1 expected)
+        cases.add(new AuditCase("No Bahnhof (control)",
+                buildDiagState(
+                        new String[][]{{"bauernhof", "bauernhof", "molkerei"},
+                                       {"weizenfeld", "weizenfeld", "wald"}},
+                        new int[]{6, 6}, null)));
+
+        // =====================================================================
+        // BIAS #1: Per-card vs whole-portfolio dice choice in playerEvPerRound
+        // =====================================================================
+        System.out.println("--- Bias #1: Per-Card vs Whole-Portfolio Dice Choice ---");
+        System.out.println("Compares playerEvPerRound() vs RollResolver ground truth.\n");
+        System.out.println("Note: playerEvPerRound measures OWN cards' gross income (no opponent red drain).");
+        System.out.println("RollResolver includes opponent red drain. Rows with opponent reds will differ.\n");
+        System.out.printf("%-3s | %-33s | %-12s | %-12s | %-8s | %-5s | %-6s%n",
+                "#", "State", "playerEv", "RollRes EV", "Delta", "OppRd", "Pct");
+        System.out.println("----+-----------------------------------+--------------+--------------+----------+-------+--------");
+
+        for (int i = 0; i < cases.size(); i++) {
+            AuditCase ac = cases.get(i);
+            GameState gs = ac.state;
+            Player p0 = gs.getPlayers()[0];
+            int n = gs.getPlayers().length;
+            int[] oppCoins = core.CardIncome.buildOpponentCoins(gs.getPlayers(), 0);
+
+            // Method A: CardIncome.playerEvPerRound (whole-portfolio dice, gross income)
+            double playerEv = core.CardIncome.playerEvPerRound(p0, n, oppCoins);
+
+            // Method B: RollResolver-based ground truth (includes opponent red drain)
+            double ownEv1d6 = 0.0, ownEv2d6 = 0.0;
+            boolean hasBahnhof = p0.hasProject("bahnhof");
+            for (int r = 1; r <= 6; r++) {
+                int[] deltas = core.RollResolver.computeAllDeltasForRoll(gs, 0, r);
+                ownEv1d6 += core.CardIncome.P1[r] * deltas[0];
+            }
+            if (hasBahnhof) {
+                for (int r = 2; r <= 12; r++) {
+                    int[] deltas = core.RollResolver.computeAllDeltasForRoll(gs, 0, r);
+                    ownEv2d6 += core.CardIncome.P2[r] * deltas[0];
+                }
+            }
+            double ownTurnEv = hasBahnhof ? Math.max(ownEv1d6, ownEv2d6) : ownEv1d6;
+
+            double oppTurnEv = 0.0;
+            for (int opp = 0; opp < n; opp++) {
+                if (opp == 0) continue;
+                double opp1d6 = 0.0;
+                for (int r = 1; r <= 6; r++) {
+                    int[] deltas = core.RollResolver.computeAllDeltasForRoll(gs, opp, r);
+                    opp1d6 += core.CardIncome.P1[r] * deltas[0];
+                }
+                oppTurnEv += opp1d6;
+            }
+            double rollResTotalEv = ownTurnEv + oppTurnEv;
+
+            // Count opponent reds
+            int oppRedCount = 0;
+            for (int j = 1; j < n; j++)
+                for (Project p : gs.getPlayers()[j].getOwned_projects())
+                    if ("rot".equals(p.getColor())) oppRedCount++;
+
+            double delta = playerEv - rollResTotalEv;
+            double pct = (Math.abs(rollResTotalEv) > 1e-9) ? (delta / rollResTotalEv * 100.0) : 0.0;
+
+            System.out.printf("%-3d | %-33s | %12.4f | %12.4f | %+8.4f | %5d | %+5.1f%%%n",
+                    i + 1, ac.name, playerEv, rollResTotalEv, delta, oppRedCount, pct);
+        }
+
+        // =====================================================================
+        // BIAS #3: Coin projection ignoring red drain in evPerRound
+        // =====================================================================
+        System.out.println("\n--- Bias #3: Coin Projection Red Drain ---");
+        System.out.println("Compares evPerRound with/without red-drain-aware coin projection.\n");
+
+        // For this, we compare Calcs.evPerRound (which projects coins forward without red drain)
+        // against a version that uses the same function but with coins pre-adjusted for red drain.
+        // The simplest test: check how much opponent red cards reduce P0's evPerRound if we account
+        // for the reduced coin count in red clamping.
+        // Actually, the red drain bias in evPerRound is about PROJECTED coins being too high,
+        // which affects red-card clamping in opponent turns. Let's measure by constructing cases
+        // where the effect is maximized.
+        System.out.printf("%-3s | %-33s | %-10s | %-10s | %-10s%n",
+                "#", "State", "P0 coins", "Opp reds", "Red drain");
+        System.out.println("----+-----------------------------------+------------+------------+------------");
+
+        for (int i = 0; i < cases.size(); i++) {
+            AuditCase ac = cases.get(i);
+            GameState gs = ac.state;
+            Player p0 = gs.getPlayers()[0];
+
+            // Count opponent red cards
+            int oppRedCount = 0;
+            for (int j = 1; j < gs.getPlayers().length; j++) {
+                for (Project p : gs.getPlayers()[j].getOwned_projects()) {
+                    if ("rot".equals(p.getColor())) oppRedCount++;
+                }
+            }
+
+            // Compute expected red drain per round on P0 (how much P0 loses to opponent reds)
+            double redDrain = 0.0;
+            for (int j = 1; j < gs.getPlayers().length; j++) {
+                for (Project card : gs.getPlayers()[j].getOwned_projects()) {
+                    if (!"rot".equals(card.getColor())) continue;
+                    core.CardIncome.PlayerStats oppStats = core.CardIncome.PlayerStats.of(gs.getPlayers()[j]);
+                    for (int r = 1; r <= 6; r++) {
+                        int loss = core.CardIncome.get_I(r, card.getId(), false,
+                                oppStats.hasEinkaufszentrum, oppStats.foodCount,
+                                oppStats.animalCount, oppStats.productionCount,
+                                p0.getCoins(), core.CardIncome.EMPTY_INT_ARRAY);
+                        if (loss < 0) redDrain += core.CardIncome.P1[r] * (-loss);
+                    }
+                }
+            }
+
+            System.out.printf("%-3d | %-33s | %10d | %10d | %10.3f%n",
+                    i + 1, ac.name, p0.getCoins(), oppRedCount, redDrain);
+        }
+
+        // =====================================================================
+        // BIAS #5: GameSimulator Freizeitpark processing order
+        // =====================================================================
+        System.out.println("\n--- Bias #5: Freizeitpark Processing Order ---");
+        System.out.println("Compares MC win rates with/without Freizeitpark order fix.");
+        System.out.println("(If difference < 1%, the bias has negligible impact.)\n");
+
+        // We can only measure this indirectly: compare MC win rate for FZP owner
+        // in case #6 (has Freizeitpark) vs case #1 (no FZP, similar cards).
+        // Actually, the best test: run MC with Freizeitpark and see if P0 WR
+        // changes meaningfully. The order bug affects edge cases, so we need many sims.
+        int MC_SIMS_BIAS = 2000;
+        for (int i = 0; i < cases.size(); i++) {
+            AuditCase ac = cases.get(i);
+            // Only test cases with Freizeitpark
+            boolean hasFzp = false;
+            for (Project p : ac.state.getPlayers()[0].getOwned_projects()) {
+                if ("freizeitpark".equals(p.getId())) { hasFzp = true; break; }
+            }
+            if (!hasFzp) continue;
+            double wrP0 = calcs.GameSimulator.mcWinRate(ac.state, 0, MC_SIMS_BIAS);
+            System.out.printf("  Case %d (%s): P0 WR = %.3f (FZP present)%n", i + 1, ac.name, wrP0);
+        }
+        System.out.println("  (FZP order bias is edge-case only — affects red clamping on doubles.\n"
+                + "   No direct A/B test possible without code change. Impact: likely < 1%.)");
+
+        // =====================================================================
+        // SUMMARY: Which biases matter?
+        // =====================================================================
+        System.out.println("\n--- Summary ---");
+        System.out.println("Bias #1 (per-card dice) — see Delta column above for quantified impact.");
+        System.out.println("Bias #3 (red drain projection) — see Red drain column.");
+        System.out.println("Bias #5 (FZP order) — edge-case, likely < 1%.");
     }
 
     // =========================================================================

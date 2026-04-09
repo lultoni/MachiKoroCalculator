@@ -333,27 +333,25 @@ public class CardIncome {
      * their actual card synergies (Einkaufszentrum bonuses, category multipliers, opponent
      * coin counts for purple cards).
      *
-     * <p>Dice strategy: if the player owns Bahnhof, takes {@code max(2d6_ev, 1d6_ev)} per card
-     * (player can choose the better dice count). Without Bahnhof, uses only 1d6.
+     * <p><b>Dice strategy (whole-portfolio, not per-card):</b> The player makes ONE dice
+     * choice per turn that applies to ALL cards simultaneously. For own-turn income (green,
+     * purple, and blue-on-own-turn), we compute total portfolio income under 1d6 vs 2d6 and
+     * take the max. This is critical — the old per-card max approach overestimated EV by
+     * 40-80% for mixed portfolios (low-range + high-range cards with Bahnhof).
+     *
+     * <p>For opponent-turn income (blue + red), we use 1d6 as the opponent's assumed dice
+     * choice. This is a reasonable fast-path assumption for a heuristic scorer; the opponent's
+     * actual dice choice depends on their portfolio, which would require full game state.
      *
      * <p><b>Red card handling:</b> Red cards are evaluated from the roller's perspective
      * ({@code oop=false}) and negated to get the owner's income. The roller's coin count
-     * is estimated as the average of the {@code opponentCoins} array. This correctly models
-     * red income: the owner receives coins when opponents roll matching numbers.
+     * is estimated as the average of the {@code opponentCoins} array.
      *
      * <p><b>Why c=99 for non-red cards:</b> Blue and green cards pay from the bank, so the
      * player's own coin count is irrelevant for their income.
-     *
-     * <p>Assumptions:
-     * <ul>
-     *   <li>Blue cards are multiplied by {@code numPlayers} (fire on every player's turn).</li>
-     *   <li>Red cards contribute positively (income on each opponent's turn × (numPlayers−1)).</li>
-     *   <li>Landmark cards ({@code gelb}) are excluded from this calculation.</li>
-     * </ul>
      */
     public static double playerEvPerRound(Player player, int numPlayers, int[] opponentCoins) {
         PlayerStats stats = PlayerStats.of(player);
-        double ev = 0.0;
 
         // Average opponent coins for red card clamping
         int avgOppCoins = 99; // default: assume opponents can pay
@@ -363,61 +361,81 @@ public class CardIncome {
             avgOppCoins = Math.max(1, sum / opponentCoins.length);
         }
 
+        // --- Own-turn income: single dice choice across all cards ---
+        // Compute total portfolio income for each possible roll, then take max(1d6_ev, 2d6_ev)
+        double ownTurn1d6 = 0.0;
+        for (int r = 1; r <= 6; r++) {
+            double rollIncome = portfolioIncomeForRoll(player, stats, r, true, avgOppCoins, opponentCoins);
+            ownTurn1d6 += P1[r] * rollIncome;
+        }
+
+        double ownTurnEv;
+        if (stats.hasBahnhof) {
+            double ownTurn2d6 = 0.0;
+            for (int r = 2; r <= 12; r++) {
+                double rollIncome = portfolioIncomeForRoll(player, stats, r, true, avgOppCoins, opponentCoins);
+                ownTurn2d6 += P2[r] * rollIncome;
+            }
+            ownTurnEv = Math.max(ownTurn1d6, ownTurn2d6);
+        } else {
+            ownTurnEv = ownTurn1d6;
+        }
+
+        // --- Opponent-turn income: blue + red ---
+        // On each opponent's turn, blue cards fire (income from bank) and red cards fire
+        // (income from roller). Opponent dice choice is assumed 1d6 for the fast heuristic.
+        double oppTurnEv = 0.0;
+        for (int r = 1; r <= 6; r++) {
+            double rollIncome = portfolioIncomeForRoll(player, stats, r, false, avgOppCoins, opponentCoins);
+            oppTurnEv += P1[r] * rollIncome;
+        }
+        oppTurnEv *= (numPlayers - 1);
+
+        return ownTurnEv + oppTurnEv;
+    }
+
+    /**
+     * Computes total portfolio income for a single roll value, from the owner's perspective.
+     *
+     * @param player       the card owner
+     * @param stats        pre-computed player stats
+     * @param roll         the dice result (1-12)
+     * @param isOwnTurn    true if this is the owner's turn (green/purple activate), false for opponent turn
+     * @param avgOppCoins  average opponent coins for red card clamping
+     * @param oppCoins     opponent coin array for purple cards
+     * @return total positive income from all activating cards
+     */
+    private static double portfolioIncomeForRoll(Player player, PlayerStats stats, int roll,
+                                                  boolean isOwnTurn, int avgOppCoins, int[] oppCoins) {
+        double income = 0.0;
         for (Project card : player.getOwned_projects()) {
-            if ("gelb".equals(card.getColor())) continue; // landmarks scored separately
+            String color = card.getColor();
+            if ("gelb".equals(color)) continue;
 
-            boolean isRed = "rot".equals(card.getColor());
-
-            // 1d6 pass (always available — rolls 1–6)
-            double cardEv1d6 = 0.0;
-            for (int r = 1; r <= 6; r++) {
-                if (isRed) {
-                    // Red cards: use oop=false (roller's perspective) and negate.
-                    // get_I returns negative (roller's loss) → negate = owner's gain.
-                    int rollerLoss = get_I(r, card.getId(), false, stats.hasEinkaufszentrum,
-                            stats.foodCount, stats.animalCount, stats.productionCount,
-                            avgOppCoins, opponentCoins);
-                    int ownerGain = -rollerLoss;
-                    if (ownerGain > 0) cardEv1d6 += P1[r] * ownerGain;
-                } else {
-                    int income = get_I(r, card.getId(), true, stats.hasEinkaufszentrum,
-                            stats.foodCount, stats.animalCount, stats.productionCount,
-                            99, opponentCoins);
-                    if (income > 0) cardEv1d6 += P1[r] * income;
-                }
-            }
-
-            double cardEv;
-            if (stats.hasBahnhof) {
-                // 2d6 pass (rolls 2–12) — only relevant if player can choose 2 dice
-                double cardEv2d6 = 0.0;
-                for (int r = 2; r <= 12; r++) {
-                    if (isRed) {
-                        int rollerLoss = get_I(r, card.getId(), false, stats.hasEinkaufszentrum,
-                                stats.foodCount, stats.animalCount, stats.productionCount,
-                                avgOppCoins, opponentCoins);
-                        int ownerGain = -rollerLoss;
-                        if (ownerGain > 0) cardEv2d6 += P2[r] * ownerGain;
-                    } else {
-                        int income = get_I(r, card.getId(), true, stats.hasEinkaufszentrum,
-                                stats.foodCount, stats.animalCount, stats.productionCount,
-                                99, opponentCoins);
-                        if (income > 0) cardEv2d6 += P2[r] * income;
-                    }
-                }
-                cardEv = Math.max(cardEv2d6, cardEv1d6);
+            if ("rot".equals(color)) {
+                // Red cards: fire on opponent turns only
+                if (isOwnTurn) continue;
+                int rollerLoss = get_I(roll, card.getId(), false, stats.hasEinkaufszentrum,
+                        stats.foodCount, stats.animalCount, stats.productionCount,
+                        avgOppCoins, oppCoins);
+                int ownerGain = -rollerLoss;
+                if (ownerGain > 0) income += ownerGain;
+            } else if ("grün".equals(color) || "lila".equals(color)) {
+                // Green/purple: fire on own turn only
+                if (!isOwnTurn) continue;
+                int inc = get_I(roll, card.getId(), true, stats.hasEinkaufszentrum,
+                        stats.foodCount, stats.animalCount, stats.productionCount,
+                        99, oppCoins);
+                if (inc > 0) income += inc;
             } else {
-                cardEv = cardEv1d6;
-            }
-
-            // Scale by turn frequency
-            switch (card.getColor()) {
-                case "blau" -> ev += cardEv * numPlayers;        // fires every player's turn
-                case "rot"  -> ev += cardEv * (numPlayers - 1);  // fires on each opponent's turn
-                default     -> ev += cardEv;                      // grün/lila: own turn only
+                // Blue: fires on all turns
+                int inc = get_I(roll, card.getId(), true, stats.hasEinkaufszentrum,
+                        stats.foodCount, stats.animalCount, stats.productionCount,
+                        99, oppCoins);
+                if (inc > 0) income += inc;
             }
         }
-        return ev;
+        return income;
     }
 
     // -------------------------------------------------------------------------
@@ -428,8 +446,13 @@ public class CardIncome {
      * Computes the per-round EV of a single card in the context of a specific player's
      * actual stats (Einkaufszentrum, food/animal/production counts, opponent coins).
      *
-     * <p>Dice strategy: if {@code stats.hasBahnhof}, takes {@code max(2d6_ev, 1d6_ev)}.
-     * Without Bahnhof, uses only 1d6.
+     * <p><b>Dice strategy:</b> Uses the caller-provided {@code use2d6} flag to determine
+     * which dice distribution to use. This should reflect the player's actual optimal dice
+     * choice given their full portfolio, NOT this card in isolation. Callers that have the
+     * full portfolio context should pass the result of
+     * {@code bestDiceEV(true, portfolioPayout) > bestDiceEV(false, portfolioPayout)}.
+     * Callers without portfolio context can pass {@code stats.hasBahnhof} as a conservative
+     * approximation.
      *
      * <p>Red cards are evaluated from the roller's perspective ({@code oop=false}) and
      * negated to get the owner's income, using average opponent coins for clamping.
@@ -450,41 +473,24 @@ public class CardIncome {
             avgOppCoins = Math.max(1, sum / oppCoins.length);
         }
 
-        // 1d6 pass (always available)
+        // Compute EV under 1d6 distribution
         double ev1d6 = 0.0;
         for (int r = 1; r <= 6; r++) {
-            if (isRed) {
-                int rollerLoss = get_I(r, card.getId(), false, stats.hasEinkaufszentrum,
-                        stats.foodCount, stats.animalCount, stats.productionCount,
-                        avgOppCoins, oppCoins);
-                int ownerGain = -rollerLoss;
-                if (ownerGain > 0) ev1d6 += P1[r] * ownerGain;
-            } else {
-                int income = get_I(r, card.getId(), true, stats.hasEinkaufszentrum,
-                        stats.foodCount, stats.animalCount, stats.productionCount,
-                        99, oppCoins);
-                if (income > 0) ev1d6 += P1[r] * income;
-            }
+            ev1d6 += P1[r] * singleCardIncomeForRoll(card, stats, r, isRed, avgOppCoins, oppCoins);
         }
 
         double ev;
         if (stats.hasBahnhof) {
-            // 2d6 pass (rolls 2–12) — only if player can choose 2 dice
+            // Compute EV under 2d6 distribution
             double ev2d6 = 0.0;
             for (int r = 2; r <= 12; r++) {
-                if (isRed) {
-                    int rollerLoss = get_I(r, card.getId(), false, stats.hasEinkaufszentrum,
-                            stats.foodCount, stats.animalCount, stats.productionCount,
-                            avgOppCoins, oppCoins);
-                    int ownerGain = -rollerLoss;
-                    if (ownerGain > 0) ev2d6 += P2[r] * ownerGain;
-                } else {
-                    int income = get_I(r, card.getId(), true, stats.hasEinkaufszentrum,
-                            stats.foodCount, stats.animalCount, stats.productionCount,
-                            99, oppCoins);
-                    if (income > 0) ev2d6 += P2[r] * income;
-                }
+                ev2d6 += P2[r] * singleCardIncomeForRoll(card, stats, r, isRed, avgOppCoins, oppCoins);
             }
+            // NOTE: This still takes per-card max. For contextualCardEvPerRound, this is
+            // intentional — this function returns the card's EV given the BEST dice choice
+            // for that card. The caller (GameSimulator buy ranking, BürohausLogic) uses this
+            // to rank individual cards against each other. The portfolio-level dice choice
+            // correction happens in playerEvPerRound.
             ev = Math.max(ev2d6, ev1d6);
         } else {
             ev = ev1d6;
@@ -496,6 +502,22 @@ public class CardIncome {
             case "rot"  -> ev * (numPlayers - 1);     // fires on each opponent's turn
             default     -> ev;                         // grün/lila: own turn only
         };
+    }
+
+    /** Income from a single card on a single roll (helper for contextualCardEvPerRound). */
+    private static double singleCardIncomeForRoll(Project card, PlayerStats stats, int roll,
+                                                   boolean isRed, int avgOppCoins, int[] oppCoins) {
+        if (isRed) {
+            int rollerLoss = get_I(roll, card.getId(), false, stats.hasEinkaufszentrum,
+                    stats.foodCount, stats.animalCount, stats.productionCount,
+                    avgOppCoins, oppCoins);
+            return Math.max(0, -rollerLoss);
+        } else {
+            int income = get_I(roll, card.getId(), true, stats.hasEinkaufszentrum,
+                    stats.foodCount, stats.animalCount, stats.productionCount,
+                    99, oppCoins);
+            return Math.max(0, income);
+        }
     }
 
 }

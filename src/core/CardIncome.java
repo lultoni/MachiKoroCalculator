@@ -336,12 +336,13 @@ public class CardIncome {
      * <p>Dice strategy: if the player owns Bahnhof, takes {@code max(2d6_ev, 1d6_ev)} per card
      * (player can choose the better dice count). Without Bahnhof, uses only 1d6.
      *
-     * <p><b>Why c=99 is correct (not an approximation):</b> The {@code c} parameter is the
-     * queried player's own coins, used only for red-card inability-to-pay clamping. In this
-     * method, red cards are evaluated from the <em>owner's</em> perspective ({@code oop=true}),
-     * where the owner <em>receives</em> income — the {@code c} parameter is irrelevant.
-     * Opponent coin clamping for Stadion/Fernsehsender uses the actual {@code opponentCoins}
-     * array, which IS correct.
+     * <p><b>Red card handling:</b> Red cards are evaluated from the roller's perspective
+     * ({@code oop=false}) and negated to get the owner's income. The roller's coin count
+     * is estimated as the average of the {@code opponentCoins} array. This correctly models
+     * red income: the owner receives coins when opponents roll matching numbers.
+     *
+     * <p><b>Why c=99 for non-red cards:</b> Blue and green cards pay from the bank, so the
+     * player's own coin count is irrelevant for their income.
      *
      * <p>Assumptions:
      * <ul>
@@ -354,16 +355,36 @@ public class CardIncome {
         PlayerStats stats = PlayerStats.of(player);
         double ev = 0.0;
 
+        // Average opponent coins for red card clamping
+        int avgOppCoins = 99; // default: assume opponents can pay
+        if (opponentCoins.length > 0) {
+            int sum = 0;
+            for (int c : opponentCoins) sum += c;
+            avgOppCoins = Math.max(1, sum / opponentCoins.length);
+        }
+
         for (Project card : player.getOwned_projects()) {
             if ("gelb".equals(card.getColor())) continue; // landmarks scored separately
+
+            boolean isRed = "rot".equals(card.getColor());
 
             // 1d6 pass (always available — rolls 1–6)
             double cardEv1d6 = 0.0;
             for (int r = 1; r <= 6; r++) {
-                int income = get_I(r, card.getId(), true, stats.hasEinkaufszentrum,
-                        stats.foodCount, stats.animalCount, stats.productionCount,
-                        99, opponentCoins);
-                if (income > 0) cardEv1d6 += P1[r] * income;
+                if (isRed) {
+                    // Red cards: use oop=false (roller's perspective) and negate.
+                    // get_I returns negative (roller's loss) → negate = owner's gain.
+                    int rollerLoss = get_I(r, card.getId(), false, stats.hasEinkaufszentrum,
+                            stats.foodCount, stats.animalCount, stats.productionCount,
+                            avgOppCoins, opponentCoins);
+                    int ownerGain = -rollerLoss;
+                    if (ownerGain > 0) cardEv1d6 += P1[r] * ownerGain;
+                } else {
+                    int income = get_I(r, card.getId(), true, stats.hasEinkaufszentrum,
+                            stats.foodCount, stats.animalCount, stats.productionCount,
+                            99, opponentCoins);
+                    if (income > 0) cardEv1d6 += P1[r] * income;
+                }
             }
 
             double cardEv;
@@ -371,10 +392,18 @@ public class CardIncome {
                 // 2d6 pass (rolls 2–12) — only relevant if player can choose 2 dice
                 double cardEv2d6 = 0.0;
                 for (int r = 2; r <= 12; r++) {
-                    int income = get_I(r, card.getId(), true, stats.hasEinkaufszentrum,
-                            stats.foodCount, stats.animalCount, stats.productionCount,
-                            99, opponentCoins);
-                    if (income > 0) cardEv2d6 += P2[r] * income;
+                    if (isRed) {
+                        int rollerLoss = get_I(r, card.getId(), false, stats.hasEinkaufszentrum,
+                                stats.foodCount, stats.animalCount, stats.productionCount,
+                                avgOppCoins, opponentCoins);
+                        int ownerGain = -rollerLoss;
+                        if (ownerGain > 0) cardEv2d6 += P2[r] * ownerGain;
+                    } else {
+                        int income = get_I(r, card.getId(), true, stats.hasEinkaufszentrum,
+                                stats.foodCount, stats.animalCount, stats.productionCount,
+                                99, opponentCoins);
+                        if (income > 0) cardEv2d6 += P2[r] * income;
+                    }
                 }
                 cardEv = Math.max(cardEv2d6, cardEv1d6);
             } else {
@@ -402,19 +431,40 @@ public class CardIncome {
      * <p>Dice strategy: if {@code stats.hasBahnhof}, takes {@code max(2d6_ev, 1d6_ev)}.
      * Without Bahnhof, uses only 1d6.
      *
+     * <p>Red cards are evaluated from the roller's perspective ({@code oop=false}) and
+     * negated to get the owner's income, using average opponent coins for clamping.
+     *
      * <p>This method correctly reflects synergy multipliers: a Markthalle owned by
      * a player with 3 food cards yields 3× the income of a Markthalle in a generic
      * reference state.
      */
     public static double contextualCardEvPerRound(Project card, PlayerStats stats,
                                             int numPlayers, int[] oppCoins) {
+        boolean isRed = "rot".equals(card.getColor());
+
+        // Average opponent coins for red card clamping
+        int avgOppCoins = 99;
+        if (isRed && oppCoins.length > 0) {
+            int sum = 0;
+            for (int c : oppCoins) sum += c;
+            avgOppCoins = Math.max(1, sum / oppCoins.length);
+        }
+
         // 1d6 pass (always available)
         double ev1d6 = 0.0;
         for (int r = 1; r <= 6; r++) {
-            int income = get_I(r, card.getId(), true, stats.hasEinkaufszentrum,
-                    stats.foodCount, stats.animalCount, stats.productionCount,
-                    99, oppCoins);
-            if (income > 0) ev1d6 += P1[r] * income;
+            if (isRed) {
+                int rollerLoss = get_I(r, card.getId(), false, stats.hasEinkaufszentrum,
+                        stats.foodCount, stats.animalCount, stats.productionCount,
+                        avgOppCoins, oppCoins);
+                int ownerGain = -rollerLoss;
+                if (ownerGain > 0) ev1d6 += P1[r] * ownerGain;
+            } else {
+                int income = get_I(r, card.getId(), true, stats.hasEinkaufszentrum,
+                        stats.foodCount, stats.animalCount, stats.productionCount,
+                        99, oppCoins);
+                if (income > 0) ev1d6 += P1[r] * income;
+            }
         }
 
         double ev;
@@ -422,10 +472,18 @@ public class CardIncome {
             // 2d6 pass (rolls 2–12) — only if player can choose 2 dice
             double ev2d6 = 0.0;
             for (int r = 2; r <= 12; r++) {
-                int income = get_I(r, card.getId(), true, stats.hasEinkaufszentrum,
-                        stats.foodCount, stats.animalCount, stats.productionCount,
-                        99, oppCoins);
-                if (income > 0) ev2d6 += P2[r] * income;
+                if (isRed) {
+                    int rollerLoss = get_I(r, card.getId(), false, stats.hasEinkaufszentrum,
+                            stats.foodCount, stats.animalCount, stats.productionCount,
+                            avgOppCoins, oppCoins);
+                    int ownerGain = -rollerLoss;
+                    if (ownerGain > 0) ev2d6 += P2[r] * ownerGain;
+                } else {
+                    int income = get_I(r, card.getId(), true, stats.hasEinkaufszentrum,
+                            stats.foodCount, stats.animalCount, stats.productionCount,
+                            99, oppCoins);
+                    if (income > 0) ev2d6 += P2[r] * income;
+                }
             }
             ev = Math.max(ev2d6, ev1d6);
         } else {

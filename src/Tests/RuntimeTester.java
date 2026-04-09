@@ -5,6 +5,7 @@ import calcs.Calcs;
 import calcs.GameSimulator;
 import calcs.RankEntry;
 import calcs.RankingOptions;
+import calcs.WinProbDiag;
 import iface.EngineRegistry;
 import iface.EngineRegistryEntry;
 import iface.EngineOrchestrator;
@@ -419,6 +420,10 @@ public class RuntimeTester {
             }
         });
 
+        runSection("WinProbability Diagnostic", () -> {
+            runWinProbDiagnostic();
+        });
+
         System.out.println("\n--- Results: " + passed + " passed, " + failed + " failed ---");
 
         if (failed > 0) {
@@ -483,6 +488,202 @@ public class RuntimeTester {
         System.out.println(" - 10 000 getAllProjects() calls: " + allProjElapsed + " ms");
         assertTrue("getAllProjects() 10 000 calls < 200 ms (was " + allProjElapsed + " ms)",
                 allProjElapsed < 200);
+    }
+
+    // =========================================================================
+    // WinProbability Diagnostic
+    // =========================================================================
+
+    /**
+     * Builds a 2-player game state with specified cards, coins, and landmarks.
+     * Starts from GameState.initial(2) (each player has Weizenfeld + Bäckerei + 3 coins).
+     * Then adds extra cards/landmarks and sets coin amounts.
+     */
+    private static GameState buildDiagState(String[][] extraCards, int[] coins, String[][] landmarks) {
+        GameState gs = GameState.initial(2);
+        Player[] players = gs.getPlayers();
+        for (int p = 0; p < 2; p++) {
+            // Add extra cards
+            if (extraCards != null && extraCards[p] != null) {
+                for (String cardId : extraCards[p]) {
+                    Project proj = ProjectLoader.getProject(cardId).orElseThrow(
+                            () -> new IllegalArgumentException("Unknown card: " + cardId));
+                    players[p].addProject(proj);
+                }
+            }
+            // Add landmarks
+            if (landmarks != null && landmarks[p] != null) {
+                for (String lmId : landmarks[p]) {
+                    Project lm = ProjectLoader.getProject(lmId).orElseThrow(
+                            () -> new IllegalArgumentException("Unknown landmark: " + lmId));
+                    players[p].addProject(lm);
+                }
+            }
+            // Set coins
+            if (coins != null) {
+                players[p].setCoins(coins[p]);
+            }
+        }
+        return gs;
+    }
+
+    private static void runWinProbDiagnostic() {
+        int MC_SIMS = 5000;
+        System.out.println("\n=== WinProbability Diagnostic: Softmax vs MC (" + MC_SIMS + " sims) ===\n");
+
+        record DiagCase(String name, GameState state) {}
+
+        List<DiagCase> cases = new ArrayList<>();
+
+        // 1. Symmetric start
+        cases.add(new DiagCase("Symmetric start",
+                buildDiagState(null, new int[]{3, 3}, null)));
+
+        // 2. Early asymmetric — P0 has income lead
+        cases.add(new DiagCase("Early: P0 income lead",
+                buildDiagState(
+                        new String[][]{{"weizenfeld", "weizenfeld"}, {}},
+                        new int[]{5, 3}, null)));
+
+        // 3. Mid-game balanced — both have Bahnhof + decent cards
+        cases.add(new DiagCase("Mid: balanced w/ Bahnhof",
+                buildDiagState(
+                        new String[][]{{"apfelplantage", "wald", "mini-markt"},
+                                       {"bauernhof", "café", "bergwerk"}},
+                        new int[]{8, 8},
+                        new String[][]{{"bahnhof"}, {"bahnhof"}})));
+
+        // 4. Mid-game income leader — P0 Käsefabrik engine, P1 red-heavy
+        cases.add(new DiagCase("Mid: P0 green engine vs P1 red",
+                buildDiagState(
+                        new String[][]{{"bauernhof", "bauernhof", "bauernhof", "molkerei"},
+                                       {"café", "café", "familienrestaurant", "familienrestaurant"}},
+                        new int[]{6, 6},
+                        new String[][]{{"bahnhof"}, {"bahnhof"}})));
+
+        // 5. Landmark leader — P0 has 3 landmarks, P1 has 1 but more income
+        cases.add(new DiagCase("Landmark lead: P0=3lm vs P1=1lm",
+                buildDiagState(
+                        new String[][]{{"apfelplantage"},
+                                       {"bauernhof", "bauernhof", "molkerei", "möbelfabrik", "wald", "wald"}},
+                        new int[]{5, 10},
+                        new String[][]{{"bahnhof", "einkaufszentrum", "freizeitpark"}, {"bahnhof"}})));
+
+        // 6. Endgame: P0 near win (3 lm + coins for 4th)
+        cases.add(new DiagCase("Endgame: P0 can afford 4th lm",
+                buildDiagState(
+                        new String[][]{{"bauernhof", "bauernhof", "molkerei", "apfelplantage"},
+                                       {"café", "café", "mini-markt", "wald"}},
+                        new int[]{22, 8},
+                        new String[][]{{"bahnhof", "einkaufszentrum", "freizeitpark"},
+                                       {"bahnhof", "einkaufszentrum"}})));
+
+        // 7. Endgame: both near win
+        cases.add(new DiagCase("Endgame: both 3 lm, close",
+                buildDiagState(
+                        new String[][]{{"bauernhof", "bauernhof", "molkerei"},
+                                       {"apfelplantage", "apfelplantage", "markthalle"}},
+                        new int[]{15, 18},
+                        new String[][]{{"bahnhof", "einkaufszentrum", "freizeitpark"},
+                                       {"bahnhof", "einkaufszentrum", "freizeitpark"}})));
+
+        // 8. Red-heavy vs blue-heavy
+        cases.add(new DiagCase("Red-heavy P0 vs blue-heavy P1",
+                buildDiagState(
+                        new String[][]{{"café", "café", "familienrestaurant", "familienrestaurant"},
+                                       {"weizenfeld", "weizenfeld", "weizenfeld", "bauernhof", "bauernhof"}},
+                        new int[]{6, 6}, null)));
+
+        // 9. Coin-rich but card-poor P0, diversified P1
+        cases.add(new DiagCase("P0 coin-rich/card-poor vs P1 diverse",
+                buildDiagState(
+                        new String[][]{{},
+                                       {"bauernhof", "apfelplantage", "wald", "mini-markt", "café"}},
+                        new int[]{20, 5},
+                        new String[][]{{}, {"bahnhof"}})));
+
+        // 10. Purple-heavy P0
+        cases.add(new DiagCase("P0 purple-heavy vs P1 income",
+                buildDiagState(
+                        new String[][]{{"stadion", "fernsehsender", "bürohaus"},
+                                       {"bauernhof", "bauernhof", "molkerei", "apfelplantage", "markthalle"}},
+                        new int[]{8, 8},
+                        new String[][]{{"bahnhof"}, {"bahnhof"}})));
+
+        // --- Phase 1: Compute MC ground truth once ---
+        double[] mcWR = new double[cases.size()];
+        for (int i = 0; i < cases.size(); i++) {
+            mcWR[i] = GameSimulator.mcWinRate(cases.get(i).state, 0, MC_SIMS);
+        }
+
+        // --- Phase 2: Temperature calibration sweep ---
+        System.out.println("--- Temperature Calibration Sweep ---");
+        System.out.printf("%-8s | %-10s | %-10s%n", "Temp", "Mean|Err|", "Max|Err|");
+        System.out.println("---------+------------+------------");
+
+        double bestT = 1.0;
+        double bestMae = Double.MAX_VALUE;
+        for (double t = 40.0; t <= 120.0; t += 5.0) {
+            WinProbDiag.setTemperature(t);
+            double sumErr = 0;
+            double maxErr = 0;
+            for (int i = 0; i < cases.size(); i++) {
+                double sm = calcs.WinProbability.computeBaselineWinProb(cases.get(i).state, 0);
+                double err = Math.abs(sm - mcWR[i]);
+                sumErr += err;
+                maxErr = Math.max(maxErr, err);
+            }
+            double mae = sumErr / cases.size();
+            System.out.printf("%8.1f | %10.4f | %10.4f%n", t, mae, maxErr);
+            if (mae < bestMae) {
+                bestMae = mae;
+                bestT = t;
+            }
+        }
+
+        System.out.printf("\nBest temperature: %.1f (MAE = %.4f)%n%n", bestT, bestMae);
+
+        // --- Phase 3: Set best temperature and print final comparison ---
+        WinProbDiag.setTemperature(bestT);
+
+        System.out.printf("=== Results with T = %.1f ===%n%n", bestT);
+        System.out.printf("%-3s | %-35s | %-10s | %-12s | %-7s | %-7s%n",
+                "#", "State", "Softmax P0", "MC P0", "Delta", "AbsErr");
+        System.out.println("----+-------------------------------------+------------+--------------+---------+---------");
+
+        for (int i = 0; i < cases.size(); i++) {
+            DiagCase dc = cases.get(i);
+            double softmax = calcs.WinProbability.computeBaselineWinProb(dc.state, 0);
+            double delta = softmax - mcWR[i];
+            double absErr = Math.abs(delta);
+
+            System.out.printf("%-3d | %-35s | %10.4f | %12.4f | %+7.4f | %7.4f%n",
+                    i + 1, dc.name, softmax, mcWR[i], delta, absErr);
+        }
+
+        // Print raw scores for deeper analysis
+        System.out.println("\n--- Raw Softmax Scores ---");
+        System.out.printf("%-3s | %-35s | %-12s | %-12s | %-8s%n",
+                "#", "State", "Score P0", "Score P1", "Ratio");
+        System.out.println("----+-------------------------------------+--------------+--------------+----------");
+
+        for (int i = 0; i < cases.size(); i++) {
+            DiagCase dc = cases.get(i);
+            double[] scores = WinProbDiag.computeScores(dc.state);
+            double ratio = (scores[1] != 0) ? scores[0] / scores[1] : Double.POSITIVE_INFINITY;
+            System.out.printf("%-3d | %-35s | %12.3f | %12.3f | %8.3f%n",
+                    i + 1, dc.name, scores[0], scores[1], ratio);
+        }
+
+        // Restore default temperature so other test sections aren't affected
+        WinProbDiag.setTemperature(65.0);
+        System.out.println("\nDiagnostic complete. (Temperature restored to default 65.0)");
+
+        // Minimal assertion: symmetric start should be close to 0.5
+        GameState symm = cases.get(0).state;
+        double symmSoftmax = calcs.WinProbability.computeBaselineWinProb(symm, 0);
+        assertTrue("Symmetric start softmax should be ~0.5 (was " + symmSoftmax + ")",
+                Math.abs(symmSoftmax - 0.5) < 0.01);
     }
 
     /**

@@ -3,6 +3,8 @@ package Tests;
 import core.*;
 import calcs.Calcs;
 import calcs.GameSimulator;
+import calcs.GameStateSampler;
+import calcs.LuckAnalyzer;
 import calcs.RankEntry;
 import calcs.RankingOptions;
 import calcs.WinProbDiag;
@@ -428,6 +430,14 @@ public class RuntimeTester {
             runCalcsBiasAudit();
         });
 
+        runSection("WinProbability Real-Game Accuracy", () -> {
+            runRealGameAccuracyTest();
+        });
+
+        runSection("Per-Roll Luck Analysis", () -> {
+            runPerRollLuckTest();
+        });
+
         System.out.println("\n--- Results: " + passed + " passed, " + failed + " failed ---");
 
         if (failed > 0) {
@@ -711,6 +721,196 @@ public class RuntimeTester {
         System.out.println("Bias #3 (red drain projection) — see Red drain column.");
         System.out.println("Bias #5 (FZP order) — edge-case, likely < 1%.");
     }
+
+    // =========================================================================
+    // WinProbability Real-Game Accuracy
+    // =========================================================================
+
+    /**
+     * Plays 200 games with greedy policy, samples every 5th turn, and compares
+     * softmax WR vs MC WR at each sampled position. Reports per-phase accuracy.
+     */
+    private static void runRealGameAccuracyTest() {
+        int NUM_GAMES = 200;
+        int MC_SIMS = 200;
+        int SAMPLE_EVERY = 5;
+
+        System.out.println("\n=== WinProbability Real-Game Accuracy (" + NUM_GAMES + " games, "
+                + MC_SIMS + " MC sims/position, sample every " + SAMPLE_EVERY + " turns) ===\n");
+
+        // Phase boundaries: early 0-10, mid 11-25, endgame 26+
+        List<Double> earlyErrors = new ArrayList<>();
+        List<Double> midErrors = new ArrayList<>();
+        List<Double> endgameErrors = new ArrayList<>();
+
+        long startTime = System.currentTimeMillis();
+
+        GameStateSampler.runGames(NUM_GAMES, 2, 0.0,
+                GameStateSampler.everyKTurns(SAMPLE_EVERY),
+                snapshot -> {
+                    double softmax = calcs.WinProbability.computeBaselineWinProb(
+                            snapshot.state(), snapshot.activePlayer());
+                    double mc = GameSimulator.mcWinRate(
+                            snapshot.state(), snapshot.activePlayer(), MC_SIMS);
+                    double absErr = Math.abs(softmax - mc);
+
+                    int turn = snapshot.turnNumber();
+                    if (turn <= 10) {
+                        synchronized (earlyErrors) { earlyErrors.add(absErr); }
+                    } else if (turn <= 25) {
+                        synchronized (midErrors) { midErrors.add(absErr); }
+                    } else {
+                        synchronized (endgameErrors) { endgameErrors.add(absErr); }
+                    }
+                });
+
+        long elapsed = System.currentTimeMillis() - startTime;
+
+        // Combine all
+        List<Double> allErrors = new ArrayList<>();
+        allErrors.addAll(earlyErrors);
+        allErrors.addAll(midErrors);
+        allErrors.addAll(endgameErrors);
+
+        // Print results table
+        System.out.printf("%-10s | %9s | %10s | %10s | %12s%n",
+                "Phase", "Positions", "Mean|Err|", "Max|Err|", "Median|Err|");
+        System.out.println("-----------+-----------+------------+------------+--------------");
+        printPhaseRow("Early", earlyErrors);
+        printPhaseRow("Mid", midErrors);
+        printPhaseRow("Endgame", endgameErrors);
+        printPhaseRow("Overall", allErrors);
+
+        System.out.printf("\nCompleted in %.1f seconds.%n", elapsed / 1000.0);
+
+        // Assertions
+        double overallMae = mean(allErrors);
+        assertTrue("Real-game accuracy: sampled at least 100 positions (got " + allErrors.size() + ")",
+                allErrors.size() >= 100);
+        assertTrue("Real-game accuracy: overall MAE < 0.30 (was " + String.format("%.4f", overallMae) + ")",
+                overallMae < 0.30);
+    }
+
+    private static void printPhaseRow(String phase, List<Double> errors) {
+        if (errors.isEmpty()) {
+            System.out.printf("%-10s | %9d | %10s | %10s | %12s%n", phase, 0, "N/A", "N/A", "N/A");
+            return;
+        }
+        double mean = mean(errors);
+        double max = errors.stream().mapToDouble(Double::doubleValue).max().orElse(0);
+        double median = median(errors);
+        System.out.printf("%-10s | %9d | %10.4f | %10.4f | %12.4f%n",
+                phase, errors.size(), mean, max, median);
+    }
+
+    private static double mean(List<Double> values) {
+        double sum = 0;
+        for (double v : values) sum += v;
+        return sum / values.size();
+    }
+
+    private static double median(List<Double> values) {
+        List<Double> sorted = new ArrayList<>(values);
+        sorted.sort(null);
+        int n = sorted.size();
+        if (n % 2 == 0) {
+            return (sorted.get(n / 2 - 1) + sorted.get(n / 2)) / 2.0;
+        } else {
+            return sorted.get(n / 2);
+        }
+    }
+
+    // =========================================================================
+    // Per-Roll Luck Analysis
+    // =========================================================================
+
+    /**
+     * Plays 50 games, computes per-roll luck at every turn, validates that
+     * average luck sums to ~0 (unbiased).
+     */
+    private static void runPerRollLuckTest() {
+        int NUM_GAMES = 50;
+        int MC_SIMS = 200;
+
+        System.out.println("\n=== Per-Roll Luck Analysis (" + NUM_GAMES + " games, "
+                + MC_SIMS + " MC sims/roll) ===\n");
+
+        // Accumulate per-game P0 luck sums
+        List<Double> gameLuckSums = new ArrayList<>();
+        List<Double> allLuckValues = new ArrayList<>();
+        // Track current game luck
+        final double[] currentGameLuck = {0.0};
+        final int[] currentGameIndex = {-1};
+        final int[] turnCount = {0};
+
+        long startTime = System.currentTimeMillis();
+
+        GameStateSampler.runGames(NUM_GAMES, 2, 0.0,
+                GameStateSampler.allTurns(),
+                // Pre-roll evaluator: compute luck on the state before income
+                snapshot -> {
+                    // Only compute luck for P0 (to keep runtime reasonable)
+                    if (snapshot.activePlayer() != 0) return;
+
+                    // When game index changes, save previous game's luck sum
+                    if (snapshot.gameIndex() != currentGameIndex[0]) {
+                        if (currentGameIndex[0] >= 0) {
+                            gameLuckSums.add(currentGameLuck[0]);
+                        }
+                        currentGameLuck[0] = 0.0;
+                        currentGameIndex[0] = snapshot.gameIndex();
+                    }
+
+                    LuckAnalyzer.RollLuck luck = LuckAnalyzer.computeRollLuck(
+                            snapshot.state(), snapshot.activePlayer(),
+                            snapshot.roll(), snapshot.usedTwoDice(), MC_SIMS);
+
+                    currentGameLuck[0] += luck.luck();
+                    allLuckValues.add(luck.luck());
+                    turnCount[0]++;
+                },
+                null  // no post-income evaluator needed
+        );
+
+        // Save last game's luck
+        if (currentGameIndex[0] >= 0) {
+            gameLuckSums.add(currentGameLuck[0]);
+        }
+
+        long elapsed = System.currentTimeMillis() - startTime;
+
+        // Print per-game summary (first 10 games)
+        System.out.println("Game | P0 Total Luck");
+        System.out.println("-----+---------------");
+        int display = Math.min(10, gameLuckSums.size());
+        for (int i = 0; i < display; i++) {
+            System.out.printf("%4d | %+.4f%n", i + 1, gameLuckSums.get(i));
+        }
+        if (gameLuckSums.size() > 10) {
+            System.out.println("  ... (" + gameLuckSums.size() + " games total)");
+        }
+
+        // Statistics
+        double meanLuckSum = mean(gameLuckSums);
+        double meanAbsLuck = allLuckValues.stream()
+                .mapToDouble(v -> Math.abs(v)).average().orElse(0);
+
+        System.out.printf("\nP0 turns evaluated:  %d%n", turnCount[0]);
+        System.out.printf("Mean per-game luck:  %+.4f (should be ~0)%n", meanLuckSum);
+        System.out.printf("Mean |per-roll luck|: %.4f (should be > 0)%n", meanAbsLuck);
+        System.out.printf("Completed in %.1f seconds.%n", elapsed / 1000.0);
+
+        // Assertions
+        assertTrue("Luck analysis: evaluated at least 100 turns (got " + turnCount[0] + ")",
+                turnCount[0] >= 100);
+        assertTrue("Luck analysis: mean |per-roll luck| > 0 (luck is not trivially zero, was "
+                + String.format("%.4f", meanAbsLuck) + ")",
+                meanAbsLuck > 0.001);
+        assertTrue("Luck analysis: mean per-game luck sum within ±0.15 of 0 (was "
+                + String.format("%+.4f", meanLuckSum) + ")",
+                Math.abs(meanLuckSum) < 0.15);
+    }
+
 
     // =========================================================================
     // WinProbability Diagnostic

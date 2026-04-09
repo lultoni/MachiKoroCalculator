@@ -6,6 +6,20 @@ Implementation history: what was built, why, and which design decisions were mad
 
 ## Phase 7: Iteration
 
+### Analysis Infrastructure — GameStateSampler, LuckAnalyzer, Real-Game Accuracy Test
+
+**GameStateSampler** (new class in `calcs/`): Reusable callback-based harness for playing full games and sampling GameState snapshots at turn boundaries. Two hook points: pre-roll (for luck analysis) and post-income (for WR accuracy tests). Three built-in sampling strategies (everyKTurns, turnRange, allTurns). Uses GameSimulator's package-private game-play methods.
+
+**LuckAnalyzer** (new class in `calcs/`): Per-roll luck computation using the backgammon model (`Luck = WR_after_actual - E[WR_after_all_rolls]`). Enumerates all 1d6/2d6 outcomes, applies income via RollResolver, evaluates WR via MC simulation. Validated unbiased (mean luck ≈ 0 over 50 games).
+
+**WinProbability Real-Game Accuracy test** (new RuntimeTester section): Plays 200 games, samples every 5th turn, compares softmax WR vs MC WR at ~2000 real positions. Reports per-phase (early/mid/endgame) accuracy statistics. Baseline: overall MAE ~0.25.
+
+**Per-Roll Luck Analysis test** (new RuntimeTester section): Plays 50 games, computes per-roll luck at every turn, validates mean luck sum ≈ 0.
+
+**GameSimulator**: 6 methods widened from private to package-private for GameStateSampler reuse.
+
+**WinProbability fixes** (prior commits in this session): Temperature scaling (T=65), whole-portfolio dice choice in playerEvPerRound, red drain computation, disruption bonus for red/purple cards.
+
 ### 7.53 — Shared engine parameter schema (#47)
 
 **Single source of truth for engine parameter definitions.** New `src/resources/jsons/engine-params.json` defines all params for all 10 engine classes with min/max/step/default/description/category, plus sweep-specific fields (sweepLow/sweepHigh/sweepDefault) for Creator params.

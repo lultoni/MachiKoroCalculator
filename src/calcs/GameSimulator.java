@@ -119,7 +119,7 @@ public class GameSimulator {
     // Roll helpers
     // -------------------------------------------------------------------------
 
-    private static int rollDice(GameState state, int activePlayer, Random rng) {
+    static int rollDice(GameState state, int activePlayer, Random rng) {
         Player player = state.getPlayers()[activePlayer];
         boolean hasBahnhof = player.hasProject("bahnhof");
 
@@ -148,7 +148,7 @@ public class GameSimulator {
     // Income
     // -------------------------------------------------------------------------
 
-    private static void applyRoll(GameState state, int activePlayer, int roll) {
+    static void applyRoll(GameState state, int activePlayer, int roll) {
         Player[] players = state.getPlayers();
         int[] deltas = RollResolver.computeAllDeltasForRoll(state, activePlayer, roll);
         for (int i = 0; i < players.length; i++) {
@@ -163,7 +163,7 @@ public class GameSimulator {
     // Buy phases
     // -------------------------------------------------------------------------
 
-    private static int greedyBuy(GameState state, int activePlayer, Map<String, Integer> supply) {
+    static int greedyBuy(GameState state, int activePlayer, Map<String, Integer> supply) {
         Player player = state.getPlayers()[activePlayer];
 
         for (String lmId : LANDMARK_ORDER) {
@@ -196,7 +196,7 @@ public class GameSimulator {
         return -1;
     }
 
-    private static int boltzmannBuy(GameState state, int activePlayer,
+    static int boltzmannBuy(GameState state, int activePlayer,
                                      Map<String, Integer> supply, Random rng, double temperature) {
         Player player = state.getPlayers()[activePlayer];
 
@@ -256,7 +256,7 @@ public class GameSimulator {
     // Helpers
     // -------------------------------------------------------------------------
 
-    private static void purchase(Player player, Project card, Map<String, Integer> supply) {
+    static void purchase(Player player, Project card, Map<String, Integer> supply) {
         player.setCoins(player.getCoins() - card.getCost());
         player.addProject(card);
         if (!card.isIs_grossprojekt()) {
@@ -264,7 +264,7 @@ public class GameSimulator {
         }
     }
 
-    private static boolean hasHighRangeCard(Player player) {
+    static boolean hasHighRangeCard(Player player) {
         for (Project p : player.getOwned_projects()) {
             if (p.isIs_grossprojekt()) continue;
             for (int activation : p.getDice_activation()) {

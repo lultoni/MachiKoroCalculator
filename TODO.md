@@ -12,7 +12,6 @@ Priorisiere in deiner Abarbeitung die wichtigsten Features. Erkenne Abhängigkei
 
 | # | Task | Type | Notes |
 |---|------|------|-------|
-| 1 | Per-roll luck computation | Dev | Backgammon model: `Luck = WinRate_after(actual_roll) - E[WinRate_after(all_rolls)]`. Enumerate all 1d6/2d6 outcomes (respect doubles + Freizeitpark, invariant #4). Use fast engine eval (low-iter MCTS). Compute for both players per turn. See INSIGHTS-SESSION.md Research section. |
 | 2 | Per-decision skill loss | Dev | Chess centipawn-loss analog: `Skill_loss = WinRate(best_option) - WinRate(chosen_option)`. At each buy decision, compare engine's top choice vs actual choice. Perfect play = 0. Depends on #1 (shared eval infrastructure). |
 | 3 | Game-level luck aggregation | Dev | `Total_Luck = sum(per_roll_luck)` per player. `Luck-Adjusted Result = Actual - Own_Luck + Opponent_Luck`. Calibrate thresholds for Machi Koro (maybe +/- 5% WR per roll = lucky/unlucky). Depends on #1. |
 | 4 | Luck display in game replay UI | Dev | Show per-roll luck value next to each roll result in H2H game replay. Color-code (green = lucky, red = unlucky). Show game-level luck summary at top. Depends on #1, #3. |
@@ -65,6 +64,7 @@ Moved here when completed. Full history in CHANGELOG.md.
 
 | Old # | Task |
 |-------|------|
+| 1 | Per-roll luck computation (LuckAnalyzer + GameStateSampler) |
 | 1 | Fix MCTS ChanceNode doubles bug |
 | 2 | Refine UI based on real gameplay usage (B24 + B25). |
 | 3 | Game-over decision review |

@@ -377,6 +377,10 @@ These are deliberate simplifications in the Calcs and WinProbability layers. Ite
 
 - **F. `BürohausLogic` greedy swap policy** is a deliberate design choice. Single-activation greedy EV-max is the correct analytical approximation for Calcs/Core. Multi-turn swap optimization belongs in Engine layer (MCTS tree search). Documented in class-level Javadoc. **Documented in TODO #11.**
 
+- **G. Whole-portfolio dice choice in `playerEvPerRound`** — Per-card `max(1d6, 2d6)` overestimated EV by 40-80% for mixed low+high range portfolios with Bahnhof. Now computes total portfolio income per roll across all cards, then takes `max(1d6_total, 2d6_total)`. **Fixed April 2026.**
+
+- **H. Red card income in WinProbability** — Red drain from opponents' red cards now explicitly computed and subtracted from net income in `computeScores()`. Red/purple cards get a disruption bonus (doubling their EV) to capture the opponent-slowing effect beyond raw income. **Fixed April 2026.**
+
 ### 7.3 Safety Valve
 
 Maximum turn limit for rollouts. Games rarely exceed 60–70 turns with reasonable play — the limit must account for unlucky edge cases while preventing infinite loops.
@@ -420,3 +424,60 @@ Weight formula: `|value - mean| / range` normalized to [0,1]. Weight = 0 when ra
 ### 8.3 Pre-computation
 
 `PrecomputeCache`: single-entry thread-safe cache with daemon `ExecutorService`. Key = `(structuralHash, playerIndex, engineId)`. New request cancels in-flight computation. `GameState.structuralHash()` provides a deterministic hash of player coins and sorted owned card IDs.
+
+---
+
+## 9. Game-State Sampling & Luck Analysis
+
+### 9.1 GameStateSampler (`calcs/GameStateSampler.java`)
+
+Reusable callback-based harness for playing full games and sampling `GameState` snapshots at turn boundaries. Designed so future metrics/engine tests only specify "what to measure" — the harness handles game-play mechanics.
+
+**Key types:**
+- `TurnSnapshot` — immutable record: `(state, activePlayer, turnNumber, roll, usedTwoDice, isDoubles, gameIndex)`
+- `SamplingStrategy` — functional interface: `shouldSample(turnNumber, activePlayer, state) → boolean`
+- `TurnEvaluator` — functional interface: `evaluate(TurnSnapshot)`
+
+**Snapshot timing:** Two hook points per turn:
+1. **Pre-roll** — before dice roll and income resolution. State reflects end of previous buy phase. Used by `LuckAnalyzer`.
+2. **Post-income** — after income resolution, before buy phase. State reflects the decision point. Used by WR accuracy tests.
+
+**Built-in strategies:** `everyKTurns(k)`, `turnRange(min, max)`, `allTurns()`.
+
+**Implementation:** Reuses `GameSimulator`'s package-private game-play methods (rollDice, applyRoll, greedyBuy, boltzmannBuy) to avoid code duplication. Plays sequential games with `GameState.initial(numPlayers)`.
+
+### 9.2 LuckAnalyzer (`calcs/LuckAnalyzer.java`)
+
+Per-roll luck computation using the backgammon model:
+
+```
+Luck(roll) = WR_after(actual_roll) - E[WR_after(all_possible_rolls)]
+```
+
+**Implementation:**
+1. Enumerates all possible roll outcomes (1-6 for 1d6, 2-12 for 2d6)
+2. For each outcome: copies state, applies income via `RollResolver.computeAllDeltasForRoll()`, handles Bürohaus if roll=6
+3. Evaluates win rate via `GameSimulator.mcWinRate()` (MC, not softmax — more accurate)
+4. Weights by dice probabilities (`CardIncome.P1`/`P2`)
+5. Returns `RollLuck(luck, wrAfterActual, expectedWr)`
+
+**Properties:**
+- Luck > 0 = actual roll better than average (lucky)
+- Luck < 0 = actual roll worse than average (unlucky)
+- Sum over many rolls converges to ~0 per player (validated in test: mean ±0.02 over 50 games)
+- Uses pre-roll state (before income) — using post-income state introduces systematic bias
+
+**Doubles handling:** Enumerates by sum only (2-12), not split doubles/non-doubles. Freizeitpark bonus turn effect is averaged out by MC evaluation. Acceptable approximation — tested to produce unbiased results.
+
+### 9.3 WinProbability Heuristic Accuracy
+
+Measured via real-game accuracy test (200 games, 200 MC sims per sampled position):
+
+| Phase | Turns | Mean Abs Error | Notes |
+|-------|-------|----------------|-------|
+| Early | 0-10 | ~0.14 | Best accuracy — simple states |
+| Mid | 11-25 | ~0.27 | Dynamic synergy evolution not captured |
+| Endgame | 26+ | ~0.30 | Landmark proximity effects dominate |
+| Overall | All | ~0.25 | Baseline for future improvements |
+
+Temperature calibrated to T=65 against MC ground truth (5000 sims) across 10 handcrafted states. The heuristic is fast (~100ns vs ~1ms for MC) and useful for MCTS rollout evaluation despite the accuracy gap.

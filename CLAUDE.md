@@ -34,7 +34,7 @@ UI (React 19 SPA) --HTTP--> Interface --> Engines --> Calcs --> Core
 | Layer | Package | Responsibility |
 |-------|---------|----------------|
 | Core | `core/` | Game rules: state, cards, dice, income, turn order, win condition. No strategy. |
-| Calcs | `calcs/` | Reusable math: EV, ROI, variance, 11 advanced metrics. Stateless. |
+| Calcs | `calcs/` | Reusable math: EV, ROI, variance, 11 advanced metrics. GameStateSampler, LuckAnalyzer, WinProbability. Stateless. |
 | Engines | `engine/` | Public API (SimulationEngine, EngineConfig, EngineResult, TurnPlan). |
 | | `engine/mcts/` | MctsV1 + 5 variants (A-E), tree nodes, rollout policies, support classes. |
 | | `engine/expectimax/` | ExpectimaxEngine. |

@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useLocale } from '../i18n/useLocale';
 import type { H2hMatchResult, H2hGameLog } from '../api/types';
 
@@ -36,77 +36,109 @@ interface MatchHighlight {
   gameIndex: number;
   value: string;
   detail?: string;
+  rank?: number;       // 1-based rank within category
+  category: string;    // category key for grouping
 }
 
-function computeHighlights(result: H2hMatchResult, t: (k: string) => string): MatchHighlight[] {
+function computeHighlights(result: H2hMatchResult, t: (k: string) => string, topN = 5): MatchHighlight[] {
   const games = result.gameLogs;
   if (!games || games.length === 0) return [];
 
   const highlights: MatchHighlight[] = [];
+  const makeDetail = (g: H2hGameLog) =>
+    `P${g.winnerIndex + 1} ${t('h2h.won')}${g.timeoutWin ? ` (${t('h2h.timeout')})` : ''}`;
+  const makeDetailWithTurns = (g: H2hGameLog) =>
+    `${makeDetail(g)} · ${g.totalTurns} ${t('h2h.turns')}`;
 
-  // Shortest game
-  let shortest = games[0];
-  let longest = games[0];
-  for (const g of games) {
-    if (g.totalTurns < shortest.totalTurns) shortest = g;
-    if (g.totalTurns > longest.totalTurns) longest = g;
-  }
-  highlights.push({
-    label: t('h2h.shortestGame'),
-    gameIndex: shortest.gameIndex,
-    value: `${shortest.totalTurns} ${t('h2h.turns')}`,
-    detail: `P${shortest.winnerIndex + 1} ${t('h2h.won')}`,
-  });
-  highlights.push({
-    label: t('h2h.longestGame'),
-    gameIndex: longest.gameIndex,
-    value: `${longest.totalTurns} ${t('h2h.turns')}`,
-    detail: `P${longest.winnerIndex + 1} ${t('h2h.won')}${longest.timeoutWin ? ` (${t('h2h.timeout')})` : ''}`,
-  });
-
-  // Biggest blowout (landmark difference)
-  let bestBlowout: H2hGameLog | null = null;
-  let bestBlowoutDiff = 0;
-  for (const g of games) {
-    if (g.landmarkCounts && g.landmarkCounts.length >= 2) {
-      const diff = Math.abs(g.landmarkCounts[0] - g.landmarkCounts[1]);
-      if (diff > bestBlowoutDiff) {
-        bestBlowoutDiff = diff;
-        bestBlowout = g;
-      }
-    }
-  }
-  if (bestBlowout) {
+  // Sort by turns ascending → shortest first
+  const byTurns = [...games].sort((a, b) => a.totalTurns - b.totalTurns);
+  for (let i = 0; i < Math.min(topN, byTurns.length); i++) {
+    const g = byTurns[i];
     highlights.push({
-      label: t('h2h.biggestBlowout'),
-      gameIndex: bestBlowout.gameIndex,
-      value: `${bestBlowout.landmarkCounts[0]} : ${bestBlowout.landmarkCounts[1]} ${t('h2h.landmarks').toLowerCase()}`,
-      detail: `P${bestBlowout.winnerIndex + 1} ${t('h2h.won')} · ${bestBlowout.totalTurns} ${t('h2h.turns')}`,
+      label: t('h2h.shortestGame'),
+      category: 'shortest',
+      rank: i + 1,
+      gameIndex: g.gameIndex,
+      value: `${g.totalTurns} ${t('h2h.turns')}`,
+      detail: makeDetail(g),
     });
   }
 
-  // Most coins at end
-  let richestGame: H2hGameLog | null = null;
-  let richestCoins = 0;
-  for (const g of games) {
-    if (g.finalCoins) {
-      const max = Math.max(...g.finalCoins);
-      if (max > richestCoins) {
-        richestCoins = max;
-        richestGame = g;
-      }
-    }
+  // Longest: sort descending
+  const byTurnsDesc = [...games].sort((a, b) => b.totalTurns - a.totalTurns);
+  for (let i = 0; i < Math.min(topN, byTurnsDesc.length); i++) {
+    const g = byTurnsDesc[i];
+    highlights.push({
+      label: t('h2h.longestGame'),
+      category: 'longest',
+      rank: i + 1,
+      gameIndex: g.gameIndex,
+      value: `${g.totalTurns} ${t('h2h.turns')}`,
+      detail: makeDetail(g),
+    });
   }
-  if (richestGame) {
+
+  // Biggest blowout (landmark difference descending)
+  const seatSwap = result.config.seatSwap !== false;
+  const swapPoint = Math.floor(result.config.gameCount / 2);
+  const gamesWithLmDiff = games
+    .filter(g => g.landmarkCounts && g.landmarkCounts.length >= 2)
+    .map(g => ({ g, diff: Math.abs(g.landmarkCounts[0] - g.landmarkCounts[1]) }))
+    .sort((a, b) => b.diff - a.diff || a.g.totalTurns - b.g.totalTurns);
+  for (let i = 0; i < Math.min(topN, gamesWithLmDiff.length); i++) {
+    const { g, diff } = gamesWithLmDiff[i];
+    if (diff === 0 && i > 0) break; // no point showing 0-diff blowouts
+    const swapped = seatSwap && g.gameIndex >= swapPoint;
+    const lm = swapped ? [g.landmarkCounts[1], g.landmarkCounts[0]] : g.landmarkCounts;
+    highlights.push({
+      label: t('h2h.biggestBlowout'),
+      category: 'blowout',
+      rank: i + 1,
+      gameIndex: g.gameIndex,
+      value: `${lm[0]} : ${lm[1]} ${t('h2h.landmarks').toLowerCase()}`,
+      detail: makeDetailWithTurns(g),
+    });
+  }
+
+  // Richest finish (highest single-player coins)
+  const gamesWithCoins = games
+    .filter(g => g.finalCoins)
+    .map(g => ({ g, max: Math.max(...g.finalCoins) }))
+    .sort((a, b) => b.max - a.max);
+  for (let i = 0; i < Math.min(topN, gamesWithCoins.length); i++) {
+    const { g, max } = gamesWithCoins[i];
     highlights.push({
       label: t('h2h.richestFinish'),
-      gameIndex: richestGame.gameIndex,
-      value: `${richestCoins} ${t('h2h.coins').toLowerCase()}`,
-      detail: `P${richestGame.winnerIndex + 1} ${t('h2h.won')} · ${richestGame.totalTurns} ${t('h2h.turns')}`,
+      category: 'richest',
+      rank: i + 1,
+      gameIndex: g.gameIndex,
+      value: `${max} ${t('h2h.coins').toLowerCase()}`,
+      detail: makeDetailWithTurns(g),
     });
   }
 
   return highlights;
+}
+
+/** Compute per-game luck advantage for the winner, accounting for seat swap.
+ * Returns null when no luck data, or a number where positive = lucky win, negative = skilled win. */
+function computeWinnerLuckAdvantage(
+  game: H2hGameLog, seatSwap: boolean, swapPoint: number
+): number | null {
+  const luck = [0, 0];
+  let hasLuck = false;
+  for (const t of game.turns) {
+    if (t.rollLuck != null && (t.playerIndex === 0 || t.playerIndex === 1)) {
+      luck[t.playerIndex] += t.rollLuck;
+      hasLuck = true;
+    }
+  }
+  if (!hasLuck) return null;
+  // Map seat indices to engine indices (accounting for swap)
+  const swapped = seatSwap && game.gameIndex >= swapPoint;
+  const winnerSeat = swapped ? (1 - game.winnerIndex) : game.winnerIndex;
+  const loserSeat = 1 - winnerSeat;
+  return luck[winnerSeat] - luck[loserSeat];
 }
 
 export function H2hMatchDetail({ result, onBack, onSelectGame }: Props) {
@@ -114,6 +146,27 @@ export function H2hMatchDetail({ result, onBack, onSelectGame }: Props) {
   const engines = result.config.engineIds;
   const [evalA, evalB] = useMemo(() => computePerEngineEval(result), [result]);
   const highlights = useMemo(() => computeHighlights(result, t), [result, t]);
+  const [expandedCats, setExpandedCats] = useState<Set<string>>(new Set());
+
+  // Pre-compute per-game winner luck advantage (accounts for seat swap)
+  const seatSwap = result.config.seatSwap !== false;
+  const swapPoint = Math.floor(result.config.gameCount / 2);
+  const gameLuckMap = useMemo(() => {
+    const m = new Map<number, number | null>();
+    for (const g of result.gameLogs) {
+      m.set(g.gameIndex, computeWinnerLuckAdvantage(g, seatSwap, swapPoint));
+    }
+    return m;
+  }, [result.gameLogs, seatSwap, swapPoint]);
+  const hasAnyLuck = useMemo(() =>
+    [...gameLuckMap.values()].some(v => v != null), [gameLuckMap]);
+  const highlightGroups = useMemo(() => {
+    const groups: Record<string, MatchHighlight[]> = {};
+    for (const h of highlights) {
+      (groups[h.category] ??= []).push(h);
+    }
+    return groups;
+  }, [highlights]);
 
   return (
     <div className="min-h-screen bg-machi-bg text-machi-text p-6">
@@ -126,9 +179,12 @@ export function H2hMatchDetail({ result, onBack, onSelectGame }: Props) {
           >
             ← {t('btn.back')}
           </button>
-          <h1 className="text-2xl font-bold">
-            {engines[0]} <span className="text-machi-text-dim">vs</span> {engines[1]}
-          </h1>
+          <div>
+            <h1 className="text-2xl font-bold">
+              {engines[0]} <span className="text-machi-text-dim">vs</span> {engines[1]}
+            </h1>
+            <div className="text-xs text-machi-text-dim font-mono">{result.id}</div>
+          </div>
         </div>
 
         {/* Symmetric Stats Row */}
@@ -178,27 +234,89 @@ export function H2hMatchDetail({ result, onBack, onSelectGame }: Props) {
             <span>{engines[0]}: {(result.winRates[0] * 100).toFixed(1)}%</span>
             <span>{engines[1]}: {(result.winRates[1] * 100).toFixed(1)}%</span>
           </div>
+          {result.luckAdjustedWinRates && (
+            <div className="mt-2 pt-2 border-t border-machi-border/50">
+              <div className="flex h-4 rounded-full overflow-hidden opacity-80">
+                <div
+                  className="bg-machi-accent/70 transition-all"
+                  style={{ width: `${result.luckAdjustedWinRates[0] * 100}%` }}
+                />
+                <div
+                  className="bg-machi-purple/70 transition-all"
+                  style={{ width: `${result.luckAdjustedWinRates[1] * 100}%` }}
+                />
+              </div>
+              <div className="flex justify-between text-[10px] text-machi-text-dim mt-0.5">
+                <span>{t('h2h.luckAdjustedWr')}: {(result.luckAdjustedWinRates[0] * 100).toFixed(1)}%</span>
+                <span>{(result.luckAdjustedWinRates[1] * 100).toFixed(1)}%</span>
+              </div>
+              {result.totalLuck && (
+                <div className="flex justify-between text-[10px] text-machi-text-dim mt-0.5">
+                  <span>{t('h2h.totalLuck')}: {result.totalLuck[0] >= 0 ? '+' : ''}{result.totalLuck[0].toFixed(2)}</span>
+                  <span>{result.totalLuck[1] >= 0 ? '+' : ''}{result.totalLuck[1].toFixed(2)}</span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Match Highlights */}
-        {highlights.length > 0 && (
+        {Object.keys(highlightGroups).length > 0 && (
           <div className="bg-machi-surface rounded-xl p-5 mb-6 border border-machi-border">
             <h2 className="text-sm font-semibold text-machi-text-dim mb-3">{t('h2h.highlights')}</h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {highlights.map((h, i) => (
-                <button
-                  key={i}
-                  onClick={() => onSelectGame(h.gameIndex)}
-                  className="text-left bg-machi-bg rounded-lg p-3 hover:bg-machi-bg/80 transition group"
-                >
-                  <div className="text-[10px] text-machi-text-dim mb-1">{h.label}</div>
-                  <div className="text-sm font-bold">{h.value}</div>
-                  {h.detail && <div className="text-[10px] text-machi-text-dim">{h.detail}</div>}
-                  <div className="text-[10px] text-machi-accent opacity-0 group-hover:opacity-100 transition mt-1">
-                    #{h.gameIndex + 1} ▶
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 items-start">
+              {Object.entries(highlightGroups).map(([cat, items]) => {
+                const top = items[0];
+                const isExpanded = expandedCats.has(cat);
+                const hasMore = items.length > 1;
+                return (
+                  <div key={cat} className="bg-machi-bg rounded-lg overflow-hidden">
+                    {/* Top item — always visible, clickable to game */}
+                    <button
+                      onClick={() => onSelectGame(top.gameIndex)}
+                      className="text-left w-full p-3 hover:bg-machi-bg/80 transition group"
+                    >
+                      <div className="text-[10px] text-machi-text-dim mb-1">{top.label}</div>
+                      <div className="text-sm font-bold">{top.value}</div>
+                      {top.detail && <div className="text-[10px] text-machi-text-dim">{top.detail}</div>}
+                      <div className="text-[10px] text-machi-accent opacity-0 group-hover:opacity-100 transition mt-1">
+                        #{top.gameIndex + 1} ▶
+                      </div>
+                    </button>
+                    {/* Expand/collapse for remaining items */}
+                    {hasMore && (
+                      <>
+                        <button
+                          onClick={() => setExpandedCats(prev => {
+                            const next = new Set(prev);
+                            if (next.has(cat)) next.delete(cat); else next.add(cat);
+                            return next;
+                          })}
+                          className="w-full text-[10px] text-machi-text-dim hover:text-machi-text py-1 border-t border-machi-border/30 transition"
+                        >
+                          {isExpanded ? '▲' : `▼ +${items.length - 1} more`}
+                        </button>
+                        {isExpanded && items.slice(1).map((h) => (
+                          <button
+                            key={h.gameIndex}
+                            onClick={() => onSelectGame(h.gameIndex)}
+                            className="text-left w-full px-3 py-1.5 hover:bg-machi-bg/80 transition group border-t border-machi-border/20"
+                          >
+                            <div className="flex items-center gap-1">
+                              <span className="text-[10px] text-machi-text-dim">#{h.rank}</span>
+                              <span className="text-xs font-medium">{h.value}</span>
+                              <span className="text-[10px] text-machi-accent opacity-0 group-hover:opacity-100 transition ml-auto">
+                                #{h.gameIndex + 1} ▶
+                              </span>
+                            </div>
+                            {h.detail && <div className="text-[10px] text-machi-text-dim">{h.detail}</div>}
+                          </button>
+                        ))}
+                      </>
+                    )}
                   </div>
-                </button>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
@@ -215,11 +333,21 @@ export function H2hMatchDetail({ result, onBack, onSelectGame }: Props) {
                   <th className="text-center py-2 px-2">{t('h2h.turns')}</th>
                   <th className="text-center py-2 px-2">{t('h2h.landmarks')}</th>
                   <th className="text-center py-2 px-2">{t('h2h.coins')}</th>
+                  {hasAnyLuck && <th className="text-center py-2 px-2">{t('h2h.diceFortune')}</th>}
                   <th className="text-center py-2 px-2"></th>
                 </tr>
               </thead>
               <tbody>
-                {result.gameLogs.map(game => (
+                {result.gameLogs.map(game => {
+                  // Map seat indices to engine indices (seat swap reverses in second half)
+                  const swapped = seatSwap && game.gameIndex >= swapPoint;
+                  const engineLandmarks = swapped && game.landmarkCounts
+                    ? [game.landmarkCounts[1], game.landmarkCounts[0]]
+                    : game.landmarkCounts;
+                  const engineCoins = swapped && game.finalCoins
+                    ? [game.finalCoins[1], game.finalCoins[0]]
+                    : game.finalCoins;
+                  return (
                   <tr
                     key={game.gameIndex}
                     className="border-b border-machi-border/50 hover:bg-machi-bg/50 cursor-pointer transition"
@@ -227,14 +355,14 @@ export function H2hMatchDetail({ result, onBack, onSelectGame }: Props) {
                   >
                     <td className="py-2 px-2">{game.gameIndex + 1}</td>
                     <td className="text-center py-2 px-2 font-semibold">
-                      P{game.winnerIndex + 1}
+                      {engines[game.winnerIndex]}
                       {game.timeoutWin && (
                         <span className="ml-1 text-xs text-machi-text-dim">(T)</span>
                       )}
                     </td>
                     <td className="text-center py-2 px-2">{game.totalTurns}</td>
                     <td className="text-center py-2 px-2">
-                      {game.landmarkCounts?.map((lm, i) => (
+                      {engineLandmarks?.map((lm, i) => (
                         <span key={i} className="mx-0.5">{lm}</span>
                       )).reduce<React.ReactNode[]>((acc, el, i) => {
                         if (i > 0) acc.push(<span key={`sep-${i}`} className="text-machi-text-dim">:</span>);
@@ -243,13 +371,27 @@ export function H2hMatchDetail({ result, onBack, onSelectGame }: Props) {
                       }, [])}
                     </td>
                     <td className="text-center py-2 px-2 text-machi-text-dim">
-                      {game.finalCoins?.join(' : ')}
+                      {engineCoins?.join(' : ')}
                     </td>
+                    {hasAnyLuck && (
+                      <td className="text-center py-2 px-2 text-[11px] font-mono">
+                        {(() => {
+                          const adv = gameLuckMap.get(game.gameIndex);
+                          if (adv == null) return <span className="text-machi-text-dim">—</span>;
+                          return (
+                            <span className={adv > 0.05 ? 'text-green-400' : adv < -0.05 ? 'text-red-400' : 'text-machi-text-dim'}>
+                              {adv >= 0 ? '+' : ''}{adv.toFixed(2)}
+                            </span>
+                          );
+                        })()}
+                      </td>
+                    )}
                     <td className="text-center py-2 px-2">
                       <span className="text-machi-accent text-xs">▶</span>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

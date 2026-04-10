@@ -148,9 +148,12 @@ final class H2hHandler implements HttpHandler {
         int luckMcSims = body.has("luckMcSims") ? body.get("luckMcSims").getAsInt() : 200;
         boolean luckUseMc = !body.has("luckUseMc") || body.get("luckUseMc").getAsBoolean();
 
+        // Card income attribution (opt-in)
+        boolean computeCardIncome = body.has("computeCardIncome") && body.get("computeCardIncome").getAsBoolean();
+
         MatchConfig config = new MatchConfig(
                 new String[]{engineA, engineB}, games, maxTurns, iterations, seatSwap,
-                configOverrides, computeLuck, luckMcSims, luckUseMc);
+                configOverrides, computeLuck, luckMcSims, luckUseMc, computeCardIncome);
 
         String matchId = java.util.UUID.randomUUID().toString().substring(0, 8);
         MatchProgress progress = new MatchProgress(matchId, config);

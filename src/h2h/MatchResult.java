@@ -27,6 +27,16 @@ public final class MatchResult {
     public int longestGameTurns;
     public List<GameLog> gameLogs;
     public long totalTimeMs;
+    /**
+     * Per-engine total luck across all games (sum of rollLuck per turn, mapped to engine seat).
+     * Positive = engine was lucky overall. Zero when luck computation was disabled.
+     */
+    public double[] totalLuck;
+    /**
+     * Win rates adjusted for luck: {@code winRates[i] - totalLuck[i] / gameCount}, clamped to [0,1].
+     * Equals {@code winRates} when luck was not computed.
+     */
+    public double[] luckAdjustedWinRates;
 
     public MatchResult(MatchConfig config, List<GameLog> gameLogs, long totalTimeMs) {
         this.id = java.util.UUID.randomUUID().toString().substring(0, 8);
@@ -44,6 +54,7 @@ public final class MatchResult {
         int totalEvalCount = 0;
         double[] evalMsPerEngine = new double[n];
         int[] evalCountPerEngine = new int[n];
+        double[] luckPerEngine = new double[n];
         int shortIdx = -1, longIdx = -1;
         int shortTurns = Integer.MAX_VALUE, longTurns = Integer.MIN_VALUE;
         boolean hasSeatSwap = config.seatSwap() && n == 2;
@@ -64,6 +75,9 @@ public final class MatchResult {
                     int engineIdx = swapped ? (1 - turn.playerIndex) : turn.playerIndex;
                     evalMsPerEngine[engineIdx] += turn.evaluateTimeMs;
                     evalCountPerEngine[engineIdx]++;
+                    if (turn.rollLuck != null) {
+                        luckPerEngine[engineIdx] += turn.rollLuck;
+                    }
                 }
             }
             if (log.totalTurns < shortTurns) {
@@ -92,5 +106,13 @@ public final class MatchResult {
         longestGameIndex = longIdx;
         shortestGameTurns = gameCount > 0 ? shortTurns : 0;
         longestGameTurns = gameCount > 0 ? longTurns : 0;
+
+        // Luck aggregation: per-engine total luck and luck-adjusted win rates
+        this.totalLuck = luckPerEngine;
+        this.luckAdjustedWinRates = new double[n];
+        for (int i = 0; i < n; i++) {
+            luckAdjustedWinRates[i] = Math.max(0.0, Math.min(1.0,
+                    winRates[i] - (gameCount > 0 ? totalLuck[i] / gameCount : 0.0)));
+        }
     }
 }

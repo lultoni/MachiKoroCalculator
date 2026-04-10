@@ -213,6 +213,7 @@ export interface H2hStartRequest {
   computeLuck?: boolean;
   luckMcSims?: number;
   luckUseMc?: boolean;
+  computeCardIncome?: boolean;
 }
 
 export interface H2hStartResponse {
@@ -262,6 +263,8 @@ export interface H2hTurnLog {
   rollLuck?: number | null;
   wrBeforeRoll?: number | null;
   wrAfterRoll?: number | null;
+  cardIncome?: Record<string, number[]> | null;
+  purchasedCardExpectedEv?: number | null;
 }
 
 export interface H2hGameLog {
@@ -289,6 +292,8 @@ export interface H2hMatchSummary {
   engines: string[];
   wins: number[];
   winRates: number[];
+  totalLuck?: number[];
+  luckAdjustedWinRates?: number[];
   ratingDelta?: number[];
 }
 

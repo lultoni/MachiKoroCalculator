@@ -1,5 +1,8 @@
 package core;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 /**
  * Resolves the coin effects of a single dice roll across all players.
  *
@@ -99,5 +102,107 @@ public final class RollResolver {
                         active.getCoins() + deltas[activePlayer], freshOpponentCoins);
             }
         }
+    }
+
+    /**
+     * Computes per-card income attribution for a single roll.
+     *
+     * <p>Replicates the same Red → Blue/Green → Purple order as
+     * {@link #computeAllDeltasForRoll}, but returns a map of card ID to per-player deltas.
+     * Duplicate cards (e.g., 3x Weizenfeld) accumulate into the same entry.
+     *
+     * <p><b>Consistency invariant:</b> For each player, the sum of all per-card deltas
+     * must equal the corresponding entry from {@code computeAllDeltasForRoll}.
+     *
+     * <p>Only for post-game analysis (MatchRunner replay). NOT for engine hot paths.
+     *
+     * @param state         current game state (coins reflect pre-roll values)
+     * @param activePlayer  index of the rolling player
+     * @param roll          dice total (1–12)
+     * @return map of card ID → int[playerCount] deltas attributed to that card
+     */
+    public static Map<String, int[]> attributeIncomePerCard(GameState state, int activePlayer, int roll) {
+        Player[] players = state.getPlayers();
+        int n = players.length;
+        Map<String, int[]> result = new LinkedHashMap<>();
+
+        // Step 1: Red card payments (counter-clockwise, sequential)
+        int rollerCoins = players[activePlayer].getCoins();
+        for (int step = 1; step < n; step++) {
+            int oppIdx = (activePlayer - step + n) % n;
+            Player opponent = players[oppIdx];
+            CardIncome.PlayerStats oppStats = CardIncome.PlayerStats.of(opponent);
+            for (Project p : opponent.getOwned_projects()) {
+                if ("rot".equals(p.getColor())) {
+                    int loss = CardIncome.get_I(roll, p.getId(), false,
+                            oppStats.hasEinkaufszentrum, 0, 0, 0,
+                            rollerCoins, CardIncome.EMPTY_INT_ARRAY);
+                    if (loss < 0 && -loss > rollerCoins) loss = -rollerCoins;
+                    int gain = -loss;
+                    if (gain != 0) {
+                        int[] deltas = result.computeIfAbsent(p.getId(), k -> new int[n]);
+                        deltas[activePlayer] += loss;
+                        deltas[oppIdx]       += gain;
+                    }
+                    rollerCoins += loss;
+                    if (rollerCoins < 0) rollerCoins = 0;
+                }
+            }
+        }
+
+        // Step 2: Blue card income for every player
+        for (int i = 0; i < n; i++) {
+            Player player = players[i];
+            CardIncome.PlayerStats stats = CardIncome.PlayerStats.of(player);
+            int[] otherCoins = CardIncome.buildOpponentCoins(players, i);
+            for (Project p : player.getOwned_projects()) {
+                if ("blau".equals(p.getColor())) {
+                    int income = CardIncome.get_I(roll, p.getId(), true,
+                            stats.hasEinkaufszentrum, stats.foodCount, stats.animalCount,
+                            stats.productionCount, player.getCoins(), otherCoins);
+                    if (income != 0) {
+                        int[] deltas = result.computeIfAbsent(p.getId(), k -> new int[n]);
+                        deltas[i] += income;
+                    }
+                }
+            }
+        }
+
+        // Step 3: Green income for the active player
+        Player active = players[activePlayer];
+        CardIncome.PlayerStats activeStats = CardIncome.PlayerStats.of(active);
+        int[] opponentCoins = CardIncome.buildOpponentCoins(players, activePlayer);
+        for (Project p : active.getOwned_projects()) {
+            if ("grün".equals(p.getColor())) {
+                int income = CardIncome.get_I(roll, p.getId(), true,
+                        activeStats.hasEinkaufszentrum, activeStats.foodCount, activeStats.animalCount,
+                        activeStats.productionCount, active.getCoins(), opponentCoins);
+                if (income != 0) {
+                    int[] deltas = result.computeIfAbsent(p.getId(), k -> new int[n]);
+                    deltas[activePlayer] += income;
+                }
+            }
+        }
+
+        // Step 4: Purple income for the active player
+        // Uses same freshOpponentCoins logic as computeAllDeltasForRoll
+        int activeDeltaSoFar = 0;
+        for (int[] d : result.values()) activeDeltaSoFar += d[activePlayer];
+        for (Project p : active.getOwned_projects()) {
+            if ("lila".equals(p.getColor())) {
+                int[] freshOpponentCoins = CardIncome.buildOpponentCoins(players, activePlayer);
+                int income = CardIncome.get_I(roll, p.getId(), true,
+                        activeStats.hasEinkaufszentrum,
+                        activeStats.foodCount, activeStats.animalCount, activeStats.productionCount,
+                        active.getCoins() + activeDeltaSoFar, freshOpponentCoins);
+                if (income != 0) {
+                    int[] deltas = result.computeIfAbsent(p.getId(), k -> new int[n]);
+                    deltas[activePlayer] += income;
+                    activeDeltaSoFar += income;
+                }
+            }
+        }
+
+        return result;
     }
 }

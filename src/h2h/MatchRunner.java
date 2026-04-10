@@ -15,6 +15,7 @@ import iface.EngineRegistryEntry;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
@@ -297,6 +298,11 @@ public final class MatchRunner {
 
         // 5. Apply roll income
         int n = state.getPlayers().length;
+        // Per-card income attribution (computed before income is applied, same state as RollResolver)
+        Map<String, int[]> cardIncome = null;
+        if (matchConfig.computeCardIncome()) {
+            cardIncome = RollResolver.attributeIncomePerCard(state, activePlayer, roll);
+        }
         int[] deltas = RollResolver.computeAllDeltasForRoll(state, activePlayer, roll);
         for (int i = 0; i < n; i++) {
             int newCoins = state.getPlayers()[i].getCoins() + deltas[i];
@@ -332,6 +338,7 @@ public final class MatchRunner {
 
         // 7. Apply purchase
         String purchasedCardId = null;
+        Double purchasedCardExpectedEv = null;
         Project purchase = plan.purchase;
         if (purchase != null && purchase != RankEntry.WAIT_SENTINEL) {
             int cost = purchase.getCost();
@@ -340,6 +347,14 @@ public final class MatchRunner {
                 active.setCoins(active.getCoins() - cost);
                 active.addProject(purchase);
                 purchasedCardId = purchase.getId();
+
+                // Compute expected per-round EV for the purchased card in current context
+                if (matchConfig.computeCardIncome() && !purchase.isIs_grossprojekt()) {
+                    CardIncome.PlayerStats stats = CardIncome.PlayerStats.of(active);
+                    int[] oppCoins = CardIncome.buildOpponentCoins(state.getPlayers(), activePlayer);
+                    purchasedCardExpectedEv = CardIncome.contextualCardEvPerRound(
+                            purchase, stats, n, oppCoins);
+                }
 
                 // Update unbuilt_projects if supply exhausted
                 if (!purchase.isIs_grossprojekt()) {
@@ -358,7 +373,8 @@ public final class MatchRunner {
                 deltas, purchasedCardId, plan.purchaseWinRate, plan.scoreIsWinRate,
                 coinsAfterPurchase, bürohausSwap, bürohausActivated, funkturmRerolled,
                 plan.computeTimeMs, detail,
-                rollLuck, wrBeforeRoll, wrAfterRoll
+                rollLuck, wrBeforeRoll, wrAfterRoll,
+                cardIncome, purchasedCardExpectedEv
         );
     }
 

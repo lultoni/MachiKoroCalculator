@@ -439,6 +439,13 @@ public class RuntimeTester {
             runPerRollLuckTest();
         });
 
+        runSection("Card Income Attribution", () -> {
+            test_card_income_sums_match_deltas();
+            test_card_income_red_sequential_deduction();
+            test_card_income_blue_all_players();
+            test_card_income_purple_on_roll_6();
+        });
+
         runSection("BitState", () -> {
             test_bitstate_translator_constants();
             test_bitstate_translator_lookups();
@@ -3910,6 +3917,148 @@ public class RuntimeTester {
         }
         MatchConfig config = new MatchConfig(new String[]{idA, idB}, total, 200, 500, true);
         return new MatchResult(config, logs, 1000);
+    }
+
+    // ─── Card Income Attribution Tests ─────────────────────────────────────
+
+    /**
+     * Verify that per-card deltas from attributeIncomePerCard() sum to the same
+     * totals as computeAllDeltasForRoll() for a variety of board states.
+     */
+    private static void test_card_income_sums_match_deltas() {
+        // Midgame state: P0 owns bäckerei(×2), weizenfeld, café. P1 owns weizenfeld, molkerei, ranch.
+        GameStateBuilder b = new GameStateBuilder(2);
+        b.setPlayerName(0, "P0").setCoins(0, 10)
+         .addProject(0, "bäckerei").addProject(0, "bäckerei").addProject(0, "weizenfeld")
+         .addProject(0, "café");
+        b.setPlayerName(1, "P1").setCoins(1, 8)
+         .addProject(1, "weizenfeld").addProject(1, "molkerei").addProject(1, "bauernhof");
+        GameState gs = b.build();
+
+        for (int roll = 1; roll <= 12; roll++) {
+            for (int active = 0; active < 2; active++) {
+                int[] expected = RollResolver.computeAllDeltasForRoll(gs, active, roll);
+                Map<String, int[]> perCard = RollResolver.attributeIncomePerCard(gs, active, roll);
+
+                // Sum per-card deltas for each player
+                int[] sums = new int[2];
+                for (int[] cardDeltas : perCard.values()) {
+                    for (int p = 0; p < 2; p++) {
+                        sums[p] += cardDeltas[p];
+                    }
+                }
+
+                boolean match = sums[0] == expected[0] && sums[1] == expected[1];
+                assertTrue("Card income sums match for roll=" + roll + " active=P" + active
+                        + " (expected [" + expected[0] + "," + expected[1] + "]"
+                        + " got [" + sums[0] + "," + sums[1] + "])", match);
+            }
+        }
+    }
+
+    /**
+     * Red card sequential deduction: when roller has limited coins,
+     * per-card attribution must track the diminishing pool correctly.
+     */
+    private static void test_card_income_red_sequential_deduction() {
+        // P0 has 3 coins. P1 owns 3× café (red, roll 3, costs 1 each).
+        // Roll 3, active P0: reds fire → P1 should get +3 (3 cafés × 1), P0 should get -3.
+        // But if P0 had only 2 coins, third café gets 0.
+        GameStateBuilder b = new GameStateBuilder(2);
+        b.setPlayerName(0, "P0").setCoins(0, 2);
+        b.setPlayerName(1, "P1").setCoins(1, 5)
+         .addProject(1, "café").addProject(1, "café").addProject(1, "café");
+        GameState gs = b.build();
+
+        Map<String, int[]> perCard = RollResolver.attributeIncomePerCard(gs, 0, 3);
+        int[] expected = RollResolver.computeAllDeltasForRoll(gs, 0, 3);
+
+        // Sum per-card
+        int[] sums = new int[2];
+        for (int[] d : perCard.values()) {
+            sums[0] += d[0]; sums[1] += d[1];
+        }
+
+        assertTrue("Red sequential: sums match deltas (P0: " + sums[0] + " vs " + expected[0]
+                + ", P1: " + sums[1] + " vs " + expected[1] + ")",
+                sums[0] == expected[0] && sums[1] == expected[1]);
+
+        // P0 should lose exactly 2 (capped at their coins), P1 gains exactly 2
+        assertTrue("Red sequential: P0 loses 2 from 3 cafés when broke (was " + sums[0] + ")",
+                sums[0] == -2);
+        assertTrue("Red sequential: P1 gains 2 from 3 cafés (was " + sums[1] + ")",
+                sums[1] == 2);
+    }
+
+    /**
+     * Blue cards fire on ALL players' turns, not just the owner's turn.
+     */
+    private static void test_card_income_blue_all_players() {
+        // Both players own weizenfeld (blue, roll 1, +1 to owner).
+        // Roll 1 on P0's turn: both weizenfelder fire → P0 +1, P1 +1.
+        GameStateBuilder b = new GameStateBuilder(2);
+        b.setPlayerName(0, "P0").setCoins(0, 5).addProject(0, "weizenfeld");
+        b.setPlayerName(1, "P1").setCoins(1, 5).addProject(1, "weizenfeld");
+        GameState gs = b.build();
+
+        Map<String, int[]> perCard = RollResolver.attributeIncomePerCard(gs, 0, 1);
+        int[] expected = RollResolver.computeAllDeltasForRoll(gs, 0, 1);
+
+        int[] sums = new int[2];
+        for (int[] d : perCard.values()) {
+            sums[0] += d[0]; sums[1] += d[1];
+        }
+
+        assertTrue("Blue cards: both players get income on P0's turn (P0: " + sums[0]
+                + " vs " + expected[0] + ", P1: " + sums[1] + " vs " + expected[1] + ")",
+                sums[0] == expected[0] && sums[1] == expected[1]);
+        assertTrue("Blue cards: P0 gets +1 from weizenfeld (was " + sums[0] + ")", sums[0] >= 1);
+        assertTrue("Blue cards: P1 gets +1 from weizenfeld (was " + sums[1] + ")", sums[1] >= 1);
+    }
+
+    /**
+     * Purple cards (stadion, fernsehsender) fire only on the owner's turn on roll 6.
+     */
+    private static void test_card_income_purple_on_roll_6() {
+        // P0 owns stadion (purple, roll 6: each opponent pays 2).
+        // Roll 6, active P0: P0 should get +2 from stadion, P1 should lose 2.
+        GameStateBuilder b = new GameStateBuilder(2);
+        b.setPlayerName(0, "P0").setCoins(0, 5).addProject(0, "stadion");
+        b.setPlayerName(1, "P1").setCoins(1, 10);
+        GameState gs = b.build();
+
+        Map<String, int[]> perCard = RollResolver.attributeIncomePerCard(gs, 0, 6);
+        int[] expected = RollResolver.computeAllDeltasForRoll(gs, 0, 6);
+
+        int[] sums = new int[2];
+        for (int[] d : perCard.values()) {
+            sums[0] += d[0]; sums[1] += d[1];
+        }
+
+        assertTrue("Purple roll 6: sums match deltas (P0: " + sums[0] + " vs " + expected[0]
+                + ", P1: " + sums[1] + " vs " + expected[1] + ")",
+                sums[0] == expected[0] && sums[1] == expected[1]);
+
+        // Check stadion specifically
+        // Note: computeAllDeltasForRoll returns the active player's gain from purple
+        // but does NOT decrement opponent deltas (opponent coin loss is implicit in the gain).
+        // attributeIncomePerCard mirrors this behavior.
+        int[] stadionDeltas = perCard.get("stadion");
+        assertTrue("Purple roll 6: stadion attribution exists", stadionDeltas != null);
+        if (stadionDeltas != null) {
+            assertTrue("Purple roll 6: stadion gives P0 +2 (was " + stadionDeltas[0] + ")",
+                    stadionDeltas[0] == 2);
+        }
+
+        // Purple should NOT fire on opponent's turn
+        Map<String, int[]> perCardOpp = RollResolver.attributeIncomePerCard(gs, 1, 6);
+        int[] sumsOpp = new int[2];
+        for (int[] d : perCardOpp.values()) {
+            sumsOpp[0] += d[0]; sumsOpp[1] += d[1];
+        }
+        int[] expectedOpp = RollResolver.computeAllDeltasForRoll(gs, 1, 6);
+        assertTrue("Purple NOT on opponent turn: P0 delta=" + sumsOpp[0] + " (expected "
+                + expectedOpp[0] + ")", sumsOpp[0] == expectedOpp[0]);
     }
 
     private static void assertTrue(String label, boolean condition) {

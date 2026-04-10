@@ -25,8 +25,20 @@ public record MatchConfig(
         Map<String, String>[] configOverrides,
         boolean computeLuck,
         int luckMcSims,
-        boolean luckUseMc
+        boolean luckUseMc,
+        boolean computeCardIncome
 ) {
+    /**
+     * Constructor without computeCardIncome: defaults to false.
+     */
+    public MatchConfig(String[] engineIds, int gameCount, int maxTurnsPerGame,
+                       int iterationsPerEval, boolean seatSwap,
+                       Map<String, String>[] configOverrides,
+                       boolean computeLuck, int luckMcSims, boolean luckUseMc) {
+        this(engineIds, gameCount, maxTurnsPerGame, iterationsPerEval, seatSwap,
+                configOverrides, computeLuck, luckMcSims, luckUseMc, false);
+    }
+
     /**
      * Luck constructor without useMc: defaults to luckUseMc=true.
      */

@@ -266,7 +266,20 @@ const en: Record<string, string> = {
   'h2h.unlucky': 'Unlucky',
   'h2h.luckyWin': 'Lucky win',
   'h2h.unluckyLoss': 'Unlucky loss',
+  'h2h.skilledWin': 'Skilled win',
   'h2h.luckAdjustedWr': 'Luck-Adjusted WR',
+  'h2h.computeCardIncome': 'Compute Card Income',
+  'h2h.cardValue': 'Card Value Analysis',
+  'h2h.cardValueCumulative': 'Cumulative Income',
+  'h2h.cardValueSummary': 'Card Summary',
+  'h2h.cardName': 'Card',
+  'h2h.cardCost': 'Cost',
+  'h2h.cardTotalIncome': 'Total',
+  'h2h.cardTurnsOwned': 'Turns',
+  'h2h.cardIncomePerTurn': 'Inc/Turn',
+  'h2h.cardRoi': 'ROI',
+  'h2h.cardExpectedIncome': 'Expected',
+  'h2h.cardActualVsExpected': 'Δ Act./Exp.',
 };
 
 export default en;

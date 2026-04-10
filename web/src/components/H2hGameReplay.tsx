@@ -289,10 +289,151 @@ function cardBgClass(color?: string): string {
   }
 }
 
+/** Chart stroke color for a card color. */
+function cardChartColor(color?: string): string {
+  switch (color) {
+    case 'blau': return '#3B82F6';
+    case 'rot': return '#EF4444';
+    case 'grün': return '#22C55E';
+    case 'lila': return '#A855F7';
+    case 'gelb': return '#EAB308';
+    default: return '#94a3b8';
+  }
+}
+
+interface CardValueEntry {
+  cardId: string;
+  color: string;
+  cost: number;
+  totalIncome: number;
+  turnsOwned: number;
+  incomePerTurn: number;
+  roi: number;
+  expectedIncome: number | null;  // null if no purchasedCardExpectedEv data
+  actualVsExpected: number | null;
+}
+
+/** Compute per-card value data from cardIncome fields in game turns. */
+function computeCardValueData(
+  game: H2hGameLog,
+  playerIdx: number,
+  inventoryTimeline: string[][][],
+  byId: (id: string) => ProjectDef | undefined,
+) {
+  // Track cumulative income per card over turns (for chart)
+  const cumIncome: Record<string, number> = {};
+  const chartData: Record<string, number>[] = [];  // one entry per turn
+  // Track purchase turn per card (first appearance after starters)
+  const purchaseTurn: Record<string, number> = {};
+  // Track expected EV per card at purchase time
+  const expectedEv: Record<string, number> = {};
+  // Track total income per card
+  const totalIncome: Record<string, number> = {};
+
+  // Determine starters (turn 0 inventory)
+  for (const cardId of STARTER_CARDS) {
+    purchaseTurn[cardId] = 0;
+    cumIncome[cardId] = 0;
+    totalIncome[cardId] = 0;
+  }
+
+  let playerTurnCount = 0;
+
+  for (let ti = 0; ti < game.turns.length; ti++) {
+    const tn = game.turns[ti];
+    if (tn.playerIndex === playerIdx) playerTurnCount++;
+
+    // If this turn has cardIncome data, accumulate only for cards this player owns
+    if (tn.cardIncome) {
+      // Get current inventory for this player (from previous turn's inventory or starters)
+      const ownedCards = ti > 0 && inventoryTimeline[ti - 1]
+        ? inventoryTimeline[ti - 1][playerIdx]
+        : [...STARTER_CARDS];
+      const ownedSet = new Set(ownedCards);
+
+      for (const [cardId, deltas] of Object.entries(tn.cardIncome)) {
+        const delta = deltas[playerIdx] ?? 0;
+        // Only track income from cards this player actually owns
+        if (delta !== 0 && ownedSet.has(cardId)) {
+          cumIncome[cardId] = (cumIncome[cardId] ?? 0) + delta;
+          totalIncome[cardId] = (totalIncome[cardId] ?? 0) + delta;
+        }
+      }
+    }
+
+    // Track purchases by this player
+    if (tn.playerIndex === playerIdx && tn.purchasedCardId && !LANDMARK_IDS.includes(tn.purchasedCardId)) {
+      if (!(tn.purchasedCardId in purchaseTurn)) {
+        purchaseTurn[tn.purchasedCardId] = ti;
+      }
+      cumIncome[tn.purchasedCardId] = cumIncome[tn.purchasedCardId] ?? 0;
+      totalIncome[tn.purchasedCardId] = totalIncome[tn.purchasedCardId] ?? 0;
+      // Capture expected EV at purchase
+      if (tn.purchasedCardExpectedEv != null && !(tn.purchasedCardId in expectedEv)) {
+        expectedEv[tn.purchasedCardId] = tn.purchasedCardExpectedEv;
+      }
+    }
+
+    // Snapshot cumulative income for chart
+    const snapshot: Record<string, number> = { turn: ti + 1 } as any;
+    for (const cardId of Object.keys(cumIncome)) {
+      snapshot[cardId] = cumIncome[cardId];
+    }
+    chartData.push(snapshot);
+  }
+
+  // Count turns owned per card (from purchase to end)
+  const turnsOwned: Record<string, number> = {};
+  for (const [cardId, pTurn] of Object.entries(purchaseTurn)) {
+    // Count turns where this player was active from purchase onwards
+    let owned = 0;
+    for (let ti = pTurn; ti < game.turns.length; ti++) {
+      if (game.turns[ti].playerIndex === playerIdx) owned++;
+    }
+    turnsOwned[cardId] = owned;
+  }
+
+  // Build summary entries
+  const allCards = new Set([...Object.keys(totalIncome), ...Object.keys(purchaseTurn)]);
+  const entries: CardValueEntry[] = [];
+  for (const cardId of allCards) {
+    const proj = byId(cardId);
+    const cost = proj?.cost ?? 0;
+    const income = totalIncome[cardId] ?? 0;
+    const turns = turnsOwned[cardId] ?? 0;
+    const ipt = turns > 0 ? income / turns : 0;
+    const roi = cost > 0 ? income / cost : 0;
+    const ev = expectedEv[cardId] ?? null;
+    const expIncome = ev != null && turns > 0 ? ev * turns : null;
+    const delta = expIncome != null ? income - expIncome : null;
+
+    entries.push({
+      cardId,
+      color: proj?.color ?? '',
+      cost,
+      totalIncome: income,
+      turnsOwned: turns,
+      incomePerTurn: ipt,
+      roi,
+      expectedIncome: expIncome,
+      actualVsExpected: delta,
+    });
+  }
+
+  // Sort by total income descending
+  entries.sort((a, b) => b.totalIncome - a.totalIncome);
+
+  // Collect all card IDs that appear in chart (those with non-zero income)
+  const chartCardIds = entries.filter(e => e.totalIncome !== 0).map(e => e.cardId);
+
+  return { chartData, entries, chartCardIds };
+}
+
 export function H2hGameReplay({ game, engines, matchId, projects, language, onBack }: Props) {
   const { t } = useLocale();
   const [turnIdx, setTurnIdx] = useState(0);
   const [showDetail, setShowDetail] = useState(false);
+  const [cardValuePlayer, setCardValuePlayer] = useState(0);
   const nameKey = `name_${language}` as 'name_de' | 'name_en';
   const landmarkAbbr = language === 'en' ? LANDMARK_ABBR_EN : LANDMARK_ABBR_DE;
 
@@ -318,6 +459,16 @@ export function H2hGameReplay({ game, engines, matchId, projects, language, onBa
   const events = useMemo(
     () => extractEvents(game, projects.byId, language),
     [game, projects, language],
+  );
+
+  // Card Value data (only when cardIncome data exists)
+  const hasCardIncome = useMemo(
+    () => game.turns.some(tn => tn.cardIncome != null),
+    [game],
+  );
+  const cardValueData = useMemo(
+    () => hasCardIncome ? computeCardValueData(game, cardValuePlayer, inventories, projects.byId) : null,
+    [game, cardValuePlayer, inventories, projects, hasCardIncome],
   );
 
   const currentInv = inventories[turnIdx];
@@ -496,6 +647,31 @@ export function H2hGameReplay({ game, engines, matchId, projects, language, onBa
                       </span>
                     ))}
                   </div>
+                  {turn.cardIncome && (
+                    <div className="mt-1.5 space-y-0.5">
+                      {Object.entries(turn.cardIncome).map(([cardId, deltas]) => {
+                        const anyNonZero = deltas.some(d => d !== 0);
+                        if (!anyNonZero) return null;
+                        const proj = projects.byId(cardId);
+                        const name = proj?.[nameKey] ?? proj?.name_de ?? cardId;
+                        return (
+                          <div key={cardId} className="flex items-center gap-1 text-[10px]">
+                            <span className={`${cardTextClass(proj?.color)} truncate w-20`}>{name}</span>
+                            {deltas.map((d, i) => (
+                              <span key={i} className={`font-mono text-right ${
+                                i === turn.playerIndex ? 'w-14 font-semibold' : 'w-14'
+                              } ${
+                                d > 0 ? 'text-green-400/80' : d < 0 ? 'text-red-400/80' : 'text-machi-text-dim/30'
+                              }`}>
+                                <span className="text-machi-text-dim/50 mr-0.5">P{i + 1}</span>
+                                {d >= 0 ? '+' : ''}{d}
+                              </span>
+                            ))}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
 
                 {/* Purchase */}
@@ -698,12 +874,12 @@ export function H2hGameReplay({ game, engines, matchId, projects, language, onBa
             }
 
             // Luck-adjusted result
-            // Raw WR proxy: winner got 1.0, loser got 0.0
+            // winnerLuckAdv > 0 means winner had more luck; < 0 means winner overcame luck deficit
             const winnerIdx = game.winnerIndex;
             const loserIdx = 1 - winnerIdx;
             const winnerLuckAdv = totalLuck[winnerIdx] - totalLuck[loserIdx];
             const isLuckyWin = winnerLuckAdv > 0.05;
-            const isUnluckyLoss = winnerLuckAdv < -0.05;
+            const isSkilledWin = winnerLuckAdv < -0.05;
 
             const chartTooltipStyle = {
               backgroundColor: '#1e1e2e',
@@ -732,12 +908,12 @@ export function H2hGameReplay({ game, engines, matchId, projects, language, onBa
                     ))}
                   </div>
                   {/* 6d. Luck-adjusted result */}
-                  {(isLuckyWin || isUnluckyLoss) && (
+                  {(isLuckyWin || isSkilledWin) && (
                     <div className={`mt-1.5 text-[11px] font-semibold ${
                       isLuckyWin ? 'text-amber-400' : 'text-cyan-400'
                     }`}>
                       {isLuckyWin && `P${winnerIdx + 1}: ${t('h2h.luckyWin')} (+${(winnerLuckAdv * 100).toFixed(1)}% ${t('h2h.lucky').toLowerCase()})`}
-                      {isUnluckyLoss && `P${loserIdx + 1}: ${t('h2h.unluckyLoss')} (${(winnerLuckAdv * 100).toFixed(1)}% ${t('h2h.unlucky').toLowerCase()})`}
+                      {isSkilledWin && `P${winnerIdx + 1}: ${t('h2h.skilledWin')} (${(winnerLuckAdv * 100).toFixed(1)}% ${t('h2h.unlucky').toLowerCase()})`}
                     </div>
                   )}
                 </div>
@@ -886,6 +1062,7 @@ export function H2hGameReplay({ game, engines, matchId, projects, language, onBa
                           <YAxis domain={domain} tick={{ fontSize: 9, fill: 'rgba(255,255,255,0.4)' }} width={30} />
                           <Tooltip
                             contentStyle={chartTooltipStyle}
+                            cursor={{ fill: 'rgba(255,255,255,0.05)' }}
                             labelFormatter={(v) => `Turn ${v}`}
                           />
                           <Bar dataKey="P1" fill="#38bdf8" maxBarSize={6} isAnimationActive={false} />
@@ -912,6 +1089,7 @@ export function H2hGameReplay({ game, engines, matchId, projects, language, onBa
                           <YAxis domain={domain} tick={{ fontSize: 9, fill: 'rgba(255,255,255,0.4)' }} width={30} />
                           <Tooltip
                             contentStyle={chartTooltipStyle}
+                            cursor={{ fill: 'rgba(255,255,255,0.05)' }}
                             labelFormatter={(v) => `Turn ${v}`}
                           />
                           <Bar dataKey="P1" fill="#1a6e8a" maxBarSize={6} isAnimationActive={false} />
@@ -933,6 +1111,134 @@ export function H2hGameReplay({ game, engines, matchId, projects, language, onBa
               })()}
             </div>
           </div>
+          {/* Card Value Analysis (conditionally rendered when cardIncome data exists) */}
+          {hasCardIncome && cardValueData && (
+            <div className="bg-machi-bg rounded-lg p-3 text-xs mb-3">
+              <div className="flex items-center gap-3 mb-2">
+                <span className="text-machi-text-dim font-semibold">{t('h2h.cardValue')}</span>
+                <div className="flex gap-1 ml-auto">
+                  {engines.map((eng, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setCardValuePlayer(i)}
+                      className={`px-2 py-0.5 rounded text-[10px] font-mono transition ${
+                        cardValuePlayer === i
+                          ? (i === 0 ? 'bg-machi-accent/20 text-machi-accent' : 'bg-fuchsia-500/20 text-fuchsia-400')
+                          : 'text-machi-text-dim/50 hover:text-machi-text-dim'
+                      }`}
+                    >
+                      P{i + 1}: {eng}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Cumulative income chart */}
+              {cardValueData.chartCardIds.length > 0 && (
+                <div className="mb-3">
+                  <div className="text-machi-text-dim/60 text-[10px] mb-1">{t('h2h.cardValueCumulative')}</div>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <LineChart data={cardValueData.chartData} margin={{ top: 5, right: 10, bottom: 5, left: -10 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.07)" />
+                      <XAxis
+                        dataKey="turn"
+                        tick={{ fontSize: 9, fill: 'rgba(255,255,255,0.4)' }}
+                      />
+                      <YAxis
+                        tick={{ fontSize: 9, fill: 'rgba(255,255,255,0.4)' }}
+                        width={30}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: '#1e1e2e',
+                          border: '1px solid rgba(255,255,255,0.1)',
+                          borderRadius: '6px',
+                          fontSize: '11px',
+                        }}
+                        labelFormatter={(v) => `Turn ${v}`}
+                      />
+                      {cardValueData.chartCardIds.map(cardId => {
+                        const proj = projects.byId(cardId);
+                        const name = proj?.[nameKey] ?? proj?.name_de ?? cardId;
+                        return (
+                          <Line
+                            key={cardId}
+                            type="monotone"
+                            dataKey={cardId}
+                            name={name}
+                            stroke={cardChartColor(proj?.color)}
+                            strokeWidth={1.5}
+                            dot={false}
+                            strokeOpacity={0.8}
+                          />
+                        );
+                      })}
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+
+              {/* Summary table */}
+              <div>
+                <div className="text-machi-text-dim/60 text-[10px] mb-1">{t('h2h.cardValueSummary')}</div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-[10px] font-mono">
+                    <thead>
+                      <tr className="text-machi-text-dim/60 border-b border-machi-border/30">
+                        <th className="text-left py-1 px-1">{t('h2h.cardName')}</th>
+                        <th className="text-right py-1 px-1">{t('h2h.cardCost')}</th>
+                        <th className="text-right py-1 px-1">{t('h2h.cardTotalIncome')}</th>
+                        <th className="text-right py-1 px-1">{t('h2h.cardTurnsOwned')}</th>
+                        <th className="text-right py-1 px-1">{t('h2h.cardIncomePerTurn')}</th>
+                        <th className="text-right py-1 px-1">{t('h2h.cardRoi')}</th>
+                        <th className="text-right py-1 px-1">{t('h2h.cardExpectedIncome')}</th>
+                        <th className="text-right py-1 px-1">{t('h2h.cardActualVsExpected')}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {cardValueData.entries.map(entry => {
+                        const proj = projects.byId(entry.cardId);
+                        const name = proj?.[nameKey] ?? proj?.name_de ?? entry.cardId;
+                        return (
+                          <tr key={entry.cardId} className="border-b border-machi-border/10 hover:bg-machi-surface/30">
+                            <td className="py-1 px-1">
+                              <span className={`inline-flex items-center gap-0.5 ${cardTextClass(proj?.color)}`}>
+                                {categoryIconPath(proj?.category) && (
+                                  <img src={categoryIconPath(proj?.category)} alt="" className="w-3 h-3" />
+                                )}
+                                {name}
+                              </span>
+                            </td>
+                            <td className="text-right py-1 px-1 text-machi-text-dim">{entry.cost}</td>
+                            <td className={`text-right py-1 px-1 ${entry.totalIncome > 0 ? 'text-green-400' : entry.totalIncome < 0 ? 'text-red-400' : 'text-machi-text-dim'}`}>
+                              {entry.totalIncome}
+                            </td>
+                            <td className="text-right py-1 px-1 text-machi-text-dim">{entry.turnsOwned}</td>
+                            <td className="text-right py-1 px-1 text-machi-text-dim">{entry.incomePerTurn.toFixed(2)}</td>
+                            <td className={`text-right py-1 px-1 ${entry.roi >= 1 ? 'text-green-400' : 'text-machi-text-dim'}`}>
+                              {entry.cost > 0 ? `${entry.roi.toFixed(1)}x` : '-'}
+                            </td>
+                            <td className="text-right py-1 px-1 text-machi-text-dim">
+                              {entry.expectedIncome != null ? entry.expectedIncome.toFixed(1) : '-'}
+                            </td>
+                            <td className={`text-right py-1 px-1 ${
+                              entry.actualVsExpected != null
+                                ? (entry.actualVsExpected > 0.5 ? 'text-green-400' : entry.actualVsExpected < -0.5 ? 'text-red-400' : 'text-machi-text-dim')
+                                : 'text-machi-text-dim'
+                            }`}>
+                              {entry.actualVsExpected != null
+                                ? `${entry.actualVsExpected >= 0 ? '+' : ''}${entry.actualVsExpected.toFixed(1)}`
+                                : '-'}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
           {/* Event Timeline (inside Game Insights) */}
           {events.length > 0 && (
             <div className="mt-3 bg-machi-bg rounded-lg p-3">

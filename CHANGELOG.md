@@ -6,6 +6,22 @@ Implementation history: what was built, why, and which design decisions were mad
 
 ## Phase 7: Iteration
 
+### Luck-adjusted WR for Sweep + Card Value Analyzer (TODO #6, #7)
+
+**Luck-adjusted WR for sweep (TODO #6).** MatchResult now computes `totalLuck[]` and `luckAdjustedWinRates[]` by aggregating per-roll luck from TurnLog across all games. `luckAdjustedWinRates[i] = clamp(winRates[i] - totalLuck[i] / gameCount, 0, 1)`. SweepMain gains `--luck` CLI flag: uses heuristic-mode luck (fast, ~0.6ms overhead per game) and feeds luck-adjusted WR into TPE objective. SweepResult.Trial gains nullable `adjustedWinRate` for display. Trial output shows raw and adjusted WR side by side.
+
+**Card income attribution (TODO #7, backend).** New `RollResolver.attributeIncomePerCard()` replicates Red→Blue/Green→Purple income logic but returns `Map<String, int[]>` keyed by card ID. Tested with 34 assertions covering sum consistency, red sequential deduction, blue all-player, and purple roll-6 behavior. TurnLog gains `cardIncome` and `purchasedCardExpectedEv` fields. MatchConfig gains `computeCardIncome` flag (default false). MatchRunner computes per-card income at each turn and expected EV at purchase time (via `CardIncome.contextualCardEvPerRound`).
+
+**Card value frontend (TODO #7, UI).** H2hGameReplay gains a "Card Value Analysis" section (conditionally rendered when cardIncome data exists):
+- Recharts LineChart of cumulative income per card over turns, colored by card color (blue/red/green/purple)
+- Summary table with card name, cost, total income, turns owned, income/turn, ROI, expected income, actual-vs-expected delta
+- Player toggle to switch between P1/P2 view
+- Per-turn income breakdown in the turn detail panel showing individual card contributions
+
+**H2H setup UI.** "Compute Card Income" checkbox added to H2hOverview alongside existing luck checkbox. Wired through useH2h → API → MatchConfig.
+
+**Locale strings.** DE/EN for all new UI elements (computeCardIncome, cardValue, cardValueCumulative, cardValueSummary, cardName, cardCost, cardTotalIncome, cardTurnsOwned, cardIncomePerTurn, cardRoi, cardExpectedIncome, cardActualVsExpected).
+
 ### Luck Integration + Dice Fortune Upgrade (TODO #3, #4, partial #24)
 
 **LuckAnalyzer dual mode.** Added `boolean useMc` parameter to `computeRollLuck`. MC mode uses `GameSimulator.mcWinRate()` (accurate, slow); heuristic mode uses `WinProbability.computeBaselineWinProb()` (instant, ~0.25 MAE). Backward-compatible: 5-param overload defaults to MC.

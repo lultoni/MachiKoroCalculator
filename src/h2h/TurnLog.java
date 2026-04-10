@@ -1,6 +1,8 @@
 package h2h;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Log of a single turn in an H2H game.
@@ -87,6 +89,10 @@ public final class TurnLog {
     public final Double rollLuck;      // luck value (positive = lucky), null when luck not computed
     public final Double wrBeforeRoll;  // E[WR] across all possible rolls (pre-roll baseline)
     public final Double wrAfterRoll;   // WR after actual roll income applied
+    /** Per-card income breakdown: cardId → int[playerCount] deltas. Null when not computed. */
+    public final Map<String, int[]> cardIncome;
+    /** Expected per-round EV of the purchased card at purchase time. Null when not computed or save. */
+    public final Double purchasedCardExpectedEv;
 
     public TurnLog(int playerIndex, int diceCount, int roll, boolean isDoubles,
                    int[] coinDeltas, String purchasedCardId, double purchaseWinRate,
@@ -94,7 +100,8 @@ public final class TurnLog {
                    int coinsAfterPurchase, String bürohausSwap, boolean bürohausActivated,
                    boolean funkturmRerolled, long evaluateTimeMs,
                    DecisionDetail decisionDetail,
-                   Double rollLuck, Double wrBeforeRoll, Double wrAfterRoll) {
+                   Double rollLuck, Double wrBeforeRoll, Double wrAfterRoll,
+                   Map<String, int[]> cardIncome, Double purchasedCardExpectedEv) {
         this.playerIndex = playerIndex;
         this.diceCount = diceCount;
         this.roll = roll;
@@ -112,6 +119,22 @@ public final class TurnLog {
         this.rollLuck = rollLuck;
         this.wrBeforeRoll = wrBeforeRoll;
         this.wrAfterRoll = wrAfterRoll;
+        this.cardIncome = cardIncome;
+        this.purchasedCardExpectedEv = purchasedCardExpectedEv;
+    }
+
+    /** Constructor without card income fields (defaults to null). */
+    public TurnLog(int playerIndex, int diceCount, int roll, boolean isDoubles,
+                   int[] coinDeltas, String purchasedCardId, double purchaseWinRate,
+                   boolean scoreIsWinRate,
+                   int coinsAfterPurchase, String bürohausSwap, boolean bürohausActivated,
+                   boolean funkturmRerolled, long evaluateTimeMs,
+                   DecisionDetail decisionDetail,
+                   Double rollLuck, Double wrBeforeRoll, Double wrAfterRoll) {
+        this(playerIndex, diceCount, roll, isDoubles, coinDeltas, purchasedCardId,
+                purchaseWinRate, scoreIsWinRate, coinsAfterPurchase, bürohausSwap,
+                bürohausActivated, funkturmRerolled, evaluateTimeMs, decisionDetail,
+                rollLuck, wrBeforeRoll, wrAfterRoll, null, null);
     }
 
     /** Legacy constructor without luck fields (defaults to null). */
@@ -131,12 +154,23 @@ public final class TurnLog {
     TurnLog remapSeats() {
         int[] swappedDeltas = (coinDeltas != null && coinDeltas.length == 2)
                 ? new int[]{coinDeltas[1], coinDeltas[0]} : coinDeltas;
+        // Swap per-card deltas (index 0↔1 in each int[])
+        Map<String, int[]> swappedCardIncome = null;
+        if (cardIncome != null) {
+            swappedCardIncome = new LinkedHashMap<>();
+            for (Map.Entry<String, int[]> e : cardIncome.entrySet()) {
+                int[] orig = e.getValue();
+                swappedCardIncome.put(e.getKey(),
+                        (orig != null && orig.length == 2) ? new int[]{orig[1], orig[0]} : orig);
+            }
+        }
         return new TurnLog(
                 1 - playerIndex, diceCount, roll, isDoubles,
                 swappedDeltas, purchasedCardId, purchaseWinRate, scoreIsWinRate,
                 coinsAfterPurchase, bürohausSwap, bürohausActivated, funkturmRerolled,
                 evaluateTimeMs, decisionDetail,
-                rollLuck, wrBeforeRoll, wrAfterRoll
+                rollLuck, wrBeforeRoll, wrAfterRoll,
+                swappedCardIncome, purchasedCardExpectedEv
         );
     }
 }

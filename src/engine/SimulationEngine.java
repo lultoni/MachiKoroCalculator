@@ -60,4 +60,40 @@ public interface SimulationEngine {
     default TurnPlan evaluateFullTurn(GameState state, int playerIndex, EngineConfig config) {
         throw new UnsupportedOperationException("Engine does not support full-turn evaluation");
     }
+
+    /**
+     * Build a static TurnPlan from an EngineResult, with instant-win priority.
+     *
+     * <p>Non-MCTS engines evaluate the board <b>before</b> the dice roll and lock in a purchase
+     * decision using pre-roll coins. This means they may miss an instant-win landmark if the
+     * player can only afford it after roll income. This helper overrides the purchase to target
+     * the winning landmark when the player has 3 landmarks — MatchRunner's affordability gate
+     * ({@code getCoins() >= cost}) safely degrades to a save if the roll doesn't provide
+     * enough income.
+     *
+     * <p>MCTS engines don't need this because their tree branches per roll outcome.
+     */
+    static TurnPlan staticPlanWithInstantWinPriority(
+            int diceCount, EngineResult result, GameState state, int playerIndex, long elapsed) {
+        core.Player player = state.getPlayers()[playerIndex];
+        core.Project winLm = core.GameState.findInstantWinLandmark(player);
+        if (winLm == null && player.getLandmarkCount() == 3) {
+            // Player has 3 landmarks but can't afford the 4th pre-roll — still target it
+            String[] LANDMARK_IDS = {"bahnhof", "einkaufszentrum", "freizeitpark", "funkturm"};
+            for (String lmId : LANDMARK_IDS) {
+                if (!player.hasProject(lmId)) {
+                    winLm = core.ProjectLoader.getProject(lmId).orElse(null);
+                    break;
+                }
+            }
+        }
+        if (winLm != null) {
+            return TurnPlan.staticPlan(diceCount, winLm, 1.0, result.iterationsUsed, elapsed, result);
+        }
+        EngineResult.Option top = result.topAffordableRecommendation();
+        core.Project purchase = "_wait_".equals(top.project.getId()) ? null : top.project;
+        return TurnPlan.staticPlan(diceCount,
+                purchase != null ? purchase : calcs.RankEntry.WAIT_SENTINEL,
+                top.score, result.iterationsUsed, elapsed, result);
+    }
 }

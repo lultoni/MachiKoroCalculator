@@ -34,15 +34,24 @@ public final class SweepResult {
         public final int index;
         public final Map<String, Double> params;
         public final double winRate;
+        /** Luck-adjusted win rate, null when luck was not computed. */
+        public final Double adjustedWinRate;
         public final int games;
         public final long timeMs;
 
-        public Trial(int index, Map<String, Double> params, double winRate, int games, long timeMs) {
+        public Trial(int index, Map<String, Double> params, double winRate, Double adjustedWinRate,
+                     int games, long timeMs) {
             this.index = index;
             this.params = params;
             this.winRate = winRate;
+            this.adjustedWinRate = adjustedWinRate;
             this.games = games;
             this.timeMs = timeMs;
+        }
+
+        /** Legacy constructor without luck adjustment. */
+        public Trial(int index, Map<String, Double> params, double winRate, int games, long timeMs) {
+            this(index, params, winRate, null, games, timeMs);
         }
     }
 

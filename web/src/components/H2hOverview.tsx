@@ -75,6 +75,7 @@ export function H2hOverview({ onBack, projects, language }: Props) {
   const [computeLuck, setComputeLuck] = useState(false);
   const [luckMcSims, setLuckMcSims] = useState(200);
   const [luckUseMc, setLuckUseMc] = useState(true);
+  const [computeCardIncome, setComputeCardIncome] = useState(false);
   const [fieldsA, setFieldsA] = useState<{ key: string; value: string }[]>([]);
   const [fieldsB, setFieldsB] = useState<{ key: string; value: string }[]>([]);
   const [view, setView] = useState<'overview' | 'ratings' | 'sweep' | 'builder'>('overview');
@@ -262,7 +263,8 @@ export function H2hOverview({ onBack, projects, language }: Props) {
       seatSwap ? undefined : false,
       computeLuck || undefined,
       computeLuck ? luckMcSims : undefined,
-      computeLuck ? (luckUseMc ? undefined : false) : undefined);
+      computeLuck ? (luckUseMc ? undefined : false) : undefined,
+      computeCardIncome || undefined);
   };
 
   // Overview
@@ -471,6 +473,15 @@ export function H2hOverview({ onBack, projects, language }: Props) {
                 )}
               </div>
             )}
+            <label className="flex items-center gap-2 cursor-pointer mt-5">
+              <input
+                type="checkbox"
+                checked={computeCardIncome}
+                onChange={e => setComputeCardIncome(e.target.checked)}
+                className="accent-machi-accent"
+              />
+              <span className="text-sm text-machi-text-dim">{t('h2h.computeCardIncome')}</span>
+            </label>
           </div>
 
           {h2h.progress ? (

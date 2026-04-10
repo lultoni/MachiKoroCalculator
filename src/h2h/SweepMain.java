@@ -144,6 +144,7 @@ public final class SweepMain {
         boolean resume = false;
         boolean includeDefault = true;
         boolean verbose = false;
+        boolean useLuck = false;
 
         for (int i = 0; i < args.length; i++) {
             switch (args[i]) {
@@ -160,6 +161,7 @@ public final class SweepMain {
                 case "--resume"    -> resume = true;
                 case "--no-default"-> includeDefault = false;
                 case "--verbose"   -> verbose = true;
+                case "--luck"      -> useLuck = true;
                 case "--help"      -> { printUsage(); return; }
                 default            -> System.err.println("Unknown arg: " + args[i]);
             }
@@ -228,6 +230,9 @@ public final class SweepMain {
             System.out.println("[SWEEP] Running indefinitely — press Ctrl+C to stop and save");
         }
         System.out.printf("[SWEEP] Parameter space: %d dimensions%n", PARAMS.length);
+        if (useLuck) {
+            System.out.println("[SWEEP] Luck adjustment enabled (heuristic mode) — TPE optimizes luck-adjusted WR");
+        }
         System.out.println();
 
         // Generate LHS points for startup
@@ -301,11 +306,13 @@ public final class SweepMain {
                 int idx = 0;
                 for (SweepResult.Trial tr : priorTrials) {
                     obsParams[idx] = trialToArray(tr);
-                    obsObjectives[idx++] = tr.winRate;
+                    obsObjectives[idx++] = useLuck && tr.adjustedWinRate != null
+                            ? tr.adjustedWinRate : tr.winRate;
                 }
                 for (SweepResult.Trial tr : newTrials) {
                     obsParams[idx] = trialToArray(tr);
-                    obsObjectives[idx++] = tr.winRate;
+                    obsObjectives[idx++] = useLuck && tr.adjustedWinRate != null
+                            ? tr.adjustedWinRate : tr.winRate;
                 }
                 paramValues = sampler.suggest(PARAMS, obsParams, obsObjectives);
                 source = "TPE";
@@ -341,12 +348,16 @@ public final class SweepMain {
             // This makes the objective unbiased across opponent strengths.
             long matchStart = System.currentTimeMillis();
             double winRateSum = 0.0;
+            double rawWrSum = 0.0;
             StringBuilder perOpp = new StringBuilder();
 
             for (int oi = 0; oi < opponentList.size(); oi++) {
                 String currentOpponent = opponentList.get(oi);
-                MatchConfig matchConfig = new MatchConfig(
-                        new String[]{creatorId, currentOpponent}, games, 200, iterations, true, overrides);
+                MatchConfig matchConfig = useLuck
+                        ? new MatchConfig(new String[]{creatorId, currentOpponent}, games, 200,
+                                iterations, true, overrides, true, 200, false)
+                        : new MatchConfig(new String[]{creatorId, currentOpponent}, games, 200,
+                                iterations, true, overrides);
 
                 final boolean verb = verbose;
                 final int totalGames = games;
@@ -360,7 +371,10 @@ public final class SweepMain {
                     }
                 } : null);
 
-                winRateSum += result.winRates[0];
+                double rawWR = result.winRates[0];
+                double thisWR = useLuck ? result.luckAdjustedWinRates[0] : rawWR;
+                winRateSum += thisWR;
+                if (useLuck) rawWrSum += rawWR;
                 if (oi > 0) perOpp.append(", ");
                 perOpp.append(result.wins[0]).append("-").append(result.wins[1]);
 
@@ -373,8 +387,10 @@ public final class SweepMain {
 
             long matchTime = System.currentTimeMillis() - matchStart;
             double winRate = winRateSum / opponentList.size();
+            Double adjustedWR = useLuck ? winRate : null;
+            double rawWR = useLuck ? rawWrSum / opponentList.size() : winRate;
             int totalGamesPlayed = games * opponentList.size();
-            SweepResult.Trial trial = new SweepResult.Trial(trialIdx, paramMap, winRate, totalGamesPlayed, matchTime);
+            SweepResult.Trial trial = new SweepResult.Trial(trialIdx, paramMap, winRate, adjustedWR, totalGamesPlayed, matchTime);
             newTrials.add(trial);
             trialsOnExit[0] = newTrials.size();
 
@@ -386,14 +402,15 @@ public final class SweepMain {
             String trialLabel = infinite
                     ? String.format("Trial %d", trialIdx + 1)
                     : String.format("Trial %d/%d", trialIdx + 1, trials);
+            String luckSuffix = useLuck ? String.format("  [raw: %.1f%%]", rawWR * 100) : "";
             if (opponentList.size() > 1) {
-                System.out.printf("  %s (%s): avgWR=%.1f%% (%s)  [best: %.1f%% @ #%d]  (%.1fs)%n",
+                System.out.printf("  %s (%s): avgWR=%.1f%% (%s)%s  [best: %.1f%% @ #%d]  (%.1fs)%n",
                         trialLabel, source, winRate * 100,
-                        perOpp,
+                        perOpp, luckSuffix,
                         bestWinRate * 100, bestTrialIdx, matchTime / 1000.0);
             } else {
-                System.out.printf("  %s (%s): WR=%.1f%%  [best: %.1f%% @ #%d]  (%.1fs)%n",
-                        trialLabel, source, winRate * 100,
+                System.out.printf("  %s (%s): WR=%.1f%%%s  [best: %.1f%% @ #%d]  (%.1fs)%n",
+                        trialLabel, source, winRate * 100, luckSuffix,
                         bestWinRate * 100, bestTrialIdx, matchTime / 1000.0);
             }
 
@@ -531,6 +548,7 @@ public final class SweepMain {
         System.out.println("  --resume             Continue from all trials in sweep-results.json");
         System.out.println("  --no-default         Skip evaluating default params as trial 0");
         System.out.println("  --verbose            Per-game results, param deltas, match details");
+        System.out.println("  --luck               Use luck-adjusted WR as TPE objective (heuristic mode, fast)");
         System.out.println("  --help               Show this help");
         System.out.println();
         System.out.println("Examples:");

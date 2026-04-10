@@ -143,8 +143,14 @@ final class H2hHandler implements HttpHandler {
         // Legacy: single iterations override (backward compat with CLI)
         int iterations = body.has("iterations") ? body.get("iterations").getAsInt() : 0;
 
+        // Luck computation (opt-in, slower)
+        boolean computeLuck = body.has("computeLuck") && body.get("computeLuck").getAsBoolean();
+        int luckMcSims = body.has("luckMcSims") ? body.get("luckMcSims").getAsInt() : 200;
+        boolean luckUseMc = !body.has("luckUseMc") || body.get("luckUseMc").getAsBoolean();
+
         MatchConfig config = new MatchConfig(
-                new String[]{engineA, engineB}, games, maxTurns, iterations, seatSwap, configOverrides);
+                new String[]{engineA, engineB}, games, maxTurns, iterations, seatSwap,
+                configOverrides, computeLuck, luckMcSims, luckUseMc);
 
         String matchId = java.util.UUID.randomUUID().toString().substring(0, 8);
         MatchProgress progress = new MatchProgress(matchId, config);

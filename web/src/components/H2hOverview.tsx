@@ -72,6 +72,9 @@ export function H2hOverview({ onBack, projects, language }: Props) {
   const [games, setGames] = useState(100);
   const [maxTurns, setMaxTurns] = useState(200);
   const [seatSwap, setSeatSwap] = useState(true);
+  const [computeLuck, setComputeLuck] = useState(false);
+  const [luckMcSims, setLuckMcSims] = useState(200);
+  const [luckUseMc, setLuckUseMc] = useState(true);
   const [fieldsA, setFieldsA] = useState<{ key: string; value: string }[]>([]);
   const [fieldsB, setFieldsB] = useState<{ key: string; value: string }[]>([]);
   const [view, setView] = useState<'overview' | 'ratings' | 'sweep' | 'builder'>('overview');
@@ -256,7 +259,10 @@ export function H2hOverview({ onBack, projects, language }: Props) {
     const configB = fieldsB.length > 0 ? fieldsToConfigMap(fieldsB) : undefined;
     h2h.startMatch(engineA, engineB, games, configA, configB,
       maxTurns !== 200 ? maxTurns : undefined,
-      seatSwap ? undefined : false);
+      seatSwap ? undefined : false,
+      computeLuck || undefined,
+      computeLuck ? luckMcSims : undefined,
+      computeLuck ? (luckUseMc ? undefined : false) : undefined);
   };
 
   // Overview
@@ -427,6 +433,44 @@ export function H2hOverview({ onBack, projects, language }: Props) {
               />
               <span className="text-sm text-machi-text-dim">{t('h2h.seatSwap')}</span>
             </label>
+            <label className="flex items-center gap-2 cursor-pointer mt-5">
+              <input
+                type="checkbox"
+                checked={computeLuck}
+                onChange={e => setComputeLuck(e.target.checked)}
+                className="accent-machi-accent"
+              />
+              <span className="text-sm text-machi-text-dim">{t('h2h.computeLuck')}</span>
+            </label>
+            {computeLuck && (
+              <div className="ml-6 mt-1 flex flex-col gap-1.5">
+                <div className="flex items-center gap-2">
+                  <label className="text-xs text-machi-text-dim w-20">{t('h2h.luckMode')}</label>
+                  <select
+                    value={luckUseMc ? 'mc' : 'heuristic'}
+                    onChange={e => setLuckUseMc(e.target.value === 'mc')}
+                    className="bg-machi-card border border-machi-border rounded px-2 py-0.5 text-xs text-machi-text"
+                  >
+                    <option value="mc">{t('h2h.luckModeMc')}</option>
+                    <option value="heuristic">{t('h2h.luckModeHeuristic')}</option>
+                  </select>
+                </div>
+                {luckUseMc && (
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs text-machi-text-dim w-20">{t('h2h.luckSims')}</label>
+                    <input
+                      type="number"
+                      min={50}
+                      max={5000}
+                      step={50}
+                      value={luckMcSims}
+                      onChange={e => setLuckMcSims(Math.max(50, Math.min(5000, Number(e.target.value) || 200)))}
+                      className="bg-machi-card border border-machi-border rounded px-2 py-0.5 text-xs text-machi-text w-20"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {h2h.progress ? (

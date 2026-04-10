@@ -6,6 +6,28 @@ Implementation history: what was built, why, and which design decisions were mad
 
 ## Phase 7: Iteration
 
+### Luck Integration + Dice Fortune Upgrade (TODO #3, #4, partial #24)
+
+**LuckAnalyzer dual mode.** Added `boolean useMc` parameter to `computeRollLuck`. MC mode uses `GameSimulator.mcWinRate()` (accurate, slow); heuristic mode uses `WinProbability.computeBaselineWinProb()` (instant, ~0.25 MAE). Backward-compatible: 5-param overload defaults to MC.
+
+**TurnLog + MatchConfig luck fields.** TurnLog gains 3 nullable Double fields: `rollLuck`, `wrBeforeRoll`, `wrAfterRoll`. MatchConfig gains `computeLuck` (boolean, default false) and `luckMcSims` (int, default 200). All backward-compatible with existing call sites.
+
+**MatchRunner luck computation.** When `computeLuck` is enabled, LuckAnalyzer runs between the final roll (post-Funkturm) and income application for every turn. Uses MC mode (200 sims/outcome). Opt-in via MatchConfig flag — ~3-6s overhead per game.
+
+**H2H API + frontend types.** H2hHandler parses `computeLuck`/`luckMcSims` from POST body. TypeScript types updated. useH2h passes through to API.
+
+**Dice Fortune Recharts upgrade.** Replaced Unicode sparklines with Recharts BarChart. Two side-by-side charts (Own Turns, Opp Turns) with P1/P2 bar series. Shared Y-axis domain for consistent comparison. Dark theme styling consistent with H2hSweepResults.
+
+**Luck visualizations (4 features).** All conditionally rendered when luck data exists:
+1. Per-roll luck annotation in turn detail dice card (color-coded: green >+2%, red <-2%, dim neutral)
+2. Luck-over-time LineChart in Game Insights (cumulative luck per player, ReferenceLine at y=0)
+3. Game-level luck summary (total luck per player, color-coded)
+4. Luck-adjusted result flag ("Lucky win" / "Unlucky loss" when >5% luck advantage)
+
+**computeLuck toggle.** Checkbox in H2hOverview match setup, next to seat swap toggle.
+
+**Locale strings.** DE/EN for all new UI elements (diceFortune, ownTurns, oppTurns, computeLuck, luckSummary, totalLuck, luckOverTime, lucky, unlucky, luckyWin, unluckyLoss, luckAdjustedWr).
+
 ### Bitwise Game Core — Phases 5-7: Fully Bitwise Engine Foundation (TODO #20 complete)
 
 **Phase 5: BitRolloutFn + Delete Old Rollouts + BitCreatorRollout.** New `BitRolloutFn` functional interface (`double simulate(BitState, int[], int, int)`) replaces the old `RolloutFn` that accepted `(GameState, SupplyTracker)`. All rollout classes expose public `simulateBit()` entry points. MctsTree changed from `RolloutFn` to `BitRolloutFn` — leaf rollouts now pass `BitState` + `int[]` directly, eliminating the double conversion (`BitState → GameState → BitState`) at every MCTS iteration. FlatMcEngine and CreatorEngine also wire directly to `BitRolloutFn`. New `BitCreatorRollout` ports CreatorRollout's coverage bonus + save-toward-landmark heuristic to BitState-native operations. `BitRolloutEvCache` made public for cross-package access. Seven old GameState-based classes deleted: `RolloutFn`, `MctsRollout`, `GreedyRollout`, `BoltzmannRollout`, `DepthLimitedRollout`, `RolloutEvCache`, `CreatorRollout`.

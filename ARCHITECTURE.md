@@ -454,12 +454,19 @@ Per-roll luck computation using the backgammon model:
 Luck(roll) = WR_after(actual_roll) - E[WR_after(all_possible_rolls)]
 ```
 
+**Dual mode:** `computeRollLuck(state, activePlayer, actualRoll, usedTwoDice, mcSims, useMc)`
+- `useMc=true` — evaluates via `GameSimulator.mcWinRate()` (accurate, slow; ~200 sims/outcome)
+- `useMc=false` — evaluates via `WinProbability.computeBaselineWinProb()` (instant, ~0.25 MAE)
+- 5-param overload defaults to MC mode for backward compatibility
+
 **Implementation:**
 1. Enumerates all possible roll outcomes (1-6 for 1d6, 2-12 for 2d6)
 2. For each outcome: copies state, applies income via `RollResolver.computeAllDeltasForRoll()`, handles Bürohaus if roll=6
-3. Evaluates win rate via `GameSimulator.mcWinRate()` (MC, not softmax — more accurate)
+3. Evaluates win rate via MC or heuristic (selected by `useMc` flag)
 4. Weights by dice probabilities (`CardIncome.P1`/`P2`)
 5. Returns `RollLuck(luck, wrAfterActual, expectedWr)`
+
+**Integration with H2H:** Wired into `MatchRunner.playTurn()` via `MatchConfig.computeLuck()` flag. Computed between final roll (post-Funkturm) and income application. TurnLog carries `rollLuck`, `wrBeforeRoll`, `wrAfterRoll` fields. Frontend renders per-roll annotation, cumulative luck chart, game-level summary, and luck-adjusted result.
 
 **Properties:**
 - Luck > 0 = actual roll better than average (lucky)

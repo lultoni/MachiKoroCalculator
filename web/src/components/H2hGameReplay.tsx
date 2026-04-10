@@ -3,6 +3,10 @@ import { useLocale } from '../i18n/useLocale';
 import type { H2hGameLog, H2hTurnLog, ProjectDef } from '../api/types';
 import { cardTextClass, categoryIconPath } from '../utils/cardDisplay';
 import { CardTooltip } from './CardTooltip';
+import {
+  BarChart, Bar, LineChart, Line, ReferenceLine,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+} from 'recharts';
 
 interface Props {
   game: H2hGameLog;
@@ -131,9 +135,6 @@ function computeInsights(game: H2hGameLog, playerCount: number) {
   };
 }
 
-/** Unicode block characters for sparklines (8 levels). */
-const SPARK = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
-
 interface DiceFortune {
   /** Per-player array of own-turn income values (one per own turn, in order). */
   ownIncome: number[][];
@@ -168,20 +169,6 @@ function computeDiceFortune(game: H2hGameLog, playerCount: number): DiceFortune 
   }
 
   return { ownIncome, oppIncome, ownIncomeFreq, oppIncomeFreq };
-}
-
-/** Render a sparkline string from an array of values.
- *  If globalMin/globalMax are provided, use them for normalization
- *  instead of per-array min/max (ensures consistent scale across charts). */
-function sparkline(values: number[], globalMin?: number, globalMax?: number): string {
-  if (values.length === 0) return '';
-  const min = globalMin ?? Math.min(...values);
-  const max = globalMax ?? Math.max(...values);
-  const range = max - min || 1;
-  return values.map(v => {
-    const idx = Math.min(7, Math.floor(((v - min) / range) * 7.99));
-    return SPARK[idx];
-  }).join('');
 }
 
 interface GameEvent {
@@ -486,6 +473,14 @@ export function H2hGameReplay({ game, engines, matchId, projects, language, onBa
                       {projects.byId('funkturm')?.[nameKey] ?? (language === 'en' ? 'Radio Tower' : 'Funkturm')} ↻
                     </div>
                   )}
+                  {turn.rollLuck != null && (
+                    <div className={`text-xs mt-0.5 font-mono ${
+                      turn.rollLuck > 0.02 ? 'text-green-400' :
+                      turn.rollLuck < -0.02 ? 'text-red-400' : 'text-machi-text-dim/60'
+                    }`}>
+                      Luck: {turn.rollLuck >= 0 ? '+' : ''}{(turn.rollLuck * 100).toFixed(1)}%
+                    </div>
+                  )}
                 </div>
 
                 {/* Income */}
@@ -682,6 +677,97 @@ export function H2hGameReplay({ game, engines, matchId, projects, language, onBa
               </div>
             ))}
           </div>
+          {/* Luck Analysis (conditionally rendered when luck data present) */}
+          {(() => {
+            const hasLuck = game.turns.some(tn => tn.rollLuck != null);
+            if (!hasLuck) return null;
+
+            // Compute cumulative luck per player
+            const cumLuck = [0, 0];
+            const luckTimeData: { turn: number; P1: number; P2: number }[] = [];
+            const totalLuck = [0, 0];
+            let turnNum = 0;
+
+            for (const tn of game.turns) {
+              turnNum++;
+              if (tn.rollLuck != null) {
+                cumLuck[tn.playerIndex] += tn.rollLuck;
+                totalLuck[tn.playerIndex] += tn.rollLuck;
+              }
+              luckTimeData.push({ turn: turnNum, P1: cumLuck[0], P2: cumLuck[1] });
+            }
+
+            // Luck-adjusted result
+            // Raw WR proxy: winner got 1.0, loser got 0.0
+            const winnerIdx = game.winnerIndex;
+            const loserIdx = 1 - winnerIdx;
+            const winnerLuckAdv = totalLuck[winnerIdx] - totalLuck[loserIdx];
+            const isLuckyWin = winnerLuckAdv > 0.05;
+            const isUnluckyLoss = winnerLuckAdv < -0.05;
+
+            const chartTooltipStyle = {
+              backgroundColor: '#1e1e2e',
+              border: '1px solid rgba(255,255,255,0.1)',
+              borderRadius: '6px',
+              fontSize: '11px',
+            };
+
+            return (
+              <>
+                {/* 6c. Game-level luck summary */}
+                <div className="bg-machi-bg rounded-lg p-3 text-xs mb-3">
+                  <div className="text-machi-text-dim mb-2 font-semibold">{t('h2h.luckSummary')}</div>
+                  <div className="flex flex-wrap gap-x-6 gap-y-1">
+                    {engines.map((_eng, i) => (
+                      <span key={i}>
+                        <span className={i === 0 ? 'text-machi-accent' : 'text-fuchsia-400'}>P{i + 1}</span>
+                        {' '}{t('h2h.totalLuck')}:{' '}
+                        <span className={`font-mono font-semibold ${
+                          totalLuck[i] > 0.02 ? 'text-green-400' :
+                          totalLuck[i] < -0.02 ? 'text-red-400' : 'text-machi-text-dim'
+                        }`}>
+                          {totalLuck[i] >= 0 ? '+' : ''}{(totalLuck[i] * 100).toFixed(1)}%
+                        </span>
+                      </span>
+                    ))}
+                  </div>
+                  {/* 6d. Luck-adjusted result */}
+                  {(isLuckyWin || isUnluckyLoss) && (
+                    <div className={`mt-1.5 text-[11px] font-semibold ${
+                      isLuckyWin ? 'text-amber-400' : 'text-cyan-400'
+                    }`}>
+                      {isLuckyWin && `P${winnerIdx + 1}: ${t('h2h.luckyWin')} (+${(winnerLuckAdv * 100).toFixed(1)}% ${t('h2h.lucky').toLowerCase()})`}
+                      {isUnluckyLoss && `P${loserIdx + 1}: ${t('h2h.unluckyLoss')} (${(winnerLuckAdv * 100).toFixed(1)}% ${t('h2h.unlucky').toLowerCase()})`}
+                    </div>
+                  )}
+                </div>
+
+                {/* 6b. Luck-over-time chart */}
+                <div className="bg-machi-bg rounded-lg p-3 text-xs mb-3">
+                  <div className="text-machi-text-dim mb-2 font-semibold">{t('h2h.luckOverTime')}</div>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <LineChart data={luckTimeData} margin={{ top: 5, right: 10, bottom: 5, left: -10 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.07)" />
+                      <XAxis dataKey="turn" tick={{ fontSize: 9, fill: 'rgba(255,255,255,0.4)' }} />
+                      <YAxis
+                        tick={{ fontSize: 9, fill: 'rgba(255,255,255,0.4)' }}
+                        tickFormatter={(v: number) => `${(v * 100).toFixed(0)}%`}
+                        width={40}
+                      />
+                      <ReferenceLine y={0} stroke="rgba(255,255,255,0.2)" strokeDasharray="3 3" />
+                      <Tooltip
+                        contentStyle={chartTooltipStyle}
+                        labelFormatter={(v) => `Turn ${v}`}
+                        formatter={(v) => [`${(Number(v) * 100).toFixed(1)}%`]}
+                      />
+                      <Line type="monotone" dataKey="P1" stroke="#38bdf8" strokeWidth={2} dot={false} />
+                      <Line type="monotone" dataKey="P2" stroke="#E879F9" strokeWidth={2} dot={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </>
+            );
+          })()}
           {/* Game-wide events summary */}
           <div className="bg-machi-bg rounded-lg p-3 text-xs mb-3">
             <div className="text-machi-text-dim mb-1 font-semibold">{t('h2h.gameEvents')}</div>
@@ -697,7 +783,7 @@ export function H2hGameReplay({ game, engines, matchId, projects, language, onBa
           </div>
           {/* Dice Fortune */}
           <div className="bg-machi-bg rounded-lg p-3 text-xs mb-3">
-            <div className="text-machi-text-dim mb-2 font-semibold">{language === 'en' ? 'Dice Fortune' : 'Würfelglück'}</div>
+            <div className="text-machi-text-dim mb-2 font-semibold">{t('h2h.diceFortune')}</div>
             <div className="grid gap-3" style={{ gridTemplateColumns: 'auto 1fr 1fr' }}>
               {/* Col 1: Frequency table */}
               {(() => {
@@ -759,48 +845,86 @@ export function H2hGameReplay({ game, engines, matchId, projects, language, onBa
                   </div>
                 );
               })()}
-              {/* Col 2: Own turns sparklines */}
+              {/* Col 2: Own turns bar chart */}
               {(() => {
-                // Compute shared min/max across all 4 sparkline series for consistent scale
+                // Compute shared Y-axis domain across all 4 series
                 const allValues = [...fortune.ownIncome, ...fortune.oppIncome].flat();
                 const globalMin = allValues.length > 0 ? Math.min(...allValues) : 0;
                 const globalMax = allValues.length > 0 ? Math.max(...allValues) : 1;
+                const domain: [number, number] = [globalMin, globalMax];
+
+                // Build data for own-turn chart: each turn index has P1/P2 bars
+                const ownLen = Math.max(fortune.ownIncome[0]?.length ?? 0, fortune.ownIncome[1]?.length ?? 0);
+                const ownData = Array.from({ length: ownLen }, (_, i) => ({
+                  turn: i + 1,
+                  P1: fortune.ownIncome[0]?.[i] ?? 0,
+                  P2: fortune.ownIncome[1]?.[i] ?? 0,
+                }));
+
+                const oppLen = Math.max(fortune.oppIncome[0]?.length ?? 0, fortune.oppIncome[1]?.length ?? 0);
+                const oppData = Array.from({ length: oppLen }, (_, i) => ({
+                  turn: i + 1,
+                  P1: fortune.oppIncome[0]?.[i] ?? 0,
+                  P2: fortune.oppIncome[1]?.[i] ?? 0,
+                }));
+
+                const chartTooltipStyle = {
+                  backgroundColor: '#1e1e2e',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: '6px',
+                  fontSize: '11px',
+                };
+
                 return (
                   <>
                     <div>
-                      <div className="text-center text-machi-text-dim/60 text-[10px] mb-1">{language === 'en' ? 'Own turns' : 'Eigene Züge'}</div>
-                      <div className="space-y-1.5">
+                      <div className="text-center text-machi-text-dim/60 text-[10px] mb-1">{t('h2h.ownTurns')}</div>
+                      <ResponsiveContainer width="100%" height={120}>
+                        <BarChart data={ownData} margin={{ top: 2, right: 2, bottom: 0, left: -20 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.07)" />
+                          <XAxis dataKey="turn" tick={false} height={4} />
+                          <YAxis domain={domain} tick={{ fontSize: 9, fill: 'rgba(255,255,255,0.4)' }} width={30} />
+                          <Tooltip
+                            contentStyle={chartTooltipStyle}
+                            labelFormatter={(v) => `Turn ${v}`}
+                          />
+                          <Bar dataKey="P1" fill="#38bdf8" maxBarSize={6} isAnimationActive={false} />
+                          <Bar dataKey="P2" fill="#E879F9" maxBarSize={6} isAnimationActive={false} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                      <div className="flex justify-between text-[9px] text-machi-text-dim/50 mt-0.5 px-1">
                         {engines.map((_eng, i) => (
-                          <div key={i} className="flex items-end gap-1" title={fortune.ownIncome[i].join(', ')}>
-                            <span className={`font-mono text-[10px] flex-shrink-0 ${i === 0 ? 'text-machi-accent' : 'text-fuchsia-400'}`}>P{i + 1}</span>
-                            <div className="font-mono text-xl leading-none tracking-[-0.02em] flex-1 text-center overflow-hidden">
-                              {sparkline(fortune.ownIncome[i], globalMin, globalMax)}
-                            </div>
-                            <span className="text-[9px] text-machi-text-dim/50 flex-shrink-0">
-                              Ø{fortune.ownIncome[i].length > 0
-                                ? (fortune.ownIncome[i].reduce((a, b) => a + b, 0) / fortune.ownIncome[i].length).toFixed(1)
-                                : '0'}
-                            </span>
-                          </div>
+                          <span key={i} className={i === 0 ? 'text-machi-accent' : 'text-fuchsia-400'}>
+                            P{i + 1} Ø{fortune.ownIncome[i].length > 0
+                              ? (fortune.ownIncome[i].reduce((a, b) => a + b, 0) / fortune.ownIncome[i].length).toFixed(1)
+                              : '0'}
+                          </span>
                         ))}
                       </div>
                     </div>
-                    {/* Col 3: Opponent turns sparklines */}
+                    {/* Col 3: Opponent turns bar chart */}
                     <div>
-                      <div className="text-center text-machi-text-dim/60 text-[10px] mb-1">{language === 'en' ? 'Opponent turns' : 'Gegnerische Züge'}</div>
-                      <div className="space-y-1.5">
+                      <div className="text-center text-machi-text-dim/60 text-[10px] mb-1">{t('h2h.oppTurns')}</div>
+                      <ResponsiveContainer width="100%" height={120}>
+                        <BarChart data={oppData} margin={{ top: 2, right: 2, bottom: 0, left: -20 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.07)" />
+                          <XAxis dataKey="turn" tick={false} height={4} />
+                          <YAxis domain={domain} tick={{ fontSize: 9, fill: 'rgba(255,255,255,0.4)' }} width={30} />
+                          <Tooltip
+                            contentStyle={chartTooltipStyle}
+                            labelFormatter={(v) => `Turn ${v}`}
+                          />
+                          <Bar dataKey="P1" fill="#1a6e8a" maxBarSize={6} isAnimationActive={false} />
+                          <Bar dataKey="P2" fill="#8b3a96" maxBarSize={6} isAnimationActive={false} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                      <div className="flex justify-between text-[9px] text-machi-text-dim/50 mt-0.5 px-1">
                         {engines.map((_eng, i) => (
-                          <div key={i} className="flex items-end gap-1" title={fortune.oppIncome[i].join(', ')}>
-                            <span className={`font-mono text-[10px] flex-shrink-0 ${i === 0 ? 'text-machi-accent' : 'text-fuchsia-400'}`}>P{i + 1}</span>
-                            <div className="font-mono text-xl leading-none tracking-[-0.02em] flex-1 text-center overflow-hidden">
-                              {sparkline(fortune.oppIncome[i], globalMin, globalMax)}
-                            </div>
-                            <span className="text-[9px] text-machi-text-dim/50 flex-shrink-0">
-                              Ø{fortune.oppIncome[i].length > 0
-                                ? (fortune.oppIncome[i].reduce((a, b) => a + b, 0) / fortune.oppIncome[i].length).toFixed(1)
-                                : '0'}
-                            </span>
-                          </div>
+                          <span key={i} className={i === 0 ? 'text-machi-accent' : 'text-fuchsia-400'}>
+                            P{i + 1} Ø{fortune.oppIncome[i].length > 0
+                              ? (fortune.oppIncome[i].reduce((a, b) => a + b, 0) / fortune.oppIncome[i].length).toFixed(1)
+                              : '0'}
+                          </span>
                         ))}
                       </div>
                     </div>

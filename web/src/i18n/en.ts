@@ -251,6 +251,22 @@ const en: Record<string, string> = {
   'builder.errorId': 'Engine ID is required.',
   'builder.customEngines': 'Custom Engines',
   'builder.noCustom': 'No custom engines yet. Create one using the form.',
+  'h2h.computeLuck': 'Compute Luck (slower)',
+  'h2h.luckMode': 'Mode',
+  'h2h.luckModeMc': 'Monte Carlo',
+  'h2h.luckModeHeuristic': 'Heuristic (fast)',
+  'h2h.luckSims': 'MC Sims',
+  'h2h.diceFortune': 'Dice Fortune',
+  'h2h.ownTurns': 'Own Turns',
+  'h2h.oppTurns': 'Opponent Turns',
+  'h2h.luckSummary': 'Luck Summary',
+  'h2h.totalLuck': 'Total Luck',
+  'h2h.luckOverTime': 'Luck Over Time',
+  'h2h.lucky': 'Lucky',
+  'h2h.unlucky': 'Unlucky',
+  'h2h.luckyWin': 'Lucky win',
+  'h2h.unluckyLoss': 'Unlucky loss',
+  'h2h.luckAdjustedWr': 'Luck-Adjusted WR',
 };
 
 export default en;

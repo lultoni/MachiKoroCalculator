@@ -1,5 +1,6 @@
 package h2h;
 
+import calcs.LuckAnalyzer;
 import calcs.RankEntry;
 import calcs.WinProbability;
 import core.*;
@@ -187,7 +188,7 @@ public final class MatchRunner {
 
         while (turnCount < config.maxTurnsPerGame()) {
             TurnLog turnLog = playTurn(state, activePlayer,
-                    gameEngines[activePlayer], gameConfigs[activePlayer]);
+                    gameEngines[activePlayer], gameConfigs[activePlayer], config);
             log.turns.add(turnLog);
             turnCount++;
 
@@ -202,7 +203,7 @@ public final class MatchRunner {
             boolean hasFreizeit = state.getPlayers()[activePlayer].hasProject("freizeitpark");
             if (hasFreizeit && turnLog.isDoubles) {
                 TurnLog bonusTurnLog = playTurn(state, activePlayer,
-                        gameEngines[activePlayer], gameConfigs[activePlayer]);
+                        gameEngines[activePlayer], gameConfigs[activePlayer], config);
                 log.turns.add(bonusTurnLog);
                 turnCount++;
 
@@ -240,7 +241,8 @@ public final class MatchRunner {
     // -------------------------------------------------------------------------
 
     private TurnLog playTurn(GameState state, int activePlayer,
-                             SimulationEngine engine, EngineConfig evalConfig) {
+                             SimulationEngine engine, EngineConfig evalConfig,
+                             MatchConfig matchConfig) {
         // 1. Engine evaluates full turn
         TurnPlan plan = engine.evaluateFullTurn(state, activePlayer, evalConfig);
 
@@ -280,6 +282,17 @@ public final class MatchRunner {
                 doubles = false;
             }
             plan.navigateReroll(roll, doubles);
+        }
+
+        // 4b. Compute per-roll luck (between final roll and income application)
+        Double rollLuck = null, wrBeforeRoll = null, wrAfterRoll = null;
+        if (matchConfig.computeLuck()) {
+            LuckAnalyzer.RollLuck luck = LuckAnalyzer.computeRollLuck(
+                    state, activePlayer, roll, diceCount == 2,
+                    matchConfig.luckMcSims(), matchConfig.luckUseMc());
+            rollLuck = luck.luck();
+            wrBeforeRoll = luck.expectedWr();
+            wrAfterRoll = luck.wrAfterActual();
         }
 
         // 5. Apply roll income
@@ -344,7 +357,8 @@ public final class MatchRunner {
                 activePlayer, diceCount, roll, doubles,
                 deltas, purchasedCardId, plan.purchaseWinRate, plan.scoreIsWinRate,
                 coinsAfterPurchase, bürohausSwap, bürohausActivated, funkturmRerolled,
-                plan.computeTimeMs, detail
+                plan.computeTimeMs, detail,
+                rollLuck, wrBeforeRoll, wrAfterRoll
         );
     }
 

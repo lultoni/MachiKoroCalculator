@@ -22,8 +22,32 @@ public record MatchConfig(
         int maxTurnsPerGame,
         int iterationsPerEval,
         boolean seatSwap,
-        Map<String, String>[] configOverrides
+        Map<String, String>[] configOverrides,
+        boolean computeLuck,
+        int luckMcSims,
+        boolean luckUseMc
 ) {
+    /**
+     * Luck constructor without useMc: defaults to luckUseMc=true.
+     */
+    public MatchConfig(String[] engineIds, int gameCount, int maxTurnsPerGame,
+                       int iterationsPerEval, boolean seatSwap,
+                       Map<String, String>[] configOverrides,
+                       boolean computeLuck, int luckMcSims) {
+        this(engineIds, gameCount, maxTurnsPerGame, iterationsPerEval, seatSwap,
+                configOverrides, computeLuck, luckMcSims, true);
+    }
+
+    /**
+     * Full constructor without luck fields: defaults to computeLuck=false, luckMcSims=200, luckUseMc=true.
+     */
+    public MatchConfig(String[] engineIds, int gameCount, int maxTurnsPerGame,
+                       int iterationsPerEval, boolean seatSwap,
+                       Map<String, String>[] configOverrides) {
+        this(engineIds, gameCount, maxTurnsPerGame, iterationsPerEval, seatSwap,
+                configOverrides, false, 200);
+    }
+
     /**
      * Legacy constructor: single iterations override for all engines.
      * Used by CLI (H2hMain), TournamentRunner, and tests.

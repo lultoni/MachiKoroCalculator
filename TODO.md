@@ -13,14 +13,13 @@ Priorisiere in deiner Abarbeitung die wichtigsten Features. Erkenne Abhängigkei
 | # | Task | Type | Notes |
 |---|------|------|-------|
 | 2 | Per-decision skill loss | Dev | Chess centipawn-loss analog: `Skill_loss = WinRate(best_option) - WinRate(chosen_option)`. At each buy decision, compare engine's top choice vs actual choice. Perfect play = 0. Depends on #1 (shared eval infrastructure). |
-| 3 | Game-level luck aggregation | Dev | `Total_Luck = sum(per_roll_luck)` per player. `Luck-Adjusted Result = Actual - Own_Luck + Opponent_Luck`. Calibrate thresholds for Machi Koro (maybe +/- 5% WR per roll = lucky/unlucky). Depends on #1. |
-| 4 | Luck display in game replay UI | Dev | Show per-roll luck value next to each roll result in H2H game replay. Color-code (green = lucky, red = unlucky). Show game-level luck summary at top. Depends on #1, #3. |
 | 5 | Luck display in live game UI | Dev | Show luck info in main game session (AssistantPanel or similar). Lower priority than replay. Depends on #1. |
 | 6 | Luck-adjusted WR for sweep optimization | Dev | Feed luck-adjusted results into SweepMain's WR calculation. Goal: optimize engine params against "true skill" rather than raw outcomes. Cautious approach — validate that it produces stronger engines before adopting. Even good WR runs could be lucky. Depends on #1, #3. |
 | 7 | Card-value-throughout-game analyzer | Dev | Track how the value/contribution of each owned card changes over the course of a game. "Was this card worth buying?" Useful for post-game analysis and engine evaluation. Concept from user — scope TBD. |
 | 8 | Engine decision comparison tool | User | Replay the same game with different engines and compare their decisions. Identify where strategies diverge and whether differences led to better/worse outcomes. Needs standardized analysis tools (#1, #2, #7). |
 | 23 | WinProbability heuristic improvement | Dev | Reduce MAE from ~0.25 to <0.10. Run real-scenario testing to identify high-error situations (compare heuristic vs deep MC). Catalog failure cases as regression tests. Iterate on the formula using those test cases. Enables cheap real-time luck computation and faster analysis everywhere the heuristic is used. |
-| 24 | Luck-adjusted ratings everywhere | Dev | Switch LuckAnalyzer to use WinProbability heuristic (instant instead of MC). Wire luck into H2H match runner (raw + luck-adjusted WR per match). Update Glicko-2 to rate on luck-adjusted outcomes. Show luck-adjusted WR wherever raw WR is displayed. Depends on #23 for reliable heuristic. |
+| 24 | Luck-adjusted ratings everywhere | Dev | LuckAnalyzer now has dual mode (MC + heuristic). Luck integrated into H2H MatchRunner (opt-in via MatchConfig.computeLuck). Game replay shows per-roll luck, cumulative luck chart, game-level summary, and luck-adjusted results. Next: wire luck-adjusted WR into Glicko-2 ratings and sweep optimization. Depends on #23 for reliable heuristic in live mode. |
+| 25 | Check Luck Analysier Weird Results | Critical Dev | in h2h match 55f275b4, game 1, turn 7 we have Luck: -9.6% despite P1 getting 2 coins there? (opponent also got 1, but the best that could have happened P1+1 and P2+0 so why such a bad luck score?). This has to be in depth tested to find out why this is happening. This was with the Luck Analysuer with 500 MC Sims. |
 
 ### Engine Quality
 
@@ -67,6 +66,8 @@ Moved here when completed. Full history in CHANGELOG.md.
 | Old # | Task |
 |-------|------|
 | 1 | Per-roll luck computation (LuckAnalyzer + GameStateSampler) |
+| 3 | Game-level luck aggregation (cumulative luck + luck-adjusted results in H2H replay) |
+| 4 | Luck display in game replay UI (per-roll annotation + luck chart + luck summary) |
 | 1 | Fix MCTS ChanceNode doubles bug |
 | 2 | Refine UI based on real gameplay usage (B24 + B25). |
 | 3 | Game-over decision review |

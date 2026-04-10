@@ -210,6 +210,9 @@ export interface H2hStartRequest {
   seatSwap?: boolean;
   configA?: Record<string, string>;
   configB?: Record<string, string>;
+  computeLuck?: boolean;
+  luckMcSims?: number;
+  luckUseMc?: boolean;
 }
 
 export interface H2hStartResponse {
@@ -256,6 +259,9 @@ export interface H2hTurnLog {
   funkturmRerolled: boolean;
   evaluateTimeMs: number;
   decisionDetail?: H2hDecisionDetail | null;
+  rollLuck?: number | null;
+  wrBeforeRoll?: number | null;
+  wrAfterRoll?: number | null;
 }
 
 export interface H2hGameLog {

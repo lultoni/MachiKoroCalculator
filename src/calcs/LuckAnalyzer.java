@@ -11,8 +11,10 @@ import core.*;
  * </pre>
  *
  * <p>For each possible roll outcome, we copy the game state, apply income via
- * {@link RollResolver#computeAllDeltasForRoll}, and evaluate win rate via
- * Monte Carlo simulation ({@link GameSimulator#mcWinRate}).
+ * {@link RollResolver#computeAllDeltasForRoll}, and evaluate win rate via either
+ * Monte Carlo simulation ({@link GameSimulator#mcWinRate}) or the
+ * {@link WinProbability} softmax heuristic. The {@code useMc} flag selects the mode:
+ * MC is more accurate but slower; heuristic is instant but has ~0.25 MAE.
  *
  * <p><b>Properties:</b>
  * <ul>
@@ -44,16 +46,9 @@ public final class LuckAnalyzer {
     public record RollLuck(double luck, double wrAfterActual, double expectedWr) {}
 
     /**
-     * Computes the per-roll luck for a specific dice outcome.
+     * Computes the per-roll luck for a specific dice outcome using Monte Carlo.
      *
-     * <p>The {@code stateBeforeRoll} should be the game position immediately before
-     * dice are rolled (after the previous buy phase). The method:
-     * <ol>
-     *   <li>Enumerates all possible roll outcomes (1-6 for 1d6, 2-12 for 2d6)</li>
-     *   <li>For each outcome: copies state, applies income, evaluates WR via MC</li>
-     *   <li>Computes the probability-weighted expected WR</li>
-     *   <li>Returns the difference: actual WR minus expected WR</li>
-     * </ol>
+     * <p>Equivalent to {@code computeRollLuck(state, activePlayer, actualRoll, usedTwoDice, mcSims, true)}.
      *
      * @param stateBeforeRoll game state before the dice roll (not mutated)
      * @param activePlayer    index of the rolling player
@@ -64,20 +59,47 @@ public final class LuckAnalyzer {
      */
     public static RollLuck computeRollLuck(GameState stateBeforeRoll, int activePlayer,
                                             int actualRoll, boolean usedTwoDice, int mcSims) {
+        return computeRollLuck(stateBeforeRoll, activePlayer, actualRoll, usedTwoDice, mcSims, true);
+    }
+
+    /**
+     * Computes the per-roll luck for a specific dice outcome.
+     *
+     * <p>The {@code stateBeforeRoll} should be the game position immediately before
+     * dice are rolled (after the previous buy phase). The method:
+     * <ol>
+     *   <li>Enumerates all possible roll outcomes (1-6 for 1d6, 2-12 for 2d6)</li>
+     *   <li>For each outcome: copies state, applies income, evaluates WR</li>
+     *   <li>Computes the probability-weighted expected WR</li>
+     *   <li>Returns the difference: actual WR minus expected WR</li>
+     * </ol>
+     *
+     * @param stateBeforeRoll game state before the dice roll (not mutated)
+     * @param activePlayer    index of the rolling player
+     * @param actualRoll      the dice total that was actually rolled
+     * @param usedTwoDice     true if the player rolled 2d6 (Bahnhof + high-range cards)
+     * @param mcSims          number of MC simulations per roll outcome (ignored when useMc is false)
+     * @param useMc           true = Monte Carlo evaluation (accurate, slow);
+     *                        false = WinProbability heuristic (instant, ~0.25 MAE)
+     * @return {@link RollLuck} with luck value, actual WR, and expected WR
+     */
+    public static RollLuck computeRollLuck(GameState stateBeforeRoll, int activePlayer,
+                                            int actualRoll, boolean usedTwoDice,
+                                            int mcSims, boolean useMc) {
         double expectedWr = 0.0;
         double wrAfterActual = 0.0;
 
         if (usedTwoDice) {
             // 2d6: enumerate sums 2-12
             for (int r = 2; r <= 12; r++) {
-                double wr = wrAfterRoll(stateBeforeRoll, activePlayer, r, mcSims);
+                double wr = wrAfterRoll(stateBeforeRoll, activePlayer, r, mcSims, useMc);
                 expectedWr += CardIncome.P2[r] * wr;
                 if (r == actualRoll) wrAfterActual = wr;
             }
         } else {
             // 1d6: enumerate 1-6
             for (int r = 1; r <= 6; r++) {
-                double wr = wrAfterRoll(stateBeforeRoll, activePlayer, r, mcSims);
+                double wr = wrAfterRoll(stateBeforeRoll, activePlayer, r, mcSims, useMc);
                 expectedWr += CardIncome.P1[r] * wr;
                 if (r == actualRoll) wrAfterActual = wr;
             }
@@ -90,7 +112,7 @@ public final class LuckAnalyzer {
      * Applies a roll to a copy of the state and evaluates the resulting win rate.
      */
     private static double wrAfterRoll(GameState stateBeforeRoll, int activePlayer,
-                                       int roll, int mcSims) {
+                                       int roll, int mcSims, boolean useMc) {
         GameState copy = stateBeforeRoll.copy();
         Player[] players = copy.getPlayers();
 
@@ -105,6 +127,8 @@ public final class LuckAnalyzer {
             BürohausLogic.executeSwap(copy, activePlayer);
         }
 
-        return GameSimulator.mcWinRate(copy, activePlayer, mcSims);
+        return useMc
+                ? GameSimulator.mcWinRate(copy, activePlayer, mcSims)
+                : WinProbability.computeBaselineWinProb(copy, activePlayer);
     }
 }

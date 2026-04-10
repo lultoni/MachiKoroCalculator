@@ -84,13 +84,17 @@ public final class TurnLog {
     public final boolean funkturmRerolled;
     public final long evaluateTimeMs;
     public final DecisionDetail decisionDetail; // null for legacy logs without detail
+    public final Double rollLuck;      // luck value (positive = lucky), null when luck not computed
+    public final Double wrBeforeRoll;  // E[WR] across all possible rolls (pre-roll baseline)
+    public final Double wrAfterRoll;   // WR after actual roll income applied
 
     public TurnLog(int playerIndex, int diceCount, int roll, boolean isDoubles,
                    int[] coinDeltas, String purchasedCardId, double purchaseWinRate,
                    boolean scoreIsWinRate,
                    int coinsAfterPurchase, String bürohausSwap, boolean bürohausActivated,
                    boolean funkturmRerolled, long evaluateTimeMs,
-                   DecisionDetail decisionDetail) {
+                   DecisionDetail decisionDetail,
+                   Double rollLuck, Double wrBeforeRoll, Double wrAfterRoll) {
         this.playerIndex = playerIndex;
         this.diceCount = diceCount;
         this.roll = roll;
@@ -105,6 +109,22 @@ public final class TurnLog {
         this.funkturmRerolled = funkturmRerolled;
         this.evaluateTimeMs = evaluateTimeMs;
         this.decisionDetail = decisionDetail;
+        this.rollLuck = rollLuck;
+        this.wrBeforeRoll = wrBeforeRoll;
+        this.wrAfterRoll = wrAfterRoll;
+    }
+
+    /** Legacy constructor without luck fields (defaults to null). */
+    public TurnLog(int playerIndex, int diceCount, int roll, boolean isDoubles,
+                   int[] coinDeltas, String purchasedCardId, double purchaseWinRate,
+                   boolean scoreIsWinRate,
+                   int coinsAfterPurchase, String bürohausSwap, boolean bürohausActivated,
+                   boolean funkturmRerolled, long evaluateTimeMs,
+                   DecisionDetail decisionDetail) {
+        this(playerIndex, diceCount, roll, isDoubles, coinDeltas, purchasedCardId,
+                purchaseWinRate, scoreIsWinRate, coinsAfterPurchase, bürohausSwap,
+                bürohausActivated, funkturmRerolled, evaluateTimeMs, decisionDetail,
+                null, null, null);
     }
 
     /** Returns a new TurnLog with playerIndex and coinDeltas swapped (for seat-swap remapping). */
@@ -115,7 +135,8 @@ public final class TurnLog {
                 1 - playerIndex, diceCount, roll, isDoubles,
                 swappedDeltas, purchasedCardId, purchaseWinRate, scoreIsWinRate,
                 coinsAfterPurchase, bürohausSwap, bürohausActivated, funkturmRerolled,
-                evaluateTimeMs, decisionDetail
+                evaluateTimeMs, decisionDetail,
+                rollLuck, wrBeforeRoll, wrAfterRoll
         );
     }
 }

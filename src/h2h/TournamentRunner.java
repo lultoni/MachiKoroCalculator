@@ -70,6 +70,31 @@ public final class TournamentRunner {
     public TournamentResult runTournament(List<String> engineIds, int gamesPerMatchup,
                                           int maxTurnsPerGame, int iterationsOverride,
                                           boolean seatSwap, ProgressListener listener) {
+        return runTournament(engineIds, gamesPerMatchup, maxTurnsPerGame, iterationsOverride,
+                seatSwap, false, 200, true, false, listener);
+    }
+
+    /**
+     * Runs the full round-robin tournament with luck and card income options.
+     *
+     * @param engineIds          engine registry IDs to participate
+     * @param gamesPerMatchup    games per match (split across seat swap)
+     * @param maxTurnsPerGame    turn limit per game
+     * @param iterationsOverride MCTS iterations override (0 = use registry default)
+     * @param seatSwap           whether to swap seats mid-match
+     * @param computeLuck        enable per-roll luck computation
+     * @param luckMcSims         MC simulations for luck (default: 200)
+     * @param luckUseMc          use MC for luck computation (default: true)
+     * @param computeCardIncome  enable per-card income attribution
+     * @param listener           optional progress listener
+     * @return aggregated tournament result
+     */
+    public TournamentResult runTournament(List<String> engineIds, int gamesPerMatchup,
+                                          int maxTurnsPerGame, int iterationsOverride,
+                                          boolean seatSwap, boolean computeLuck,
+                                          int luckMcSims, boolean luckUseMc,
+                                          boolean computeCardIncome,
+                                          ProgressListener listener) {
         long startMs = System.currentTimeMillis();
         this.currentEngineIds = new ArrayList<>(engineIds);
         completedResults.clear();
@@ -90,9 +115,12 @@ public final class TournamentRunner {
                 listener.onMatchStarted(m, totalMatches, idA, idB);
             }
 
-            MatchConfig config = new MatchConfig(
-                    new String[]{idA, idB}, gamesPerMatchup, maxTurnsPerGame,
-                    iterationsOverride, seatSwap);
+            MatchConfig config = (computeLuck || computeCardIncome)
+                    ? new MatchConfig(new String[]{idA, idB}, gamesPerMatchup, maxTurnsPerGame,
+                            iterationsOverride, seatSwap, null,
+                            computeLuck, luckMcSims, luckUseMc, computeCardIncome)
+                    : new MatchConfig(new String[]{idA, idB}, gamesPerMatchup, maxTurnsPerGame,
+                            iterationsOverride, seatSwap);
 
             MatchResult result = runner.runMatch(config, null);
             store.save(result);

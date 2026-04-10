@@ -37,6 +37,10 @@ public final class AutoBattleRunner {
     private final int maxTurnsPerGame;
     private final int effectiveMaxRounds;
     private final List<String> engineIds;
+    private final boolean computeLuck;
+    private final int luckMcSims;
+    private final boolean luckUseMc;
+    private final boolean computeCardIncome;
 
     // State
     private volatile boolean running;
@@ -55,12 +59,31 @@ public final class AutoBattleRunner {
     public AutoBattleRunner(EngineOrchestrator orchestrator, H2hResultStore store,
                             int gamesPerMatch, int maxTurnsPerGame, int maxRounds,
                             List<String> engineIds) {
+        this(orchestrator, store, gamesPerMatch, maxTurnsPerGame, maxRounds, engineIds,
+                false, 200, true, false);
+    }
+
+    /**
+     * @param maxRounds          maximum number of rounds; {@code <= 0} for endless mode
+     * @param computeLuck        enable per-roll luck computation
+     * @param luckMcSims         MC simulations for luck
+     * @param luckUseMc          use MC for luck computation
+     * @param computeCardIncome  enable per-card income attribution
+     */
+    public AutoBattleRunner(EngineOrchestrator orchestrator, H2hResultStore store,
+                            int gamesPerMatch, int maxTurnsPerGame, int maxRounds,
+                            List<String> engineIds, boolean computeLuck,
+                            int luckMcSims, boolean luckUseMc, boolean computeCardIncome) {
         this.orchestrator = orchestrator;
         this.store = store;
         this.gamesPerMatch = gamesPerMatch;
         this.maxTurnsPerGame = maxTurnsPerGame;
         this.effectiveMaxRounds = maxRounds <= 0 ? Integer.MAX_VALUE : maxRounds;
         this.engineIds = engineIds;
+        this.computeLuck = computeLuck;
+        this.luckMcSims = luckMcSims;
+        this.luckUseMc = luckUseMc;
+        this.computeCardIncome = computeCardIncome;
     }
 
     /** Start the auto battle loop. Call from a background thread. */
@@ -97,8 +120,10 @@ public final class AutoBattleRunner {
                 // 3. Run match (with mid-match cancellation support)
                 gamesCompletedInMatch = 0;
                 AtomicInteger matchGamesCounter = new AtomicInteger(0);
-                MatchConfig config = new MatchConfig(
-                        pair, gamesPerMatch, maxTurnsPerGame, 0, true);
+                MatchConfig config = (computeLuck || computeCardIncome)
+                        ? new MatchConfig(pair, gamesPerMatch, maxTurnsPerGame, 0, true,
+                                null, computeLuck, luckMcSims, luckUseMc, computeCardIncome)
+                        : new MatchConfig(pair, gamesPerMatch, maxTurnsPerGame, 0, true);
                 MatchResult result = runner.runMatch(config, (gameIdx, log) -> {
                     gamesCompletedInMatch = matchGamesCounter.incrementAndGet();
                 }, () -> stopRequested);
@@ -177,23 +202,43 @@ public final class AutoBattleRunner {
     public static AutoBattleRunner createWithAllEngines(
             EngineOrchestrator orchestrator, H2hResultStore store,
             int gamesPerMatch, int maxTurnsPerGame, int maxRounds) {
+        return createWithAllEngines(orchestrator, store, gamesPerMatch, maxTurnsPerGame,
+                maxRounds, false, 200, true, false);
+    }
+
+    /** Create an AutoBattleRunner with all registered engines and analysis options. */
+    public static AutoBattleRunner createWithAllEngines(
+            EngineOrchestrator orchestrator, H2hResultStore store,
+            int gamesPerMatch, int maxTurnsPerGame, int maxRounds,
+            boolean computeLuck, int luckMcSims, boolean luckUseMc, boolean computeCardIncome) {
         List<String> ids = new ArrayList<>();
         for (EngineRegistryEntry e : EngineRegistry.getAll()) {
             ids.add(e.id());
         }
         return new AutoBattleRunner(orchestrator, store,
-                gamesPerMatch, maxTurnsPerGame, maxRounds, ids);
+                gamesPerMatch, maxTurnsPerGame, maxRounds, ids,
+                computeLuck, luckMcSims, luckUseMc, computeCardIncome);
     }
 
     /** Create an AutoBattleRunner with engines from a specific tier. */
     public static AutoBattleRunner createWithTier(
             EngineOrchestrator orchestrator, H2hResultStore store,
             String tier, int gamesPerMatch, int maxTurnsPerGame, int maxRounds) {
+        return createWithTier(orchestrator, store, tier, gamesPerMatch, maxTurnsPerGame,
+                maxRounds, false, 200, true, false);
+    }
+
+    /** Create an AutoBattleRunner with engines from a specific tier and analysis options. */
+    public static AutoBattleRunner createWithTier(
+            EngineOrchestrator orchestrator, H2hResultStore store,
+            String tier, int gamesPerMatch, int maxTurnsPerGame, int maxRounds,
+            boolean computeLuck, int luckMcSims, boolean luckUseMc, boolean computeCardIncome) {
         List<String> ids = new ArrayList<>();
         for (EngineRegistryEntry e : EngineRegistry.getByTier(tier)) {
             ids.add(e.id());
         }
         return new AutoBattleRunner(orchestrator, store,
-                gamesPerMatch, maxTurnsPerGame, maxRounds, ids);
+                gamesPerMatch, maxTurnsPerGame, maxRounds, ids,
+                computeLuck, luckMcSims, luckUseMc, computeCardIncome);
     }
 }

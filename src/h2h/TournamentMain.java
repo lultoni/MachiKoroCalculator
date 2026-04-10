@@ -60,6 +60,10 @@ public final class TournamentMain {
         boolean noSwap = false;
         boolean estimateOnly = false;
         boolean verbose = false;
+        boolean luck = false;
+        int luckMcSims = 200;
+        boolean luckUseMc = true;
+        boolean computeCardIncome = false;
 
         for (int i = 0; i < args.length; i++) {
             switch (args[i]) {
@@ -72,6 +76,10 @@ public final class TournamentMain {
                 case "--no-swap" -> noSwap = true;
                 case "--estimate" -> estimateOnly = true;
                 case "--verbose" -> verbose = true;
+                case "--luck" -> luck = true;
+                case "--luckMcSims" -> luckMcSims = Integer.parseInt(args[++i]);
+                case "--luckUseMc" -> luckUseMc = Boolean.parseBoolean(args[++i]);
+                case "--computeCardIncome" -> computeCardIncome = true;
                 case "--help" -> { printUsage(); return; }
                 default -> System.err.println("Unknown arg: " + args[i]);
             }
@@ -168,7 +176,8 @@ public final class TournamentMain {
         final int totalM = totalMatchups;
 
         TournamentResult result = runner.runTournament(engineIds, games, maxTurns, iterations,
-                seatSwap, new TournamentRunner.ProgressListener() {
+                seatSwap, luck, luckMcSims, luckUseMc, computeCardIncome,
+                new TournamentRunner.ProgressListener() {
                     @Override
                     public void onMatchStarted(int matchIndex, int totalMatches, String engineA, String engineB) {
                         System.out.printf("[%d/%d] %s vs %s ...%n",
@@ -457,6 +466,12 @@ public final class TournamentMain {
         System.out.println("  --iterations <n>             Override MCTS iterations (0 = registry default)");
         System.out.println("  --maxTurns <n>               Max turns per game (default: 200)");
         System.out.println("  --no-swap                    Disable mid-match seat swapping");
+        System.out.println();
+        System.out.println("Analysis:");
+        System.out.println("  --luck                       Enable per-roll luck computation");
+        System.out.println("  --luckMcSims <n>             MC simulations for luck (default: 200)");
+        System.out.println("  --luckUseMc <true|false>     Use MC for luck (default: true)");
+        System.out.println("  --computeCardIncome          Enable per-card income attribution");
         System.out.println();
         System.out.println("Output:");
         System.out.println("  --estimate                   Print runtime estimate and exit");

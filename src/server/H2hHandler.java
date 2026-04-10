@@ -328,14 +328,20 @@ final class H2hHandler implements HttpHandler {
         int maxTurnsPerGame = body.has("maxTurns") ? body.get("maxTurns").getAsInt() : 200;
         int maxRounds = body.has("maxRounds") ? body.get("maxRounds").getAsInt() : 20;
         String tier = body.has("tier") ? body.get("tier").getAsString() : null;
+        boolean computeLuck = body.has("computeLuck") && body.get("computeLuck").getAsBoolean();
+        int luckMcSims = body.has("luckMcSims") ? body.get("luckMcSims").getAsInt() : 200;
+        boolean luckUseMc = !body.has("luckUseMc") || body.get("luckUseMc").getAsBoolean();
+        boolean computeCardIncome = body.has("computeCardIncome") && body.get("computeCardIncome").getAsBoolean();
 
         AutoBattleRunner runner;
         if (tier != null && !tier.isEmpty()) {
             runner = AutoBattleRunner.createWithTier(orchestrator, store,
-                    tier, gamesPerMatch, maxTurnsPerGame, maxRounds);
+                    tier, gamesPerMatch, maxTurnsPerGame, maxRounds,
+                    computeLuck, luckMcSims, luckUseMc, computeCardIncome);
         } else {
             runner = AutoBattleRunner.createWithAllEngines(orchestrator, store,
-                    gamesPerMatch, maxTurnsPerGame, maxRounds);
+                    gamesPerMatch, maxTurnsPerGame, maxRounds,
+                    computeLuck, luckMcSims, luckUseMc, computeCardIncome);
         }
         autoBattle = runner;
 

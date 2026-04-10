@@ -40,6 +40,10 @@ public final class H2hMain {
         int iterations = 500;
         int maxTurns = 200;
         boolean verbose = false;
+        boolean luck = false;
+        int luckMcSims = 200;
+        boolean luckUseMc = true;
+        boolean computeCardIncome = false;
 
         for (int i = 0; i < args.length; i++) {
             switch (args[i]) {
@@ -49,6 +53,10 @@ public final class H2hMain {
                 case "--iterations" -> iterations = Integer.parseInt(args[++i]);
                 case "--maxTurns" -> maxTurns = Integer.parseInt(args[++i]);
                 case "--verbose" -> verbose = true;
+                case "--luck" -> luck = true;
+                case "--luckMcSims" -> luckMcSims = Integer.parseInt(args[++i]);
+                case "--luckUseMc" -> luckUseMc = Boolean.parseBoolean(args[++i]);
+                case "--computeCardIncome" -> computeCardIncome = true;
                 case "--help" -> { printUsage(); return; }
                 default -> System.err.println("Unknown arg: " + args[i]);
             }
@@ -67,11 +75,14 @@ public final class H2hMain {
         orchestrator.register(new ExpectimaxEngine());
         orchestrator.register(new CreatorEngine());
 
-        MatchConfig config = new MatchConfig(
-                new String[]{engineA, engineB}, games, maxTurns, iterations, true);
+        MatchConfig config = luck || computeCardIncome
+                ? new MatchConfig(new String[]{engineA, engineB}, games, maxTurns,
+                        iterations, true, null, luck, luckMcSims, luckUseMc, computeCardIncome)
+                : new MatchConfig(new String[]{engineA, engineB}, games, maxTurns, iterations, true);
 
-        System.out.printf("[H2H] %s vs %s — %d games, %d iter/eval, %d max turns%n",
-                engineA, engineB, games, iterations, maxTurns);
+        System.out.printf("[H2H] %s vs %s — %d games, %d iter/eval, %d max turns%s%s%n",
+                engineA, engineB, games, iterations, maxTurns,
+                luck ? " [luck]" : "", computeCardIncome ? " [cardIncome]" : "");
 
         MatchRunner runner = new MatchRunner(orchestrator);
         final boolean verb = verbose;
@@ -95,6 +106,15 @@ public final class H2hMain {
         }
         System.out.printf("  Avg game length: %.1f turns%n", result.avgGameLength);
         System.out.printf("  Avg eval time: %.1f ms%n", result.avgEvalTimeMs);
+        if (result.luckAdjustedWinRates != null && result.luckAdjustedWinRates.length > 0) {
+            System.out.println("  Luck-adjusted:");
+            for (int i = 0; i < config.playerCount(); i++) {
+                System.out.printf("    P%d (%s): %.1f%% (delta: %+.1f%%)%n",
+                        i + 1, config.engineIds()[i],
+                        result.luckAdjustedWinRates[i] * 100,
+                        (result.luckAdjustedWinRates[i] - result.winRates[i]) * 100);
+            }
+        }
 
         // Save
         H2hResultStore store = new H2hResultStore();
@@ -110,6 +130,10 @@ public final class H2hMain {
         System.out.println("  --iterations <n>  MCTS iterations per eval (default: 500)");
         System.out.println("  --maxTurns <n>    Max turns per game (default: 200)");
         System.out.println("  --verbose         Print every game result");
+        System.out.println("  --luck            Enable per-roll luck computation");
+        System.out.println("  --luckMcSims <n>  MC simulations for luck (default: 200, requires --luck)");
+        System.out.println("  --luckUseMc <b>   Use MC for luck (true/false, default: true)");
+        System.out.println("  --computeCardIncome  Enable per-card income attribution");
         System.out.println();
         System.out.println("Available engines:");
         for (EngineRegistryEntry e : EngineRegistry.getAll()) {

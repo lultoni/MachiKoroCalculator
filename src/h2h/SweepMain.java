@@ -145,6 +145,7 @@ public final class SweepMain {
         boolean includeDefault = true;
         boolean verbose = false;
         boolean useLuck = false;
+        boolean useCardIncome = false;
 
         for (int i = 0; i < args.length; i++) {
             switch (args[i]) {
@@ -162,6 +163,7 @@ public final class SweepMain {
                 case "--no-default"-> includeDefault = false;
                 case "--verbose"   -> verbose = true;
                 case "--luck"      -> useLuck = true;
+                case "--computeCardIncome" -> useCardIncome = true;
                 case "--help"      -> { printUsage(); return; }
                 default            -> System.err.println("Unknown arg: " + args[i]);
             }
@@ -353,9 +355,9 @@ public final class SweepMain {
 
             for (int oi = 0; oi < opponentList.size(); oi++) {
                 String currentOpponent = opponentList.get(oi);
-                MatchConfig matchConfig = useLuck
+                MatchConfig matchConfig = (useLuck || useCardIncome)
                         ? new MatchConfig(new String[]{creatorId, currentOpponent}, games, 200,
-                                iterations, true, overrides, true, 200, false)
+                                iterations, true, overrides, useLuck, 200, false, useCardIncome)
                         : new MatchConfig(new String[]{creatorId, currentOpponent}, games, 200,
                                 iterations, true, overrides);
 
@@ -549,6 +551,7 @@ public final class SweepMain {
         System.out.println("  --no-default         Skip evaluating default params as trial 0");
         System.out.println("  --verbose            Per-game results, param deltas, match details");
         System.out.println("  --luck               Use luck-adjusted WR as TPE objective (heuristic mode, fast)");
+        System.out.println("  --computeCardIncome  Enable per-card income attribution in matches");
         System.out.println("  --help               Show this help");
         System.out.println();
         System.out.println("Examples:");

@@ -22,6 +22,47 @@ const LANDMARK_ABBR_DE = ['B', 'E', 'F', 'F'];
 const LANDMARK_ABBR_EN = ['T', 'S', 'A', 'R'];
 const STARTER_CARDS = ['weizenfeld', 'bäckerei'];
 
+/** Pip positions for die face rendering (3×3 grid). */
+const PIP_POSITIONS: Record<number, [number, number][]> = {
+  1: [[1, 1]],
+  2: [[0, 2], [2, 0]],
+  3: [[0, 2], [1, 1], [2, 0]],
+  4: [[0, 0], [0, 2], [2, 0], [2, 2]],
+  5: [[0, 0], [0, 2], [1, 1], [2, 0], [2, 2]],
+  6: [[0, 0], [0, 2], [1, 0], [1, 2], [2, 0], [2, 2]],
+};
+
+/** Small die face for the replay turn detail. */
+function DieFaceSmall({ value }: { value: number }) {
+  const pips = PIP_POSITIONS[value] ?? [];
+  return (
+    <span className="inline-grid grid-cols-3 grid-rows-3 w-7 h-7 p-1 gap-0 rounded border border-machi-border bg-machi-surface">
+      {Array.from({ length: 9 }, (_, i) => {
+        const row = Math.floor(i / 3);
+        const col = i % 3;
+        const hasPip = pips.some(([r, c]) => r === row && c === col);
+        return (
+          <span key={i} className={`w-full h-full rounded-full ${hasPip ? 'bg-machi-text' : ''}`} />
+        );
+      })}
+    </span>
+  );
+}
+
+/** Decompose a 2d6 sum into two valid die values. */
+function decompose2d6(sum: number, isDoubles: boolean): [number, number] {
+  if (isDoubles) {
+    const v = sum / 2;
+    return [v, v];
+  }
+  // Pick a balanced split: min die as close to sum/2 as possible, within [1,6]
+  const d1 = Math.max(1, Math.min(6, Math.ceil(sum / 2)));
+  const d2 = sum - d1;
+  if (d2 >= 1 && d2 <= 6) return [d1, d2];
+  // Fallback for edge cases
+  return [Math.max(1, sum - 6), Math.min(6, sum - 1)];
+}
+
 /** Reconstruct per-player card inventories and coin totals up to each turn. */
 function buildInventoryTimeline(game: H2hGameLog, playerCount: number) {
   // inventories[turnIdx][playerIdx] = cardId[]
@@ -634,17 +675,23 @@ export function H2hGameReplay({ game, engines, matchId, projects, language, onBa
                 {/* Dice */}
                 <div className="bg-machi-bg rounded-lg p-3">
                   <div className="text-machi-text-dim text-xs mb-1">{t('h2h.dice')}</div>
-                  <div className="font-mono text-lg">
-                    {turn.diceCount}d6 → {turn.roll}
-                    {turn.isDoubles && <span className="ml-1 text-machi-yellow text-xs">D</span>}
+                  <div className="flex items-center gap-1.5 flex-nowrap">
+                    {turn.diceCount === 1 ? (
+                      <DieFaceSmall value={turn.roll} />
+                    ) : (() => {
+                      const [d1, d2] = decompose2d6(turn.roll, turn.isDoubles);
+                      return <><DieFaceSmall value={d1} /><DieFaceSmall value={d2} /></>;
+                    })()}
+                    <span className="font-mono text-lg whitespace-nowrap">={turn.roll}</span>
                   </div>
-                  {turn.funkturmRerolled && (
-                    <div className="text-xs text-machi-accent mt-0.5">
-                      {projects.byId('funkturm')?.[nameKey] ?? (language === 'en' ? 'Radio Tower' : 'Funkturm')} ↻
+                  {(turn.isDoubles || turn.funkturmRerolled) && (
+                    <div className="flex items-center gap-2 mt-1">
+                      {turn.isDoubles && <span className="text-machi-yellow text-xs font-bold">⚄⚄ Doubles</span>}
+                      {turn.funkturmRerolled && <span className="text-machi-accent text-xs">↻ Reroll</span>}
                     </div>
                   )}
                   {turn.rollLuck != null && (
-                    <div className={`text-xs mt-0.5 font-mono ${
+                    <div className={`text-xs mt-1 font-mono ${
                       turn.rollLuck > 0.02 ? 'text-green-400' :
                       turn.rollLuck < -0.02 ? 'text-red-400' : 'text-machi-text-dim/60'
                     }`}>
@@ -656,15 +703,19 @@ export function H2hGameReplay({ game, engines, matchId, projects, language, onBa
                 {/* Income */}
                 <div className="bg-machi-bg rounded-lg p-3">
                   <div className="text-machi-text-dim text-xs mb-1">{t('h2h.income')}</div>
-                  <div className="font-mono">
-                    {engines.map((_, i) => (
-                      <span key={i} className={`mr-2 ${
-                        (turn.coinDeltas?.[i] ?? 0) > 0 ? 'text-green-400' :
-                        (turn.coinDeltas?.[i] ?? 0) < 0 ? 'text-red-400' : 'text-machi-text-dim'
-                      }`}>
-                        P{i + 1}: {(turn.coinDeltas?.[i] ?? 0) >= 0 ? '+' : ''}{turn.coinDeltas?.[i] ?? 0}
-                      </span>
-                    ))}
+                  <div className="font-mono space-y-0.5">
+                    {engines.map((_, i) => {
+                      const before = turnIdx > 0 ? (coinHistory[turnIdx - 1]?.[i] ?? 3) : 3;
+                      const delta = turn.coinDeltas?.[i] ?? 0;
+                      return (
+                        <div key={i} className={
+                          delta > 0 ? 'text-green-400' :
+                          delta < 0 ? 'text-red-400' : 'text-machi-text-dim'
+                        }>
+                          P{i + 1}: {before}{delta >= 0 ? '+' : ''}{delta}
+                        </div>
+                      );
+                    })}
                   </div>
                   {turn.cardIncome && (
                     <div className="mt-1.5 space-y-0.5">
@@ -696,17 +747,17 @@ export function H2hGameReplay({ game, engines, matchId, projects, language, onBa
                 {/* Purchase */}
                 <div className="bg-machi-bg rounded-lg p-3">
                   <div className="text-machi-text-dim text-xs mb-1">{t('h2h.purchase')}</div>
-                  <div className="font-mono">
+                  <div className="font-mono text-sm">
                     {turn.purchasedCardId ? (() => {
                       const proj = projects.byId(turn.purchasedCardId);
                       const name = proj?.[nameKey] ?? proj?.name_de ?? turn.purchasedCardId;
                       return (
                         <CardTooltip project={proj} language={language}>
-                          <span className={`inline-flex items-center ${cardTextClass(proj?.color)}`}>
+                          <span className={`inline-flex items-center flex-wrap ${cardTextClass(proj?.color)}`}>
                             {categoryIconPath(proj?.category) && (
-                              <img src={categoryIconPath(proj?.category)} alt="" className="w-3.5 h-3.5 mr-0.5" />
+                              <img src={categoryIconPath(proj?.category)} alt="" className="w-3.5 h-3.5 mr-0.5 shrink-0" />
                             )}
-                            {name}
+                            {name}{proj?.cost != null && <span className="text-machi-text-dim ml-1">({proj.cost}$)</span>}
                           </span>
                         </CardTooltip>
                       );
@@ -722,9 +773,9 @@ export function H2hGameReplay({ game, engines, matchId, projects, language, onBa
                 {/* Coins After */}
                 <div className="bg-machi-bg rounded-lg p-3">
                   <div className="text-machi-text-dim text-xs mb-1">{t('h2h.coins')}</div>
-                  <div className="font-mono">
+                  <div className="font-mono space-y-0.5">
                     {coinHistory[turnIdx]?.map((c: number, i: number) => (
-                      <span key={i} className="mr-2">P{i + 1}: {c}</span>
+                      <div key={i}>P{i + 1}: {c}</div>
                     ))}
                   </div>
                 </div>

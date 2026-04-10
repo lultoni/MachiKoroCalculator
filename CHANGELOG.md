@@ -6,6 +6,12 @@ Implementation history: what was built, why, and which design decisions were mad
 
 ## Phase 7: Iteration
 
+### Per-Game Luck-Weighted Win Rates (TODO #25)
+
+**Replaced simple mean subtraction with per-game weighted scoring.** Old formula: `adjustedWR = rawWR - totalLuck/gameCount` (treats all games equally). New formula scores each game individually: wins always worth >= 1.0, wins against bad luck earn a bonus via power curve `(((-luck - 0.05) / 0.95) ^ 1.3)`. Losses always 0.0. Key properties: dead zone until luck < -5% (normal variance ignored), accelerating rewards (-30% luck → +0.24 bonus, -50% → +0.50, -100% → +1.00), no punishment for lucky wins. `totalLuck[]` still computed as before for display.
+
+**Files:** `MatchResult.java` (per-game scoring loop, `luckWinBonus()` method).
+
 ### Luck-Adjusted Glicko-2 Ratings (TODO #24)
 
 **Dual ratings display.** Glicko-2 ratings now computed from both raw and luck-adjusted win rates. `RatingCalculator` parameterized with `useLuckAdjusted` flag that substitutes `luckAdjustedWinRates` from MatchResult when available. API returns both sets from `/api/h2h/ratings`. Frontend shows side-by-side columns with colored delta indicators (green +N / red -N) showing how luck adjustment shifts each engine's rating. When no luck data exists, gracefully falls back to raw-only display.

@@ -33,8 +33,20 @@ public final class MatchResult {
      */
     public double[] totalLuck;
     /**
-     * Win rates adjusted for luck: {@code winRates[i] - totalLuck[i] / gameCount}, clamped to [0,1].
-     * Equals {@code winRates} when luck was not computed.
+     * Win rates adjusted for luck using per-game weighted scoring.
+     *
+     * <p>Each game's contribution depends on the winner's luck:
+     * <ul>
+     *   <li>Loss → 0.0 (always)</li>
+     *   <li>Win with luck ≥ -5% → 1.0 (no bonus for neutral/lucky wins)</li>
+     *   <li>Win with luck &lt; -5% → 1.0 + bonus (reward for outperforming bad luck)</li>
+     * </ul>
+     *
+     * <p>Bonus uses a power curve: {@code (((-luck - 0.05) / 0.95) ^ 1.3)},
+     * giving accelerating rewards — e.g. -30% luck → +0.24, -50% → +0.50, -100% → +1.00.
+     * Final values normalized so all players sum to 1.0 (zero-sum property).
+     *
+     * <p>Equals {@code winRates} when luck was not computed.
      */
     public double[] luckAdjustedWinRates;
 
@@ -107,12 +119,62 @@ public final class MatchResult {
         shortestGameTurns = gameCount > 0 ? shortTurns : 0;
         longestGameTurns = gameCount > 0 ? longTurns : 0;
 
-        // Luck aggregation: per-engine total luck and luck-adjusted win rates
+        // Luck aggregation: per-engine total luck (unchanged — used for display)
         this.totalLuck = luckPerEngine;
+
+        // Per-game luck-weighted win rates: wins against bad luck score > 1.0
         this.luckAdjustedWinRates = new double[n];
-        for (int i = 0; i < n; i++) {
-            luckAdjustedWinRates[i] = Math.max(0.0, Math.min(1.0,
-                    winRates[i] - (gameCount > 0 ? totalLuck[i] / gameCount : 0.0)));
+        boolean hasLuckData = false;
+        for (double l : luckPerEngine) { if (l != 0.0) { hasLuckData = true; break; } }
+
+        if (hasLuckData && gameCount > 0) {
+            double[] weightedScores = new double[n];
+            for (GameLog log : gameLogs) {
+                boolean swapped = hasSeatSwap && log.gameIndex >= swapPoint;
+                // Compute per-engine luck for this game
+                double[] gameLuck = new double[n];
+                for (TurnLog turn : log.turns) {
+                    if (turn.rollLuck != null && turn.playerIndex >= 0 && turn.playerIndex < n) {
+                        int engineIdx = swapped ? (1 - turn.playerIndex) : turn.playerIndex;
+                        gameLuck[engineIdx] += turn.rollLuck;
+                    }
+                }
+                // Score: winner gets 1.0 + bonus(luck), loser gets 0.0
+                // Note: winnerIndex is already in engine-seat space (remapped by MatchRunner)
+                if (log.winnerIndex >= 0 && log.winnerIndex < n) {
+                    weightedScores[log.winnerIndex] += 1.0 + luckWinBonus(gameLuck[log.winnerIndex]);
+                }
+            }
+            for (int i = 0; i < n; i++) {
+                luckAdjustedWinRates[i] = weightedScores[i] / gameCount;
+            }
+            // Normalize so rates sum to 1.0 (preserves zero-sum property)
+            double sum = 0;
+            for (double r : luckAdjustedWinRates) sum += r;
+            if (sum > 0) {
+                for (int i = 0; i < n; i++) {
+                    luckAdjustedWinRates[i] /= sum;
+                }
+            }
+        } else {
+            // No luck data — fall back to raw win rates
+            System.arraycopy(winRates, 0, luckAdjustedWinRates, 0, n);
         }
+    }
+
+    /**
+     * Bonus score for winning a game despite bad luck.
+     *
+     * <p>Power curve with a dead zone: no bonus until luck &lt; -5%,
+     * then accelerating bonus up to +1.0 at -100% luck.
+     *
+     * @param gameLuck total luck for the winning engine in this game (negative = unlucky)
+     * @return bonus in [0, 1]: 0 for neutral/lucky wins, up to 1.0 for extremely unlucky wins
+     */
+    static double luckWinBonus(double gameLuck) {
+        double threshold = 0.05;
+        if (gameLuck >= -threshold) return 0.0;
+        double raw = (-gameLuck - threshold) / (1.0 - threshold);
+        return Math.min(1.0, Math.pow(raw, 1.3));
     }
 }

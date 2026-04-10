@@ -6,6 +6,10 @@ Implementation history: what was built, why, and which design decisions were mad
 
 ## Phase 7: Iteration
 
+### Chart Turn Indicator in Game Replay (TODO #26)
+
+All 4 time-series charts in H2hGameReplay now display a vertical dashed reference line at the currently selected turn. Applies to Luck Over Time (LineChart), Dice Fortune own turns (BarChart), Dice Fortune opponent turns (BarChart), and Card Value cumulative income (LineChart). For the Dice Fortune charts, the reference line maps from the global turn index to the per-player own/opponent turn count using a computed `fortuneTurnIndices` memo. Uses Recharts `ReferenceLine` component with consistent styling (`rgba(255,255,255,0.35)`, dashed).
+
 ### Luck-adjusted WR for Sweep + Card Value Analyzer (TODO #6, #7)
 
 **Luck-adjusted WR for sweep (TODO #6).** MatchResult now computes `totalLuck[]` and `luckAdjustedWinRates[]` by aggregating per-roll luck from TurnLog across all games. `luckAdjustedWinRates[i] = clamp(winRates[i] - totalLuck[i] / gameCount, 0, 1)`. SweepMain gains `--luck` CLI flag: uses heuristic-mode luck (fast, ~0.6ms overhead per game) and feeds luck-adjusted WR into TPE objective. SweepResult.Trial gains nullable `adjustedWinRate` for display. Trial output shows raw and adjusted WR side by side.

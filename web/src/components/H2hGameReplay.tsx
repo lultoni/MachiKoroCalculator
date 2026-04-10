@@ -471,6 +471,25 @@ export function H2hGameReplay({ game, engines, matchId, projects, language, onBa
     [game, cardValuePlayer, inventories, projects, hasCardIncome],
   );
 
+  // Compute own-turn and opponent-turn indices up to turnIdx (for Dice Fortune chart indicators)
+  const fortuneTurnIndices = useMemo(() => {
+    // ownTurnIndex[p] = how many own turns player p has had through turnIdx (1-indexed for chart)
+    // oppTurnIndex[p] = how many opponent turns player p has experienced through turnIdx
+    const ownCount = Array(playerCount).fill(0);
+    const oppCount = Array(playerCount).fill(0);
+    for (let ti = 0; ti <= Math.min(turnIdx, game.turns.length - 1); ti++) {
+      const roller = game.turns[ti].playerIndex;
+      ownCount[roller]++;
+      for (let p = 0; p < playerCount; p++) {
+        if (p !== roller) oppCount[p]++;
+      }
+    }
+    return { ownCount, oppCount };
+  }, [turnIdx, game.turns, playerCount]);
+
+  // Current game turn number for chart reference lines (1-indexed)
+  const currentChartTurn = turnIdx + 1;
+
   const currentInv = inventories[turnIdx];
 
   /** Render a compact card inventory for one player. */
@@ -931,6 +950,7 @@ export function H2hGameReplay({ game, engines, matchId, projects, language, onBa
                         width={40}
                       />
                       <ReferenceLine y={0} stroke="rgba(255,255,255,0.2)" strokeDasharray="3 3" />
+                      <ReferenceLine x={currentChartTurn} stroke="rgba(255,255,255,0.35)" strokeDasharray="4 3" strokeWidth={1} />
                       <Tooltip
                         contentStyle={chartTooltipStyle}
                         labelFormatter={(v) => `Turn ${v}`}
@@ -1060,6 +1080,9 @@ export function H2hGameReplay({ game, engines, matchId, projects, language, onBa
                           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.07)" />
                           <XAxis dataKey="turn" tick={false} height={4} />
                           <YAxis domain={domain} tick={{ fontSize: 9, fill: 'rgba(255,255,255,0.4)' }} width={30} />
+                          {fortuneTurnIndices.ownCount[0] > 0 && (
+                            <ReferenceLine x={Math.max(...fortuneTurnIndices.ownCount)} stroke="rgba(255,255,255,0.35)" strokeDasharray="4 3" strokeWidth={1} />
+                          )}
                           <Tooltip
                             contentStyle={chartTooltipStyle}
                             cursor={{ fill: 'rgba(255,255,255,0.05)' }}
@@ -1087,6 +1110,9 @@ export function H2hGameReplay({ game, engines, matchId, projects, language, onBa
                           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.07)" />
                           <XAxis dataKey="turn" tick={false} height={4} />
                           <YAxis domain={domain} tick={{ fontSize: 9, fill: 'rgba(255,255,255,0.4)' }} width={30} />
+                          {fortuneTurnIndices.oppCount[0] > 0 && (
+                            <ReferenceLine x={Math.max(...fortuneTurnIndices.oppCount)} stroke="rgba(255,255,255,0.35)" strokeDasharray="4 3" strokeWidth={1} />
+                          )}
                           <Tooltip
                             contentStyle={chartTooltipStyle}
                             cursor={{ fill: 'rgba(255,255,255,0.05)' }}
@@ -1148,6 +1174,7 @@ export function H2hGameReplay({ game, engines, matchId, projects, language, onBa
                         tick={{ fontSize: 9, fill: 'rgba(255,255,255,0.4)' }}
                         width={30}
                       />
+                      <ReferenceLine x={currentChartTurn} stroke="rgba(255,255,255,0.35)" strokeDasharray="4 3" strokeWidth={1} />
                       <Tooltip
                         contentStyle={{
                           backgroundColor: '#1e1e2e',

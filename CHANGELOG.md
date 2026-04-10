@@ -6,6 +6,12 @@ Implementation history: what was built, why, and which design decisions were mad
 
 ## Phase 7: Iteration
 
+### Luck-Adjusted Glicko-2 Ratings (TODO #24)
+
+**Dual ratings display.** Glicko-2 ratings now computed from both raw and luck-adjusted win rates. `RatingCalculator` parameterized with `useLuckAdjusted` flag that substitutes `luckAdjustedWinRates` from MatchResult when available. API returns both sets from `/api/h2h/ratings`. Frontend shows side-by-side columns with colored delta indicators (green +N / red -N) showing how luck adjustment shifts each engine's rating. When no luck data exists, gracefully falls back to raw-only display.
+
+**Files:** `RatingCalculator.java` (luck-adjusted computation), `H2hHandler.java` (dual API response), `types.ts` (response type), `H2hRatings.tsx` (dual columns + RatingDelta component), `en.ts`/`de.ts` (locale strings).
+
 ### Wire Accurate WinProb into Engines + Hybrid Mode
 
 **Three-tier WinProbability now wired into engines.** Following TODO #23's dual-mode architecture, added a third tier: hybrid (5 MC rollouts, ~1-3ms, MAE ~0.11). Wired all three modes into appropriate engine layers:

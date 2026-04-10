@@ -190,6 +190,11 @@ const de: Record<string, string> = {
   'h2h.ratingsMatchesTip': 'Anzahl H2H-Matches an denen diese Engine teilgenommen hat.',
   'h2h.ratingsConf': 'Konfidenz',
   'h2h.ratingsConfTip': 'Rating-Konfidenz basierend auf RD: Hoch (RD<100, viele Matches), Mittel (RD 100–200), Niedrig (RD>200, wenige Matches).',
+  'h2h.ratingsRaw': 'Roh',
+  'h2h.ratingsLuckAdj': 'Glücksber.',
+  'h2h.ratingsRawTip': 'Rating basierend auf rohen Gewinnquoten.',
+  'h2h.ratingsLuckAdjTip': 'Rating basierend auf glücksbereinigten Gewinnquoten (entfernt Würfelglück).',
+  'h2h.ratingsNoLuckData': 'Keine Glücksdaten — Matches mit Glückstracking starten.',
 
   // H2H Export/Import
   'h2h.export': 'Exportieren',

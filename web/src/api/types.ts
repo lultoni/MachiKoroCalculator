@@ -199,6 +199,7 @@ export interface EngineRating {
 
 export interface RatingsResponse {
   ratings: Record<string, EngineRating>;
+  luckAdjustedRatings: Record<string, EngineRating>;
 }
 
 export interface H2hStartRequest {

@@ -41,7 +41,15 @@ public final class RatingCalculator {
      * @return map of engine ID → current Glicko-2 rating (only engines that appeared in matches)
      */
     public static Map<String, Glicko2Rating> computeRatings(List<MatchResult> results) {
-        return computeRatingsWithDeltas(results, null);
+        return computeRatingsWithDeltas(results, null, false);
+    }
+
+    /**
+     * Computes Glicko-2 ratings using luck-adjusted win rates where available.
+     * Falls back to raw win rates for matches without luck data.
+     */
+    public static Map<String, Glicko2Rating> computeRatingsLuckAdjusted(List<MatchResult> results) {
+        return computeRatingsWithDeltas(results, null, true);
     }
 
     /**
@@ -53,6 +61,19 @@ public final class RatingCalculator {
      */
     public static Map<String, Glicko2Rating> computeRatingsWithDeltas(
             List<MatchResult> results, Map<String, RatingDelta> deltas) {
+        return computeRatingsWithDeltas(results, deltas, false);
+    }
+
+    /**
+     * Core implementation: computes Glicko-2 ratings with optional luck adjustment.
+     *
+     * @param results           all H2H match results (may be unsorted)
+     * @param deltas            if non-null, populated with match ID → rating delta
+     * @param useLuckAdjusted   if true, uses {@code luckAdjustedWinRates} where available
+     */
+    public static Map<String, Glicko2Rating> computeRatingsWithDeltas(
+            List<MatchResult> results, Map<String, RatingDelta> deltas,
+            boolean useLuckAdjusted) {
         Map<String, Glicko2Rating> ratings = new HashMap<>();
 
         // Sort by date for chronological replay
@@ -73,8 +94,15 @@ public final class RatingCalculator {
             double beforeA = ratingA.rating;
             double beforeB = ratingB.rating;
 
-            // Score from A's perspective = A's win rate
-            double scoreA = match.winRates[0];
+            // Score from A's perspective = A's win rate (luck-adjusted if requested and available)
+            double scoreA;
+            if (useLuckAdjusted && match.luckAdjustedWinRates != null
+                    && match.luckAdjustedWinRates.length > 0
+                    && match.luckAdjustedWinRates[0] != match.winRates[0]) {
+                scoreA = match.luckAdjustedWinRates[0];
+            } else {
+                scoreA = match.winRates[0];
+            }
 
             // More games → more rating periods → stronger signal, tighter RD
             int actualGameCount = 0;

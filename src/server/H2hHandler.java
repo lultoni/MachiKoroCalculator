@@ -51,6 +51,7 @@ final class H2hHandler implements HttpHandler {
 
     /** Cached Glicko-2 ratings (recomputed when store version changes). */
     private volatile java.util.Map<String, Glicko2Rating> cachedRatings;
+    private volatile java.util.Map<String, Glicko2Rating> cachedRatingsLuckAdjusted;
     private volatile int cachedRatingsVersion = -1;
 
     /** Active auto battle runner (only one at a time). */
@@ -484,25 +485,34 @@ final class H2hHandler implements HttpHandler {
     private void handleRatings(HttpExchange exchange) throws IOException {
         int storeVersion = store.version();
         java.util.Map<String, Glicko2Rating> ratings = cachedRatings;
+        java.util.Map<String, Glicko2Rating> luckRatings = cachedRatingsLuckAdjusted;
         if (ratings == null || storeVersion != cachedRatingsVersion) {
             java.util.List<MatchResult> all = store.loadAll();
             ratings = RatingCalculator.computeRatings(all);
+            luckRatings = RatingCalculator.computeRatingsLuckAdjusted(all);
             cachedRatings = ratings;
+            cachedRatingsLuckAdjusted = luckRatings;
             cachedRatingsVersion = storeVersion;
         }
 
         JsonObject response = new JsonObject();
-        JsonObject ratingsObj = new JsonObject();
+        response.add("ratings", ratingsToJson(ratings));
+        response.add("luckAdjustedRatings", ratingsToJson(luckRatings));
+        ApiUtils.sendJson(exchange, 200, response);
+    }
+
+    private static JsonObject ratingsToJson(java.util.Map<String, Glicko2Rating> ratings) {
+        JsonObject obj = new JsonObject();
+        if (ratings == null) return obj;
         for (var entry : ratings.entrySet()) {
             JsonObject r = new JsonObject();
             r.addProperty("rating", Math.round(entry.getValue().rating));
             r.addProperty("rd", Math.round(entry.getValue().rd));
             r.addProperty("volatility", Math.round(entry.getValue().volatility * 10000.0) / 10000.0);
             r.addProperty("matchCount", entry.getValue().matchCount);
-            ratingsObj.add(entry.getKey(), r);
+            obj.add(entry.getKey(), r);
         }
-        response.add("ratings", ratingsObj);
-        ApiUtils.sendJson(exchange, 200, response);
+        return obj;
     }
 
     // -------------------------------------------------------------------------

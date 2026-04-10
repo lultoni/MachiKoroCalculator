@@ -10,14 +10,20 @@ interface Props {
 export function H2hRatings({ onBack }: Props) {
   const { t } = useLocale();
   const [ratings, setRatings] = useState<Record<string, EngineRating>>({});
+  const [luckRatings, setLuckRatings] = useState<Record<string, EngineRating>>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     api.h2hRatings()
-      .then(r => setRatings(r.ratings))
+      .then(r => {
+        setRatings(r.ratings);
+        setLuckRatings(r.luckAdjustedRatings ?? {});
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
+
+  const hasLuckData = Object.keys(luckRatings).length > 0;
 
   const sorted = useMemo(() =>
     Object.entries(ratings).sort((a, b) => b[1].rating - a[1].rating),
@@ -25,10 +31,14 @@ export function H2hRatings({ onBack }: Props) {
   );
 
   const bestRating = sorted.length > 0 ? sorted[0][1].rating : 0;
+  const bestLuckRating = useMemo(() => {
+    if (!hasLuckData) return 0;
+    return Math.max(...Object.values(luckRatings).map(r => r.rating));
+  }, [luckRatings, hasLuckData]);
 
   return (
     <div className="min-h-screen bg-machi-bg text-machi-text p-6">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-5xl mx-auto">
         {/* Header */}
         <div className="flex items-center gap-4 mb-6">
           <button
@@ -44,6 +54,9 @@ export function H2hRatings({ onBack }: Props) {
           {/* Legend */}
           <div className="mb-4 text-xs text-machi-text-dim space-y-1">
             <p>{t('h2h.ratingsInfo')}</p>
+            {!hasLuckData && !loading && sorted.length > 0 && (
+              <p className="text-machi-yellow">{t('h2h.ratingsNoLuckData')}</p>
+            )}
           </div>
 
           {loading ? (
@@ -59,10 +72,20 @@ export function H2hRatings({ onBack }: Props) {
                     <th className="text-left py-2 px-2">{t('h2h.ratingsEngine')}</th>
                     <th
                       className="text-center py-2 px-2 cursor-help"
-                      title={t('h2h.ratingsRatingTip')}
+                      title={t('h2h.ratingsRawTip')}
                     >
                       {t('h2h.ratingsRating')}
+                      {hasLuckData && <span className="text-[10px] block font-normal">({t('h2h.ratingsRaw')})</span>}
                     </th>
+                    {hasLuckData && (
+                      <th
+                        className="text-center py-2 px-2 cursor-help"
+                        title={t('h2h.ratingsLuckAdjTip')}
+                      >
+                        {t('h2h.ratingsRating')}
+                        <span className="text-[10px] block font-normal">({t('h2h.ratingsLuckAdj')})</span>
+                      </th>
+                    )}
                     <th
                       className="text-center py-2 px-2 cursor-help"
                       title={t('h2h.ratingsRdTip')}
@@ -86,6 +109,7 @@ export function H2hRatings({ onBack }: Props) {
                 <tbody>
                   {sorted.map(([id, r], i) => {
                     const conf = confidenceLevel(r.rd);
+                    const lr = luckRatings[id];
                     return (
                       <tr
                         key={id}
@@ -99,6 +123,19 @@ export function H2hRatings({ onBack }: Props) {
                         <td className="text-center py-2 px-2 font-semibold font-mono">
                           {Math.round(r.rating)}
                         </td>
+                        {hasLuckData && (
+                          <td className="text-center py-2 px-2 font-semibold font-mono">
+                            {lr ? (
+                              <>
+                                {Math.round(lr.rating)}
+                                {lr.rating === bestLuckRating && <span className="ml-1 text-machi-yellow">★</span>}
+                                <RatingDelta raw={r.rating} luckAdj={lr.rating} />
+                              </>
+                            ) : (
+                              <span className="text-machi-text-dim">—</span>
+                            )}
+                          </td>
+                        )}
                         <td className="text-center py-2 px-2 text-machi-text-dim font-mono">
                           ±{Math.round(r.rd)}
                         </td>
@@ -120,6 +157,18 @@ export function H2hRatings({ onBack }: Props) {
         </div>
       </div>
     </div>
+  );
+}
+
+/** Small colored delta indicator showing how luck adjustment shifts the rating. */
+function RatingDelta({ raw, luckAdj }: { raw: number; luckAdj: number }) {
+  const diff = Math.round(luckAdj - raw);
+  if (diff === 0) return null;
+  const color = diff > 0 ? 'text-machi-green' : 'text-machi-red';
+  return (
+    <span className={`ml-1 text-[10px] ${color}`}>
+      {diff > 0 ? '+' : ''}{diff}
+    </span>
   );
 }
 

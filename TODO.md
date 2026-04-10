@@ -13,7 +13,6 @@ Priorisiere in deiner Abarbeitung die wichtigsten Features. Erkenne Abhängigkei
 | # | Task | Type | Notes |
 |---|------|------|-------|
 | 5 | Luck display in live game UI | Dev | Show luck info in main game session (AssistantPanel or similar). Lower priority than replay. Depends on #1. |
-| 24 | Luck-adjusted ratings everywhere | Dev | LuckAnalyzer now has dual mode (MC + heuristic). Luck integrated into H2H MatchRunner (opt-in via MatchConfig.computeLuck). Game replay shows per-roll luck, cumulative luck chart, game-level summary, and luck-adjusted results. Next: wire luck-adjusted WR into Glicko-2 ratings and sweep optimization. WinProbability now has dual-mode: fast heuristic (MAE ~0.22) and micro MC (MAE ~0.03) via computeAccurateWinProb. |
 | 25 | Per-game luck-weighted WR | User | Current luck-adjusted WR = simple mean subtraction (totalLuck / gameCount). Discuss: weight each game's WR by the magnitude of luck involved — a win despite massive bad luck should count more than a win with neutral luck. Design per-game weighting formula. Relates to #24. |
 | 27 | Card copy count in Card Value analysis | User | Card Value summary table doesn't factor in number of copies owned (e.g., 3× Bäckerei). Income attribution is correct (sums all copies), but ROI/expected/per-turn columns need to account for copy count. Discuss: show copy column, divide expected EV by copies, or show per-copy breakdown. |
 
@@ -78,6 +77,7 @@ Moved here when completed. Full history in CHANGELOG.md.
 | 7 | Card-value-throughout-game analyzer — Full per-card income attribution via RollResolver.attributeIncomePerCard(). TurnLog carries cardIncome + purchasedCardExpectedEv. MatchConfig.computeCardIncome flag. Frontend: cumulative income LineChart, ROI summary table, per-turn income breakdown in turn detail, player toggle. |
 | 23 | WinProbability dual-mode: fast heuristic (MAE ~0.22) + micro MC with 50 rollouts (MAE ~0.03). 10 experiments proved static features cap at MAE ~0.20. Eval set: 35 positions with 100K MC ground truth. |
 | 26 | Chart turn indicator in game replay — vertical ReferenceLine on all 4 time-series charts (Luck Over Time, Dice Fortune own/opp, Card Value cumulative) tracks the currently selected turn. |
+| 24 | Luck-adjusted ratings everywhere — RatingCalculator parametrized for luck-adjusted WR. H2H API serves both raw and luck-adjusted Glicko-2 ratings. Frontend shows dual columns with colored deltas. |
 
 | Old # | Task |
 |-------|------|

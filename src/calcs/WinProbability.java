@@ -23,6 +23,9 @@ public final class WinProbability {
     /** Number of MC rollouts for the accurate win probability estimate. */
     static int MICRO_MC_SIMS = 50;
 
+    /** Number of MC rollouts for the hybrid (mid-accuracy) estimate. */
+    static int HYBRID_MC_SIMS = 5;
+
     /** Softmax temperature — for N>2 player games in fast mode. */
     static double SOFTMAX_TEMPERATURE = 5.0;
 
@@ -34,6 +37,7 @@ public final class WinProbability {
     static double W_LANDMARK_ADV = 4.0;
     static double W_TTW_GAP = 0.0;
     static double W_RED_DRAIN = -0.5;
+    static double W_ENDGAME_URGENCY = 1.5;
 
     private WinProbability() {}
 
@@ -75,6 +79,22 @@ public final class WinProbability {
 
     public static double computeAccurateWinProb(core.BitState bs, int playerIndex) {
         return computeAccurateWinProb(bs.toGameState(), playerIndex);
+    }
+
+    /**
+     * Hybrid win probability using a small number of fast greedy rollouts.
+     * Bridges the gap between the pure heuristic (~0.22 MAE) and full micro MC
+     * (~0.03 MAE). Runs {@link #HYBRID_MC_SIMS} rollouts (~1-3ms).
+     *
+     * <p>Use this for MCTS depth-limited rollout terminals and other hot paths
+     * where the heuristic is too inaccurate but 50 MC sims is too slow.
+     */
+    public static double computeHybridWinProb(GameState gs, int playerIndex) {
+        return GameSimulator.mcWinRate(gs, playerIndex, HYBRID_MC_SIMS);
+    }
+
+    public static double computeHybridWinProb(core.BitState bs, int playerIndex) {
+        return computeHybridWinProb(bs.toGameState(), playerIndex);
     }
 
     /**
@@ -129,6 +149,10 @@ public final class WinProbability {
         double avgTtw = (ttwSelf + ttwOpp) / 2.0;
         double incomeTimesHorizon = (grossSelf - grossOpp) * Math.min(avgTtw, 20.0);
 
+        // Endgame urgency: 3-landmark positions are highly non-linear
+        double urgency = endgameUrgency(players[playerIndex], remSelf, netSelf)
+                       - endgameUrgency(players[oi], remOpp, netOpp);
+
         return W_BIAS
                 + W_INCOME_ADV * (grossSelf - grossOpp)
                 + W_COIN_ADV * coinUtilAdv
@@ -136,7 +160,8 @@ public final class WinProbability {
                 + W_LANDMARK_ADV * (lmSelf - lmOpp)
                 + W_TTW_GAP * (ttwOpp - ttwSelf)
                 + W_RED_DRAIN * (drainSelf - drainOpp)
-                + 0.05 * incomeTimesHorizon;
+                + 0.05 * incomeTimesHorizon
+                + W_ENDGAME_URGENCY * urgency;
     }
 
     private static double coinUtility(Player player) {
@@ -150,6 +175,36 @@ public final class WinProbability {
         double coins = player.getCoins();
         if (coins >= cheapest) return cheapest + Math.sqrt(coins - cheapest);
         return coins * coins / cheapest;
+    }
+
+    /**
+     * Endgame urgency: non-linear bonus for players with 3 landmarks.
+     * With 3 landmarks and enough coins for the 4th, the player wins on
+     * their next turn with very high probability. This binary threshold
+     * is poorly captured by linear features.
+     */
+    private static double endgameUrgency(Player player, int remainingCost, double netIncome) {
+        int lm = player.getLandmarkCount();
+        if (lm < 2) return 0.0;
+        int coins = player.getCoins();
+        if (lm == 3) {
+            // Can afford the last landmark — near-certain win
+            if (coins >= remainingCost) return 3.0;
+            // Close to affording — scaled by proximity
+            double proximity = (double) coins / Math.max(1, remainingCost);
+            // Also factor in income: high income means 1-2 turns away
+            double turnsAway = Math.max(0, remainingCost - coins) / netIncome;
+            if (turnsAway <= 1.0) return 2.5 * proximity;
+            if (turnsAway <= 3.0) return 1.5 * proximity;
+            return 0.5 * proximity;
+        }
+        if (lm == 2) {
+            // 2 landmarks — mild urgency based on proximity
+            double proximity = 1.0 - (double) Math.max(0, remainingCost - coins)
+                    / Math.max(1, remainingCost);
+            return 0.3 * proximity;
+        }
+        return 0.0;
     }
 
     private static double computeRedDrain(Player[] players, int targetIdx, int n, int[] oppCoins) {
@@ -204,22 +259,61 @@ public final class WinProbability {
         Player[] players = gs.getPlayers();
         int n = players.length;
 
-        double[] scores = new double[n];
+        // Pre-compute per-player features
+        double[] gross = new double[n];
+        double[] netIncome = new double[n];
+        double[] invest = new double[n];
+        int[] remCost = new int[n];
+        int[] lm = new int[n];
+        double[] coinUtil = new double[n];
+        double[] drain = new double[n];
+        double[] urgency = new double[n];
+
         for (int i = 0; i < n; i++) {
             int[] oppCoins = CardIncome.buildOpponentCoins(players, i);
-            double gross = CardIncome.playerEvPerRound(players[i], n, oppCoins);
-            double drain = computeRedDrain(players, i, n, oppCoins);
-            double net = Math.max(0.5, gross - drain * 0.5);
+            gross[i] = CardIncome.playerEvPerRound(players[i], n, oppCoins);
+            drain[i] = computeRedDrain(players, i, n, oppCoins);
+            netIncome[i] = Math.max(0.5, gross[i] - drain[i] * 0.5);
 
-            double invest = 0;
             for (Project p : players[i].getOwned_projects())
-                if (!p.isIs_grossprojekt()) invest += p.getCost();
+                if (!p.isIs_grossprojekt()) invest[i] += p.getCost();
 
-            int remCost = remainingLandmarkCost(players[i]);
-            double deficit = Math.max(0, remCost - players[i].getCoins());
-            double ttw = deficit / net;
+            remCost[i] = remainingLandmarkCost(players[i]);
+            lm[i] = players[i].getLandmarkCount();
+            coinUtil[i] = coinUtility(players[i]);
+            urgency[i] = endgameUrgency(players[i], remCost[i], netIncome[i]);
+        }
 
-            scores[i] = -ttw + invest * 0.1 + players[i].getLandmarkCount() * 5.0;
+        // Compute averages for relative features
+        double avgGross = 0, avgCoinUtil = 0, avgInvest = 0, avgLm = 0, avgDrain = 0, avgUrgency = 0;
+        for (int i = 0; i < n; i++) {
+            avgGross += gross[i];
+            avgCoinUtil += coinUtil[i];
+            avgInvest += invest[i];
+            avgLm += lm[i];
+            avgDrain += drain[i];
+            avgUrgency += urgency[i];
+        }
+        avgGross /= n; avgCoinUtil /= n; avgInvest /= n;
+        avgLm /= n; avgDrain /= n; avgUrgency /= n;
+
+        // Per-player logit using same features as 2-player model
+        double[] scores = new double[n];
+        for (int i = 0; i < n; i++) {
+            double incomeAdv = gross[i] - avgGross;
+            double coinAdv = coinUtil[i] - avgCoinUtil;
+            double investAdv = invest[i] - avgInvest;
+            double lmAdv = lm[i] - avgLm;
+            double drainAdv = drain[i] - avgDrain;
+            double urgencyAdv = urgency[i] - avgUrgency;
+
+            scores[i] = W_BIAS
+                    + W_INCOME_ADV * incomeAdv
+                    + W_COIN_ADV * coinAdv
+                    + W_INVESTMENT_ADV * investAdv
+                    + W_LANDMARK_ADV * lmAdv
+                    + W_RED_DRAIN * drainAdv
+                    + W_ENDGAME_URGENCY * urgencyAdv;
         }
         return scores;
     }

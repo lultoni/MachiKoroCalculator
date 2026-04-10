@@ -34,7 +34,7 @@ public final class WinProbDiag {
         return WinProbability.SOFTMAX_TEMPERATURE;
     }
 
-    /** Sets all logistic model weights at once. */
+    /** Sets all logistic model weights at once (including endgame urgency). */
     public static void setWeights(double wBias, double wIncome, double wCoin,
                                    double wInvest, double wLandmark, double wTtw, double wRedDrain) {
         WinProbability.W_BIAS = wBias;
@@ -46,13 +46,18 @@ public final class WinProbDiag {
         WinProbability.W_RED_DRAIN = wRedDrain;
     }
 
-    /** Returns the current weights. */
+    /** Sets the endgame urgency weight separately. */
+    public static void setEndgameUrgencyWeight(double w) {
+        WinProbability.W_ENDGAME_URGENCY = w;
+    }
+
+    /** Returns the current weights (including endgame urgency as last element). */
     public static double[] getWeights() {
         return new double[] {
             WinProbability.W_BIAS, WinProbability.W_INCOME_ADV,
             WinProbability.W_COIN_ADV, WinProbability.W_INVESTMENT_ADV,
             WinProbability.W_LANDMARK_ADV, WinProbability.W_TTW_GAP,
-            WinProbability.W_RED_DRAIN
+            WinProbability.W_RED_DRAIN, WinProbability.W_ENDGAME_URGENCY
         };
     }
 
@@ -64,5 +69,15 @@ public final class WinProbDiag {
     /** Returns the current micro MC sim count. */
     public static int getMicroMcSims() {
         return WinProbability.MICRO_MC_SIMS;
+    }
+
+    /** Sets the number of MC rollouts for the hybrid estimator. */
+    public static void setHybridMcSims(int sims) {
+        WinProbability.HYBRID_MC_SIMS = sims;
+    }
+
+    /** Returns the current hybrid MC sim count. */
+    public static int getHybridMcSims() {
+        return WinProbability.HYBRID_MC_SIMS;
     }
 }

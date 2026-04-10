@@ -14,14 +14,19 @@ import engine.TurnPlan;
  * resulting state using {@link calcs.WinProbability#computeBaselineWinProb}
  * instead of simulating to game completion.
  *
+ * <p>When {@code extra.terminalEval} is {@code "hybrid"}, uses
+ * {@link calcs.WinProbability#computeHybridWinProb} (5 MC rollouts) for
+ * higher accuracy at the terminal. This is slower (~1-3ms per terminal)
+ * and is recommended only with low iteration counts.
+ *
  * <p>Registry {@code engineClass}: {@code "mcts-v1-depth-limited"}.
- * Registry entries: {@code mcts-v1-depth3}, {@code mcts-v1-depth7}, {@code mcts-v1-depth10}.
  */
 public final class MctsDepthLimitedEngine extends MctsV1Engine {
 
     public static final String ENGINE_ID = "mcts-v1-depth-limited";
 
     private static final ThreadLocal<Integer> currentMaxDepth = ThreadLocal.withInitial(() -> 10);
+    private static final ThreadLocal<Boolean> useHybrid = ThreadLocal.withInitial(() -> false);
 
     @Override
     public String id() {
@@ -36,22 +41,28 @@ public final class MctsDepthLimitedEngine extends MctsV1Engine {
     @Override
     public EngineResult evaluate(GameState state, int playerIndex, EngineConfig config) {
         int maxDepth = Integer.parseInt(config.getExtra("maxRolloutDepth", "10"));
+        boolean hybrid = "hybrid".equals(config.getExtra("terminalEval", "heuristic"));
         currentMaxDepth.set(maxDepth);
+        useHybrid.set(hybrid);
         try {
             return super.evaluate(state, playerIndex, config);
         } finally {
             currentMaxDepth.remove();
+            useHybrid.remove();
         }
     }
 
     @Override
     public TurnPlan evaluateFullTurn(GameState state, int playerIndex, EngineConfig config) {
         int maxDepth = Integer.parseInt(config.getExtra("maxRolloutDepth", "10"));
+        boolean hybrid = "hybrid".equals(config.getExtra("terminalEval", "heuristic"));
         currentMaxDepth.set(maxDepth);
+        useHybrid.set(hybrid);
         try {
             return super.evaluateFullTurn(state, playerIndex, config);
         } finally {
             currentMaxDepth.remove();
+            useHybrid.remove();
         }
     }
 
@@ -60,8 +71,11 @@ public final class MctsDepthLimitedEngine extends MctsV1Engine {
                                  int activePlayer, int playerPerspective,
                                  double explorationConstant) {
         int maxDepth = currentMaxDepth.get();
+        BitRolloutFn rollout = useHybrid.get()
+                ? BitMctsRollout.withMaxDepthHybrid(maxDepth)
+                : BitMctsRollout.withMaxDepth(maxDepth);
         return new MctsTree(bs, supply, activePlayer, playerPerspective,
-                explorationConstant, BitMctsRollout.withMaxDepth(maxDepth));
+                explorationConstant, rollout);
     }
 
     @Override
@@ -69,7 +83,10 @@ public final class MctsDepthLimitedEngine extends MctsV1Engine {
                                           int activePlayer, int playerPerspective,
                                           double explorationConstant) {
         int maxDepth = currentMaxDepth.get();
+        BitRolloutFn rollout = useHybrid.get()
+                ? BitMctsRollout.withMaxDepthHybrid(maxDepth)
+                : BitMctsRollout.withMaxDepth(maxDepth);
         return new MctsTree(bs, supply, activePlayer, playerPerspective,
-                explorationConstant, BitMctsRollout.withMaxDepth(maxDepth), false, true);
+                explorationConstant, rollout, false, true);
     }
 }

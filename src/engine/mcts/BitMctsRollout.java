@@ -62,6 +62,20 @@ public final class BitMctsRollout {
                         bs.getNumPlayers(), startingPlayer, playerPerspective, Math.max(1, maxDepth));
     }
 
+    /**
+     * Creates a depth-limited rollout that uses the hybrid win probability
+     * estimator (5 MC rollouts, ~1-3ms) instead of the fast heuristic at
+     * the depth limit. More accurate but slower — use with low iteration budgets.
+     *
+     * @param maxDepth maximum number of turns before applying hybrid eval
+     * @return a BitRolloutFn suitable for {@link MctsTree}
+     */
+    public static BitRolloutFn withMaxDepthHybrid(int maxDepth) {
+        return (bs, supply, startingPlayer, playerPerspective) ->
+                simulateInternalHybrid(bs.copy(), Arrays.copyOf(supply, supply.length),
+                        bs.getNumPlayers(), startingPlayer, playerPerspective, Math.max(1, maxDepth));
+    }
+
     // -------------------------------------------------------------------------
     // Core simulation
     // -------------------------------------------------------------------------
@@ -85,6 +99,18 @@ public final class BitMctsRollout {
     private static double simulateInternal(BitState bs, int[] supply, int n,
                                            int startingPlayer, int playerPerspective,
                                            int turnLimit) {
+        return simulateInternal(bs, supply, n, startingPlayer, playerPerspective, turnLimit, false);
+    }
+
+    private static double simulateInternalHybrid(BitState bs, int[] supply, int n,
+                                                  int startingPlayer, int playerPerspective,
+                                                  int turnLimit) {
+        return simulateInternal(bs, supply, n, startingPlayer, playerPerspective, turnLimit, true);
+    }
+
+    private static double simulateInternal(BitState bs, int[] supply, int n,
+                                           int startingPlayer, int playerPerspective,
+                                           int turnLimit, boolean useHybridTerminal) {
         ThreadLocalRandom rng = ThreadLocalRandom.current();
         int activePlayer = startingPlayer;
         int turnCount = 0;
@@ -150,8 +176,10 @@ public final class BitMctsRollout {
             turnCount++;
         }
 
-        // Turn/depth limit reached — use softmax heuristic
-        return WinProbability.computeBaselineWinProb(bs, playerPerspective);
+        // Turn/depth limit reached — use heuristic or hybrid terminal evaluation
+        return useHybridTerminal
+                ? WinProbability.computeHybridWinProb(bs, playerPerspective)
+                : WinProbability.computeBaselineWinProb(bs, playerPerspective);
     }
 
     // -------------------------------------------------------------------------

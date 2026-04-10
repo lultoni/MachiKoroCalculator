@@ -807,32 +807,38 @@ public class RuntimeTester {
         System.out.println("\n=== WinProb Error Analysis (" + NUM_GAMES + " games, "
                 + MC_SIMS + " MC sims, sample every " + SAMPLE_EVERY + ") ===\n");
 
-        // Buckets by MC WR range
+        // Heuristic errors
         List<Double> signedErrors = new ArrayList<>();
-        // Bucket by MC WR: [0,0.2), [0.2,0.4), [0.4,0.6), [0.6,0.8), [0.8,1.0]
         @SuppressWarnings("unchecked") List<Double>[] bucketErrors = new List[5];
         for (int i = 0; i < 5; i++) bucketErrors[i] = new ArrayList<>();
-        // Bucket by landmark count
         @SuppressWarnings("unchecked") List<Double>[] lmErrors = new List[5];
         for (int i = 0; i < 5; i++) lmErrors[i] = new ArrayList<>();
-        // Bucket by turn phase
         List<Double> earlyE = new ArrayList<>(), midE = new ArrayList<>(), endE = new ArrayList<>();
+
+        // Hybrid errors (5 MC rollouts)
+        List<Double> hybridErrors = new ArrayList<>();
+        @SuppressWarnings("unchecked") List<Double>[] hybridBucketErrors = new List[5];
+        for (int i = 0; i < 5; i++) hybridBucketErrors[i] = new ArrayList<>();
 
         GameStateSampler.runGames(NUM_GAMES, 2, 0.0,
                 GameStateSampler.everyKTurns(SAMPLE_EVERY),
                 snapshot -> {
                     int pi = snapshot.activePlayer();
-                    double softmax = calcs.WinProbability.computeBaselineWinProb(
+                    double heuristic = calcs.WinProbability.computeBaselineWinProb(
+                            snapshot.state(), pi);
+                    double hybrid = calcs.WinProbability.computeHybridWinProb(
                             snapshot.state(), pi);
                     double mc = GameSimulator.mcWinRate(snapshot.state(), pi, MC_SIMS);
-                    double signedErr = softmax - mc; // positive = overestimate, negative = underestimate
+                    double signedErr = heuristic - mc;
+                    double hybridErr = hybrid - mc;
 
                     synchronized (signedErrors) { signedErrors.add(signedErr); }
+                    synchronized (hybridErrors) { hybridErrors.add(hybridErr); }
 
                     int bucket = Math.min(4, (int)(mc * 5));
                     synchronized (bucketErrors[bucket]) { bucketErrors[bucket].add(signedErr); }
+                    synchronized (hybridBucketErrors[bucket]) { hybridBucketErrors[bucket].add(hybridErr); }
 
-                    // Landmark count of active player
                     Player player = snapshot.state().getPlayers()[pi];
                     int lmCount = 0;
                     for (Project p : player.getOwned_projects())
@@ -845,7 +851,8 @@ public class RuntimeTester {
                     else synchronized (endE) { endE.add(signedErr); }
                 });
 
-        // Print by MC WR bucket
+        // Print heuristic by MC WR bucket
+        System.out.println("--- Heuristic ---");
         System.out.printf("%-12s | %5s | %8s | %8s | %8s%n",
                 "MC WR range", "N", "MeanErr", "MeanAbs", "MedianE");
         System.out.println("-------------+-------+----------+----------+----------");
@@ -857,6 +864,20 @@ public class RuntimeTester {
             double med = median(bucketErrors[i]);
             System.out.printf("%-12s | %5d | %+8.4f | %8.4f | %+8.4f%n",
                     labels[i], bucketErrors[i].size(), m, ma, med);
+        }
+
+        // Print hybrid by MC WR bucket
+        System.out.println("\n--- Hybrid (5 MC rollouts) ---");
+        System.out.printf("%-12s | %5s | %8s | %8s | %8s%n",
+                "MC WR range", "N", "MeanErr", "MeanAbs", "MedianE");
+        System.out.println("-------------+-------+----------+----------+----------");
+        for (int i = 0; i < 5; i++) {
+            if (hybridBucketErrors[i].isEmpty()) continue;
+            double m = mean(hybridBucketErrors[i]);
+            double ma = hybridBucketErrors[i].stream().mapToDouble(Math::abs).average().orElse(0);
+            double med = median(hybridBucketErrors[i]);
+            System.out.printf("%-12s | %5d | %+8.4f | %8.4f | %+8.4f%n",
+                    labels[i], hybridBucketErrors[i].size(), m, ma, med);
         }
 
         // Print by landmark count
@@ -877,11 +898,15 @@ public class RuntimeTester {
         printErrorRow("Mid", midE);
         printErrorRow("Endgame", endE);
 
-        // Overall
+        // Overall comparison
         double overallBias = mean(signedErrors);
         double overallMae = signedErrors.stream().mapToDouble(Math::abs).average().orElse(0);
-        System.out.printf("%nOverall bias: %+.4f, MAE: %.4f, N: %d%n",
+        double hybridBias = mean(hybridErrors);
+        double hybridMae = hybridErrors.stream().mapToDouble(Math::abs).average().orElse(0);
+        System.out.printf("%nHeuristic — bias: %+.4f, MAE: %.4f, N: %d%n",
                 overallBias, overallMae, signedErrors.size());
+        System.out.printf("Hybrid(5) — bias: %+.4f, MAE: %.4f, N: %d%n",
+                hybridBias, hybridMae, hybridErrors.size());
     }
 
     private static void printErrorRow(String label, List<Double> errors) {

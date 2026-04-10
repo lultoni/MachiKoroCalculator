@@ -48,8 +48,9 @@ import java.util.Map;
  * <h2>Configuration</h2>
  * <ul>
  *   <li>{@code maxDepthRounds} — search depth in full rounds (default 2)</li>
- *   <li>{@code leafEval} — leaf evaluation function: {@code "winprob"} (default)
- *       or {@code "composite"}</li>
+ *   <li>{@code leafEval} — leaf evaluation function: {@code "winprob"} (default),
+ *       {@code "composite"}, or {@code "accurate"} (micro MC with 50 rollouts per leaf —
+ *       much higher accuracy but ~5-20ms per leaf; only practical at depth 1)</li>
  * </ul>
  *
  * <h2>Doubles handling</h2>
@@ -777,6 +778,10 @@ public final class ExpectimaxEngine implements SimulationEngine {
     private double leafEval(BitState bs, int perspective, String evalFn) {
         if ("composite".equals(evalFn)) {
             return leafEvalComposite(bs, perspective);
+        }
+        if ("accurate".equals(evalFn)) {
+            return Math.max(0.0, Math.min(1.0,
+                    WinProbability.computeAccurateWinProb(bs, perspective)));
         }
         return Math.max(0.0, Math.min(1.0,
                 WinProbability.computeBaselineWinProb(bs, perspective)));

@@ -222,6 +222,18 @@
     }
   },
   {
+    "id": "mcts-v1-depth3-hybrid",
+    "engineClass": "mcts-v1-depth-limited",
+    "description": "MCTS Variant D — depth 3, hybrid MC terminal eval (5 rollouts per leaf)",
+    "default": false,
+    "tier": "balanced",
+    "config": {
+      "iterations": "500",
+      "maxRolloutDepth": "3",
+      "terminalEval": "hybrid"
+    }
+  },
+  {
     "id": "mcts-v1-adaptive-fast",
     "engineClass": "mcts-v1-adaptive",
     "description": "MCTS Variant E — adaptive budget, fast mode (~500 iterations)",
@@ -313,6 +325,18 @@
       "iterations": "0",
       "maxDepthRounds": "1",
       "leafEval": "composite"
+    }
+  },
+  {
+    "id": "expectimax-d1-accurate",
+    "engineClass": "expectimax",
+    "description": "Expectimax — depth 1, micro-MC leaf eval (50 rollouts per leaf)",
+    "default": false,
+    "tier": "fast",
+    "config": {
+      "iterations": "0",
+      "maxDepthRounds": "1",
+      "leafEval": "accurate"
     }
   },
   {

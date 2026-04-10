@@ -689,6 +689,15 @@ public final class Calcs {
     }
 
     /**
+     * Returns a hybrid win probability using a small number of fast greedy rollouts
+     * (~1-3ms, MAE between heuristic and full micro MC). Useful for hot paths
+     * where the pure heuristic is too inaccurate but 50 MC sims is too slow.
+     */
+    public static double computeHybridWinProb(GameState gs, int playerIndex) {
+        return WinProbability.computeHybridWinProb(gs, playerIndex);
+    }
+
+    /**
      * Estimates the change in win probability for playerIndex from buying {@code candidate},
      * using micro MC for accuracy.
      */

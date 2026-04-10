@@ -6,6 +6,23 @@ Implementation history: what was built, why, and which design decisions were mad
 
 ## Phase 7: Iteration
 
+### Wire Accurate WinProb into Engines + Hybrid Mode
+
+**Three-tier WinProbability now wired into engines.** Following TODO #23's dual-mode architecture, added a third tier: hybrid (5 MC rollouts, ~1-3ms, MAE ~0.11). Wired all three modes into appropriate engine layers:
+
+- **Accurate (50 MC):** New Expectimax `leafEval: "accurate"` mode for depth-1 searches. Registry entry `expectimax-d1-accurate`. HeuristicEvEngine and CreatorScorer already use accurate mode via `Calcs.estimateWinProbDelta`.
+- **Hybrid (5 MC):** New `computeHybridWinProb` method. MCTS depth-limited engine gains `terminalEval: "hybrid"` config option. Registry entry `mcts-v1-depth3-hybrid` (balanced tier, 500 iterations). `BitMctsRollout.withMaxDepthHybrid()` factory method.
+- **Heuristic:** Enhanced with endgame urgency model (3-landmark positions get non-linear bonus/penalty) and unified N-player scoring (replaced simplistic `-ttw + invest*0.1 + landmarks*5.0` with per-player logistic model using same features as 2-player path).
+
+**MAE comparison (200 games, 3300 positions, 500 MC ground truth):**
+| Mode | MAE | Bias | Time |
+|------|-----|------|------|
+| Heuristic | ~0.30 | -0.11 | <1ms |
+| Hybrid (5 MC) | 0.11 | -0.002 | ~1-3ms |
+| Accurate (50 MC) | ~0.03 | ~0 | ~5-20ms |
+
+**Files:** `WinProbability.java` (hybrid mode, endgame urgency, N-player unification), `WinProbDiag.java` (hybrid accessors, urgency weight), `Calcs.java` (hybrid wrapper), `ExpectimaxEngine.java` (accurate leafEval), `BitMctsRollout.java` (hybrid terminal, parameterized simulateInternal), `MctsDepthLimitedEngine.java` (terminalEval config), `engines.json` (+2 entries), `engine-params.json` (terminalEval, accurate leafEval), `RuntimeTester.java` (hybrid comparison in error analysis).
+
 ### WinProbability Dual-Mode Architecture (TODO #23)
 
 **Problem:** Static heuristic win probability had MAE ~0.276 on real-game positions (2031 positions from 200 games). After 10 systematic experiments (temperature tuning, race models, logistic regression, surplus projection, feature interactions), root cause identified: static game-state features have maximum Pearson r ≈ 0.34 with MC ground truth. No formula can predict below MAE ~0.20 because win probability depends on future card purchases, dice variance, and path-dependent dynamics.

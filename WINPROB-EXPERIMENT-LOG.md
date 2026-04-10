@@ -90,8 +90,18 @@ Instead of trying to improve the pure heuristic beyond its theoretical limit, we
    - Used for UI display, luck analysis, ranking, and anywhere accuracy matters
    - **Achieves MAE < 0.10 target** (measured 0.028-0.032 against 100K MC ground truth)
 
+3. **Hybrid MC** (`computeHybridWinProb`): ~1-3ms, MAE ~0.11
+   - 5 greedy rollouts — bridges heuristic and full micro MC
+   - Used for MCTS depth-limited rollout terminals and Expectimax leaves
+   - 3× better than heuristic, only 4× worse than full micro MC
+
 ### High-confidence eval set (35 positions, 100K MC ground truth)
 - Heuristic MAE: 0.217
+- Hybrid(5) MAE: ~0.110
 - MC(50) MAE: 0.032
 
-This solution respects the constraint "lightweight compared to MC" — 50 sims is 10-1000× less than the 500-100K used for ground truth, while achieving nearly the same accuracy.
+### Real-game validation (200 games, 500 MC ground truth, 3300 positions)
+- Heuristic MAE: 0.297
+- Hybrid(5) MAE: 0.110 (bias: -0.002, nearly unbiased)
+
+This solution respects the constraint "lightweight compared to MC" — 5-50 sims is 10-1000× less than the 500-100K used for ground truth, while achieving dramatically better accuracy.

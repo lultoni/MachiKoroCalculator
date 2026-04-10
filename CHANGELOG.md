@@ -6,6 +6,26 @@ Implementation history: what was built, why, and which design decisions were mad
 
 ## Phase 7: Iteration
 
+### WinProbability Dual-Mode Architecture (TODO #23)
+
+**Problem:** Static heuristic win probability had MAE ~0.276 on real-game positions (2031 positions from 200 games). After 10 systematic experiments (temperature tuning, race models, logistic regression, surplus projection, feature interactions), root cause identified: static game-state features have maximum Pearson r ≈ 0.34 with MC ground truth. No formula can predict below MAE ~0.20 because win probability depends on future card purchases, dice variance, and path-dependent dynamics.
+
+**Solution: Dual-mode architecture.**
+1. **Fast heuristic** (`computeBaselineWinProb`): Feature-based logistic model with calibrated weights (income=0.5, coin=0.10, invest=0.05, landmark=4.0, drain=-0.5). MAE ~0.22, <1ms. Used inside MCTS rollouts and Expectimax terminal evaluation.
+2. **Micro MC** (`computeAccurateWinProb`): 50 greedy rollouts via `GameSimulator.mcWinRate()`. MAE ~0.03, ~5-20ms. Used for UI display, luck analysis, ranking, and anywhere accuracy matters.
+
+**Eval infrastructure:** 35-position eval set (15 hand-crafted edge cases + 20 real-game positions) with 100K MC ground truth per position. Weight grid search over 2880 combinations. Feature correlation analysis (18 features, Pearson r). Full experiment log in `WINPROB-EXPERIMENT-LOG.md`.
+
+**Public API changes:**
+- `WinProbability.computeAccurateWinProb(GameState, int)` — new accurate mode
+- `WinProbability.computeAccurateWinProb(BitState, int)` — BitState overload
+- `Calcs.computeAccurateWinProb(GameState, int)` — public wrapper
+- `WinProbDiag` — new diagnostic methods: `computeTurnsToWin`, `setWeights`/`getWeights`, `setMicroMcSims`/`getMicroMcSims`
+
+**New RuntimeTester sections:** "WinProb Error Analysis" (real-game MAE), "Calibration Sweep" (weight grid search), "Feature Correlation" (Pearson r analysis), "WinProb Eval Set Generator" (100K MC ground truth).
+
+**Files:** `WinProbability.java` (dual-mode rewrite), `WinProbDiag.java` (expanded diagnostics), `Calcs.java` (new public wrapper), `RuntimeTester.java` (4 new test sections), `WINPROB-EXPERIMENT-LOG.md` (new).
+
 ### Chart Turn Indicator in Game Replay (TODO #26)
 
 All 4 time-series charts in H2hGameReplay now display a vertical dashed reference line at the currently selected turn. Applies to Luck Over Time (LineChart), Dice Fortune own turns (BarChart), Dice Fortune opponent turns (BarChart), and Card Value cumulative income (LineChart). For the Dice Fortune charts, the reference line maps from the global turn index to the per-player own/opponent turn count using a computed `fortuneTurnIndices` memo. Uses Recharts `ReferenceLine` component with consistent styling (`rgba(255,255,255,0.35)`, dashed).

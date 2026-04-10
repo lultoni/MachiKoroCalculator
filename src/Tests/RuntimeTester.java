@@ -431,6 +431,22 @@ public class RuntimeTester {
             runCalcsBiasAudit();
         });
 
+        runSection("WinProb Error Analysis", () -> {
+            runWinProbErrorAnalysis();
+        });
+
+        runSection("WinProb Calibration Sweep", () -> {
+            runCalibrationSweep();
+        });
+
+        runSection("WinProb Feature Correlation", () -> {
+            runFeatureCorrelation();
+        });
+
+        runSection("WinProb Eval Set Generator", () -> {
+            generateHighConfidenceEvalSet();
+        });
+
         runSection("WinProbability Real-Game Accuracy", () -> {
             runRealGameAccuracyTest();
         });
@@ -773,6 +789,529 @@ public class RuntimeTester {
         System.out.println("Bias #1 (per-card dice) — see Delta column above for quantified impact.");
         System.out.println("Bias #3 (red drain projection) — see Red drain column.");
         System.out.println("Bias #5 (FZP order) — edge-case, likely < 1%.");
+    }
+
+    // =========================================================================
+    // WinProb Error Analysis
+    // =========================================================================
+
+    /**
+     * Detailed signed-error analysis of WinProbability across real game positions.
+     * Reports error by MC win-prob bucket, landmark count, and signed bias direction.
+     */
+    private static void runWinProbErrorAnalysis() {
+        int NUM_GAMES = 200;
+        int MC_SIMS = 500;
+        int SAMPLE_EVERY = 3;
+
+        System.out.println("\n=== WinProb Error Analysis (" + NUM_GAMES + " games, "
+                + MC_SIMS + " MC sims, sample every " + SAMPLE_EVERY + ") ===\n");
+
+        // Buckets by MC WR range
+        List<Double> signedErrors = new ArrayList<>();
+        // Bucket by MC WR: [0,0.2), [0.2,0.4), [0.4,0.6), [0.6,0.8), [0.8,1.0]
+        @SuppressWarnings("unchecked") List<Double>[] bucketErrors = new List[5];
+        for (int i = 0; i < 5; i++) bucketErrors[i] = new ArrayList<>();
+        // Bucket by landmark count
+        @SuppressWarnings("unchecked") List<Double>[] lmErrors = new List[5];
+        for (int i = 0; i < 5; i++) lmErrors[i] = new ArrayList<>();
+        // Bucket by turn phase
+        List<Double> earlyE = new ArrayList<>(), midE = new ArrayList<>(), endE = new ArrayList<>();
+
+        GameStateSampler.runGames(NUM_GAMES, 2, 0.0,
+                GameStateSampler.everyKTurns(SAMPLE_EVERY),
+                snapshot -> {
+                    int pi = snapshot.activePlayer();
+                    double softmax = calcs.WinProbability.computeBaselineWinProb(
+                            snapshot.state(), pi);
+                    double mc = GameSimulator.mcWinRate(snapshot.state(), pi, MC_SIMS);
+                    double signedErr = softmax - mc; // positive = overestimate, negative = underestimate
+
+                    synchronized (signedErrors) { signedErrors.add(signedErr); }
+
+                    int bucket = Math.min(4, (int)(mc * 5));
+                    synchronized (bucketErrors[bucket]) { bucketErrors[bucket].add(signedErr); }
+
+                    // Landmark count of active player
+                    Player player = snapshot.state().getPlayers()[pi];
+                    int lmCount = 0;
+                    for (Project p : player.getOwned_projects())
+                        if (p.isIs_grossprojekt()) lmCount++;
+                    synchronized (lmErrors[lmCount]) { lmErrors[lmCount].add(signedErr); }
+
+                    int turn = snapshot.turnNumber();
+                    if (turn <= 10) synchronized (earlyE) { earlyE.add(signedErr); }
+                    else if (turn <= 25) synchronized (midE) { midE.add(signedErr); }
+                    else synchronized (endE) { endE.add(signedErr); }
+                });
+
+        // Print by MC WR bucket
+        System.out.printf("%-12s | %5s | %8s | %8s | %8s%n",
+                "MC WR range", "N", "MeanErr", "MeanAbs", "MedianE");
+        System.out.println("-------------+-------+----------+----------+----------");
+        String[] labels = {"[0.0,0.2)", "[0.2,0.4)", "[0.4,0.6)", "[0.6,0.8)", "[0.8,1.0]"};
+        for (int i = 0; i < 5; i++) {
+            if (bucketErrors[i].isEmpty()) continue;
+            double m = mean(bucketErrors[i]);
+            double ma = bucketErrors[i].stream().mapToDouble(Math::abs).average().orElse(0);
+            double med = median(bucketErrors[i]);
+            System.out.printf("%-12s | %5d | %+8.4f | %8.4f | %+8.4f%n",
+                    labels[i], bucketErrors[i].size(), m, ma, med);
+        }
+
+        // Print by landmark count
+        System.out.printf("%n%-12s | %5s | %8s | %8s%n", "Landmarks", "N", "MeanErr", "MeanAbs");
+        System.out.println("-------------+-------+----------+----------");
+        for (int lm = 0; lm <= 4; lm++) {
+            if (lmErrors[lm].isEmpty()) continue;
+            double m = mean(lmErrors[lm]);
+            double ma = lmErrors[lm].stream().mapToDouble(Math::abs).average().orElse(0);
+            System.out.printf("%-12s | %5d | %+8.4f | %8.4f%n",
+                    lm + " landmarks", lmErrors[lm].size(), m, ma);
+        }
+
+        // Print by phase
+        System.out.printf("%n%-12s | %5s | %8s | %8s%n", "Phase", "N", "MeanErr", "MeanAbs");
+        System.out.println("-------------+-------+----------+----------");
+        printErrorRow("Early", earlyE);
+        printErrorRow("Mid", midE);
+        printErrorRow("Endgame", endE);
+
+        // Overall
+        double overallBias = mean(signedErrors);
+        double overallMae = signedErrors.stream().mapToDouble(Math::abs).average().orElse(0);
+        System.out.printf("%nOverall bias: %+.4f, MAE: %.4f, N: %d%n",
+                overallBias, overallMae, signedErrors.size());
+    }
+
+    private static void printErrorRow(String label, List<Double> errors) {
+        if (errors.isEmpty()) return;
+        double m = mean(errors);
+        double ma = errors.stream().mapToDouble(Math::abs).average().orElse(0);
+        System.out.printf("%-12s | %5d | %+8.4f | %8.4f%n", label, errors.size(), m, ma);
+    }
+
+    // =========================================================================
+    // WinProb Calibration Sweep
+    // =========================================================================
+
+    /**
+     * Sweeps (T, k) parameter combinations against real-game positions to find
+     * the optimal temperature and calibration steepness.
+     * Samples positions from 100 games, evaluates each (T,k) pair, reports MAE.
+     */
+    private static void runCalibrationSweep() {
+        int NUM_GAMES = 100;
+        int MC_SIMS = 500;
+        int SAMPLE_EVERY = 5;
+
+        System.out.println("\n=== WinProb Weight Sweep (" + NUM_GAMES + " games, "
+                + MC_SIMS + " MC sims) ===\n");
+
+        // Collect (state, playerIndex, mcWR) tuples
+        record Sample(GameState state, int playerIndex, double mcWR) {}
+        List<Sample> samples = java.util.Collections.synchronizedList(new ArrayList<>());
+
+        GameStateSampler.runGames(NUM_GAMES, 2, 0.0,
+                GameStateSampler.everyKTurns(SAMPLE_EVERY),
+                snapshot -> {
+                    int pi = snapshot.activePlayer();
+                    double mc = GameSimulator.mcWinRate(snapshot.state(), pi, MC_SIMS);
+                    samples.add(new Sample(snapshot.state().copy(), pi, mc));
+                });
+
+        System.out.println("Collected " + samples.size() + " samples.\n");
+
+        double[] origWeights = WinProbDiag.getWeights();
+
+        // Grid search over key weights
+        // Weights: [bias, income, coin, invest, landmark, ttw, redDrain]
+        double bestMae = Double.MAX_VALUE;
+        double[] bestW = origWeights.clone();
+
+        // Sweep income, coin, investment, landmark, ttw
+        double[] incomeVals = {0.5, 1.0, 1.5, 2.0};
+        double[] coinVals = {0.02, 0.05, 0.1};
+        double[] investVals = {0.05, 0.1, 0.15, 0.25};
+        double[] lmVals = {0.5, 1.0, 1.5, 2.5, 4.0};
+        double[] ttwVals = {0.0, 0.05, 0.1, 0.2};
+        double[] drainVals = {-0.5, -1.0, -2.0};
+
+        int combos = incomeVals.length * coinVals.length * investVals.length
+                * lmVals.length * ttwVals.length * drainVals.length;
+        System.out.println("Sweeping " + combos + " combinations...\n");
+
+        int count = 0;
+        for (double wInc : incomeVals) {
+            for (double wCoin : coinVals) {
+                for (double wInv : investVals) {
+                    for (double wLm : lmVals) {
+                        for (double wTtw : ttwVals) {
+                            for (double wDrain : drainVals) {
+                                WinProbDiag.setWeights(0.0, wInc, wCoin, wInv, wLm, wTtw, wDrain);
+
+                                double sumAbsErr = 0;
+                                for (Sample s : samples) {
+                                    double h = calcs.WinProbability.computeBaselineWinProb(s.state, s.playerIndex);
+                                    sumAbsErr += Math.abs(h - s.mcWR);
+                                }
+                                double mae = sumAbsErr / samples.size();
+
+                                if (mae < bestMae) {
+                                    bestMae = mae;
+                                    bestW = new double[]{0.0, wInc, wCoin, wInv, wLm, wTtw, wDrain};
+                                    System.out.printf("[%d/%d] NEW BEST: MAE=%.4f | inc=%.2f coin=%.3f inv=%.2f lm=%.1f ttw=%.2f drain=%.1f%n",
+                                            count, combos, mae, wInc, wCoin, wInv, wLm, wTtw, wDrain);
+                                }
+                                count++;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        System.out.printf("\nBest MAE: %.4f%n", bestMae);
+        System.out.printf("Weights: bias=%.2f income=%.2f coin=%.3f invest=%.2f landmark=%.1f ttw=%.2f drain=%.1f%n",
+                bestW[0], bestW[1], bestW[2], bestW[3], bestW[4], bestW[5], bestW[6]);
+
+        // Restore original weights
+        WinProbDiag.setWeights(origWeights[0], origWeights[1], origWeights[2],
+                origWeights[3], origWeights[4], origWeights[5], origWeights[6]);
+    }
+
+    // =========================================================================
+    // WinProb Feature Correlation
+    // =========================================================================
+
+    /**
+     * Collects game-position features and MC WR, computes Pearson correlation
+     * of each feature with MC WR. Helps identify which features best predict
+     * winning so we can build a better heuristic.
+     */
+    private static void runFeatureCorrelation() {
+        int NUM_GAMES = 100;
+        int MC_SIMS = 500;
+        int SAMPLE_EVERY = 3;
+
+        System.out.println("\n=== Feature Correlation (" + NUM_GAMES + " games, "
+                + MC_SIMS + " MC sims, sample every " + SAMPLE_EVERY + ") ===\n");
+
+        // Feature names
+        String[] featureNames = {
+            "landmarkCount", "landmarkAdv", "coins", "coinAdv",
+            "grossIncome", "incomeAdv", "redDrain", "redDrainAdv",
+            "netIncome", "netIncomeAdv", "totalInvestment", "investmentAdv",
+            "ttwSelf", "ttwGap", "remainingCost", "remainingCostAdv",
+            "affordableNow", "incomeRatio"
+        };
+        int F = featureNames.length;
+
+        // Collect feature rows: features[k] = list of feature-k values, mcWrs = MC WR values
+        @SuppressWarnings("unchecked")
+        List<Double>[] features = new List[F];
+        for (int k = 0; k < F; k++) features[k] = new ArrayList<>();
+        List<Double> mcWrs = new ArrayList<>();
+
+        GameStateSampler.runGames(NUM_GAMES, 2, 0.0,
+                GameStateSampler.everyKTurns(SAMPLE_EVERY),
+                snapshot -> {
+                    int pi = snapshot.activePlayer();
+                    GameState gs = snapshot.state();
+                    Player[] players = gs.getPlayers();
+                    int n = players.length;
+                    int oi = 1 - pi; // opponent (2-player)
+
+                    double mc = GameSimulator.mcWinRate(gs, pi, MC_SIMS);
+
+                    // Compute features
+                    int lmSelf = players[pi].getLandmarkCount();
+                    int lmOpp = players[oi].getLandmarkCount();
+                    double coinsSelf = players[pi].getCoins();
+                    double coinsOpp = players[oi].getCoins();
+
+                    int[] oppCoinsI = CardIncome.buildOpponentCoins(players, pi);
+                    int[] oppCoinsJ = CardIncome.buildOpponentCoins(players, oi);
+                    double grossSelf = CardIncome.playerEvPerRound(players[pi], n, oppCoinsI);
+                    double grossOpp = CardIncome.playerEvPerRound(players[oi], n, oppCoinsJ);
+
+                    // Red drain on self
+                    double drainSelf = 0;
+                    for (int j = 0; j < n; j++) {
+                        if (j == pi) continue;
+                        for (Project card : players[j].getOwned_projects()) {
+                            if (!"rot".equals(card.getColor())) continue;
+                            CardIncome.PlayerStats os = CardIncome.PlayerStats.of(players[j]);
+                            for (int r = 1; r <= 6; r++) {
+                                int loss = CardIncome.get_I(r, card.getId(), false, os.hasEinkaufszentrum,
+                                        os.foodCount, os.animalCount, os.productionCount,
+                                        Math.max(1, players[pi].getCoins()), oppCoinsI);
+                                if (loss < 0) drainSelf += CardIncome.P1[r] * (-loss);
+                            }
+                        }
+                    }
+                    double drainOpp = 0;
+                    for (int j = 0; j < n; j++) {
+                        if (j == oi) continue;
+                        for (Project card : players[j].getOwned_projects()) {
+                            if (!"rot".equals(card.getColor())) continue;
+                            CardIncome.PlayerStats os = CardIncome.PlayerStats.of(players[j]);
+                            for (int r = 1; r <= 6; r++) {
+                                int loss = CardIncome.get_I(r, card.getId(), false, os.hasEinkaufszentrum,
+                                        os.foodCount, os.animalCount, os.productionCount,
+                                        Math.max(1, players[oi].getCoins()), oppCoinsJ);
+                                if (loss < 0) drainOpp += CardIncome.P1[r] * (-loss);
+                            }
+                        }
+                    }
+
+                    double netSelf = grossSelf - drainSelf * 0.6;
+                    double netOpp = grossOpp - drainOpp * 0.6;
+
+                    double investSelf = 0, investOpp = 0;
+                    for (Project p : players[pi].getOwned_projects())
+                        if (!p.isIs_grossprojekt()) investSelf += p.getCost();
+                    for (Project p : players[oi].getOwned_projects())
+                        if (!p.isIs_grossprojekt()) investOpp += p.getCost();
+
+                    double[] ttw = calcs.WinProbDiag.computeTurnsToWin(gs);
+                    double ttwSelf = ttw[pi];
+                    double ttwGap = ttw[oi] - ttw[pi];
+
+                    // Remaining landmark cost
+                    int remSelf = 0, remOpp = 0;
+                    for (Project p : ProjectLoader.getAllProjects()) {
+                        if (p.isIs_grossprojekt()) {
+                            if (!players[pi].hasProject(p.getId())) remSelf += p.getCost();
+                            if (!players[oi].hasProject(p.getId())) remOpp += p.getCost();
+                        }
+                    }
+
+                    // How many landmarks can afford now
+                    double canAfford = 0;
+                    int tempCoins = players[pi].getCoins();
+                    for (Project p : ProjectLoader.getAllProjects()) {
+                        if (p.isIs_grossprojekt() && !players[pi].hasProject(p.getId())) {
+                            if (tempCoins >= p.getCost()) { canAfford++; tempCoins -= p.getCost(); }
+                        }
+                    }
+
+                    double incomeRatio = (grossOpp > 0.01) ? grossSelf / grossOpp : 10.0;
+
+                    double[] fvals = {
+                        lmSelf, lmSelf - lmOpp, coinsSelf, coinsSelf - coinsOpp,
+                        grossSelf, grossSelf - grossOpp, drainSelf, drainSelf - drainOpp,
+                        netSelf, netSelf - netOpp, investSelf, investSelf - investOpp,
+                        ttwSelf, ttwGap, remSelf, remSelf - remOpp,
+                        canAfford, incomeRatio
+                    };
+
+                    synchronized (mcWrs) {
+                        mcWrs.add(mc);
+                        for (int k = 0; k < F; k++) features[k].add(fvals[k]);
+                    }
+                });
+
+        // Compute Pearson correlation of each feature with MC WR
+        int N = mcWrs.size();
+        double[] mcArr = mcWrs.stream().mapToDouble(Double::doubleValue).toArray();
+        double mcMean = 0;
+        for (double v : mcArr) mcMean += v;
+        mcMean /= N;
+
+        System.out.printf("%-20s | %8s | %8s | %8s%n", "Feature", "Corr(MC)", "Mean", "StdDev");
+        System.out.println("---------------------+----------+----------+----------");
+
+        for (int k = 0; k < F; k++) {
+            double[] fArr = features[k].stream().mapToDouble(Double::doubleValue).toArray();
+            double fMean = 0;
+            for (double v : fArr) fMean += v;
+            fMean /= N;
+
+            double covSum = 0, fVarSum = 0, mcVarSum = 0;
+            for (int i = 0; i < N; i++) {
+                double fd = fArr[i] - fMean;
+                double md = mcArr[i] - mcMean;
+                covSum += fd * md;
+                fVarSum += fd * fd;
+                mcVarSum += md * md;
+            }
+            double corr = (fVarSum > 0 && mcVarSum > 0) ? covSum / Math.sqrt(fVarSum * mcVarSum) : 0;
+            double fStd = Math.sqrt(fVarSum / N);
+
+            System.out.printf("%-20s | %+8.4f | %8.3f | %8.3f%n",
+                    featureNames[k], corr, fMean, fStd);
+        }
+
+        System.out.printf("%nSamples: %d%n", N);
+    }
+
+    // =========================================================================
+    // WinProb High-Confidence Eval Set
+    // =========================================================================
+
+    /**
+     * Generates a high-confidence eval set:
+     * - 20 real-game positions sampled from 10 games at various stages
+     * - 15 hand-crafted edge cases
+     * Each position evaluated with 100K MC sims for near-exact ground truth.
+     */
+    private static void generateHighConfidenceEvalSet() {
+        int MC_SIMS = 100_000;
+        System.out.println("\n=== WinProb Eval Set (100K MC sims per position) ===\n");
+
+        // Part 1: Hand-crafted edge cases
+        record EvalCase(String name, GameState state, int playerIndex) {}
+        List<EvalCase> cases = new ArrayList<>();
+
+        // E1: Symmetric start (should be ~0.50)
+        cases.add(new EvalCase("Symmetric start",
+                buildDiagState(null, new int[]{3, 3}, null), 0));
+
+        // E2: P0 income lead, early game
+        cases.add(new EvalCase("Early: P0 income lead",
+                buildDiagState(
+                    new String[][]{{"bäckerei", "mini-markt", "weizenfeld"}, {}},
+                    new int[]{5, 3}, null), 0));
+
+        // E3: P0 coin-rich but card-poor (coins don't help without income)
+        cases.add(new EvalCase("Coin-rich P0, card-poor",
+                buildDiagState(
+                    new String[][]{null, {"bäckerei", "bäckerei", "mini-markt"}},
+                    new int[]{20, 3}, null), 0));
+
+        // E4: P0 has Bahnhof + high-range cards
+        cases.add(new EvalCase("P0 Bahnhof + high-range",
+                buildDiagState(
+                    new String[][]{{"molkerei", "möbelfabrik"}, {"bäckerei", "bäckerei"}},
+                    new int[]{5, 5},
+                    new String[][]{{"bahnhof"}, null}), 0));
+
+        // E5: P0 heavy red strategy
+        cases.add(new EvalCase("P0 red-heavy",
+                buildDiagState(
+                    new String[][]{{"café", "café", "café", "familienrestaurant"}, {"bäckerei", "bäckerei"}},
+                    new int[]{4, 6}, null), 0));
+
+        // E6: P0 has 3 landmarks, can almost afford 4th
+        cases.add(new EvalCase("P0 3-lm, almost can win",
+                buildDiagState(
+                    new String[][]{{"bäckerei", "bäckerei", "molkerei", "mini-markt"}, {"wald", "bergwerk"}},
+                    new int[]{20, 5},
+                    new String[][]{{"bahnhof", "einkaufszentrum", "freizeitpark"}, {"bahnhof"}}), 0));
+
+        // E7: P0 has 3 landmarks + can afford cheapest missing (instant win)
+        cases.add(new EvalCase("P0 instant win possible",
+                buildDiagState(
+                    new String[][]{{"bäckerei", "mini-markt"}, {}},
+                    new int[]{25, 10},
+                    new String[][]{{"bahnhof", "einkaufszentrum", "freizeitpark"}, null}), 0));
+
+        // E8: Both 3 landmarks, both can almost afford
+        cases.add(new EvalCase("Both 3-lm, close race",
+                buildDiagState(
+                    new String[][]{{"bäckerei", "bäckerei", "mini-markt"}, {"weizenfeld", "weizenfeld", "molkerei"}},
+                    new int[]{18, 15},
+                    new String[][]{{"bahnhof", "einkaufszentrum", "freizeitpark"}, {"bahnhof", "einkaufszentrum", "freizeitpark"}}), 0));
+
+        // E9: P0 has 2 landmarks vs P1 has 0
+        cases.add(new EvalCase("P0 2-lm vs P1 0-lm",
+                buildDiagState(
+                    new String[][]{{"bäckerei"}, {"bäckerei", "bäckerei", "mini-markt"}},
+                    new int[]{8, 8},
+                    new String[][]{{"bahnhof", "einkaufszentrum"}, null}), 0));
+
+        // E10: Mid-game balanced with mixed strategies
+        cases.add(new EvalCase("Mid balanced, mixed strategies",
+                buildDiagState(
+                    new String[][]{{"bäckerei", "bäckerei", "wald", "bergwerk"}, {"café", "café", "familienrestaurant", "weizenfeld"}},
+                    new int[]{7, 7},
+                    new String[][]{{"bahnhof"}, {"bahnhof"}}), 0));
+
+        // E11: P0 green economy (production chain)
+        cases.add(new EvalCase("P0 green engine",
+                buildDiagState(
+                    new String[][]{{"wald", "wald", "wald", "möbelfabrik", "möbelfabrik"}, {"bäckerei", "bäckerei"}},
+                    new int[]{3, 5},
+                    new String[][]{{"bahnhof"}, null}), 0));
+
+        // E12: P0 blue economy (consistent income)
+        cases.add(new EvalCase("P0 blue engine",
+                buildDiagState(
+                    new String[][]{{"weizenfeld", "weizenfeld", "weizenfeld", "wald", "wald"}, {"bäckerei"}},
+                    new int[]{5, 5}, null), 0));
+
+        // E13: P1 massive income lead (evaluate P0 — should be low)
+        cases.add(new EvalCase("P1 income domination",
+                buildDiagState(
+                    new String[][]{null, {"bäckerei", "bäckerei", "bäckerei", "mini-markt", "mini-markt", "wald", "molkerei"}},
+                    new int[]{3, 8},
+                    new String[][]{null, {"bahnhof", "einkaufszentrum"}}), 0));
+
+        // E14: Purple card advantage
+        cases.add(new EvalCase("P0 has purple (Stadion)",
+                buildDiagState(
+                    new String[][]{{"stadion", "bäckerei"}, {"bäckerei", "bäckerei", "mini-markt"}},
+                    new int[]{5, 5},
+                    new String[][]{{"bahnhof"}, {"bahnhof"}}), 0));
+
+        // E15: Late game, P0 rich with 1 landmark vs P1 poor with 2 landmarks
+        cases.add(new EvalCase("P0 rich 1-lm vs P1 poor 2-lm",
+                buildDiagState(
+                    new String[][]{{"bäckerei", "bäckerei", "mini-markt", "weizenfeld", "molkerei"}, {"café", "wald"}},
+                    new int[]{30, 2},
+                    new String[][]{{"bahnhof"}, {"bahnhof", "einkaufszentrum"}}), 0));
+
+        // Part 2: Real-game positions
+        System.out.println("Sampling real-game positions...");
+        final int[] sampleCount = {0};
+        List<EvalCase> realGameCases = java.util.Collections.synchronizedList(new ArrayList<>());
+
+        GameStateSampler.runGames(10, 2, 0.0,
+                GameStateSampler.everyKTurns(5),
+                snapshot -> {
+                    synchronized (realGameCases) {
+                        if (sampleCount[0] >= 20) return;
+                        // Diversify: take positions at different phases
+                        int turn = snapshot.turnNumber();
+                        String phase = turn <= 8 ? "early" : turn <= 20 ? "mid" : "late";
+                        realGameCases.add(new EvalCase(
+                            "RealGame t" + turn + " " + phase,
+                            snapshot.state().copy(), snapshot.activePlayer()));
+                        sampleCount[0]++;
+                    }
+                });
+
+        cases.addAll(realGameCases);
+
+        // Evaluate all cases
+        System.out.printf("%-35s | %8s | %8s | %8s | %8s | %8s | %6s%n",
+                "Case", "Heurist", "MC50", "MC(100K)", "|H-GT|", "|M50-GT|", "Phase");
+        System.out.println("------------------------------------+----------+----------+----------+----------+----------+--------");
+
+        double sumAbsErr = 0;
+        double sumAbsErrMc50 = 0;
+        int n = 0;
+        for (EvalCase ec : cases) {
+            double heuristic = calcs.WinProbability.computeBaselineWinProb(ec.state, ec.playerIndex);
+            double mc50 = GameSimulator.mcWinRate(ec.state, ec.playerIndex, 50);
+            double mc = GameSimulator.mcWinRate(ec.state, ec.playerIndex, MC_SIMS);
+            double absErr = Math.abs(heuristic - mc);
+            double absErrMc50 = Math.abs(mc50 - mc);
+            sumAbsErr += absErr;
+            sumAbsErrMc50 += absErrMc50;
+            n++;
+
+            int lm = ec.state.getPlayers()[ec.playerIndex].getLandmarkCount();
+            String phase = lm >= 3 ? "end" : lm >= 1 ? "mid" : "early";
+
+            System.out.printf("%-35s | %8.4f | %8.4f | %8.4f | %8.4f | %8.4f | %6s%n",
+                    ec.name, heuristic, mc50, mc, absErr, absErrMc50, phase);
+        }
+
+        double mae = sumAbsErr / n;
+        double maeMc50 = sumAbsErrMc50 / n;
+        System.out.printf("%nHeuristic MAE: %.4f, MC(50) MAE: %.4f (N=%d)%n", mae, maeMc50, n);
     }
 
     // =========================================================================

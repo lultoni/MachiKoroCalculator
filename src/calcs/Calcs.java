@@ -671,16 +671,26 @@ public final class Calcs {
     // -------------------------------------------------------------------------
 
     /**
-     * Returns the baseline win probability for {@code playerIndex} using the analytical
-     * softmax score approximation (no simulation).
+     * Returns the baseline win probability for {@code playerIndex} using the fast
+     * heuristic approximation (no simulation, <1ms, ~0.25 MAE).
+     * Used by engine internals (MCTS rollouts, Expectimax).
      */
     public static double computeBaselineWinProb(GameState gs, int playerIndex) {
         return WinProbability.computeBaselineWinProb(gs, playerIndex);
     }
 
     /**
+     * Returns an accurate win probability using micro Monte Carlo (50 greedy
+     * rollouts, ~5-20ms, ~0.03 MAE). Use for UI display, luck analysis, and
+     * ranking where accuracy matters more than sub-millisecond speed.
+     */
+    public static double computeAccurateWinProb(GameState gs, int playerIndex) {
+        return WinProbability.computeAccurateWinProb(gs, playerIndex);
+    }
+
+    /**
      * Estimates the change in win probability for playerIndex from buying {@code candidate},
-     * using the analytical softmax only (no Monte Carlo).
+     * using micro MC for accuracy.
      */
     public static double estimateWinProbDelta(GameState gs, int playerIndex, Project candidate) {
         return WinProbability.estimateWinProbDelta(gs, playerIndex, candidate);

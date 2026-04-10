@@ -27,16 +27,15 @@ Priorisiere in deiner Abarbeitung die wichtigsten Features. Erkenne Abhängigkei
 
 | # | Task | Type | Notes |
 |---|------|------|-------|
-| 14 | Player-vs-AI: engine auto-play backend | Dev | Engine automatically plays opponent turns in a game session. Core needs to correctly handle AI making dice choice, Funkturm, Bürohaus, and buy decisions. Existing GameSession + engine evaluate infrastructure is close — needs turn automation loop. |
-| 15 | Player-vs-AI: immersive board-game UI | Dev | Redesign the game session screen to look like the physical Machi Koro board. Cards laid out visually, opponent's tableau visible, market in center. Priority alongside #14 — both matter for the experience. |
+| **17c** | **Continuous thinking engine infrastructure** | **Dev (critical)** | **NEXT STEP.** Implement `CONTINUOUS-THINKING-SPEC.md`. ContinuousWorker interface + 5 engine implementations (MCTS tree persistence + TreeNavigator, FlatMC/Creator candidate accumulators, Expectimax transposition table, HeuristicEv instant). ContinuousEvaluator wrapper with flag-based "letter on desk" control. Timekeeper for minThinkTimeMs. Server-side PlayerVsAiController. AI turn dramatic reveal endpoint. Frontend Player-vs-AI mode toggle. Tests. See spec for full 15-step implementation plan. Depends on #17 (done). Blocks #14, #15. |
+| 14 | Player-vs-AI: engine auto-play backend | Dev | Engine automatically plays opponent turns in a game session. Continuous thinking (#17c) provides the core engine infrastructure — this task builds the game session automation loop on top. PlayerVsAiController from #17c handles AI turn execution; this task wires it into GameSession lifecycle, handles edge cases (game over, undo, save/load). Depends on #17c. |
+| 15 | Player-vs-AI: immersive board-game UI | Dev | Redesign the game session screen to look like the physical Machi Koro board. Cards laid out visually, opponent's tableau visible, market in center. AI dramatic reveal animation (200ms per step) from #17c's AiTurnStep data. Player-vs-AI mode hides assistant panel (player has no engine help — pure skill test). Depends on #14, #17c. |
 | 16 | Player-vs-AI: per-turn notes box | Dev | Simple textarea, tagged per turn, persists with game save. Accessory feature, not centerpiece. Export to JSON for later review. Lower priority than #14/#15. |
 
 ### Engine Infrastructure
 
 | # | Task | Type | Notes |
 |---|------|------|-------|
-| 17a | Time budget mode: Phase 2 — continuous thinking during opponent turns | User | Research and discuss when Phase 1 is verified. MCTS tree reuse, non-MCTS re-eval, Settings minThinkTimeMs wired to eval path. Depends on Phase 1 (#17). |
-| 17b | Time budget mode: Phase 3 — expand Player-vs-AI TODOs with time budget notes | Dev | Brief note in #14/#15/#16 referencing time budget infrastructure. Separate from actual Player-vs-AI implementation. |
 | 18 | Sweep progressive refinement | Dev | Two-phase: Phase 1 = wide LHS exploration (100 trials), Phase 2 = local search around top-5 regions (CMA-ES or coordinate descent). TPE handles both currently, but explicit local refinement may extract more. |
 
 ### Core & Scaling
@@ -44,6 +43,12 @@ Priorisiere in deiner Abarbeitung die wichtigsten Features. Erkenne Abhängigkei
 | # | Task | Type | Notes |
 |---|------|------|-------|
 | 19 | 3/4 player H2H testing | Dev | Multi-player match runner + tournament support. Glicko-2 adjustments for >2 players. Separate per-player-count leaderboards + overall leaderboard. |
+
+## Prompt: Implement Continuous Thinking (#17c)
+
+Copy-paste this into a new Claude session to start implementation:
+
+> Read `CONTINUOUS-THINKING-SPEC.md` and `CLAUDE.md` fully. Then implement TODO #17c: the continuous thinking engine infrastructure. Follow the spec's 15-step implementation priority (Section 12). Start by entering plan mode and creating a concrete implementation plan based on the spec, then work through it step by step. Key points: (1) ContinuousWorker interface in `engine/`, (2) MctsContinuousWorker with TreeNavigator for MCTS tree persistence, (3) FlatMc/Creator/Expectimax/Heuristic workers, (4) ContinuousEvaluator wrapper with AtomicBoolean flag-based control, (5) Timekeeper with minThinkTimeMs, (6) Server-side PlayerVsAiController, (7) AI turn dramatic reveal endpoint, (8) Frontend Player-vs-AI mode, (9) Tests. The spec has all the detail you need — follow it closely but ask if anything is ambiguous.
 
 ## Scaling Roadmap
 
@@ -80,6 +85,10 @@ Moved here when completed. Full history in CHANGELOG.md.
 | 24 | Luck-adjusted ratings everywhere — RatingCalculator parametrized for luck-adjusted WR. H2H API serves both raw and luck-adjusted Glicko-2 ratings. Frontend shows dual columns with colored deltas. |
 | 25 | Per-game luck-weighted WR — replaced simple mean subtraction with per-game scoring. Wins against bad luck (< -5%) earn bonus using power curve (exponent 1.3). Lucky wins stay at 1.0, losses always 0.0. |
 | 17 | Time budget mode Phase 1 — FlatMcEngine + ExpectimaxEngine time support, MatchConfig.timeBudgetMsPerEval, CLI --timeBudget for H2H/Tournament/Sweep, AutoBattleRunner + H2hHandler time budget, engines.json migration (timeBudgetMs: 0), H2H UI time budget field, auto-battle time budget + compute luck, Settings minThinkTimeMs (Phase 2 prep), localization. |
+| 17a | Time budget mode Phase 2 — Research & design complete. Discussed MCTS tree reuse vs. background re-eval vs. minThinkTimeMs wiring. Concluded: persistent MCTS tree with "letter on desk" flag-based control is correct approach. Full spec written in `CONTINUOUS-THINKING-SPEC.md`. Implementation task is #17c. |
+| 17b | Time budget mode Phase 3 — Player-vs-AI TODOs (#14, #15) updated with continuous thinking dependencies and time budget infrastructure notes. Superseded by #17c spec. |
+| 17a | Time budget mode Phase 2 — Research & design complete. Discussed MCTS tree reuse vs. background re-eval vs. minThinkTimeMs wiring. Concluded: persistent MCTS tree with "letter on desk" flag-based control is correct approach. Full spec written in `CONTINUOUS-THINKING-SPEC.md`. Implementation task is #17c. |
+| 17b | Time budget mode Phase 3 — Player-vs-AI TODOs (#14, #15) updated with continuous thinking dependencies and time budget infrastructure notes. Superseded by #17c spec. |
 
 | Old # | Task |
 |-------|------|

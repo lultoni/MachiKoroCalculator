@@ -76,6 +76,7 @@ export function H2hOverview({ onBack, projects, language }: Props) {
   const [luckMcSims, setLuckMcSims] = useState(200);
   const [luckUseMc, setLuckUseMc] = useState(true);
   const [computeCardIncome, setComputeCardIncome] = useState(false);
+  const [timeBudgetMs, setTimeBudgetMs] = useState(0);
   const [fieldsA, setFieldsA] = useState<{ key: string; value: string }[]>([]);
   const [fieldsB, setFieldsB] = useState<{ key: string; value: string }[]>([]);
   const [view, setView] = useState<'overview' | 'ratings' | 'sweep' | 'builder'>('overview');
@@ -86,6 +87,8 @@ export function H2hOverview({ onBack, projects, language }: Props) {
   const [autoMaxRounds, setAutoMaxRounds] = useState(20);
   const [autoEndless, setAutoEndless] = useState(true);
   const [autoTier, setAutoTier] = useState('');
+  const [autoTimeBudgetMs, setAutoTimeBudgetMs] = useState(0);
+  const [autoComputeLuck, setAutoComputeLuck] = useState(false);
   const [autoStopping, setAutoStopping] = useState(false);
   const autoPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastSeenRoundsRef = useRef<number>(-1);
@@ -141,6 +144,8 @@ export function H2hOverview({ onBack, projects, language }: Props) {
         gamesPerMatch: autoGames,
         maxRounds: rounds,
         tier: autoTier || undefined,
+        timeBudgetMs: autoTimeBudgetMs > 0 ? autoTimeBudgetMs : undefined,
+        computeLuck: autoComputeLuck || undefined,
       });
       setAutoStatus({ running: true, roundsCompleted: 0, maxRounds: rounds, endless: autoEndless });
       pollAutoStatus();
@@ -264,7 +269,8 @@ export function H2hOverview({ onBack, projects, language }: Props) {
       computeLuck || undefined,
       computeLuck ? luckMcSims : undefined,
       computeLuck ? (luckUseMc ? undefined : false) : undefined,
-      computeCardIncome || undefined);
+      computeCardIncome || undefined,
+      timeBudgetMs > 0 ? timeBudgetMs : undefined);
   };
 
   // Overview
@@ -425,6 +431,24 @@ export function H2hOverview({ onBack, projects, language }: Props) {
                 max={1000}
                 className="w-40 bg-machi-bg border border-machi-border rounded-lg px-3 py-2 text-sm"
               />
+            </div>
+            <div>
+              <label className="block text-sm text-machi-text-dim mb-1">{t('h2h.timeBudget')}</label>
+              <input
+                type="number"
+                value={timeBudgetMs}
+                onChange={e => setTimeBudgetMs(Math.max(0, Number(e.target.value)))}
+                min={0}
+                max={60000}
+                step={100}
+                className="w-40 bg-machi-bg border border-machi-border rounded-lg px-3 py-2 text-sm"
+                title={t('h2h.timeBudgetHint')}
+              />
+              {timeBudgetMs > 0 && (
+                <div className="text-[10px] text-machi-accent/80 mt-0.5">
+                  {t('h2h.timeBudgetActive')}
+                </div>
+              )}
             </div>
             <label className="flex items-center gap-2 cursor-pointer mt-5">
               <input
@@ -632,6 +656,28 @@ export function H2hOverview({ onBack, projects, language }: Props) {
                     <option value="deep">deep</option>
                   </select>
                 </div>
+                <div>
+                  <label className="block text-[11px] text-machi-text-dim mb-1">{t('h2h.timeBudget')}</label>
+                  <input
+                    type="number"
+                    value={autoTimeBudgetMs}
+                    onChange={e => setAutoTimeBudgetMs(Math.max(0, Number(e.target.value)))}
+                    min={0}
+                    max={60000}
+                    step={100}
+                    className="w-24 bg-machi-bg border border-machi-border rounded px-2 py-1 text-sm"
+                    title={t('h2h.timeBudgetHint')}
+                  />
+                </div>
+                <label className="flex items-center gap-1.5 cursor-pointer mt-3">
+                  <input
+                    type="checkbox"
+                    checked={autoComputeLuck}
+                    onChange={e => setAutoComputeLuck(e.target.checked)}
+                    className="accent-machi-purple"
+                  />
+                  <span className="text-xs text-machi-text-dim">{t('h2h.autoComputeLuck')}</span>
+                </label>
               </div>
               <button
                 onClick={handleAutoStart}

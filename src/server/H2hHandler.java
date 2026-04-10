@@ -144,6 +144,9 @@ final class H2hHandler implements HttpHandler {
         // Legacy: single iterations override (backward compat with CLI)
         int iterations = body.has("iterations") ? body.get("iterations").getAsInt() : 0;
 
+        // Time budget override (takes precedence over iterations when > 0)
+        int timeBudgetMs = body.has("timeBudgetMs") ? body.get("timeBudgetMs").getAsInt() : 0;
+
         // Luck computation (opt-in, slower)
         boolean computeLuck = body.has("computeLuck") && body.get("computeLuck").getAsBoolean();
         int luckMcSims = body.has("luckMcSims") ? body.get("luckMcSims").getAsInt() : 200;
@@ -153,7 +156,7 @@ final class H2hHandler implements HttpHandler {
         boolean computeCardIncome = body.has("computeCardIncome") && body.get("computeCardIncome").getAsBoolean();
 
         MatchConfig config = new MatchConfig(
-                new String[]{engineA, engineB}, games, maxTurns, iterations, seatSwap,
+                new String[]{engineA, engineB}, games, maxTurns, iterations, timeBudgetMs, seatSwap,
                 configOverrides, computeLuck, luckMcSims, luckUseMc, computeCardIncome);
 
         String matchId = java.util.UUID.randomUUID().toString().substring(0, 8);
@@ -328,6 +331,7 @@ final class H2hHandler implements HttpHandler {
         int maxTurnsPerGame = body.has("maxTurns") ? body.get("maxTurns").getAsInt() : 200;
         int maxRounds = body.has("maxRounds") ? body.get("maxRounds").getAsInt() : 20;
         String tier = body.has("tier") ? body.get("tier").getAsString() : null;
+        int timeBudgetMs = body.has("timeBudgetMs") ? body.get("timeBudgetMs").getAsInt() : 0;
         boolean computeLuck = body.has("computeLuck") && body.get("computeLuck").getAsBoolean();
         int luckMcSims = body.has("luckMcSims") ? body.get("luckMcSims").getAsInt() : 200;
         boolean luckUseMc = !body.has("luckUseMc") || body.get("luckUseMc").getAsBoolean();
@@ -337,11 +341,11 @@ final class H2hHandler implements HttpHandler {
         if (tier != null && !tier.isEmpty()) {
             runner = AutoBattleRunner.createWithTier(orchestrator, store,
                     tier, gamesPerMatch, maxTurnsPerGame, maxRounds,
-                    computeLuck, luckMcSims, luckUseMc, computeCardIncome);
+                    timeBudgetMs, computeLuck, luckMcSims, luckUseMc, computeCardIncome);
         } else {
             runner = AutoBattleRunner.createWithAllEngines(orchestrator, store,
                     gamesPerMatch, maxTurnsPerGame, maxRounds,
-                    computeLuck, luckMcSims, luckUseMc, computeCardIncome);
+                    timeBudgetMs, computeLuck, luckMcSims, luckUseMc, computeCardIncome);
         }
         autoBattle = runner;
 

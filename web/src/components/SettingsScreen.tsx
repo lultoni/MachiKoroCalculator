@@ -288,6 +288,24 @@ export function SettingsScreen({ settings, update, players, onClose }: Props) {
             ))}
           </div>
         </div>
+
+        {/* Min Think Time */}
+        <div className="space-y-1.5">
+          <label className="text-sm text-machi-text-dim">{t('settings.minThinkTime')}</label>
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              value={settings.minThinkTimeMs}
+              onChange={e => update({ minThinkTimeMs: Math.max(0, Number(e.target.value)) })}
+              min={0}
+              max={30000}
+              step={100}
+              className="w-28 bg-machi-bg border border-machi-border rounded-lg px-3 py-1.5 text-sm"
+            />
+            <span className="text-xs text-machi-text-dim">ms</span>
+          </div>
+          <p className="text-[10px] text-machi-text-dim/60">{t('settings.minThinkTimeHint')}</p>
+        </div>
       </div>
     </div>
   );

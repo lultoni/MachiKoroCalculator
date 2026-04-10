@@ -138,6 +138,7 @@ public final class SweepMain {
         String opponent = "heuristic-ev-default";
         List<String> opponentList = null;  // set when --opponents is used
         int iterations = 0;  // 0 = use registry defaults
+        int timeBudget = 0;  // 0 = use registry defaults
         int startup = 20;
         double gamma = 0.25;
         long seed = System.nanoTime();
@@ -156,6 +157,7 @@ public final class SweepMain {
                 case "--opponent"  -> opponent = args[++i];
                 case "--opponents" -> opponentList = Arrays.asList(args[++i].split(","));
                 case "--iterations"-> iterations = Integer.parseInt(args[++i]);
+                case "--timeBudget"-> timeBudget = Integer.parseInt(args[++i]);
                 case "--startup"   -> startup = Integer.parseInt(args[++i]);
                 case "--gamma"     -> gamma = Double.parseDouble(args[++i]);
                 case "--seed"      -> seed = Long.parseLong(args[++i]);
@@ -355,11 +357,11 @@ public final class SweepMain {
 
             for (int oi = 0; oi < opponentList.size(); oi++) {
                 String currentOpponent = opponentList.get(oi);
-                MatchConfig matchConfig = (useLuck || useCardIncome)
+                MatchConfig matchConfig = (useLuck || useCardIncome || timeBudget > 0)
                         ? new MatchConfig(new String[]{creatorId, currentOpponent}, games, 200,
-                                iterations, true, overrides, useLuck, 200, false, useCardIncome)
+                                iterations, timeBudget, true, overrides, useLuck, 200, false, useCardIncome)
                         : new MatchConfig(new String[]{creatorId, currentOpponent}, games, 200,
-                                iterations, true, overrides);
+                                iterations, 0, true, overrides);
 
                 final boolean verb = verbose;
                 final int totalGames = games;
@@ -544,6 +546,7 @@ public final class SweepMain {
         System.out.println("  --opponent <id>      Single opponent engine ID (default: heuristic-ev-default)");
         System.out.println("  --opponents <a,b,c>  Comma-separated opponent list; each trial plays ALL, WR averaged");
         System.out.println("  --iterations N       Override iterations (0 = registry default)");
+        System.out.println("  --timeBudget N       Time budget in ms per eval (overrides iterations when > 0)");
         System.out.println("  --startup N          Random trials before TPE (default: 20)");
         System.out.println("  --gamma F            TPE good/bad split (default: 0.25)");
         System.out.println("  --seed N             Random seed for reproducibility");

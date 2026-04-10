@@ -207,6 +207,7 @@ export interface H2hStartRequest {
   engineB: string;
   games: number;
   iterations?: number;
+  timeBudgetMs?: number;
   maxTurns?: number;
   seatSwap?: boolean;
   configA?: Record<string, string>;

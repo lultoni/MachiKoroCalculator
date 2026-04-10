@@ -6,6 +6,30 @@ Implementation history: what was built, why, and which design decisions were mad
 
 ## Phase 7: Iteration
 
+### Time Budget Mode — Phase 1 (TODO #17)
+
+**All engines now support time-based thinking.** Instead of fixed iteration counts, engines can be given a millisecond deadline and think until time runs out. This is the foundation for continuous-thinking features in future phases.
+
+**Engine changes:**
+- **FlatMcEngine:** New deadline-based evaluation path. Survey phase (20 samples/option), then focus top-K in rounds of 50 until deadline. Falls back to iteration-based path when timeBudgetMs=0.
+- **ExpectimaxEngine:** Progressive deepening. Starts at depth=1, tries depth=2, etc., keeping the deepest complete result. With budget < 1s, result is depth-1 (correct — depth 2 takes ~1.3s).
+- MCTS (v1 + variants A-E) and CreatorEngine already supported timeBudgetMs — no changes needed.
+
+**Infrastructure:**
+- `MatchConfig.timeBudgetMsPerEval` field with resolution order: per-seat configOverrides > global timeBudget > global iterations > registry defaults.
+- `--timeBudget N` CLI flag added to H2hMain, TournamentMain, SweepMain.
+- `AutoBattleRunner` gains `timeBudgetMs` field, passed through to MatchConfig.
+- `H2hHandler` parses `timeBudgetMs` from both match start and auto-battle start requests.
+- `engines.json` migrated: all 38 entries now have explicit `timeBudgetMs: "0"` field.
+
+**Frontend:**
+- H2H match setup: "Time Budget (ms)" number input. When > 0, shows indicator that iterations are overridden.
+- Auto-battle setup: time budget field + compute luck checkbox.
+- Settings: `minThinkTimeMs` field (default 1000ms) — Phase 2 prep, not yet wired to eval path.
+- Full EN/DE localization for all new strings.
+
+**Files:** `FlatMcEngine.java`, `ExpectimaxEngine.java`, `MatchConfig.java`, `H2hMain.java`, `TournamentMain.java`, `TournamentRunner.java`, `SweepMain.java`, `AutoBattleRunner.java`, `H2hHandler.java`, `engines.json`, `H2hOverview.tsx`, `useH2h.ts`, `useSettings.ts`, `SettingsScreen.tsx`, `types.ts`, `client.ts`, `en.ts`, `de.ts`.
+
 ### Per-Game Luck-Weighted Win Rates (TODO #25)
 
 **Replaced simple mean subtraction with per-game weighted scoring.** Old formula: `adjustedWR = rawWR - totalLuck/gameCount` (treats all games equally). New formula scores each game individually: wins always worth >= 1.0, wins against bad luck earn a bonus via power curve `(((-luck - 0.05) / 0.95) ^ 1.3)`. Losses always 0.0. Key properties: dead zone until luck < -5% (normal variance ignored), accelerating rewards (-30% luck → +0.24 bonus, -50% → +0.50, -100% → +1.00), no punishment for lucky wins. `totalLuck[]` still computed as before for display.

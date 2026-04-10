@@ -56,6 +56,7 @@ public final class TournamentMain {
         boolean unleashed = false;
         int games = 50;
         int iterations = 0; // 0 = use registry default
+        int timeBudget = 0; // 0 = use registry default
         int maxTurns = 200;
         boolean noSwap = false;
         boolean estimateOnly = false;
@@ -72,6 +73,7 @@ public final class TournamentMain {
                 case "--unleashed" -> unleashed = true;
                 case "--games" -> games = Integer.parseInt(args[++i]);
                 case "--iterations" -> iterations = Integer.parseInt(args[++i]);
+                case "--timeBudget" -> timeBudget = Integer.parseInt(args[++i]);
                 case "--maxTurns" -> maxTurns = Integer.parseInt(args[++i]);
                 case "--no-swap" -> noSwap = true;
                 case "--estimate" -> estimateOnly = true;
@@ -176,7 +178,7 @@ public final class TournamentMain {
         final int totalM = totalMatchups;
 
         TournamentResult result = runner.runTournament(engineIds, games, maxTurns, iterations,
-                seatSwap, luck, luckMcSims, luckUseMc, computeCardIncome,
+                timeBudget, seatSwap, luck, luckMcSims, luckUseMc, computeCardIncome,
                 new TournamentRunner.ProgressListener() {
                     @Override
                     public void onMatchStarted(int matchIndex, int totalMatches, String engineA, String engineB) {
@@ -463,7 +465,8 @@ public final class TournamentMain {
         System.out.println();
         System.out.println("Match settings:");
         System.out.println("  --games <n>                  Games per matchup (default: 50)");
-        System.out.println("  --iterations <n>             Override MCTS iterations (0 = registry default)");
+        System.out.println("  --iterations <n>             Override iterations (0 = registry default)");
+        System.out.println("  --timeBudget <n>             Time budget in ms per eval (overrides iterations)");
         System.out.println("  --maxTurns <n>               Max turns per game (default: 200)");
         System.out.println("  --no-swap                    Disable mid-match seat swapping");
         System.out.println();

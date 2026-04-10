@@ -21,7 +21,6 @@ Priorisiere in deiner Abarbeitung die wichtigsten Features. Erkenne Abhängigkei
 | 9 | Sweep against stronger opponents | User | Re-run Creator sweep with strong opponent pool: heuristic-ev-balanced, creator-balanced (default params), maybe self-play. Keep 1 weak engine as sanity check. Current tuned engine doesn't dominate these. Goal: find params that beat everyone, not just weak engines. |
 | 10 | NarrativeExplainer class | Dev | New class in `iface/` that takes `EngineResult` + `GameState` → natural-language teacher-style explanation. Populates the existing `summarySentence` field (always null today). Conversational tone, explains synergy/risk/tempo/opponent threats as flowing prose. See INSIGHTS-SESSION.md for tone reference and roleplay example. |
 | 11 | Machi Koro strategy brainstorm | User | Fundamental thinking: what makes a position good/bad? How to find the best move? Play lots of 2P games, build intuition, document patterns. Foundation for a potential creator-engine-v2. |
-| 12 | Creator Engine: Adaptive opponent modeling | Dev (shelved) | Track opponent purchase patterns to adjust rollout/threat assessment. Assessment: low priority — game is fundamentally solitaire-optimization. Threat gravity well already models opponent proximity. Shelved. |
 | 13 | Creator Engine: Per-player-count tuned params | Dev | Separate sweep runs for 2p, 3p, 4p. Store as `creator-tuned-2p/3p/4p` registry entries. Auto-select by player count. Blocked by #19. |
 
 ### Player vs AI
@@ -36,7 +35,8 @@ Priorisiere in deiner Abarbeitung die wichtigsten Features. Erkenne Abhängigkei
 
 | # | Task | Type | Notes |
 |---|------|------|-------|
-| 17 | Time budget mode for all engines | User | Brainstorm: engines work with time budget instead of iterations. Unifies fast/balanced/deep into a single entry with configurable time. UI settings switch. H2H + sweep adjustments needed. Retain iteration mode as option. Discuss effects and feasibility first. |
+| 17a | Time budget mode: Phase 2 — continuous thinking during opponent turns | User | Research and discuss when Phase 1 is verified. MCTS tree reuse, non-MCTS re-eval, Settings minThinkTimeMs wired to eval path. Depends on Phase 1 (#17). |
+| 17b | Time budget mode: Phase 3 — expand Player-vs-AI TODOs with time budget notes | Dev | Brief note in #14/#15/#16 referencing time budget infrastructure. Separate from actual Player-vs-AI implementation. |
 | 18 | Sweep progressive refinement | Dev | Two-phase: Phase 1 = wide LHS exploration (100 trials), Phase 2 = local search around top-5 regions (CMA-ES or coordinate descent). TPE handles both currently, but explicit local refinement may extract more. |
 
 ### Core & Scaling
@@ -44,8 +44,6 @@ Priorisiere in deiner Abarbeitung die wichtigsten Features. Erkenne Abhängigkei
 | # | Task | Type | Notes |
 |---|------|------|-------|
 | 19 | 3/4 player H2H testing | Dev | Multi-player match runner + tournament support. Glicko-2 adjustments for >2 players. Separate per-player-count leaderboards + overall leaderboard. |
-| 21 | GPU-accelerated match simulations | Dev | Run large-scale simulations on GPU (RTX 4070). Likely depends on #20 (bitwise core). |
-| 22 | Expansion card support | Dev | Out of scope until base game is perfected. Scaling roadmap: (1) perfect 2P → (2) 3/4P → (3) expansions. |
 
 ## Scaling Roadmap
 
@@ -59,6 +57,9 @@ Parked tasks — not currently planned but kept for future consideration.
 |---|------|------|-------|
 | 2 | Per-decision skill loss | Dev | Chess centipawn-loss analog: `Skill_loss = WinRate(best_option) - WinRate(chosen_option)`. At each buy decision, compare engine's top choice vs actual choice. Perfect play = 0. Depends on #1 (shared eval infrastructure). |
 | 8 | Engine decision comparison tool | User | Replay the same game with different engines and compare their decisions. Identify where strategies diverge and whether differences led to better/worse outcomes. Needs standardized analysis tools (#1, #2, #7). |
+| 12 | Creator Engine: Adaptive opponent modeling | Dev (shelved) | Track opponent purchase patterns to adjust rollout/threat assessment. Assessment: low priority — game is fundamentally solitaire-optimization. Threat gravity well already models opponent proximity. Shelved. |
+| 21 | GPU-accelerated match simulations | Dev | Run large-scale simulations on GPU (RTX 4070). Likely depends on #20 (bitwise core). |
+| 22 | Expansion card support | Dev | Out of scope until base game is perfected. Scaling roadmap: (1) perfect 2P → (2) 3/4P → (3) expansions. |
 
 ## Done
 
@@ -78,6 +79,7 @@ Moved here when completed. Full history in CHANGELOG.md.
 | 26 | Chart turn indicator in game replay — vertical ReferenceLine on all 4 time-series charts (Luck Over Time, Dice Fortune own/opp, Card Value cumulative) tracks the currently selected turn. |
 | 24 | Luck-adjusted ratings everywhere — RatingCalculator parametrized for luck-adjusted WR. H2H API serves both raw and luck-adjusted Glicko-2 ratings. Frontend shows dual columns with colored deltas. |
 | 25 | Per-game luck-weighted WR — replaced simple mean subtraction with per-game scoring. Wins against bad luck (< -5%) earn bonus using power curve (exponent 1.3). Lucky wins stay at 1.0, losses always 0.0. |
+| 17 | Time budget mode Phase 1 — FlatMcEngine + ExpectimaxEngine time support, MatchConfig.timeBudgetMsPerEval, CLI --timeBudget for H2H/Tournament/Sweep, AutoBattleRunner + H2hHandler time budget, engines.json migration (timeBudgetMs: 0), H2H UI time budget field, auto-battle time budget + compute luck, Settings minThinkTimeMs (Phase 2 prep), localization. |
 
 | Old # | Task |
 |-------|------|

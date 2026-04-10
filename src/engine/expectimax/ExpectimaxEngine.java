@@ -53,6 +53,12 @@ import java.util.Map;
  *       much higher accuracy but ~5-20ms per leaf; only practical at depth 1)</li>
  * </ul>
  *
+ * <h2>Time budget</h2>
+ * When {@code timeBudgetMs > 0}, uses progressive deepening: starts at depth 1 and
+ * increases depth until the deadline is reached or {@code maxDepthRounds} is hit.
+ * Always returns the deepest complete result. Depth 1 takes 8-60ms; depth 2 takes
+ * 1.3-1.5s — so budgets under ~1s will yield depth-1 results.
+ *
  * <h2>Doubles handling</h2>
  * Unlike the MCTS ChanceNode (which treats all even 2d6 sums as doubles), this engine
  * correctly splits even roll totals into doubles and non-doubles branches with exact
@@ -91,11 +97,67 @@ public final class ExpectimaxEngine implements SimulationEngine {
         int nextPlayer = (playerIndex + 1) % n;
         int[] rootSupply = bs.buildSupplyArray();
 
+        List<ScoredOption> scored;
+        int completedDepth;
+
+        if (config.timeBudgetMs > 0) {
+            // Progressive deepening: try increasing depth until deadline
+            long deadline = startTime + config.timeBudgetMs;
+            scored = null;
+            completedDepth = 0;
+
+            for (int depth = 1; depth <= maxDepthRounds; depth++) {
+                if (System.currentTimeMillis() >= deadline) break;
+
+                List<ScoredOption> depthScored = evaluateAtDepth(
+                        bs, rootSupply, playerIndex, nextPlayer, coins, n, depth, leafEval);
+
+                if (System.currentTimeMillis() < deadline || scored == null) {
+                    // Completed within budget, or first depth (always keep at least depth-1)
+                    scored = depthScored;
+                    completedDepth = depth;
+                }
+                // If we exceeded the deadline mid-evaluation but have a previous result, break
+                if (System.currentTimeMillis() >= deadline) break;
+            }
+
+            if (scored == null) {
+                // Defensive: should never happen since depth-1 always completes first
+                scored = evaluateAtDepth(bs, rootSupply, playerIndex, nextPlayer, coins, n, 1, leafEval);
+                completedDepth = 1;
+            }
+        } else {
+            // Fixed depth (original path)
+            scored = evaluateAtDepth(bs, rootSupply, playerIndex, nextPlayer, coins, n,
+                    maxDepthRounds, leafEval);
+            completedDepth = maxDepthRounds;
+        }
+
+        long computeTimeMs = System.currentTimeMillis() - startTime;
+        return buildResult(state, playerIndex, scored, coins, computeTimeMs, leafEval, completedDepth);
+    }
+
+    /**
+     * Evaluates all purchase options at a specific search depth.
+     *
+     * @param bs          root BitState
+     * @param rootSupply  supply array
+     * @param playerIndex active player
+     * @param nextPlayer  next player index
+     * @param coins       active player's coins
+     * @param n           number of players
+     * @param depth       search depth in full rounds
+     * @param leafEval    leaf evaluation function name
+     * @return scored options for all valid purchases + save
+     */
+    private List<ScoredOption> evaluateAtDepth(BitState bs, int[] rootSupply,
+                                                int playerIndex, int nextPlayer, int coins,
+                                                int n, int depth, String leafEval) {
         List<ScoredOption> scored = new ArrayList<>();
 
-        // Save option — evaluate position without buying anything
+        // Save option
         double saveScore = Math.min(1.0, evaluateTurn(bs, rootSupply, nextPlayer, playerIndex,
-                maxDepthRounds, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY,
+                depth, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY,
                 leafEval, false));
         scored.add(new ScoredOption(RankEntry.WAIT_SENTINEL, saveScore, true));
 
@@ -118,7 +180,7 @@ public final class ExpectimaxEngine implements SimulationEngine {
                     score = leafEval(childBS, playerIndex, leafEval);
                 } else {
                     score = Math.min(1.0, evaluateTurn(childBS, childSupply, nextPlayer, playerIndex,
-                            maxDepthRounds, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY,
+                            depth, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY,
                             leafEval, false));
                 }
                 scored.add(new ScoredOption(BitStateTranslator.NORMAL_CARD_PROJECTS[ci], score, affordable));
@@ -137,7 +199,7 @@ public final class ExpectimaxEngine implements SimulationEngine {
                     score = leafEval(childBS, playerIndex, leafEval);
                 } else {
                     score = Math.min(1.0, evaluateTurn(childBS, rootSupply, nextPlayer, playerIndex,
-                            maxDepthRounds, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY,
+                            depth, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY,
                             leafEval, false));
                 }
                 scored.add(new ScoredOption(BitStateTranslator.PURPLE_CARD_PROJECTS[pi], score, affordable));
@@ -167,7 +229,7 @@ public final class ExpectimaxEngine implements SimulationEngine {
                 score = leafEval(childBS, playerIndex, leafEval);
             } else {
                 score = Math.min(1.0, evaluateTurn(childBS, rootSupply, nextPlayer, playerIndex,
-                        maxDepthRounds, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY,
+                        depth, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY,
                         leafEval, false));
             }
             scored.add(new ScoredOption(
@@ -175,8 +237,7 @@ public final class ExpectimaxEngine implements SimulationEngine {
                     score, affordable));
         }
 
-        long computeTimeMs = System.currentTimeMillis() - startTime;
-        return buildResult(state, playerIndex, scored, coins, computeTimeMs, leafEval, maxDepthRounds);
+        return scored;
     }
 
     // -------------------------------------------------------------------------

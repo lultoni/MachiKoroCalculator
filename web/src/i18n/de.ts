@@ -76,6 +76,8 @@ const de: Record<string, string> = {
   'settings.autosave': 'Automatisch speichern',
   'settings.bürohausPanel': 'Bürohaus-Popup',
   'settings.userPlayer': 'Mein Spieler',
+  'settings.minThinkTime': 'Min. Denkzeit',
+  'settings.minThinkTimeHint': 'Minimale Engine-Denkzeit pro Zug (Phase 2 — noch nicht aktiv)',
 
   // Game over
   'gameOver.title': '{name} hat gewonnen!',
@@ -274,6 +276,10 @@ const de: Record<string, string> = {
   'h2h.skilledWin': 'Verdienter Sieg',
   'h2h.luckAdjustedWr': 'Glücks-bereinigt WR',
   'h2h.computeCardIncome': 'Karten-Einkommen berechnen',
+  'h2h.timeBudget': 'Zeitbudget (ms)',
+  'h2h.timeBudgetHint': 'Wenn > 0, denken Engines diese Dauer pro Zug (überschreibt Iterationen)',
+  'h2h.timeBudgetActive': 'Zeitbudget aktiv — überschreibt Engine-Iterationen',
+  'h2h.autoComputeLuck': 'Glück berechnen',
   'h2h.cardValue': 'Kartenwert-Analyse',
   'h2h.cardValueCumulative': 'Kumulatives Einkommen',
   'h2h.cardValueSummary': 'Karten-Zusammenfassung',

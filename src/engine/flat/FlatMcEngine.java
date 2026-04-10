@@ -36,6 +36,11 @@ import java.util.Map;
  *   <li>Build {@link EngineResult} with win rates as scores.</li>
  * </ol>
  *
+ * <h2>Time budget</h2>
+ * When {@code timeBudgetMs > 0}, the engine runs in deadline mode: a brief survey phase
+ * (20 samples per option), then focus-phase rounds of 50 samples on top-K until the
+ * deadline. The anytime property means the result is always valid at any stopping point.
+ *
  * <h2>Purpose</h2>
  * Serves as a <b>lower bound</b> for what tree-based search should beat. Also useful
  * for calibrating H2H: "how much does UCT help vs. just sampling?"
@@ -47,6 +52,9 @@ public final class FlatMcEngine implements SimulationEngine {
 
     /** Top-K options to focus on after survey phase. */
     private static final int FOCUS_TOP_K = 5;
+
+    /** Samples per option per round in time-budget mode. */
+    private static final int TIME_ROUND_SIZE = 50;
 
     @Override
     public String id() { return "flat-mc"; }
@@ -66,7 +74,6 @@ public final class FlatMcEngine implements SimulationEngine {
     @Override
     public EngineResult evaluate(GameState state, int playerIndex, EngineConfig config) {
         long startTime = System.currentTimeMillis();
-        int totalIterations = config.iterations > 0 ? config.iterations : 500;
 
         BitState bs = BitState.fromGameState(state);
         int coins = bs.getCoins(playerIndex);
@@ -82,33 +89,83 @@ public final class FlatMcEngine implements SimulationEngine {
             candidates.add(new CandidateOption(RankEntry.WAIT_SENTINEL, bs, rootSupply, false));
         }
 
-        // ---- Survey phase: 20% of budget, evenly distributed ----
-        int surveyBudget = Math.max(candidates.size(), totalIterations / 5);
-        int perOptionSurvey = Math.max(1, surveyBudget / candidates.size());
+        int usedIterations;
 
-        for (CandidateOption c : candidates) {
-            if (!c.unaffordable) runSamples(c, perOptionSurvey, nextPlayer, playerIndex);
-        }
-
-        int usedIterations = perOptionSurvey * candidates.size();
-        int remaining = totalIterations - usedIterations;
-
-        // ---- Focus phase: 80% of budget on top-K ----
-        if (remaining > 0 && candidates.size() > 1) {
-            // Sort by win rate descending to find top-K
-            candidates.sort(Comparator.comparingDouble(CandidateOption::winRate).reversed());
-            int topK = Math.min(FOCUS_TOP_K, candidates.size());
-            int perOptionFocus = Math.max(1, remaining / topK);
-
-            for (int i = 0; i < topK; i++) {
-                runSamples(candidates.get(i), perOptionFocus, nextPlayer, playerIndex);
-            }
-            usedIterations += perOptionFocus * topK;
+        if (config.timeBudgetMs > 0) {
+            // ---- Time-budget mode: rounds until deadline ----
+            usedIterations = evaluateWithTimeBudget(candidates, nextPlayer, playerIndex,
+                    startTime + config.timeBudgetMs);
+        } else {
+            // ---- Iteration mode (original path) ----
+            int totalIterations = config.iterations > 0 ? config.iterations : 500;
+            usedIterations = evaluateWithIterations(candidates, nextPlayer, playerIndex, totalIterations);
         }
 
         // ---- Build result ----
         long computeTimeMs = System.currentTimeMillis() - startTime;
         return buildResult(candidates, coins, n, usedIterations, computeTimeMs);
+    }
+
+    /**
+     * Runs fixed-iteration survey + focus phases.
+     * @return total iterations used
+     */
+    private int evaluateWithIterations(List<CandidateOption> candidates, int nextPlayer,
+                                        int perspective, int totalIterations) {
+        // Survey phase: 20% of budget, evenly distributed
+        int surveyBudget = Math.max(candidates.size(), totalIterations / 5);
+        int perOptionSurvey = Math.max(1, surveyBudget / candidates.size());
+
+        for (CandidateOption c : candidates) {
+            if (!c.unaffordable) runSamples(c, perOptionSurvey, nextPlayer, perspective);
+        }
+
+        int usedIterations = perOptionSurvey * candidates.size();
+        int remaining = totalIterations - usedIterations;
+
+        // Focus phase: 80% of budget on top-K
+        if (remaining > 0 && candidates.size() > 1) {
+            candidates.sort(Comparator.comparingDouble(CandidateOption::winRate).reversed());
+            int topK = Math.min(FOCUS_TOP_K, candidates.size());
+            int perOptionFocus = Math.max(1, remaining / topK);
+
+            for (int i = 0; i < topK; i++) {
+                runSamples(candidates.get(i), perOptionFocus, nextPlayer, perspective);
+            }
+            usedIterations += perOptionFocus * topK;
+        }
+
+        return usedIterations;
+    }
+
+    /**
+     * Runs deadline-based survey + focus phases. Survey: 20 samples per option.
+     * Focus: rounds of {@link #TIME_ROUND_SIZE} on top-K until deadline.
+     *
+     * @return total iterations used
+     */
+    private int evaluateWithTimeBudget(List<CandidateOption> candidates, int nextPlayer,
+                                        int perspective, long deadline) {
+        // Survey phase: fixed small sample per option
+        int perOptionSurvey = 20;
+        for (CandidateOption c : candidates) {
+            if (!c.unaffordable) runSamples(c, perOptionSurvey, nextPlayer, perspective);
+        }
+        int usedIterations = perOptionSurvey * candidates.size();
+
+        // Focus phase: rounds until deadline
+        if (candidates.size() > 1) {
+            while (System.currentTimeMillis() < deadline) {
+                candidates.sort(Comparator.comparingDouble(CandidateOption::winRate).reversed());
+                int topK = Math.min(FOCUS_TOP_K, candidates.size());
+                for (int i = 0; i < topK && System.currentTimeMillis() < deadline; i++) {
+                    runSamples(candidates.get(i), TIME_ROUND_SIZE, nextPlayer, perspective);
+                    usedIterations += TIME_ROUND_SIZE;
+                }
+            }
+        }
+
+        return usedIterations;
     }
 
     // -------------------------------------------------------------------------

@@ -13,14 +13,23 @@ import java.util.Map;
  *
  * <p>Per-engine config overrides can be specified via {@link #configOverrides}. When present,
  * the override map for each seat is merged with the registry entry's config (override keys
- * win). When absent, {@link #iterationsPerEval} is used as a global iterations override
- * (backward compat with CLI tools and tournaments).
+ * win). When absent, global overrides ({@link #timeBudgetMsPerEval}, {@link #iterationsPerEval})
+ * are used as fallbacks (backward compat with CLI tools and tournaments).
+ *
+ * <h2>Config resolution order in {@link #buildSeatConfig}</h2>
+ * <ol>
+ *   <li>Per-seat configOverrides (if present) — merged with registry config</li>
+ *   <li>Global timeBudgetMsPerEval &gt; 0: always wins — sets timeBudgetMs, clears iterations to 0</li>
+ *   <li>Global iterationsPerEval &gt; 0: overrides iterations (legacy, only when no per-seat overrides)</li>
+ *   <li>Registry config as-is</li>
+ * </ol>
  */
 public record MatchConfig(
         String[] engineIds,
         int gameCount,
         int maxTurnsPerGame,
         int iterationsPerEval,
+        int timeBudgetMsPerEval,
         boolean seatSwap,
         Map<String, String>[] configOverrides,
         boolean computeLuck,
@@ -32,41 +41,41 @@ public record MatchConfig(
      * Constructor without computeCardIncome: defaults to false.
      */
     public MatchConfig(String[] engineIds, int gameCount, int maxTurnsPerGame,
-                       int iterationsPerEval, boolean seatSwap,
+                       int iterationsPerEval, int timeBudgetMsPerEval, boolean seatSwap,
                        Map<String, String>[] configOverrides,
                        boolean computeLuck, int luckMcSims, boolean luckUseMc) {
-        this(engineIds, gameCount, maxTurnsPerGame, iterationsPerEval, seatSwap,
-                configOverrides, computeLuck, luckMcSims, luckUseMc, false);
+        this(engineIds, gameCount, maxTurnsPerGame, iterationsPerEval, timeBudgetMsPerEval,
+                seatSwap, configOverrides, computeLuck, luckMcSims, luckUseMc, false);
     }
 
     /**
-     * Luck constructor without useMc: defaults to luckUseMc=true.
+     * Constructor without luckUseMc: defaults to true.
      */
     public MatchConfig(String[] engineIds, int gameCount, int maxTurnsPerGame,
-                       int iterationsPerEval, boolean seatSwap,
+                       int iterationsPerEval, int timeBudgetMsPerEval, boolean seatSwap,
                        Map<String, String>[] configOverrides,
                        boolean computeLuck, int luckMcSims) {
-        this(engineIds, gameCount, maxTurnsPerGame, iterationsPerEval, seatSwap,
-                configOverrides, computeLuck, luckMcSims, true);
+        this(engineIds, gameCount, maxTurnsPerGame, iterationsPerEval, timeBudgetMsPerEval,
+                seatSwap, configOverrides, computeLuck, luckMcSims, true);
     }
 
     /**
-     * Full constructor without luck fields: defaults to computeLuck=false, luckMcSims=200, luckUseMc=true.
+     * Constructor without luck fields: defaults to computeLuck=false.
      */
     public MatchConfig(String[] engineIds, int gameCount, int maxTurnsPerGame,
-                       int iterationsPerEval, boolean seatSwap,
+                       int iterationsPerEval, int timeBudgetMsPerEval, boolean seatSwap,
                        Map<String, String>[] configOverrides) {
-        this(engineIds, gameCount, maxTurnsPerGame, iterationsPerEval, seatSwap,
-                configOverrides, false, 200);
+        this(engineIds, gameCount, maxTurnsPerGame, iterationsPerEval, timeBudgetMsPerEval,
+                seatSwap, configOverrides, false, 200);
     }
 
     /**
-     * Legacy constructor: single iterations override for all engines.
+     * Legacy constructor: single iterations override, no time budget.
      * Used by CLI (H2hMain), TournamentRunner, and tests.
      */
     public MatchConfig(String[] engineIds, int gameCount, int maxTurnsPerGame,
                        int iterationsPerEval, boolean seatSwap) {
-        this(engineIds, gameCount, maxTurnsPerGame, iterationsPerEval, seatSwap, null);
+        this(engineIds, gameCount, maxTurnsPerGame, iterationsPerEval, 0, seatSwap, null);
     }
 
     /** Default match: 100 games, 200-turn limit, 500 iterations, seat swap on. */
@@ -86,7 +95,8 @@ public record MatchConfig(
      * <p>Resolution order:
      * <ol>
      *   <li>If {@code configOverrides[seatIndex]} exists, merge its keys onto registry config</li>
-     *   <li>Else if {@code iterationsPerEval > 0}, override only iterations</li>
+     *   <li>If {@code timeBudgetMsPerEval > 0}, always override timeBudgetMs and clear iterations to 0</li>
+     *   <li>Else if {@code iterationsPerEval > 0} and no per-seat overrides, override iterations</li>
      *   <li>Else use registry config as-is</li>
      * </ol>
      *
@@ -129,7 +139,15 @@ public record MatchConfig(
                     merged.put(key, e.getValue());
                 }
             }
-        } else if (iterationsPerEval > 0) {
+        }
+
+        // Global overrides apply on top of per-seat overrides when set.
+        // Time budget takes precedence: clears iterations so engines use deadline mode.
+        if (timeBudgetMsPerEval > 0) {
+            timeBudget = timeBudgetMsPerEval;
+            iterations = 0;
+        } else if (iterationsPerEval > 0 && configOverrides == null) {
+            // Legacy: global iterations only when no per-seat overrides exist
             iterations = iterationsPerEval;
         }
 

@@ -168,6 +168,11 @@ export interface AutoBattleStartRequest {
   maxTurns?: number;
   maxRounds?: number;
   tier?: string;
+  timeBudgetMs?: number;
+  computeLuck?: boolean;
+  luckMcSims?: number;
+  luckUseMc?: boolean;
+  computeCardIncome?: boolean;
 }
 
 export interface AutoBattleStatusResponse {

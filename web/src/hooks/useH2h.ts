@@ -40,11 +40,11 @@ export function useH2h() {
     configA?: Record<string, string>, configB?: Record<string, string>,
     maxTurns?: number, seatSwap?: boolean,
     computeLuck?: boolean, luckMcSims?: number, luckUseMc?: boolean,
-    computeCardIncome?: boolean,
+    computeCardIncome?: boolean, timeBudgetMs?: number,
   ) => {
     setState(s => ({ ...s, loading: true, error: null }));
     try {
-      const res = await api.h2hStart({ engineA, engineB, games, configA, configB, maxTurns, seatSwap, computeLuck, luckMcSims, luckUseMc, computeCardIncome });
+      const res = await api.h2hStart({ engineA, engineB, games, configA, configB, maxTurns, seatSwap, computeLuck, luckMcSims, luckUseMc, computeCardIncome, timeBudgetMs });
       setState(s => ({
         ...s,
         activeMatchId: res.matchId,

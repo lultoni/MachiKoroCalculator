@@ -38,6 +38,7 @@ public final class H2hMain {
         String engineB = "mcts-v1-fast";
         int games = 100;
         int iterations = 500;
+        int timeBudget = 0;
         int maxTurns = 200;
         boolean verbose = false;
         boolean luck = false;
@@ -51,6 +52,7 @@ public final class H2hMain {
                 case "--engineB" -> engineB = args[++i];
                 case "--games" -> games = Integer.parseInt(args[++i]);
                 case "--iterations" -> iterations = Integer.parseInt(args[++i]);
+                case "--timeBudget" -> timeBudget = Integer.parseInt(args[++i]);
                 case "--maxTurns" -> maxTurns = Integer.parseInt(args[++i]);
                 case "--verbose" -> verbose = true;
                 case "--luck" -> luck = true;
@@ -75,13 +77,15 @@ public final class H2hMain {
         orchestrator.register(new ExpectimaxEngine());
         orchestrator.register(new CreatorEngine());
 
-        MatchConfig config = luck || computeCardIncome
+        MatchConfig config = luck || computeCardIncome || timeBudget > 0
                 ? new MatchConfig(new String[]{engineA, engineB}, games, maxTurns,
-                        iterations, true, null, luck, luckMcSims, luckUseMc, computeCardIncome)
+                        iterations, timeBudget, true, null, luck, luckMcSims, luckUseMc, computeCardIncome)
                 : new MatchConfig(new String[]{engineA, engineB}, games, maxTurns, iterations, true);
 
-        System.out.printf("[H2H] %s vs %s — %d games, %d iter/eval, %d max turns%s%s%n",
-                engineA, engineB, games, iterations, maxTurns,
+        System.out.printf("[H2H] %s vs %s — %d games, %s, %d max turns%s%s%n",
+                engineA, engineB, games,
+                timeBudget > 0 ? timeBudget + "ms/eval" : iterations + " iter/eval",
+                maxTurns,
                 luck ? " [luck]" : "", computeCardIncome ? " [cardIncome]" : "");
 
         MatchRunner runner = new MatchRunner(orchestrator);
@@ -127,7 +131,8 @@ public final class H2hMain {
         System.out.println("  --engineA <id>    Engine registry ID for player 1 (default: mcts-v1-fast)");
         System.out.println("  --engineB <id>    Engine registry ID for player 2 (default: mcts-v1-fast)");
         System.out.println("  --games <n>       Number of games (default: 100)");
-        System.out.println("  --iterations <n>  MCTS iterations per eval (default: 500)");
+        System.out.println("  --iterations <n>  Iterations per eval (default: 500)");
+        System.out.println("  --timeBudget <n>  Time budget in ms per eval (overrides iterations when > 0)");
         System.out.println("  --maxTurns <n>    Max turns per game (default: 200)");
         System.out.println("  --verbose         Print every game result");
         System.out.println("  --luck            Enable per-roll luck computation");

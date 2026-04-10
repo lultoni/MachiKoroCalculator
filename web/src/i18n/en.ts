@@ -76,6 +76,8 @@ const en: Record<string, string> = {
   'settings.autosave': 'Autosave',
   'settings.bürohausPanel': 'Bürohaus popup',
   'settings.userPlayer': 'My Player',
+  'settings.minThinkTime': 'Min Think Time',
+  'settings.minThinkTimeHint': 'Minimum engine think time per move (Phase 2 — not yet wired to eval)',
 
   // Game over
   'gameOver.title': '{name} wins!',
@@ -274,6 +276,10 @@ const en: Record<string, string> = {
   'h2h.skilledWin': 'Skilled win',
   'h2h.luckAdjustedWr': 'Luck-Adjusted WR',
   'h2h.computeCardIncome': 'Compute Card Income',
+  'h2h.timeBudget': 'Time Budget (ms)',
+  'h2h.timeBudgetHint': 'When > 0, engines think for this duration per move (overrides iterations)',
+  'h2h.timeBudgetActive': 'Time budget active — overrides per-engine iterations',
+  'h2h.autoComputeLuck': 'Compute Luck',
   'h2h.cardValue': 'Card Value Analysis',
   'h2h.cardValueCumulative': 'Cumulative Income',
   'h2h.cardValueSummary': 'Card Summary',

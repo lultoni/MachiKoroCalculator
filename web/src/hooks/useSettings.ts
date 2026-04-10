@@ -8,6 +8,7 @@ export interface Settings {
   autosave: boolean;
   userPlayerIndex: number;
   showBürohausPanel: boolean;
+  minThinkTimeMs: number;
 }
 
 const STORAGE_KEY = 'machi-settings';
@@ -18,6 +19,7 @@ const DEFAULTS: Settings = {
   autosave: false,
   userPlayerIndex: 0,
   showBürohausPanel: false,
+  minThinkTimeMs: 1000,
 };
 
 function loadSettings(): Settings {

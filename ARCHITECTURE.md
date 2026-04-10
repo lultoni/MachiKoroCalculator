@@ -244,7 +244,7 @@ Six engine variants are implemented:
 - **Variant D (depth-limited)**: Stop rollout after N turns, evaluate position via `WinProbability.computeBaselineWinProb`. Faster, quality depends on heuristic.
 - **Variant E (adaptive budget)**: Survey phase (iterations/5), then concentrate remaining budget on close races. Focused subtree exploration via `MctsTree.runIterationsFromNode`.
 
-Each variant has fast/balanced/deep configurations. Total: 35 registry entries across 10 engine classes (6 MCTS in `engine.mcts` + FlatMc in `engine.flat` + HeuristicEv in `engine.heuristic` + Expectimax in `engine.expectimax` + Creator in `engine.creator`).
+Each variant has fast/balanced/deep configurations. Total: 38 registry entries across 10 engine classes (6 MCTS in `engine.mcts` + FlatMc in `engine.flat` + HeuristicEv in `engine.heuristic` + Expectimax in `engine.expectimax` + Creator in `engine.creator`).
 
 ### 6.4 Expectimax Engine
 
@@ -268,9 +268,9 @@ Deterministic minimax engine with probability-weighted chance nodes. No random r
 - `"winprob"`: `WinProbability.computeBaselineWinProb()`, clamped to [0,1].
 - `"composite"`: position score differential (evPerRound × 12 + landmarks × 15 + coins × 0.5) through sigmoid.
 
-**Config:** `maxDepthRounds` (default 2), `leafEval` ("winprob" or "composite").
+**Config:** `maxDepthRounds` (default 2), `leafEval` ("winprob", "composite", or "accurate"). When `timeBudgetMs > 0`, progressive deepening from depth=1 upward (see Section 6.6).
 
-**Performance:** depth-1 ≈ 8–60ms, depth-2 ≈ 1.3–1.5s, depth-3 ≈ 17 min (impractical). Registry: 4 entries (d1/d2 × winprob/composite).
+**Performance:** depth-1 ≈ 8–60ms, depth-2 ≈ 1.3–1.5s, depth-3 ≈ 17 min (impractical). Registry: 5 entries (d1×winprob/composite/accurate, d2×winprob/composite).
 
 ### 6.5 Creator Engine
 
@@ -336,6 +336,32 @@ H2H benchmarks (7.46, 100 games at 5000 iterations): CreatorRollout v3 wins 74% 
 **31 configurable knobs** via `EngineConfig.extra` for H2H sweep optimization: 4 situation weights, 8 base weights, 1 sigmoid steepness, 4 gravity well parameters, 1 save discount, rollout policy + temperature, plus multiplier endpoints.
 
 **Config:** `iterations` (iteration budget), `timeBudgetMs` (anytime mode), `rolloutPolicy` ("creator" default / "greedy" / "uniform" / "boltzmann"). Default changed from greedy to creator in 7.46 after CreatorRollout v3 (coverage bonus + save-toward-landmark) matched or beat greedy across all opponents. Registry: 3 entries (fast/balanced/deep).
+
+### 6.6 Time Budget Mode
+
+All 10 engine classes support `timeBudgetMs` in `EngineConfig`. When `timeBudgetMs > 0`, the engine thinks until the deadline expires instead of counting iterations.
+
+**Per-engine behavior:**
+
+| Engine | Time budget support | Method |
+|--------|-------------------|--------|
+| MCTS v1 + A-E | Native | `MctsTree.runUntilDeadline(deadline)` — runs MCTS iterations in a loop checking `System.currentTimeMillis() < deadline` |
+| CreatorEngine | Native | Round-based MC loop — survey + focus rounds until deadline |
+| FlatMcEngine | Added Phase 1 | Survey (20 samples/option) + focus top-K in rounds of 50 until deadline |
+| ExpectimaxEngine | Added Phase 1 | Progressive deepening: depth=1, then depth=2, etc. Keeps deepest complete result. |
+| HeuristicEvEngine | N/A | Zero-search formula, completes in <5ms — time budget has no effect |
+
+**FlatMcEngine time path:** `evaluateWithTimeBudget()` runs an initial survey phase (20 samples per non-unaffordable candidate), then repeatedly sorts candidates by win rate, focuses top-K (`FOCUS_TOP_K=3`) with 50-sample rounds until deadline.
+
+**ExpectimaxEngine progressive deepening:** When `timeBudgetMs > 0`, evaluates at increasing depths (1, 2, ..., `maxDepthRounds`). After each depth completes, checks if deadline passed. Keeps the last fully-completed depth's results. With depth-1 ≈ 8-60ms and depth-2 ≈ 1.3-1.5s, a budget < 1s yields depth-1 (correct).
+
+**MatchConfig resolution order** in `buildSeatConfig()`:
+1. Per-seat `configOverrides` (if present) — merged with registry config
+2. Global `timeBudgetMsPerEval > 0` — always wins: sets timeBudgetMs, clears iterations to 0
+3. Global `iterationsPerEval > 0` — overrides iterations (legacy, only when no per-seat overrides)
+4. Registry config as-is
+
+**Registry:** All 38 engine entries in `engines.json` have explicit `timeBudgetMs` field (0 for iteration-based, >0 for time-based like `creator-deep` at 5000ms).
 
 ---
 

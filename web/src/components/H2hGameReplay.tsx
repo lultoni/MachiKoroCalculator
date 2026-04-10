@@ -885,6 +885,7 @@ export function H2hGameReplay({ game, engines, matchId, projects, language, onBa
                               background: opt.chosen ? 'rgba(56,189,248,0.08)' : undefined }}
                           >
                             <span className="text-center text-machi-text-dim font-mono">{i + 1}</span>
+                            <CardTooltip project={proj} language={language}>
                             <span className="flex items-center gap-1 truncate">
                               {!isSave && categoryIconPath(proj?.category) && (
                                 <img src={categoryIconPath(proj?.category)} alt="" className="w-3 h-3 flex-shrink-0" />
@@ -893,6 +894,7 @@ export function H2hGameReplay({ game, engines, matchId, projects, language, onBa
                                 {name}
                               </span>
                             </span>
+                            </CardTooltip>
                             <div className="h-3 bg-machi-bg rounded-full overflow-hidden">
                               <div
                                 className={`h-full rounded-full ${opt.chosen ? 'bg-machi-accent/60' : 'bg-machi-text-dim/20'}`}

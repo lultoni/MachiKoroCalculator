@@ -51,7 +51,6 @@ Priorisiere in deiner Abarbeitung die wichtigsten Features. Erkenne Abhängigkei
 | # | Task | Type | Notes |
 |---|------|------|-------|
 | 19 | 3/4 player H2H testing | Dev | Multi-player match runner + tournament support. Glicko-2 adjustments for >2 players. Separate per-player-count leaderboards + overall leaderboard. |
-| 20 | Bitwise game core — fully complete | Dev | Phase 1: BitState + BitStateTranslator. Phase 2: GameSimulator hot path. Phase 3: All MCTS rollouts. Phase 4: MCTS tree nodes + all engines use BitState. Phase 5: BitRolloutFn interface, deleted 7 old rollout classes, created BitCreatorRollout. Phase 6: Calcs-layer BitState overloads. Phase 7: Cleanup. All engine layers are fully bitwise end-to-end. |
 | 21 | GPU-accelerated match simulations | Dev | Run large-scale simulations on GPU (RTX 4070). Likely depends on #20 (bitwise core). |
 | 22 | Expansion card support | Dev | Out of scope until base game is perfected. Scaling roadmap: (1) perfect 2P → (2) 3/4P → (3) expansions. |
 
@@ -63,11 +62,15 @@ Confirmed direction: **(1)** Perfect 2P engines + insights → **(2)** 3/4P adju
 
 Moved here when completed. Full history in CHANGELOG.md.
 
+| New # | Task |
+|-------|------|
+| 3 | Game-level luck aggregation (cumulative luck + luck-adjusted results in H2H replay) |
+| 4 | Luck display in game replay UI (per-roll annotation + luck chart + luck summary) |
+| 20 | Bitwise game core — fully complete (Phases 1-7, all engine layers fully bitwise end-to-end) |
+
 | Old # | Task |
 |-------|------|
 | 1 | Per-roll luck computation (LuckAnalyzer + GameStateSampler) |
-| 3 | Game-level luck aggregation (cumulative luck + luck-adjusted results in H2H replay) |
-| 4 | Luck display in game replay UI (per-roll annotation + luck chart + luck summary) |
 | 1 | Fix MCTS ChanceNode doubles bug |
 | 2 | Refine UI based on real gameplay usage (B24 + B25). |
 | 3 | Game-over decision review |

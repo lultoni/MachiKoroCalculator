@@ -345,8 +345,14 @@ function cardChartColor(color?: string): string {
 interface CardValueEntry {
   cardId: string;
   color: string;
-  cost: number;
+  /** Per-copy cost (from project definition). */
+  unitCost: number;
+  /** Total cost across all copies. */
+  totalCost: number;
+  copies: number;
   totalIncome: number;
+  /** Per-copy turns owned (one entry per copy, descending by turns). */
+  perCopyTurns: number[];
   turnsOwned: number;
   incomePerTurn: number;
   roi: number;
@@ -364,16 +370,17 @@ function computeCardValueData(
   // Track cumulative income per card over turns (for chart)
   const cumIncome: Record<string, number> = {};
   const chartData: Record<string, number>[] = [];  // one entry per turn
-  // Track purchase turn per card (first appearance after starters)
-  const purchaseTurn: Record<string, number> = {};
-  // Track expected EV per card at purchase time
-  const expectedEv: Record<string, number> = {};
+  // Track purchase turn per card copy (all copies, not just first)
+  const purchaseTurns: Record<string, number[]> = {};
+  // Track expected EV per card copy at purchase time (parallel to purchaseTurns)
+  const expectedEvPerCopy: Record<string, (number | null)[]> = {};
   // Track total income per card
   const totalIncome: Record<string, number> = {};
 
   // Determine starters (turn 0 inventory)
   for (const cardId of STARTER_CARDS) {
-    purchaseTurn[cardId] = 0;
+    purchaseTurns[cardId] = [0];
+    expectedEvPerCopy[cardId] = [null]; // no EV data for starters
     cumIncome[cardId] = 0;
     totalIncome[cardId] = 0;
   }
@@ -402,17 +409,16 @@ function computeCardValueData(
       }
     }
 
-    // Track purchases by this player
+    // Track purchases by this player (every copy, not just first)
     if (tn.playerIndex === playerIdx && tn.purchasedCardId && !LANDMARK_IDS.includes(tn.purchasedCardId)) {
-      if (!(tn.purchasedCardId in purchaseTurn)) {
-        purchaseTurn[tn.purchasedCardId] = ti;
+      if (!purchaseTurns[tn.purchasedCardId]) {
+        purchaseTurns[tn.purchasedCardId] = [];
+        expectedEvPerCopy[tn.purchasedCardId] = [];
       }
+      purchaseTurns[tn.purchasedCardId].push(ti);
+      expectedEvPerCopy[tn.purchasedCardId].push(tn.purchasedCardExpectedEv ?? null);
       cumIncome[tn.purchasedCardId] = cumIncome[tn.purchasedCardId] ?? 0;
       totalIncome[tn.purchasedCardId] = totalIncome[tn.purchasedCardId] ?? 0;
-      // Capture expected EV at purchase
-      if (tn.purchasedCardExpectedEv != null && !(tn.purchasedCardId in expectedEv)) {
-        expectedEv[tn.purchasedCardId] = tn.purchasedCardExpectedEv;
-      }
     }
 
     // Snapshot cumulative income for chart
@@ -423,36 +429,62 @@ function computeCardValueData(
     chartData.push(snapshot);
   }
 
-  // Count turns owned per card (from purchase to end)
-  const turnsOwned: Record<string, number> = {};
-  for (const [cardId, pTurn] of Object.entries(purchaseTurn)) {
-    // Count turns where this player was active from purchase onwards
-    let owned = 0;
-    for (let ti = pTurn; ti < game.turns.length; ti++) {
-      if (game.turns[ti].playerIndex === playerIdx) owned++;
-    }
-    turnsOwned[cardId] = owned;
+  // Count turns owned per card copy (from each copy's purchase to end)
+  // Also pair with per-copy EV, then sort by turns descending (keeping pairs aligned)
+  const perCopyTurns: Record<string, number[]> = {};
+  const perCopyEv: Record<string, (number | null)[]> = {};
+  for (const [cardId, pTurns] of Object.entries(purchaseTurns)) {
+    const evs = expectedEvPerCopy[cardId] ?? [];
+    const pairs: { turns: number; ev: number | null }[] = pTurns.map((pTurn, idx) => {
+      let owned = 0;
+      for (let ti = pTurn; ti < game.turns.length; ti++) {
+        if (game.turns[ti].playerIndex === playerIdx) owned++;
+      }
+      return { turns: owned, ev: evs[idx] ?? null };
+    });
+    // Sort descending by turns (longest-held copy first)
+    pairs.sort((a, b) => b.turns - a.turns);
+    perCopyTurns[cardId] = pairs.map(p => p.turns);
+    perCopyEv[cardId] = pairs.map(p => p.ev);
   }
 
   // Build summary entries
-  const allCards = new Set([...Object.keys(totalIncome), ...Object.keys(purchaseTurn)]);
+  const allCards = new Set([...Object.keys(totalIncome), ...Object.keys(purchaseTurns)]);
   const entries: CardValueEntry[] = [];
   for (const cardId of allCards) {
     const proj = byId(cardId);
-    const cost = proj?.cost ?? 0;
+    const unitCost = proj?.cost ?? 0;
+    const copyTurns = perCopyTurns[cardId] ?? [];
+    const copyEvs = perCopyEv[cardId] ?? [];
+    const copies = copyTurns.length || 1;
+    const totalCost = unitCost * copies;
     const income = totalIncome[cardId] ?? 0;
-    const turns = turnsOwned[cardId] ?? 0;
-    const ipt = turns > 0 ? income / turns : 0;
-    const roi = cost > 0 ? income / cost : 0;
-    const ev = expectedEv[cardId] ?? null;
-    const expIncome = ev != null && turns > 0 ? ev * turns : null;
+    const turns = copyTurns.length > 0 ? copyTurns[0] : 0; // longest-held copy
+    const totalCopyTurns = copyTurns.reduce((s, t) => s + t, 0);
+    const ipt = totalCopyTurns > 0 ? income / totalCopyTurns : 0;
+    const roi = totalCost > 0 ? income / totalCost : 0;
+    // Expected income: sum of (ev_i × turns_i) for each copy with known EV
+    let expIncome: number | null = null;
+    const hasAnyEv = copyEvs.some(e => e != null);
+    if (hasAnyEv && totalCopyTurns > 0) {
+      expIncome = 0;
+      for (let i = 0; i < copies; i++) {
+        const ev = copyEvs[i];
+        if (ev != null) {
+          expIncome += ev * (copyTurns[i] ?? 0);
+        }
+      }
+    }
     const delta = expIncome != null ? income - expIncome : null;
 
     entries.push({
       cardId,
       color: proj?.color ?? '',
-      cost,
+      unitCost,
+      totalCost,
+      copies,
       totalIncome: income,
+      perCopyTurns: copyTurns,
       turnsOwned: turns,
       incomePerTurn: ipt,
       roi,
@@ -1234,6 +1266,7 @@ export function H2hGameReplay({ game, engines, matchId, projects, language, onBa
                           fontSize: '11px',
                         }}
                         labelFormatter={(v) => `Turn ${v}`}
+                        itemSorter={(item) => -(typeof item.value === 'number' ? item.value : 0)}
                       />
                       {cardValueData.chartCardIds.map(cardId => {
                         const proj = projects.byId(cardId);
@@ -1264,6 +1297,7 @@ export function H2hGameReplay({ game, engines, matchId, projects, language, onBa
                     <thead>
                       <tr className="text-machi-text-dim/60 border-b border-machi-border/30">
                         <th className="text-left py-1 px-1">{t('h2h.cardName')}</th>
+                        <th className="text-right py-1 px-1">×</th>
                         <th className="text-right py-1 px-1">{t('h2h.cardCost')}</th>
                         <th className="text-right py-1 px-1">{t('h2h.cardTotalIncome')}</th>
                         <th className="text-right py-1 px-1">{t('h2h.cardTurnsOwned')}</th>
@@ -1277,6 +1311,12 @@ export function H2hGameReplay({ game, engines, matchId, projects, language, onBa
                       {cardValueData.entries.map(entry => {
                         const proj = projects.byId(entry.cardId);
                         const name = proj?.[nameKey] ?? proj?.name_de ?? entry.cardId;
+                        const showPerCopy = entry.copies > 1;
+                        // Per-copy ROI: income proportional to turns, divided by unit cost
+                        const totalCopyTurns = entry.perCopyTurns.reduce((s, t) => s + t, 0);
+                        const perCopyRoi = showPerCopy && entry.unitCost > 0 && totalCopyTurns > 0
+                          ? entry.perCopyTurns.map(t => ((entry.totalIncome * t / totalCopyTurns) / entry.unitCost).toFixed(1) + 'x')
+                          : null;
                         return (
                           <tr key={entry.cardId} className="border-b border-machi-border/10 hover:bg-machi-surface/30">
                             <td className="py-1 px-1">
@@ -1287,14 +1327,23 @@ export function H2hGameReplay({ game, engines, matchId, projects, language, onBa
                                 {name}
                               </span>
                             </td>
-                            <td className="text-right py-1 px-1 text-machi-text-dim">{entry.cost}</td>
+                            <td className="text-right py-1 px-1 text-machi-text-dim">
+                              {entry.copies > 1 ? `${entry.copies}×` : ''}
+                            </td>
+                            <td className="text-right py-1 px-1 text-machi-text-dim">{entry.totalCost}</td>
                             <td className={`text-right py-1 px-1 ${entry.totalIncome > 0 ? 'text-green-400' : entry.totalIncome < 0 ? 'text-red-400' : 'text-machi-text-dim'}`}>
                               {entry.totalIncome}
                             </td>
-                            <td className="text-right py-1 px-1 text-machi-text-dim">{entry.turnsOwned}</td>
-                            <td className="text-right py-1 px-1 text-machi-text-dim">{entry.incomePerTurn.toFixed(2)}</td>
+                            <td className="text-right py-1 px-1 text-machi-text-dim">
+                              {showPerCopy ? entry.perCopyTurns.join('/') : entry.turnsOwned}
+                            </td>
+                            <td className="text-right py-1 px-1 text-machi-text-dim">
+                              {entry.incomePerTurn.toFixed(2)}
+                            </td>
                             <td className={`text-right py-1 px-1 ${entry.roi >= 1 ? 'text-green-400' : 'text-machi-text-dim'}`}>
-                              {entry.cost > 0 ? `${entry.roi.toFixed(1)}x` : '-'}
+                              {entry.totalCost > 0
+                                ? (perCopyRoi ? perCopyRoi.join('/') : `${entry.roi.toFixed(1)}x`)
+                                : '-'}
                             </td>
                             <td className="text-right py-1 px-1 text-machi-text-dim">
                               {entry.expectedIncome != null ? entry.expectedIncome.toFixed(1) : '-'}

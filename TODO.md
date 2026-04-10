@@ -13,7 +13,6 @@ Priorisiere in deiner Abarbeitung die wichtigsten Features. Erkenne Abhängigkei
 | # | Task | Type | Notes |
 |---|------|------|-------|
 | 5 | Luck display in live game UI | Dev | Show luck info in main game session (AssistantPanel or similar). Lower priority than replay. Depends on #1. |
-| 27 | Card copy count in Card Value analysis | User | Card Value summary table doesn't factor in number of copies owned (e.g., 3× Bäckerei). Income attribution is correct (sums all copies), but ROI/expected/per-turn columns need to account for copy count. Discuss: show copy column, divide expected EV by copies, or show per-copy breakdown. |
 
 ### Engine Quality
 
@@ -72,6 +71,7 @@ Moved here when completed. Full history in CHANGELOG.md.
 | 4 | Luck display in game replay UI (per-roll annotation + luck chart + luck summary) |
 | 20 | Bitwise game core — fully complete (Phases 1-7, all engine layers fully bitwise end-to-end) |
 | 25 | Check Luck Analyser weird results — investigated, behavior is correct. Roll 1 triggers blue Weizenfeld for both players (P0+2, P1+1), making it the only roll that feeds the opponent. MC confirms roll 1 WR is ~0.38 vs expected ~0.45. The -7-10% luck is real: giving P1 +1 coin drops P0's WR by ~8pp because it accelerates P1's card purchases. |
+| 27 | Card copy count in Card Value analysis — ×N column, total cost (unit×copies), per-copy turns and ROI (slash-separated), Inc/Turn normalized to per-copy rate, Expected income uses per-copy EV at each purchase time. Cumulative income chart tooltip sorted by value. |
 | 6 | Luck-adjusted WR for sweep optimization — SweepMain `--luck` flag uses heuristic-mode luck adjustment. MatchResult aggregates totalLuck[] and luckAdjustedWinRates[]. SweepResult.Trial gains adjustedWinRate field. TPE objective uses adjusted WR when enabled. |
 | 7 | Card-value-throughout-game analyzer — Full per-card income attribution via RollResolver.attributeIncomePerCard(). TurnLog carries cardIncome + purchasedCardExpectedEv. MatchConfig.computeCardIncome flag. Frontend: cumulative income LineChart, ROI summary table, per-turn income breakdown in turn detail, player toggle. |
 | 23 | WinProbability dual-mode: fast heuristic (MAE ~0.22) + micro MC with 50 rollouts (MAE ~0.03). 10 experiments proved static features cap at MAE ~0.20. Eval set: 35 positions with 100K MC ground truth. |

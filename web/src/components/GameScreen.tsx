@@ -5,7 +5,6 @@ import { useLocale } from '../i18n/useLocale';
 import { useEngine } from '../hooks/useEngine';
 import { useRollPreview } from '../hooks/useRollPreview';
 import { useInsights } from '../hooks/useInsights';
-import { usePlayerVsAi } from '../hooks/usePlayerVsAi';
 import type { UseSessionReturn } from '../hooks/useSession';
 import type { Settings } from '../hooks/useSettings';
 import type { UseHoverReturn } from '../hooks/useHover';
@@ -23,7 +22,8 @@ import { BürohausModal } from './BürohausModal';
 import { SettingsScreen } from './SettingsScreen';
 import { SaveLoadMenu } from './SaveLoadMenu';
 import { DecisionReview } from './DecisionReview';
-import { PlayerVsAiPanel, AiThinkingIndicator, AiTurnReveal } from './PlayerVsAiPanel';
+import { AiThinkingIndicator, AiTurnReveal } from './PlayerVsAiPanel';
+import type { UsePvAiReturn } from '../hooks/usePlayerVsAi';
 
 interface Props {
   session: UseSessionReturn;
@@ -31,13 +31,13 @@ interface Props {
   updateSettings: (partial: Partial<Settings>) => void;
   projects: { projects: ProjectDef[]; byId: (id: string) => ProjectDef | undefined };
   hover: UseHoverReturn;
+  pvai: UsePvAiReturn;
 }
 
-export function GameScreen({ session, settings, updateSettings, projects, hover }: Props) {
+export function GameScreen({ session, settings, updateSettings, projects, hover, pvai }: Props) {
   const { t } = useLocale();
   const s = session.session!;
   const engine = useEngine();
-  const pvai = usePlayerVsAi();
 
   // Dice selection state
   const [die1, setDie1] = useState<number | null>(null);
@@ -651,15 +651,20 @@ export function GameScreen({ session, settings, updateSettings, projects, hover 
               })}
           </div>
 
-          {/* Player vs AI panel (bottom of right sidebar) */}
-          <PlayerVsAiPanel
-            pvai={pvai}
-            projects={projects.projects}
-            language={settings.language}
-            playerNames={s.state.players.map(p => p.name)}
-            onSetup={(_engineId, _aiIdx, _minMs) => { /* already handled by pvai.startPvAi */ }}
-            onStop={() => pvai.stopPvAi()}
-          />
+          {/* Player vs AI status (shown only when PvAI is active) */}
+          {pvai.pvaiActive && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-machi-accent">vs AI</span>
+                <button
+                  className="text-xs text-machi-text-dim hover:text-machi-text transition-colors"
+                  onClick={() => pvai.stopPvAi()}
+                >
+                  Stop
+                </button>
+              </div>
+            </div>
+          )}
         </aside>
       </div>
 

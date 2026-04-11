@@ -1,12 +1,15 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useSession } from './hooks/useSession';
 import { useSettings } from './hooks/useSettings';
 import { useProjects } from './hooks/useProjects';
 import { useHover } from './hooks/useHover';
 import { useLocale } from './i18n/useLocale';
+import { usePlayerVsAi } from './hooks/usePlayerVsAi';
 import { SetupScreen } from './components/SetupScreen';
+import type { PvAiSetupConfig } from './components/SetupScreen';
 import { GameScreen } from './components/GameScreen';
 import { H2hOverview } from './components/H2hOverview';
+import type { CreateSessionRequest } from './api/types';
 
 type AppView = 'game' | 'h2h';
 
@@ -15,8 +18,16 @@ export default function App() {
   const { settings, update: updateSettings } = useSettings();
   const projects = useProjects();
   const hover = useHover();
+  const pvai = usePlayerVsAi();
   const { t } = useLocale();
   const [view, setView] = useState<AppView>('game');
+
+  const handleStart = useCallback(async (req: CreateSessionRequest, pvaiConfig?: PvAiSetupConfig) => {
+    await session.create(req);
+    if (pvaiConfig) {
+      await pvai.startPvAi(pvaiConfig.engineId, pvaiConfig.aiPlayerIndex, pvaiConfig.minThinkTimeMs);
+    }
+  }, [session, pvai]);
 
   // Loading project data
   if (projects.loading) {
@@ -36,7 +47,7 @@ export default function App() {
   if (!session.session) {
     return (
       <SetupScreen
-        onStart={session.create}
+        onStart={handleStart}
         onLoad={session.load}
         onFromSnapshot={session.fromSnapshot}
         loading={session.loading}
@@ -54,6 +65,7 @@ export default function App() {
       updateSettings={updateSettings}
       projects={projects}
       hover={hover}
+      pvai={pvai}
     />
   );
 }

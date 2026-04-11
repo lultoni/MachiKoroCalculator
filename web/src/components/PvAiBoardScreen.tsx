@@ -422,10 +422,11 @@ interface WinScreenProps {
   humanPlayerIndex: number;
   aiPlayerIndex: number;
   engineId: string;
+  luckUseMc: boolean;
   onNewGame: () => void;
 }
 
-function WinScreen({ players, winnerIndex, humanPlayerIndex, aiPlayerIndex, engineId, onNewGame }: WinScreenProps) {
+function WinScreen({ players, winnerIndex, humanPlayerIndex, aiPlayerIndex, engineId, luckUseMc, onNewGame }: WinScreenProps) {
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [savedId, setSavedId] = useState<string | null>(null);
 
@@ -436,6 +437,7 @@ function WinScreen({ players, winnerIndex, humanPlayerIndex, aiPlayerIndex, engi
         humanName: players[humanPlayerIndex].name,
         aiPlayerIndex,
         engineId,
+        luckUseMc,
       });
       setSavedId(res.id);
       setSaveState('saved');
@@ -790,6 +792,7 @@ export function PvAiBoardScreen({ session, settings, projects, pvai }: Props) {
         humanPlayerIndex={humanPlayerIndex}
         aiPlayerIndex={pvai.aiPlayerIndex}
         engineId={settings.engineId}
+        luckUseMc={settings.luckUseMc}
         onNewGame={() => { pvai.stopPvAi(); session.clearSession(); }}
       />
     );

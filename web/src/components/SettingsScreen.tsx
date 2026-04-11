@@ -269,6 +269,28 @@ export function SettingsScreen({ settings, update, players, onClose }: Props) {
           </button>
         </div>
 
+        {/* Luck mode */}
+        <div className="flex items-center justify-between">
+          <div>
+            <label className="text-sm text-machi-text-dim block">Luck calculation mode</label>
+            <p className="text-[10px] text-machi-text-dim/60 mt-0.5">
+              {settings.luckUseMc
+                ? 'MC: accurate but slow per saved game (~200 sims/roll)'
+                : 'Heuristic: instant but ~0.25 MAE per roll'}
+            </p>
+          </div>
+          <button
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+              settings.luckUseMc
+                ? 'border-machi-accent text-machi-accent bg-machi-accent/10'
+                : 'border-machi-green text-machi-green bg-machi-green/10'
+            }`}
+            onClick={() => update({ luckUseMc: !settings.luckUseMc })}
+          >
+            {settings.luckUseMc ? 'MC' : 'Heuristic'}
+          </button>
+        </div>
+
         {/* User player */}
         <div className="space-y-1.5">
           <label className="text-sm text-machi-text-dim">{t('settings.userPlayer')}</label>

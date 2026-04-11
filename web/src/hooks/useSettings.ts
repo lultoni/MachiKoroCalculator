@@ -9,6 +9,8 @@ export interface Settings {
   userPlayerIndex: number;
   showBürohausPanel: boolean;
   minThinkTimeMs: number;
+  /** true = MC luck (accurate, slow ~200 sims/roll); false = heuristic (instant, ~0.25 MAE). */
+  luckUseMc: boolean;
 }
 
 const STORAGE_KEY = 'machi-settings';
@@ -20,6 +22,7 @@ const DEFAULTS: Settings = {
   userPlayerIndex: 0,
   showBürohausPanel: false,
   minThinkTimeMs: 1000,
+  luckUseMc: true,
 };
 
 function loadSettings(): Settings {

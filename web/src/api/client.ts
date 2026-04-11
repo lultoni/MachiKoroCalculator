@@ -240,6 +240,7 @@ export const pvaiSave = (req: {
   humanName: string;
   aiPlayerIndex: number;
   engineId: string;
+  luckUseMc?: boolean;
 }) => post<{ id: string; date: string }>('/api/session/pvai/save', req);
 
 export const pvaiGames = () =>

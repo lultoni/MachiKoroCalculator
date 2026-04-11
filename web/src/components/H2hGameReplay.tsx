@@ -454,11 +454,16 @@ function computeRollBreakdown(
       const isActual = roll === turn.roll && twoDice === (turn.diceCount === 2);
       // Compute luck for this roll: wr(roll) - expectedWr
       // wrPerRoll: index = roll - minRoll (0-based). expectedWr = wrBeforeRoll.
+      // Only use wrPerRoll when the dice mode matches — a 1d6 turn produces 6 WR values
+      // (index 0=roll1 … 5=roll6) and a 2d6 turn produces 11 (index 0=roll2 … 10=roll12).
+      // Using 1d6 wrPerRoll for the 2d6 panel (or vice versa) would map wrong rolls.
+      const wrPerRollMatchesDiceMode = turn.wrPerRoll != null
+        && (twoDice ? turn.wrPerRoll.length === 11 : turn.wrPerRoll.length === 6);
       let luck: number | null = null;
-      if (turn.wrPerRoll && turn.wrBeforeRoll != null) {
+      if (wrPerRollMatchesDiceMode && turn.wrBeforeRoll != null) {
         const rollIdx = roll - (twoDice ? 2 : 1);
-        if (rollIdx >= 0 && rollIdx < turn.wrPerRoll.length) {
-          luck = turn.wrPerRoll[rollIdx] - turn.wrBeforeRoll;
+        if (rollIdx >= 0 && rollIdx < turn.wrPerRoll!.length) {
+          luck = turn.wrPerRoll![rollIdx] - turn.wrBeforeRoll;
         }
       } else if (isActual && turn.rollLuck != null) {
         luck = turn.rollLuck;

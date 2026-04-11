@@ -95,10 +95,13 @@ final class PvAiSaveHandler implements HttpHandler {
                 engineId = (cid != null) ? cid : "unknown";
             }
 
+            boolean luckUseMc = !body.has("luckUseMc") || body.get("luckUseMc").isJsonNull()
+                    || body.get("luckUseMc").getAsBoolean();
+
             int humanPlayerIndex = 1 - aiPlayerIndex;
             int numPlayers = session.getState().getPlayers().length;
 
-            GameLog gameLog = buildGameLog(session.getHistory(), numPlayers);
+            GameLog gameLog = buildGameLog(session.getHistory(), numPlayers, luckUseMc);
 
             PvAiGameRecord record = new PvAiGameRecord(humanName, engineId, humanPlayerIndex, gameLog);
             store.save(record);
@@ -118,8 +121,11 @@ final class PvAiSaveHandler implements HttpHandler {
     /**
      * Replays turn history from the initial game state, computing luck and win-rate
      * for each turn, and returns a populated {@link GameLog}.
+     *
+     * @param luckUseMc true = Monte Carlo luck evaluation (accurate, slow ~200 sims/roll);
+     *                  false = heuristic evaluation (instant, ~0.25 MAE)
      */
-    private static GameLog buildGameLog(List<TurnRecord> history, int numPlayers) {
+    private static GameLog buildGameLog(List<TurnRecord> history, int numPlayers, boolean luckUseMc) {
         GameState replayState = GameState.initial(numPlayers);
         GameLog log = new GameLog(0);
 
@@ -132,7 +138,7 @@ final class PvAiSaveHandler implements HttpHandler {
 
             // Compute luck + baseline WR
             LuckAnalyzer.RollLuck rollLuck = LuckAnalyzer.computeRollLuck(
-                    preRollState, pi, record.roll, usedTwoDice, MC_SIMS, true);
+                    preRollState, pi, record.roll, usedTwoDice, MC_SIMS, luckUseMc);
 
             // Per-card income attribution (computed from pre-roll state for chart display)
             java.util.Map<String, int[]> cardIncome = RollResolver.attributeIncomePerCard(

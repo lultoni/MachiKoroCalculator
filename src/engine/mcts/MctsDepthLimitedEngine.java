@@ -89,4 +89,12 @@ public final class MctsDepthLimitedEngine extends MctsV1Engine {
         return new MctsTree(bs, supply, activePlayer, playerPerspective,
                 explorationConstant, rollout, false, true);
     }
+
+    @Override
+    protected BitRolloutFn buildRolloutFn(EngineConfig config) {
+        int maxDepth = Integer.parseInt(config.getExtra("maxRolloutDepth", "10"));
+        boolean hybrid = "hybrid".equals(config.getExtra("terminalEval", "heuristic"));
+        return hybrid ? BitMctsRollout.withMaxDepthHybrid(maxDepth)
+                      : BitMctsRollout.withMaxDepth(maxDepth);
+    }
 }

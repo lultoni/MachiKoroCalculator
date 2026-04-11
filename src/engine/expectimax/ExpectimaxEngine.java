@@ -150,7 +150,8 @@ public final class ExpectimaxEngine implements SimulationEngine {
      * @param leafEval    leaf evaluation function name
      * @return scored options for all valid purchases + save
      */
-    private List<ScoredOption> evaluateAtDepth(BitState bs, int[] rootSupply,
+    /** Package-private for use by {@link ExpectimaxContinuousWorker}. */
+    List<ScoredOption> evaluateAtDepth(BitState bs, int[] rootSupply,
                                                 int playerIndex, int nextPlayer, int coins,
                                                 int n, int depth, String leafEval) {
         List<ScoredOption> scored = new ArrayList<>();
@@ -885,7 +886,8 @@ public final class ExpectimaxEngine implements SimulationEngine {
     // Result construction (uses original GameState for Calcs metrics)
     // -------------------------------------------------------------------------
 
-    private EngineResult buildResult(GameState state, int playerIndex,
+    /** Package-private for use by {@link ExpectimaxContinuousWorker}. */
+    EngineResult buildResult(GameState state, int playerIndex,
                                       List<ScoredOption> scored, int coins,
                                       long computeTimeMs, String leafEval, int maxDepth) {
         List<EngineResult.Option> options = new ArrayList<>();
@@ -936,7 +938,8 @@ public final class ExpectimaxEngine implements SimulationEngine {
     // Helpers
     // -------------------------------------------------------------------------
 
-    private static final class ScoredOption {
+    /** Package-private for use by {@link ExpectimaxContinuousWorker}. */
+    static final class ScoredOption {
         final Project card;
         final double score;
         final boolean affordable;

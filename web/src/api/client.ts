@@ -22,6 +22,8 @@ import type {
   RatingsResponse,
   H2hImportResponse,
   SweepRun,
+  PvAiStartRequest,
+  AiTurnResult,
 } from './types';
 
 const BASE = '';  // same-origin; Vite proxy handles /api → :8080
@@ -217,3 +219,17 @@ export async function deleteCustomEngine(id: string): Promise<{ status: string; 
 
 export const sweepResults = () =>
   json<SweepRun[]>('/api/h2h/sweep/results');
+
+// ─── Player vs AI ────────────────────────────────────────────────────
+
+export const pvaiStart = (req: PvAiStartRequest) =>
+  post<{ ok: boolean; aiPlayerIndex: number }>('/api/session/pvai/start', req);
+
+export const pvaiHumanTurn = (req: ApplyTurnRequest & {
+  bürohausOwnCardId?: string | null;
+  bürohausOppCardId?: string | null;
+  bürohausOppPlayer?: number | null;
+}) => post<SessionJson>('/api/session/pvai/human-turn', req);
+
+export const pvaiAiTurn = () =>
+  json<AiTurnResult>('/api/session/pvai/ai-turn');

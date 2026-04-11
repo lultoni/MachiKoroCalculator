@@ -81,4 +81,10 @@ public final class MctsBoltzmannRolloutEngine extends MctsV1Engine {
             currentTemperature.remove();
         }
     }
+
+    @Override
+    protected BitRolloutFn buildRolloutFn(EngineConfig config) {
+        double temperature = Double.parseDouble(config.getExtra("rolloutTemperature", "0.7"));
+        return BitBoltzmannRollout.withTemperature(temperature);
+    }
 }

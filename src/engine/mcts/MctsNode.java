@@ -32,8 +32,14 @@ public abstract class MctsNode {
      */
     public final int[] supply;
 
-    /** Parent node; null for the root. */
-    public final MctsNode parent;
+    /**
+     * Parent node; null for the root.
+     *
+     * <p><strong>Note:</strong> This field is not final so that {@link TreeNavigator#pruneAbove}
+     * can sever the parent link after tree navigation, allowing GC to collect ancestor nodes
+     * and sibling subtrees. Only {@code TreeNavigator} should set this to {@code null}.
+     */
+    public MctsNode parent;
 
     /** Expanded children, in the order they were added. */
     protected final List<MctsNode> children = new ArrayList<>();

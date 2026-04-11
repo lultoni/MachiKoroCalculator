@@ -6,6 +6,40 @@ Implementation history: what was built, why, and which design decisions were mad
 
 ## Phase 7: Iteration
 
+### Continuous Thinking Engine Infrastructure (TODO #17c)
+
+**Engines now think continuously during the human's turn rather than just-in-time.** Instead of a ~200ms on-demand evaluation at turn start, each engine runs in a background thread accumulating 750K-1.5M iterations during the human's 30-60s deliberation. The human's "Buy" click is a lock-in event that navigates the engine's internal state. When the AI's turn arrives, it reveals its pre-computed decision step-by-step.
+
+**New engine-layer classes (17 files total):**
+- `engine.NavigationEvent` — Java record capturing the full path through the game tree (diceCount, rollTotal, isDoubles, funkturmKeep, rerollTotal, bürohausSwap, purchasedCardId).
+- `engine.ContinuousWorker` — interface for per-engine continuous loops (init, runOneIteration, peekResult, navigate, iterations).
+- `engine.ContinuousEvaluator` — background thread wrapper. AtomicReference mailbox for NavigationEvent delivery; AtomicBoolean flags for stop-and-report and shutdown; volatile result buffer. Worker pauses via synchronized(pauseLock)+wait/notifyAll when stopAndReport fires.
+- `engine.Timekeeper` — timing contract. `effectiveMinMs = max(minThinkTimeMs, engineTimeBudgetMs)`. `requestResult()` blocks for remaining wait then returns a CompletableFuture<EngineResult>.
+- `engine.mcts.TreeNavigator` — walks DiceChoiceNode → ChanceNode → FunkturmNode → BürohausNode → BuyDecisionNode to reuse the MCTS tree on lock-in events. `pruneAbove()` severs parent link for GC.
+- `engine.mcts.MctsTree.withExistingRoot()` — static factory to wrap a navigated subtree in a fresh MctsTree instance.
+- `engine.mcts.MctsContinuousWorker` — MCTS tree persists across lock-in events via TreeNavigator.
+- `engine.flat.FlatMcContinuousWorker` — candidate accumulator; always fresh init on navigate (rollout results invalid for new state).
+- `engine.creator.CreatorContinuousWorker` — heuristic seeding + MC validation with 50%/30%/20% allocation.
+- `engine.expectimax.ExpectimaxContinuousWorker` — iterative deepening; best completed depth stored as bestResult.
+- `engine.heuristic.HeuristicContinuousWorker` — single-pass formula; runOneIteration is a no-op.
+
+**Server integration (3 new endpoints + 2 new files):**
+- `server.PlayerVsAiController` — session-level coordinator. start() picks engine worker + creates evaluator + timekeeper. onHumanTurnComplete() delivers NavigationEvent. executeAiTurn() blocks for minThinkTimeMs, extracts TurnPlan, rolls dice, navigates Funkturm/Bürohaus, applies turn to session.
+- `server.AiTurnResult` — response object with diceCount, rollTotal, coinDeltas, funkturm/bürohaus/purchase fields.
+- `POST /api/session/pvai/start` — activate PvAI mode for current session.
+- `POST /api/session/pvai/human-turn` — human lock-in event; navigate engine and return updated session.
+- `GET /api/session/pvai/ai-turn` — blocks until think time elapses; returns AI decision + updated session.
+- `SessionManager` gains `getPvaiController()` lazy accessor.
+
+**Frontend (2 new files):**
+- `usePlayerVsAi` hook — startPvAi, onHumanBuy, requestAiTurn. Decomposes AiTurnResult into AiTurnStep[] and animates them sequentially with 220ms delays.
+- `PlayerVsAiPanel` / `PlayerVsAiSetup` / `AiThinkingIndicator` / `AiTurnReveal` components — setup form (AI seat, engine, minThinkTimeMs slider) + step-by-step animated reveal.
+- `GameScreen` — isAiTurn branch replaces OpponentTurnEntry with "Show AI Turn" button + thinking indicator. PvAI setup panel added to right sidebar.
+
+**Tests:** 16 new assertions in `"Continuous Evaluation"` section of RuntimeTester — all pass.
+
+---
+
 ### Time Budget Mode — Phase 1 (TODO #17)
 
 **All engines now support time-based thinking.** Instead of fixed iteration counts, engines can be given a millisecond deadline and think until time runs out. This is the foundation for continuous-thinking features in future phases.

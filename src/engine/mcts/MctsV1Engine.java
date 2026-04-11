@@ -160,6 +160,18 @@ public class MctsV1Engine implements SimulationEngine {
     }
 
     /**
+     * Returns the rollout function used by this engine variant.
+     * Overridable by subclasses so that {@link MctsContinuousWorker} can use the
+     * correct rollout policy when building or rebuilding a tree.
+     *
+     * @param config engine configuration (may specify rolloutPolicy in extra params)
+     * @return the rollout function
+     */
+    protected BitRolloutFn buildRolloutFn(EngineConfig config) {
+        return BitMctsRollout::simulateBit;
+    }
+
+    /**
      * Builds the {@link EngineResult} from a pre-warmed {@link MctsTree}.
      * Subclasses that control the iteration schedule themselves (e.g. adaptive budget)
      * can call this after running their own iteration logic.

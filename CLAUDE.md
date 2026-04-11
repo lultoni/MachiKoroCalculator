@@ -35,18 +35,20 @@ UI (React 19 SPA) --HTTP--> Interface --> Engines --> Calcs --> Core
 |-------|---------|----------------|
 | Core | `core/` | Game rules: state, cards, dice, income, turn order, win condition. No strategy. |
 | Calcs | `calcs/` | Reusable math: EV, ROI, variance, 11 advanced metrics. GameStateSampler, LuckAnalyzer, WinProbability. Stateless. |
-| Engines | `engine/` | Public API (SimulationEngine, EngineConfig, EngineResult, TurnPlan). |
-| | `engine/mcts/` | MctsV1 + 5 variants (A-E), tree nodes, rollout policies, support classes. |
-| | `engine/expectimax/` | ExpectimaxEngine. |
-| | `engine/flat/` | FlatMcEngine. |
-| | `engine/heuristic/` | HeuristicEvEngine. |
-| | `engine/creator/` | CreatorEngine (seeded FlatMC + CreatorScorer + CreatorRollout). |
+| Engines | `engine/` | Public API (SimulationEngine, EngineConfig, EngineResult, TurnPlan). Continuous thinking: ContinuousWorker, ContinuousEvaluator, Timekeeper, NavigationEvent. |
+| | `engine/mcts/` | MctsV1 + 5 variants (A-E), tree nodes, rollout policies, support classes. TreeNavigator, MctsContinuousWorker. |
+| | `engine/expectimax/` | ExpectimaxEngine, ExpectimaxContinuousWorker. |
+| | `engine/flat/` | FlatMcEngine, FlatMcContinuousWorker. |
+| | `engine/heuristic/` | HeuristicEvEngine, HeuristicContinuousWorker. |
+| | `engine/creator/` | CreatorEngine (seeded FlatMC + CreatorScorer + CreatorRollout), CreatorContinuousWorker. |
 | Interface | `iface/` | Engine registry (JSON), routing, result formatting. |
-| Server | `server/` | Java HTTP API (26 endpoints), session management, pre-computation. |
+| Server | `server/` | Java HTTP API (29 endpoints), session management, pre-computation. PlayerVsAiController, AiTurnResult. |
 | H2H | `h2h/` | Engine comparison: match runner, tournament, Glicko-2 ratings, sweep optimization, game logging. |
-| UI | `web/` | React 19 + TypeScript + Vite 8 + Recharts + Tailwind CSS 4. 19 components, 8 hooks, DE/EN. |
+| UI | `web/` | React 19 + TypeScript + Vite 8 + Recharts + Tailwind CSS 4. 21 components, 9 hooks, DE/EN. |
 
 **Engine classes (10 classes, 38 registry configs):** MctsV1 (base) + 5 variants (A-E) in `engine.mcts`, FlatMcEngine in `engine.flat`, HeuristicEvEngine in `engine.heuristic`, ExpectimaxEngine in `engine.expectimax`, CreatorEngine in `engine.creator`.
+
+**Continuous workers (5 classes):** MctsContinuousWorker, FlatMcContinuousWorker, CreatorContinuousWorker, ExpectimaxContinuousWorker, HeuristicContinuousWorker — all implement `ContinuousWorker`, driven by `ContinuousEvaluator` background thread.
 
 ## Build & Run
 
@@ -75,7 +77,7 @@ java -cp "out:src:gson-2.11.0.jar" h2h.TournamentMain --tier fast --games 50
 ## Testing Rules
 
 - **Never run the full test suite.** It takes minutes. Always use `--section "Name"` for only the sections relevant to your change.
-- 470+ assertions across 30 sections. Supports `--section` (substring, case-insensitive) and `--test` filters.
+- 486+ assertions across 31 sections. Supports `--section` (substring, case-insensitive) and `--test` filters.
 - After changing code, compile and run the relevant section(s). Assume unrelated sections pass.
 - If you changed code in multiple areas, run each relevant section separately.
 

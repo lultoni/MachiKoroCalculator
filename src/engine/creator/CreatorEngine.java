@@ -260,7 +260,8 @@ public final class CreatorEngine implements SimulationEngine {
         return totalRun;
     }
 
-    private void runSamples(CandidateOption candidate, int numSamples,
+    /** Package-private for use by {@link CreatorContinuousWorker}. */
+    void runSamples(CandidateOption candidate, int numSamples,
                             int nextPlayer, int perspective, BitRolloutFn rolloutFn) {
         if (candidate.isInstantWin) return;
         for (int i = 0; i < numSamples; i++) {
@@ -275,7 +276,8 @@ public final class CreatorEngine implements SimulationEngine {
     // Rollout policy selection
     // =====================================================================
 
-    private BitRolloutFn selectRolloutFn(EngineConfig config) {
+    /** Package-private for use by {@link CreatorContinuousWorker}. */
+    BitRolloutFn selectRolloutFn(EngineConfig config) {
         // Default: creator (BitCreatorRollout). H2H benchmarks (7.46) show CreatorRollout v3
         // matches or beats GreedyRollout across all opponents (+4% vs MCTS v1, +1% vs
         // heuristic-ev, tie vs Flat MC). CreatorRollout adds coverage bonus (portfolio
@@ -298,7 +300,8 @@ public final class CreatorEngine implements SimulationEngine {
     // Result construction
     // =====================================================================
 
-    private EngineResult buildResult(List<CandidateOption> candidates, int coins,
+    /** Package-private for use by {@link CreatorContinuousWorker}. */
+    EngineResult buildResult(List<CandidateOption> candidates, int coins,
                                      int iterationsUsed, long computeTimeMs,
                                      boolean usedMC, long phase1Ms) {
         List<EngineResult.Option> options = new ArrayList<>();
@@ -389,7 +392,8 @@ public final class CreatorEngine implements SimulationEngine {
     // Internal candidate holder
     // =====================================================================
 
-    private static final class CandidateOption {
+    /** Package-private for use by {@link CreatorContinuousWorker}. */
+    static final class CandidateOption {
         final Project card;
         final BitState postState;
         final int[] postSupply;

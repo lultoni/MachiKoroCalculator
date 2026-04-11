@@ -172,7 +172,8 @@ public final class FlatMcEngine implements SimulationEngine {
     // Option enumeration (BitState-native)
     // -------------------------------------------------------------------------
 
-    private List<CandidateOption> enumerateOptions(BitState bs, int[] supply, int playerIndex, int coins) {
+    /** Package-private for use by {@link FlatMcContinuousWorker}. */
+    List<CandidateOption> enumerateOptions(BitState bs, int[] supply, int playerIndex, int coins) {
         List<CandidateOption> candidates = new ArrayList<>();
 
         // Save option
@@ -256,7 +257,8 @@ public final class FlatMcEngine implements SimulationEngine {
     // Sampling
     // -------------------------------------------------------------------------
 
-    private void runSamples(CandidateOption candidate, int numSamples, int nextPlayer, int perspective) {
+    /** Package-private for use by {@link FlatMcContinuousWorker}. */
+    void runSamples(CandidateOption candidate, int numSamples, int nextPlayer, int perspective) {
         if (candidate.isInstantWin) return; // already scored 1.0
         for (int i = 0; i < numSamples; i++) {
             double result = BitMctsRollout.simulateBit(candidate.postState, candidate.postSupply,
@@ -270,7 +272,8 @@ public final class FlatMcEngine implements SimulationEngine {
     // Result construction
     // -------------------------------------------------------------------------
 
-    private EngineResult buildResult(List<CandidateOption> candidates, int coins, int n,
+    /** Package-private for use by {@link FlatMcContinuousWorker}. */
+    EngineResult buildResult(List<CandidateOption> candidates, int coins, int n,
                                      int iterationsUsed, long computeTimeMs) {
         List<EngineResult.Option> options = new ArrayList<>();
 
@@ -305,7 +308,8 @@ public final class FlatMcEngine implements SimulationEngine {
     // Internal candidate holder
     // -------------------------------------------------------------------------
 
-    private static final class CandidateOption {
+    /** Package-private for use by {@link FlatMcContinuousWorker}. */
+    static final class CandidateOption {
         final Project card;
         final BitState postState;
         final int[] postSupply;

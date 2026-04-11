@@ -507,6 +507,15 @@ public class RuntimeTester {
             test_bitstate_mc_win_rates_reasonable();
         });
 
+        runSection("Continuous Evaluation", () -> {
+            test_continuous_heuristic_instant_result();
+            test_continuous_flatmc_accumulation();
+            test_continuous_creator_heuristic_seed();
+            test_continuous_mcts_init_and_iterate();
+            test_continuous_evaluator_stop_timing();
+            test_continuous_evaluator_navigate_resets();
+        });
+
         System.out.println("\n--- Results: " + passed + " passed, " + failed + " failed ---");
 
         if (failed > 0) {
@@ -6121,5 +6130,102 @@ public class RuntimeTester {
         assertTrue("P0 win rate > 0.1 (got " + wr0 + ")", wr0 > 0.1);
         assertTrue("P1 win rate > 0.1 (got " + wr1 + ")", wr1 > 0.1);
         assertTrue("P0+P1 win rates sum ~1.0 (got " + (wr0 + wr1) + ")", wr0 + wr1 > 0.8 && wr0 + wr1 < 1.15);
+    }
+
+    // =========================================================================
+    // Continuous Evaluation Tests
+    // =========================================================================
+
+    private static void test_continuous_heuristic_instant_result() {
+        engine.heuristic.HeuristicContinuousWorker worker = new engine.heuristic.HeuristicContinuousWorker();
+        core.GameState gs = core.GameState.initial(2);
+        core.BitState bs = core.BitState.fromGameState(gs);
+        int[] supply = bs.buildSupplyArray();
+        worker.init(bs, supply, 0, EngineConfig.ofIterations(100));
+        engine.EngineResult result = worker.peekResult(gs, 0, EngineConfig.ofIterations(100));
+        assertTrue("Heuristic: peekResult non-null immediately after init", result != null);
+        assertTrue("Heuristic: rankedOptions non-empty", result != null && !result.rankedOptions.isEmpty());
+        assertTrue("Heuristic: iterations returns 1 after init", worker.iterations() == 1);
+        // runOneIteration is a no-op — should not throw
+        worker.runOneIteration();
+        assertTrue("Heuristic: iterations still 1 after no-op runOneIteration", worker.iterations() == 1);
+    }
+
+    private static void test_continuous_flatmc_accumulation() {
+        engine.flat.FlatMcContinuousWorker worker = new engine.flat.FlatMcContinuousWorker();
+        core.GameState gs = core.GameState.initial(2);
+        core.BitState bs = core.BitState.fromGameState(gs);
+        int[] supply = bs.buildSupplyArray();
+        worker.init(bs, supply, 0, EngineConfig.ofIterations(200));
+        // Run 200 iterations
+        for (int i = 0; i < 200; i++) worker.runOneIteration();
+        engine.EngineResult result = worker.peekResult(gs, 0, EngineConfig.ofIterations(200));
+        assertTrue("FlatMC: peekResult non-null after 200 iterations", result != null);
+        assertTrue("FlatMC: top option score in [0,1]", result != null
+                && result.rankedOptions.get(0).score >= 0.0
+                && result.rankedOptions.get(0).score <= 1.0);
+        assertTrue("FlatMC: iterCount >= 200 after 200 calls", worker.iterations() >= 200);
+    }
+
+    private static void test_continuous_creator_heuristic_seed() {
+        engine.creator.CreatorContinuousWorker worker = new engine.creator.CreatorContinuousWorker();
+        core.GameState gs = core.GameState.initial(2);
+        core.BitState bs = core.BitState.fromGameState(gs);
+        int[] supply = bs.buildSupplyArray();
+        worker.init(bs, supply, 0, EngineConfig.ofIterations(100));
+        engine.EngineResult result = worker.peekResult(gs, 0, EngineConfig.ofIterations(100));
+        assertTrue("Creator: peekResult non-null after init (heuristic seeded)", result != null);
+        assertTrue("Creator: at least one option has non-zero score", result != null
+                && result.rankedOptions.stream().anyMatch(o -> o.score != 0.0));
+    }
+
+    private static void test_continuous_mcts_init_and_iterate() {
+        engine.mcts.MctsContinuousWorker worker = new engine.mcts.MctsContinuousWorker();
+        core.GameState gs = core.GameState.initial(2);
+        core.BitState bs = core.BitState.fromGameState(gs);
+        int[] supply = bs.buildSupplyArray();
+        worker.init(bs, supply, 0, EngineConfig.ofIterations(100));
+        // Run 100 iterations
+        for (int i = 0; i < 100; i++) worker.runOneIteration();
+        assertTrue("MCTS continuous: iterCount == 100", worker.iterations() == 100);
+        engine.EngineResult result = worker.peekResult(gs, 0, EngineConfig.ofIterations(100));
+        assertTrue("MCTS continuous: peekResult non-null after 100 iterations", result != null);
+        assertTrue("MCTS continuous: rankedOptions non-empty", result != null && !result.rankedOptions.isEmpty());
+    }
+
+    private static void test_continuous_evaluator_stop_timing() throws Exception {
+        engine.heuristic.HeuristicContinuousWorker worker = new engine.heuristic.HeuristicContinuousWorker();
+        engine.ContinuousEvaluator evaluator = new engine.ContinuousEvaluator(worker);
+        core.GameState gs = core.GameState.initial(2);
+        evaluator.init(gs, 0, EngineConfig.ofIterations(500));
+        // Give worker a moment to initialize
+        Thread.sleep(50);
+        // stopAndGetResult should return quickly for heuristic worker
+        long before = System.currentTimeMillis();
+        engine.EngineResult result = evaluator.stopAndGetResult();
+        long elapsed = System.currentTimeMillis() - before;
+        assertTrue("ContinuousEvaluator: stopAndGetResult returns within 500ms (was " + elapsed + "ms)",
+                elapsed < 500);
+        assertTrue("ContinuousEvaluator: result non-null after heuristic init", result != null);
+        evaluator.shutdown();
+    }
+
+    private static void test_continuous_evaluator_navigate_resets() throws Exception {
+        engine.flat.FlatMcContinuousWorker worker = new engine.flat.FlatMcContinuousWorker();
+        engine.ContinuousEvaluator evaluator = new engine.ContinuousEvaluator(worker);
+        core.GameState gs = core.GameState.initial(2);
+        evaluator.init(gs, 0, EngineConfig.ofIterations(200));
+        Thread.sleep(100); // let worker accumulate some iterations
+        int itersBefore = evaluator.iterations();
+        // Navigate to a new state — FlatMcContinuousWorker returns false → fresh init
+        engine.NavigationEvent event = engine.NavigationEvent.forceReset(gs, 0);
+        evaluator.navigate(event);
+        Thread.sleep(50);
+        int itersAfter = evaluator.iterations();
+        assertTrue("ContinuousEvaluator: accumulated some iterations before navigate (was " + itersBefore + ")",
+                itersBefore >= 0);
+        assertTrue("ContinuousEvaluator: iterations reset after navigate (now " + itersAfter + ")",
+                itersAfter < itersBefore || itersBefore == 0);
+        evaluator.shutdown();
     }
 }

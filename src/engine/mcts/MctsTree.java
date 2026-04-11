@@ -244,7 +244,15 @@ public final class MctsTree {
     // Single iteration
     // -------------------------------------------------------------------------
 
-    private void runOneIteration() {
+    /**
+     * Runs a single MCTS iteration (select → expand → rollout → backpropagate).
+     * Exposed as public for use by {@link MctsContinuousWorker}, which drives the
+     * iteration loop externally and checks a stop flag between calls.
+     *
+     * <p>Does NOT increment {@link #iterationsPerformed}; callers that need the
+     * tree-level count should use {@link #runIterations} instead.
+     */
+    public void runOneIteration() {
         long t0, t1;
         MctsNode iterRoot = fullTurnRoot != null ? fullTurnRoot : root;
 
@@ -524,5 +532,63 @@ public final class MctsTree {
         int index = roll - minRoll;
         if (index < 0 || index >= children.size()) return null;
         return children.get(index);
+    }
+
+    // -------------------------------------------------------------------------
+    // Factory for continuous-thinking tree reconstruction
+    // -------------------------------------------------------------------------
+
+    /**
+     * Creates a new {@link MctsTree} that wraps an existing {@code newRoot} node
+     * (obtained via {@link TreeNavigator#navigate}) as its {@code fullTurnRoot}.
+     *
+     * <p>Used by {@link MctsContinuousWorker} after a successful tree navigation: the
+     * subtree below {@code newRoot} is preserved intact, and iterations continue from
+     * the new root position. The dummy {@link BuyDecisionNode} at {@link #root} is set
+     * to match {@code newRoot}'s state for API compatibility.
+     *
+     * @param newRoot            the navigated node to use as the full-turn root
+     * @param playerPerspective  the player whose win rate to maximise
+     * @param explorationConstant UCB1 C value
+     * @param rolloutFn          rollout strategy
+     * @param greedyBuySelection if true, BuyDecisionNode uses greedy selection
+     * @return a new MctsTree whose fullTurnRoot is {@code newRoot}
+     */
+    public static MctsTree withExistingRoot(MctsNode newRoot, int playerPerspective,
+                                             double explorationConstant, BitRolloutFn rolloutFn,
+                                             boolean greedyBuySelection) {
+        int activePlayer = extractActivePlayer(newRoot);
+        int nextPlayer   = (activePlayer + 1) % newRoot.state.getNumPlayers();
+        // Dummy root for API compatibility (fullTurnRoot drives actual iterations)
+        BuyDecisionNode dummyRoot = new BuyDecisionNode(
+                newRoot.state, newRoot.supply, null, activePlayer, nextPlayer);
+        return new MctsTree(dummyRoot, newRoot, playerPerspective,
+                explorationConstant, rolloutFn, greedyBuySelection);
+    }
+
+    /**
+     * Private constructor used by {@link #withExistingRoot}: accepts pre-built root nodes.
+     */
+    private MctsTree(BuyDecisionNode dummyRoot, MctsNode fullTurnRoot,
+                     int playerPerspective, double explorationConstant,
+                     BitRolloutFn rolloutFn, boolean greedyBuySelection) {
+        this.explorationConstant = explorationConstant;
+        this.playerPerspective   = playerPerspective;
+        this.activePlayer        = extractActivePlayer(fullTurnRoot);
+        this.rolloutFn           = rolloutFn;
+        this.greedyBuySelection  = greedyBuySelection;
+        this.root                = dummyRoot;
+        this.fullTurnRoot        = fullTurnRoot;
+    }
+
+    /** Extracts the active player index from a node (handles all node types). */
+    private static int extractActivePlayer(MctsNode node) {
+        if (node instanceof DiceChoiceNode dc) return dc.activePlayer;
+        if (node instanceof ChanceNode cn)     return cn.activePlayer;
+        if (node instanceof FunkturmNode fn)   return fn.activePlayer;
+        if (node instanceof BürohausNode bn)   return bn.activePlayer;
+        if (node instanceof BuyDecisionNode bd) return bd.activePlayer;
+        // Fallback: player 0
+        return 0;
     }
 }

@@ -5,6 +5,7 @@ import { useLocale } from '../i18n/useLocale';
 import { useEngine } from '../hooks/useEngine';
 import { useRollPreview } from '../hooks/useRollPreview';
 import { useInsights } from '../hooks/useInsights';
+import { usePlayerVsAi } from '../hooks/usePlayerVsAi';
 import type { UseSessionReturn } from '../hooks/useSession';
 import type { Settings } from '../hooks/useSettings';
 import type { UseHoverReturn } from '../hooks/useHover';
@@ -22,6 +23,7 @@ import { BürohausModal } from './BürohausModal';
 import { SettingsScreen } from './SettingsScreen';
 import { SaveLoadMenu } from './SaveLoadMenu';
 import { DecisionReview } from './DecisionReview';
+import { PlayerVsAiPanel, AiThinkingIndicator, AiTurnReveal } from './PlayerVsAiPanel';
 
 interface Props {
   session: UseSessionReturn;
@@ -35,6 +37,7 @@ export function GameScreen({ session, settings, updateSettings, projects, hover 
   const { t } = useLocale();
   const s = session.session!;
   const engine = useEngine();
+  const pvai = usePlayerVsAi();
 
   // Dice selection state
   const [die1, setDie1] = useState<number | null>(null);
@@ -48,6 +51,7 @@ export function GameScreen({ session, settings, updateSettings, projects, hover 
 
   const activePlayer = s.state.players[s.nextPlayerIndex];
   const isUserTurn = s.nextPlayerIndex === settings.userPlayerIndex;
+  const isAiTurn = pvai.pvaiActive && s.nextPlayerIndex === pvai.aiPlayerIndex;
   const canUse2d6 = activePlayer.ownedIds.includes('bahnhof');
 
   // Insights for opponent turns
@@ -169,6 +173,15 @@ export function GameScreen({ session, settings, updateSettings, projects, hover 
       }
     }, 100);
   }, [session, engine, settings]);
+
+  // AI turn handler — request pre-computed result from continuous engine
+  const handleRequestAiTurn = useCallback(async () => {
+    const updatedSession = await pvai.requestAiTurn();
+    if (updatedSession) {
+      // Session was updated server-side by executeAiTurn; sync local state
+      await session.refresh();
+    }
+  }, [pvai, session]);
 
   // Popup swap handler — sets pending swap and closes popup
   const handleBürohausPopupSwap = useCallback((req: BürohausRequest) => {
@@ -443,6 +456,25 @@ export function GameScreen({ session, settings, updateSettings, projects, hover 
                 />
               )}
             </>
+          ) : isAiTurn ? (
+            /* AI's turn — show thinking indicator + request button */
+            <div className="space-y-4">
+              {pvai.aiThinking && <AiThinkingIndicator />}
+              {(pvai.animating || pvai.lastAiTurn) && (
+                <AiTurnReveal pvai={pvai} projects={projects.projects} language={settings.language} />
+              )}
+              {!pvai.animating && !pvai.aiThinking && (
+                <div className="bg-machi-surface rounded-xl border border-machi-border p-4 text-center">
+                  <button
+                    className="px-6 py-2 rounded-lg font-semibold bg-machi-accent text-machi-bg hover:brightness-110 transition-all disabled:opacity-50"
+                    onClick={handleRequestAiTurn}
+                    disabled={session.loading}
+                  >
+                    {session.loading ? '...' : 'Show AI Turn'}
+                  </button>
+                </div>
+              )}
+            </div>
           ) : (
             /* Opponent turn tracking + insights */
             <div className="space-y-4">
@@ -618,6 +650,16 @@ export function GameScreen({ session, settings, updateSettings, projects, hover 
                 );
               })}
           </div>
+
+          {/* Player vs AI panel (bottom of right sidebar) */}
+          <PlayerVsAiPanel
+            pvai={pvai}
+            projects={projects.projects}
+            language={settings.language}
+            playerNames={s.state.players.map(p => p.name)}
+            onSetup={(_engineId, _aiIdx, _minMs) => { /* already handled by pvai.startPvAi */ }}
+            onStop={() => pvai.stopPvAi()}
+          />
         </aside>
       </div>
 

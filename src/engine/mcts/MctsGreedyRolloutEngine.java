@@ -43,4 +43,9 @@ public final class MctsGreedyRolloutEngine extends MctsV1Engine {
         return new MctsTree(bs, supply, activePlayer, playerPerspective,
                 explorationConstant, BitGreedyRollout::simulateBit, false, true);
     }
+
+    @Override
+    protected BitRolloutFn buildRolloutFn(engine.EngineConfig config) {
+        return BitGreedyRollout::simulateBit;
+    }
 }

@@ -356,3 +356,29 @@ export interface SweepRun {
   trials: SweepTrial[];
   totalTimeMs: number;
 }
+
+// ─── Player vs AI ─────────────────────────────────────────────────────────
+
+export interface PvAiStartRequest {
+  engineId?: string;
+  aiPlayerIndex?: number;
+  minThinkTimeMs?: number;
+  timeBudgetMs?: number;
+}
+
+export interface AiTurnResult {
+  diceCount: 1 | 2;
+  rollTotal: number;
+  isDoubles: boolean;
+  coinDeltas: number[];
+  funkturmKeep: boolean | null;
+  rerollTotal: number | null;
+  rerollIsDoubles: boolean | null;
+  bürohausOwnCardId: string | null;
+  bürohausOppCardId: string | null;
+  bürohausOppPlayer: number | null;
+  purchasedCardId: string | null;
+  iterationsUsed: number;
+  thinkTimeMs: number;
+  session?: SessionJson;
+}

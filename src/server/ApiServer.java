@@ -32,6 +32,9 @@ import java.util.concurrent.Executors;
  *   <li>{@code GET  /api/session/saves}       — list saved .mkoro files</li>
  *   <li>{@code POST /api/session/from-snapshot} — create session from mid-game state</li>
  *   <li>{@code GET  /api/session/insights}    — position insights for the assistant panel</li>
+ *   <li>{@code POST /api/session/pvai/start}       — activate Player-vs-AI continuous thinking</li>
+ *   <li>{@code POST /api/session/pvai/human-turn}  — human lock-in event; navigate engine</li>
+ *   <li>{@code GET  /api/session/pvai/ai-turn}     — block until think time elapses; return AI decision</li>
  *   <li>{@code POST /api/h2h/start}             — start H2H match in background</li>
  *   <li>{@code GET  /api/h2h/status/{matchId}}  — match progress</li>
  *   <li>{@code GET  /api/h2h/results}           — all completed matches (summary)</li>
@@ -109,6 +112,11 @@ public final class ApiServer {
         httpServer.createContext("/api/session/saves",         new SessionSavesListHandler(sessionManager));
         httpServer.createContext("/api/session/from-snapshot", new SessionFromSnapshotHandler(sessionManager));
         httpServer.createContext("/api/session/insights",      new SessionInsightsHandler(sessionManager));
+
+        // Player-vs-AI endpoints
+        httpServer.createContext("/api/session/pvai/start",      new PvAiStartHandler(sessionManager));
+        httpServer.createContext("/api/session/pvai/human-turn", new PvAiHumanTurnHandler(sessionManager));
+        httpServer.createContext("/api/session/pvai/ai-turn",    new PvAiAiTurnHandler(sessionManager));
 
         // H2H engine testing endpoints
         H2hHandler h2hHandler = new H2hHandler(orchestrator, h2hStore);

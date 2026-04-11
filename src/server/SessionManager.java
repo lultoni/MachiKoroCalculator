@@ -27,6 +27,12 @@ public final class SessionManager {
     private final ArrayList<JsonObject> engineSnapshots = new ArrayList<>();
 
     /**
+     * Player-vs-AI controller for continuous engine thinking.
+     * Non-null only while PvAI mode is active.
+     */
+    private PlayerVsAiController pvaiController;
+
+    /**
      * @param savesDir directory where .mkoro save files are stored
      */
     public SessionManager(Path savesDir) {
@@ -39,10 +45,22 @@ public final class SessionManager {
     /**
      * Replaces the active session. Pass {@code null} to clear it.
      * Also clears any stored engine snapshots (new game = fresh review data).
+     * If PvAI mode is active, stops it.
      */
     public synchronized void setSession(GameSession s) {
         this.activeSession = s;
         this.engineSnapshots.clear();
+        if (pvaiController != null && pvaiController.isActive()) {
+            pvaiController.stop();
+        }
+    }
+
+    /** Returns the Player-vs-AI controller (lazily created on first access). */
+    public synchronized PlayerVsAiController getPvaiController() {
+        if (pvaiController == null) {
+            pvaiController = new PlayerVsAiController(this);
+        }
+        return pvaiController;
     }
 
     /** Returns the configured saves directory (may not exist yet on disk). */

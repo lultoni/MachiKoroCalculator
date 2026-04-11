@@ -42,6 +42,14 @@ Implementation history: what was built, why, and which design decisions were mad
 - Events summary panel removed; doubles/Funkturm/Bürohaus counts moved into per-player stats panels.
 - Game-wide `doublesCount/funkturmCount/bürohausCount` changed to per-player arrays in `computeInsights`.
 
+**wrPerRoll dice-mode mismatch fix:**
+- The 2d6 panel was incorrectly reading the 6-value 1d6 `wrPerRoll` array, mapping 1d6 roll-1 WR to 2d6 roll-2 slot, etc. Fix: the panel validates array length (11 for 2d6, 6 for 1d6) before indexing.
+
+**Luck mode setting:**
+- Added `luckUseMc` to `Settings` (default `true`) with a toggle in SettingsScreen ("MC" vs "Heuristic").
+- `PvAiSaveHandler` now accepts `luckUseMc` in the save request body and passes it to `LuckAnalyzer.computeRollLuck`. H2H already had per-match control.
+- Heuristic mode (instant, ~0.23 MAE) gives less noisy luck values globally but can produce cliff artifacts in endgame positions where landmark affordability thresholds cause non-linear WR jumps. Use MC for trusted analysis; heuristic for fast preview.
+
 ---
 
 

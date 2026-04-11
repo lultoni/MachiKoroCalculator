@@ -24,6 +24,7 @@ import { SaveLoadMenu } from './SaveLoadMenu';
 import { DecisionReview } from './DecisionReview';
 import { AiThinkingIndicator, AiTurnReveal } from './PlayerVsAiPanel';
 import type { UsePvAiReturn } from '../hooks/usePlayerVsAi';
+import { PvAiBoardScreen } from './PvAiBoardScreen';
 
 interface Props {
   session: UseSessionReturn;
@@ -242,6 +243,18 @@ export function GameScreen({ session, settings, updateSettings, projects, hover,
           )}
         </div>
       </div>
+    );
+  }
+
+  // PvAI mode → dedicated board screen
+  if (pvai.pvaiActive) {
+    return (
+      <PvAiBoardScreen
+        session={session}
+        settings={settings}
+        projects={projects}
+        pvai={pvai}
+      />
     );
   }
 

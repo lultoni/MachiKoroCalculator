@@ -23,7 +23,7 @@ const PIP_POSITIONS: Record<number, [number, number][]> = {
   6: [[0, 0], [0, 2], [1, 0], [1, 2], [2, 0], [2, 2]],
 };
 
-function DieFace({ value, selected, onClick }: { value: number; selected: boolean; onClick: () => void }) {
+export function DieFace({ value, selected, onClick }: { value: number; selected: boolean; onClick: () => void }) {
   const pips = PIP_POSITIONS[value];
   return (
     <button

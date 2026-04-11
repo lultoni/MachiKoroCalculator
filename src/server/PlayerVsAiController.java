@@ -11,7 +11,6 @@ import engine.ContinuousEvaluator;
 import engine.ContinuousWorker;
 import engine.EngineConfig;
 import engine.EngineResult;
-import engine.NavigationEvent;
 import engine.TurnPlan;
 import engine.Timekeeper;
 import engine.creator.CreatorContinuousWorker;
@@ -32,8 +31,8 @@ import java.util.Random;
  *   <li>{@link #start} — called after session creation; picks a ContinuousWorker for the engine,
  *       creates ContinuousEvaluator + Timekeeper, kicks off thinking on the initial position.</li>
  *   <li>{@link #onHumanTurnComplete} — called after the human's Buy is applied to GameSession.
- *       Constructs a NavigationEvent and delivers it to the evaluator so thinking continues
- *       on the AI's upcoming position.</li>
+ *       Re-initialises the engine on the AI's upcoming position so thinking begins
+ *       immediately on the right state.</li>
  *   <li>{@link #executeAiTurn} — called when the frontend wants the AI's decision.
  *       Blocks for the remaining minThinkTimeMs, then retrieves the TurnPlan, rolls dice,
  *       navigates Funkturm/Bürohaus, applies the turn to the session, and returns the result.</li>
@@ -90,17 +89,27 @@ public final class PlayerVsAiController {
         timekeeper.setEngineTimeBudgetMs(config.timeBudgetMs);
         this.active = true;
 
-        // Start thinking on current position if it's already the AI's turn
-        GameState state = session.getState();
-        evaluator.init(state, aiPlayerIndex, config);
-        timekeeper.start(System.currentTimeMillis());
+        if (session.nextPlayerIndex() == aiPlayerIndex) {
+            // AI goes first — start thinking immediately on this position
+            evaluator.init(session.getState(), aiPlayerIndex, config);
+            timekeeper.start(System.currentTimeMillis());
+        }
+        // If human goes first, evaluator stays idle until onHumanTurnComplete()
     }
 
     /**
      * Called after the human player's turn has been applied to the session.
-     * Delivers a NavigationEvent so the engine navigates its tree to the AI's upcoming position.
+     * Initialises the engine on the AI's upcoming turn position and starts the
+     * think-time clock.
      *
-     * @param humanTurnRecord the TurnRecord just applied (contains roll, diceCount, isDoubles, etc.)
+     * <p>We always do a fresh {@code init()} here rather than {@code navigate()}.
+     * The engine was thinking on the initial position (AI's first turn) — not on the
+     * human's turn that just completed — so tree navigation would look for the human's
+     * roll/buy path inside the AI's turn tree, which is structurally wrong.
+     * After the AI's turn completes, the engine is re-started on the human's predicted
+     * next turn via the post-AI-turn {@code init()} at the bottom of {@link #executeAiTurn}.
+     *
+     * @param humanTurnRecord the TurnRecord just applied (contains roll, diceCount, etc.)
      */
     public synchronized void onHumanTurnComplete(TurnRecord humanTurnRecord) {
         if (!active) return;
@@ -108,8 +117,7 @@ public final class PlayerVsAiController {
         if (session == null) return;
 
         GameState newState = session.getState();
-        NavigationEvent event = buildNavigationEvent(newState, aiPlayerIndex, humanTurnRecord);
-        evaluator.navigate(event);
+        evaluator.init(newState, aiPlayerIndex, engineConfig);
         timekeeper.start(System.currentTimeMillis());
     }
 
@@ -192,11 +200,24 @@ public final class PlayerVsAiController {
             bürohausOppPlayer = plan.bürohausOppPlayer;
         }
 
-        // Determine purchase
+        // Determine purchase — null out WAIT_SENTINEL so TurnRecord treats it as save
         String purchasedCardId = null;
         Project purchase = plan.purchase;
         if (purchase != null && !calcs.RankEntry.WAIT_SENTINEL.getId().equals(purchase.getId())) {
             purchasedCardId = purchase.getId();
+        } else {
+            purchase = null; // treat as save for session.applyTurn
+        }
+
+        // Validate purchase affordability AFTER income is applied — engine evaluated pre-roll coins;
+        // red-card income can reduce the AI's coins, making the planned purchase unaffordable.
+        if (purchase != null) {
+            int coinsAfterIncome = Math.max(0, state.getPlayers()[aiPlayerIndex].getCoins()
+                    + coinDeltas[aiPlayerIndex]);
+            if (coinsAfterIncome < purchase.getCost()) {
+                purchase = null;
+                purchasedCardId = null;
+            }
         }
 
         // Apply turn to session
@@ -294,24 +315,6 @@ public final class PlayerVsAiController {
         int diceCount = hasBahnhof ? 2 : 1;
         return engine.SimulationEngine.staticPlanWithInstantWinPriority(
                 diceCount, result, state, aiPlayerIndex, 0L);
-    }
-
-    private NavigationEvent buildNavigationEvent(GameState newState, int targetPlayer,
-                                                  TurnRecord record) {
-        String purchasedCardId = record.bought != null
-                && !calcs.RankEntry.WAIT_SENTINEL.getId().equals(record.bought.getId())
-                ? record.bought.getId() : null;
-
-        String bürohausOwn = record.swappedAway != null ? record.swappedAway.getId() : null;
-        String bürohausOpp = record.swappedIn   != null ? record.swappedIn.getId()   : null;
-        Integer bürohausOppPlayer = record.swapOppPlayerIndex >= 0 ? record.swapOppPlayerIndex : null;
-
-        return new NavigationEvent(
-                newState, targetPlayer,
-                record.diceCount, record.roll, record.isDoubles,
-                null, null, null,   // Funkturm: not tracked in TurnRecord directly
-                bürohausOwn, bürohausOpp, bürohausOppPlayer,
-                purchasedCardId, false);
     }
 
     private int rollDice(int count) {

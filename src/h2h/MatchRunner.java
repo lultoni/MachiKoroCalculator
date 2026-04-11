@@ -287,6 +287,7 @@ public final class MatchRunner {
 
         // 4b. Compute per-roll luck (between final roll and income application)
         Double rollLuck = null, wrBeforeRoll = null, wrAfterRoll = null;
+        double[] wrPerRoll = null;
         if (matchConfig.computeLuck()) {
             LuckAnalyzer.RollLuck luck = LuckAnalyzer.computeRollLuck(
                     state, activePlayer, roll, diceCount == 2,
@@ -294,6 +295,7 @@ public final class MatchRunner {
             rollLuck = luck.luck();
             wrBeforeRoll = luck.expectedWr();
             wrAfterRoll = luck.wrAfterActual();
+            wrPerRoll = luck.wrPerRoll();
         }
 
         // 5. Apply roll income
@@ -373,7 +375,7 @@ public final class MatchRunner {
                 deltas, purchasedCardId, plan.purchaseWinRate, plan.scoreIsWinRate,
                 coinsAfterPurchase, bürohausSwap, bürohausActivated, funkturmRerolled,
                 plan.computeTimeMs, detail,
-                rollLuck, wrBeforeRoll, wrAfterRoll,
+                rollLuck, wrBeforeRoll, wrAfterRoll, wrPerRoll,
                 cardIncome, purchasedCardExpectedEv
         );
     }

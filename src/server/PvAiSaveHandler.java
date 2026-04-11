@@ -207,7 +207,7 @@ final class PvAiSaveHandler implements HttpHandler {
                     coinsAfterPurchase,
                     bürohausSwapStr, bürohausActivated,
                     false, 0L, null, /* funkturmRerolled, evaluateTimeMs, decisionDetail */
-                    rollLuck.luck(), rollLuck.expectedWr(), rollLuck.wrAfterActual(),
+                    rollLuck.luck(), rollLuck.expectedWr(), rollLuck.wrAfterActual(), rollLuck.wrPerRoll(),
                     cardIncome.isEmpty() ? null : cardIncome, purchasedCardExpectedEv
             );
             log.turns.add(turnLog);

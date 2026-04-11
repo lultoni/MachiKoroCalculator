@@ -265,6 +265,12 @@ export interface H2hTurnLog {
   rollLuck?: number | null;
   wrBeforeRoll?: number | null;
   wrAfterRoll?: number | null;
+  /**
+   * WR for each possible roll in ascending order.
+   * 1d6: 6 values [roll1..roll6]. 2d6: 11 values [roll2..roll12].
+   * Null when luck was not computed for this game.
+   */
+  wrPerRoll?: number[] | null;
   cardIncome?: Record<string, number[]> | null;
   purchasedCardExpectedEv?: number | null;
 }

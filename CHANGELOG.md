@@ -6,7 +6,45 @@ Implementation history: what was built, why, and which design decisions were mad
 
 ## Phase 7: Iteration
 
-### Continuous Thinking Engine Infrastructure (TODO #17c)
+### PvAI Save/History + Purple Income Fixes + Income-Only Unification
+
+**PvAI game save and history:**
+- `POST /api/session/pvai/save` replays the complete turn history, computing per-turn MC luck (200 sims) and heuristic win probability; writes a `PvAiGameRecord` to `data/pvai-games.json`.
+- `GET /api/session/pvai/games` returns summaries; `?full=true` returns full records; `?id=xxx` returns a single record by ID.
+- `PvAiGamesOverview` component lists saved games with outcome, engine, luck summary; clicking replays via `H2hGameReplay`.
+- "PvAI History" link added to the setup screen.
+- `PvAiSaveHandler` computes `cardIncome` (per-card attribution via `RollResolver.attributeIncomePerCard`) and `purchasedCardExpectedEv` (via `CardIncome.contextualCardEvPerRound`) so the Card Value Analysis section is fully populated in replays.
+
+**Purple income bug fix:**
+- `RollResolver.computeAllDeltasForRoll` and `attributeIncomePerCard` now correctly subtract coins from victims when Stadion (2 from each opponent) or Fernsehsender (5 from richest) fires. Previously treated as bank income.
+- `BitState.applyRollIncome` (new method) is the single authoritative income-without-swap implementation; `applyRoll` delegates to it then does the Bürohaus swap.
+- `ChanceNode.applyRollIncomeOnly` and `ExpectimaxEngine.applyRollIncomeOnly` now delegate to `BitState.applyRollIncome` — eliminating ~200 LOC of duplicated income logic.
+
+**Luck calculation fix:**
+- `GameSimulator.greedyBuyBit/boltzmannBuyBit` (and GameState equivalents) no longer skip buying Bahnhof when it is the player's 4th and final landmark. Previously, a player at 3 landmarks with no high-range cards would never complete games in MC simulation → endgame luck values were wildly wrong (near-0% WR when about to win).
+
+**Replay display fixes:**
+- Steal-type purple card losses (Stadion/Fernsehsender) no longer appear as negative income in the victim's Card Value table when both players own the card.
+- "Lost to red" label renamed to "Lost to opponents" (covers purple steal losses too).
+- Per-copy ROI values in the card table are individually colored (green/dim) instead of all copies sharing the first copy's color.
+
+### Roll Breakdown Table + Per-Roll Luck + UI Cleanup
+
+**Per-roll luck data (LuckAnalyzer → TurnLog → frontend):**
+- `LuckAnalyzer.RollLuck` now carries `double[] wrPerRoll` — WR for each possible roll (6 values for 1d6, 11 for 2d6), so the frontend can compute luck for every alternative roll, not just the actual one.
+- `TurnLog` gains `double[] wrPerRoll` field. `MatchRunner` and `PvAiSaveHandler` populate it from the `RollLuck` result.
+
+**Roll breakdown table in Game Insights:**
+- New section below the luck chart: 1d6 panel (33% width) and 2d6 panel (66% width, two-column layout for rolls 2-12), shown only when luck data is available.
+- Each row shows roll, probability, active-player income, opponent income, and luck value for every possible roll.
+- 2d6 panel only appears when the active player owns Bahnhof.
+- Income computed from card inventories using `income_base` per card. `GET /api/projects` now includes `income_base` computed via `CardIncome.get_I` (base values, no synergies).
+- Events summary panel removed; doubles/Funkturm/Bürohaus counts moved into per-player stats panels.
+- Game-wide `doublesCount/funkturmCount/bürohausCount` changed to per-player arrays in `computeInsights`.
+
+---
+
+
 
 **Engines now think continuously during the human's turn rather than just-in-time.** Instead of a ~200ms on-demand evaluation at turn start, each engine runs in a background thread accumulating 750K-1.5M iterations during the human's 30-60s deliberation. The human's "Buy" click is a lock-in event that navigates the engine's internal state. When the AI's turn arrives, it reveals its pre-computed decision step-by-step.
 

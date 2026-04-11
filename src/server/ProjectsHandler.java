@@ -4,6 +4,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
+import core.CardIncome;
 import core.Project;
 import core.ProjectLoader;
 
@@ -14,7 +15,12 @@ import java.util.ArrayList;
  * GET /api/projects — returns all 19 base-game cards.
  *
  * <p>Response: JSON array of project objects, each with:
- * {@code id, name_de, name_en, color, category, cost, activationRolls, isGrossprojekt}
+ * {@code id, name_de, name_en, color, category, cost, activationRolls, isGrossprojekt, income_base}
+ *
+ * <p>{@code income_base} is the base coin income per activation with no synergies:
+ * owner's perspective, no Einkaufszentrum, f_c=1, a_c=1, p_c=1, c=100, co=[2,2].
+ * For Markthalle it uses f_c=1 (one food card), Molkerei uses a_c=1, Möbelfabrik uses p_c=1.
+ * Red cards return the positive amount taken from the roller (negated for display).
  */
 final class ProjectsHandler implements HttpHandler {
 
@@ -43,6 +49,24 @@ final class ProjectsHandler implements HttpHandler {
             JsonArray rolls = new JsonArray();
             for (int r : p.getDice_activation()) rolls.add(r);
             obj.add("dice_activation", rolls);
+
+            // income_base: base income per activation (owner perspective, no synergy bonuses)
+            // Red cards: return the absolute amount taken (positive number)
+            int incomeBase = 0;
+            int[] activationRolls = p.getDice_activation();
+            if (activationRolls.length > 0) {
+                int r = activationRolls[0];
+                int raw = CardIncome.get_I(r, p.getId(), true, false, 1, 1, 1, 100, new int[]{2, 2});
+                if (raw == 0 && p.getColor().equals("rot")) {
+                    // Red: query from roller's side (oop=false) and negate
+                    int rollerCost = CardIncome.get_I(r, p.getId(), false, false, 1, 1, 1, 100, new int[]{2, 2});
+                    incomeBase = -rollerCost;  // positive = coins taken from roller
+                } else {
+                    incomeBase = raw;
+                }
+            }
+            obj.addProperty("income_base", incomeBase);
+
             arr.add(obj);
         }
 

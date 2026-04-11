@@ -89,6 +89,13 @@ public final class TurnLog {
     public final Double rollLuck;      // luck value (positive = lucky), null when luck not computed
     public final Double wrBeforeRoll;  // E[WR] across all possible rolls (pre-roll baseline)
     public final Double wrAfterRoll;   // WR after actual roll income applied
+    /**
+     * WR for each possible roll in ascending order.
+     * For 1d6: 6 values, index 0 = roll 1 ... index 5 = roll 6.
+     * For 2d6: 11 values, index 0 = roll 2 ... index 10 = roll 12.
+     * Null when luck not computed.
+     */
+    public final double[] wrPerRoll;
     /** Per-card income breakdown: cardId → int[playerCount] deltas. Null when not computed. */
     public final Map<String, int[]> cardIncome;
     /** Expected per-round EV of the purchased card at purchase time. Null when not computed or save. */
@@ -100,7 +107,7 @@ public final class TurnLog {
                    int coinsAfterPurchase, String bürohausSwap, boolean bürohausActivated,
                    boolean funkturmRerolled, long evaluateTimeMs,
                    DecisionDetail decisionDetail,
-                   Double rollLuck, Double wrBeforeRoll, Double wrAfterRoll,
+                   Double rollLuck, Double wrBeforeRoll, Double wrAfterRoll, double[] wrPerRoll,
                    Map<String, int[]> cardIncome, Double purchasedCardExpectedEv) {
         this.playerIndex = playerIndex;
         this.diceCount = diceCount;
@@ -119,8 +126,24 @@ public final class TurnLog {
         this.rollLuck = rollLuck;
         this.wrBeforeRoll = wrBeforeRoll;
         this.wrAfterRoll = wrAfterRoll;
+        this.wrPerRoll = wrPerRoll;
         this.cardIncome = cardIncome;
         this.purchasedCardExpectedEv = purchasedCardExpectedEv;
+    }
+
+    /** Constructor without wrPerRoll (defaults to null). */
+    public TurnLog(int playerIndex, int diceCount, int roll, boolean isDoubles,
+                   int[] coinDeltas, String purchasedCardId, double purchaseWinRate,
+                   boolean scoreIsWinRate,
+                   int coinsAfterPurchase, String bürohausSwap, boolean bürohausActivated,
+                   boolean funkturmRerolled, long evaluateTimeMs,
+                   DecisionDetail decisionDetail,
+                   Double rollLuck, Double wrBeforeRoll, Double wrAfterRoll,
+                   Map<String, int[]> cardIncome, Double purchasedCardExpectedEv) {
+        this(playerIndex, diceCount, roll, isDoubles, coinDeltas, purchasedCardId,
+                purchaseWinRate, scoreIsWinRate, coinsAfterPurchase, bürohausSwap,
+                bürohausActivated, funkturmRerolled, evaluateTimeMs, decisionDetail,
+                rollLuck, wrBeforeRoll, wrAfterRoll, null, cardIncome, purchasedCardExpectedEv);
     }
 
     /** Constructor without card income fields (defaults to null). */
@@ -134,7 +157,7 @@ public final class TurnLog {
         this(playerIndex, diceCount, roll, isDoubles, coinDeltas, purchasedCardId,
                 purchaseWinRate, scoreIsWinRate, coinsAfterPurchase, bürohausSwap,
                 bürohausActivated, funkturmRerolled, evaluateTimeMs, decisionDetail,
-                rollLuck, wrBeforeRoll, wrAfterRoll, null, null);
+                rollLuck, wrBeforeRoll, wrAfterRoll, null, null, null);
     }
 
     /** Legacy constructor without luck fields (defaults to null). */
@@ -169,7 +192,7 @@ public final class TurnLog {
                 swappedDeltas, purchasedCardId, purchaseWinRate, scoreIsWinRate,
                 coinsAfterPurchase, bürohausSwap, bürohausActivated, funkturmRerolled,
                 evaluateTimeMs, decisionDetail,
-                rollLuck, wrBeforeRoll, wrAfterRoll,
+                rollLuck, wrBeforeRoll, wrAfterRoll, wrPerRoll,
                 swappedCardIncome, purchasedCardExpectedEv
         );
     }

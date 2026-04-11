@@ -133,9 +133,9 @@ function computeInsights(game: H2hGameLog, playerCount: number) {
   const diceChoices1d6 = Array(playerCount).fill(0);
   const diceChoices2d6 = Array(playerCount).fill(0);
   const landmarkTurns: number[][] = Array.from({ length: playerCount }, () => []);
-  let doublesCount = 0;
-  let funkturmCount = 0;
-  let bürohausCount = 0;
+  const doublesCount = Array(playerCount).fill(0);
+  const funkturmCount = Array(playerCount).fill(0);
+  const bürohausCount = Array(playerCount).fill(0);
 
   for (const tn of game.turns) {
     const pi = tn.playerIndex;
@@ -163,9 +163,9 @@ function computeInsights(game: H2hGameLog, playerCount: number) {
     } else {
       saveTurns[pi]++;
     }
-    if (tn.isDoubles) doublesCount++;
-    if (tn.funkturmRerolled) funkturmCount++;
-    if (tn.bürohausSwap) bürohausCount++;
+    if (tn.isDoubles) doublesCount[pi]++;
+    if (tn.funkturmRerolled) funkturmCount[pi]++;
+    if (tn.bürohausSwap) bürohausCount[pi]++;
   }
 
   // Average income per turn
@@ -342,6 +342,140 @@ function cardChartColor(color?: string): string {
     case 'gelb': return '#EAB308';
     default: return '#94a3b8';
   }
+}
+
+/** Per-roll income breakdown for one turn. */
+interface RollBreakdownRow {
+  roll: number;
+  prob: number;   // probability [0,1]
+  /** Net coin change for the active player. */
+  activeIncome: number;
+  /** Net coin change for all opponents combined. */
+  oppIncome: number;
+  isActual: boolean;
+  luck: number | null;  // rollLuck for actual roll; null for alternatives
+}
+
+/**
+ * Compute the expected income for each possible roll given the current inventories and coin counts.
+ * Income follows simplified Machi Koro rules:
+ *   - Blue (blau): bank pays owner on every player's turn.
+ *   - Green (grün): bank pays owner only on owner's own turn.
+ *   - Red (rot): roller pays opponent owner (clamped to roller's coins) on opponent's turns.
+ *   - Purple (lila): active player only, roll 6. Stadion = +2 per opp, Fernsehsender = +5.
+ *     Bürohaus is a swap (no coin change); omitted here.
+ * Returns two tables: [1d6 rows, 2d6 rows].
+ */
+function computeRollBreakdown(
+  turnIdx: number,
+  turn: H2hTurnLog,
+  inventories: string[][][],
+  coinHistory: number[][],
+  byId: (id: string) => ProjectDef | undefined,
+  playerCount: number,
+): { rows1d6: RollBreakdownRow[]; rows2d6: RollBreakdownRow[] } {
+  const activePlayer = turn.playerIndex;
+
+  // Inventory BEFORE this turn (end of previous turn), or starters if first turn
+  const inv = turnIdx > 0
+    ? inventories[turnIdx - 1]
+    : Array.from({ length: playerCount }, () => [...STARTER_CARDS]);
+
+  // Coins at START of this turn = end of previous turn = coinHistory[turnIdx - 1]
+  // For first turn (turnIdx = 0), starting coins = 3 per player
+  const coinsAtStart = turnIdx > 0
+    ? coinHistory[turnIdx - 1]
+    : Array(playerCount).fill(3);
+  const activeCoins = Math.max(0, coinsAtStart[activePlayer] ?? 3);
+
+  function buildRows(twoDice: boolean): RollBreakdownRow[] {
+    const minRoll = twoDice ? 2 : 1;
+    const maxRoll = twoDice ? 12 : 6;
+    const rows: RollBreakdownRow[] = [];
+
+    for (let roll = minRoll; roll <= maxRoll; roll++) {
+      const prob = twoDice
+        ? (6 - Math.abs(roll - 7)) / 36
+        : 1 / 6;
+
+      let activeIncome = 0;
+      let oppIncome = 0;
+      let rollerCoinsLeft = activeCoins;
+
+      // Red: opponents' red cards paid by roller
+      for (let p = 0; p < playerCount; p++) {
+        if (p === activePlayer) continue;
+        for (const cardId of inv[p]) {
+          const proj = byId(cardId);
+          if (!proj || proj.color !== 'rot') continue;
+          if (!proj.dice_activation.includes(roll)) continue;
+          const actual = Math.min(proj.income_base, rollerCoinsLeft);
+          activeIncome -= actual;
+          rollerCoinsLeft -= actual;
+          oppIncome += actual;
+        }
+      }
+
+      // Blue: any player's turn, bank → owner
+      for (let p = 0; p < playerCount; p++) {
+        for (const cardId of inv[p]) {
+          const proj = byId(cardId);
+          if (!proj || proj.color !== 'blau') continue;
+          if (!proj.dice_activation.includes(roll)) continue;
+          if (p === activePlayer) activeIncome += proj.income_base;
+          else oppIncome += proj.income_base;
+        }
+      }
+
+      // Green: only on owner's own turn
+      for (const cardId of inv[activePlayer]) {
+        const proj = byId(cardId);
+        if (!proj || proj.color !== 'grün') continue;
+        if (!proj.dice_activation.includes(roll)) continue;
+        activeIncome += proj.income_base;
+      }
+
+      // Purple (lila): active player's own turn only
+      for (const cardId of inv[activePlayer]) {
+        const proj = byId(cardId);
+        if (!proj || proj.color !== 'lila') continue;
+        if (!proj.dice_activation.includes(roll)) continue;
+        if (cardId === 'bürohaus') continue; // swap, no net coin change
+        if (cardId === 'stadion') {
+          const steal = proj.income_base * (playerCount - 1);
+          activeIncome += steal;
+          oppIncome -= steal;
+        } else if (cardId === 'fernsehsender') {
+          activeIncome += proj.income_base;
+          oppIncome -= proj.income_base;
+        }
+      }
+
+      const isActual = roll === turn.roll && twoDice === (turn.diceCount === 2);
+      // Compute luck for this roll: wr(roll) - expectedWr
+      // wrPerRoll: index = roll - minRoll (0-based). expectedWr = wrBeforeRoll.
+      let luck: number | null = null;
+      if (turn.wrPerRoll && turn.wrBeforeRoll != null) {
+        const rollIdx = roll - (twoDice ? 2 : 1);
+        if (rollIdx >= 0 && rollIdx < turn.wrPerRoll.length) {
+          luck = turn.wrPerRoll[rollIdx] - turn.wrBeforeRoll;
+        }
+      } else if (isActual && turn.rollLuck != null) {
+        luck = turn.rollLuck;
+      }
+      rows.push({
+        roll,
+        prob,
+        activeIncome,
+        oppIncome,
+        isActual,
+        luck,
+      });
+    }
+    return rows;
+  }
+
+  return { rows1d6: buildRows(false), rows2d6: buildRows(true) };
 }
 
 interface CardValueEntry {
@@ -547,6 +681,13 @@ export function H2hGameReplay({ game, engines, matchId, projects, language, onBa
   const cardValueData = useMemo(
     () => hasCardIncome ? computeCardValueData(game, cardValuePlayer, inventories, projects.byId) : null,
     [game, cardValuePlayer, inventories, projects, hasCardIncome],
+  );
+
+  const rollBreakdown = useMemo(
+    () => turn
+      ? computeRollBreakdown(turnIdx, turn, inventories, coinHistory, projects.byId, playerCount)
+      : { rows1d6: [], rows2d6: [] },
+    [turnIdx, turn, inventories, coinHistory, projects, playerCount],
   );
 
   // Compute own-turn and opponent-turn indices up to turnIdx (for Dice Fortune chart indicators)
@@ -953,6 +1094,15 @@ export function H2hGameReplay({ game, engines, matchId, projects, language, onBa
                   <div>{t('h2h.saves')}: <span className="font-mono">{insights.saveTurns[i]}</span></div>
                   <div>1d6: <span className="font-mono">{insights.diceChoices1d6[i]}</span></div>
                   <div>2d6: <span className="font-mono">{insights.diceChoices2d6[i]}</span></div>
+                  {insights.doublesCount[i] > 0 && (
+                    <div>{language === 'en' ? 'Doubles' : 'Pasch'}: <span className="font-mono">{insights.doublesCount[i]}</span></div>
+                  )}
+                  {insights.funkturmCount[i] > 0 && (
+                    <div>{projects.byId('funkturm')?.[nameKey] ?? (language === 'en' ? 'Radio Tower' : 'Funkturm')}: <span className="font-mono">{insights.funkturmCount[i]}</span></div>
+                  )}
+                  {insights.bürohausCount[i] > 0 && (
+                    <div>{projects.byId('bürohaus')?.[nameKey] ?? (language === 'en' ? 'Business Center' : 'Bürohaus')}: <span className="font-mono">{insights.bürohausCount[i]}</span></div>
+                  )}
                   {insights.landmarkTurns[i].length > 0 && (
                     <div className="col-span-2 mt-1 text-machi-yellow/80">
                       {language === 'en' ? 'Landmarks' : 'Großprojekte'}: {insights.landmarkTurns[i].map((t: number) => `T${t}`).join(', ')}
@@ -1027,7 +1177,7 @@ export function H2hGameReplay({ game, engines, matchId, projects, language, onBa
                   )}
                 </div>
 
-                {/* 6b. Luck-over-time chart */}
+                {/* 6b. Luck-over-time chart (full width) */}
                 <div className="bg-machi-bg rounded-lg p-3 text-xs mb-3">
                   <div className="text-machi-text-dim mb-2 font-semibold">{t('h2h.luckOverTime')}</div>
                   <ResponsiveContainer width="100%" height={200}>
@@ -1051,22 +1201,114 @@ export function H2hGameReplay({ game, engines, matchId, projects, language, onBa
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
+
+                {/* 6e. Roll breakdown: 1d6 (33%) + 2d6 (66%) side by side, below luck chart */}
+                {turn && (() => {
+                  const activeInv = turnIdx > 0 ? inventories[turnIdx - 1] : Array.from({ length: playerCount }, () => [...STARTER_CARDS]);
+                  const hasBahnhof = activeInv[turn.playerIndex]?.includes('bahnhof') ?? false;
+                  const { rows1d6, rows2d6 } = rollBreakdown;
+                  const actualIs2d6 = turn.diceCount === 2;
+                  const pColor = turn.playerIndex === 0 ? 'text-machi-accent' : 'text-fuchsia-400';
+
+                  // Compact table for a set of rows; for 2d6 splits into two sub-columns
+                  function RollTableRows({ rows, showLuck }: { rows: RollBreakdownRow[]; showLuck: boolean }) {
+                    return (
+                      <>
+                        {rows.map((row) => (
+                          <tr key={`${row.roll}-${row.isActual}`} className={row.isActual ? 'bg-white/5' : ''}>
+                            <td className={`pr-1 py-px whitespace-nowrap ${row.isActual ? 'font-bold text-machi-text' : 'text-machi-text-dim'}`}>
+                              {row.roll}{row.isActual ? '←' : ''}
+                            </td>
+                            <td className="text-right pr-1 text-machi-text-dim/60">
+                              {(row.prob * 100).toFixed(0)}%
+                            </td>
+                            <td className={`text-right pr-1 ${row.activeIncome > 0 ? 'text-green-400' : row.activeIncome < 0 ? 'text-red-400' : 'text-machi-text-dim/30'}`}>
+                              {row.activeIncome > 0 ? `+${row.activeIncome}` : row.activeIncome === 0 ? '—' : `${row.activeIncome}`}
+                            </td>
+                            <td className={`text-right pr-1 ${row.oppIncome > 0 ? 'text-green-400' : row.oppIncome < 0 ? 'text-red-400' : 'text-machi-text-dim/30'}`}>
+                              {row.oppIncome > 0 ? `+${row.oppIncome}` : row.oppIncome === 0 ? '—' : `${row.oppIncome}`}
+                            </td>
+                            {showLuck && (
+                              <td className={`text-right ${
+                                row.luck != null
+                                  ? row.luck > 0.02 ? 'text-green-400' : row.luck < -0.02 ? 'text-red-400' : 'text-machi-text-dim/60'
+                                  : 'text-machi-text-dim/30'
+                              }`}>
+                                {row.luck != null ? `${row.luck >= 0 ? '+' : ''}${(row.luck * 100).toFixed(1)}%` : '·'}
+                              </td>
+                            )}
+                          </tr>
+                        ))}
+                      </>
+                    );
+                  }
+
+                  function TableHead({ showLuck }: { showLuck: boolean }) {
+                    return (
+                      <thead>
+                        <tr className="text-machi-text-dim/50">
+                          <th className="text-left pb-0.5 pr-1">#</th>
+                          <th className="text-right pb-0.5 pr-1">%</th>
+                          <th className={`text-right pb-0.5 pr-1 ${pColor}`}>P{turn!.playerIndex + 1}</th>
+                          <th className="text-right pb-0.5 pr-1">{language === 'en' ? 'Opp' : 'Geg'}</th>
+                          {showLuck && <th className="text-right pb-0.5">{language === 'en' ? 'Luck' : 'Glück'}</th>}
+                        </tr>
+                      </thead>
+                    );
+                  }
+
+                  const label = language === 'en'
+                    ? `Turn ${turnIdx + 1} — P${turn.playerIndex + 1}`
+                    : `Zug ${turnIdx + 1} — S${turn.playerIndex + 1}`;
+
+                  return (
+                    <div className="flex gap-3 mb-3 text-[10px] font-mono">
+                      {/* 1d6 panel (1/3 width) */}
+                      <div className="bg-machi-bg rounded-lg p-3 flex-none" style={{ width: '33%' }}>
+                        <div className="text-machi-text-dim mb-1.5 font-semibold text-[10px]">
+                          {label}{' '}
+                          <span className="text-machi-text-dim/60 font-normal">1d6</span>
+                          {!actualIs2d6 && <span className="ml-1 text-machi-accent text-[9px]">←</span>}
+                        </div>
+                        <table className="w-full" style={{ borderSpacing: 0 }}>
+                          <TableHead showLuck={rows1d6.some(r => r.luck !== null)} />
+                          <tbody>
+                            <RollTableRows rows={rows1d6} showLuck={rows1d6.some(r => r.luck !== null)} />
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* 2d6 panel (2/3 width), only shown when Bahnhof owned */}
+                      {hasBahnhof && (
+                        <div className="bg-machi-bg rounded-lg p-3 flex-1">
+                          <div className="text-machi-text-dim mb-1.5 font-semibold text-[10px]">
+                            {label}{' '}
+                            <span className="text-machi-text-dim/60 font-normal">2d6</span>
+                            {actualIs2d6 && <span className="ml-1 text-machi-accent text-[9px]">←</span>}
+                          </div>
+                          {/* Two sub-columns: rolls 2-7 left, 8-12 right */}
+                          <div className="grid grid-cols-2 gap-x-3">
+                            <table style={{ borderSpacing: 0 }}>
+                              <TableHead showLuck={rows2d6.some(r => r.luck !== null)} />
+                              <tbody>
+                                <RollTableRows rows={rows2d6.slice(0, 6)} showLuck={rows2d6.some(r => r.luck !== null)} />
+                              </tbody>
+                            </table>
+                            <table style={{ borderSpacing: 0 }}>
+                              <TableHead showLuck={rows2d6.some(r => r.luck !== null)} />
+                              <tbody>
+                                <RollTableRows rows={rows2d6.slice(6)} showLuck={rows2d6.some(r => r.luck !== null)} />
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </>
             );
           })()}
-          {/* Game-wide events summary */}
-          <div className="bg-machi-bg rounded-lg p-3 text-xs mb-3">
-            <div className="text-machi-text-dim mb-1 font-semibold">{t('h2h.gameEvents')}</div>
-            <div className="flex flex-wrap gap-x-4 gap-y-0.5">
-              <div>{t('dice.doubles')}: <span className="font-mono">{insights.doublesCount}</span></div>
-              {insights.funkturmCount > 0 && (
-                <div>{projects.byId('funkturm')?.[nameKey] ?? (language === 'en' ? 'Radio Tower' : 'Funkturm')}: <span className="font-mono">{insights.funkturmCount}</span></div>
-              )}
-              {insights.bürohausCount > 0 && (
-                <div>{projects.byId('bürohaus')?.[nameKey] ?? (language === 'en' ? 'Business Center' : 'Bürohaus')}: <span className="font-mono">{insights.bürohausCount}</span></div>
-              )}
-            </div>
-          </div>
           {/* Dice Fortune */}
           <div className="bg-machi-bg rounded-lg p-3 text-xs mb-3">
             <div className="text-machi-text-dim mb-2 font-semibold">{t('h2h.diceFortune')}</div>

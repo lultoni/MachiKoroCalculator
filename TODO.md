@@ -44,12 +44,6 @@ Priorisiere in deiner Abarbeitung die wichtigsten Features. Erkenne Abhängigkei
 |---|------|------|-------|
 | 19 | 3/4 player H2H testing | Dev | Multi-player match runner + tournament support. Glicko-2 adjustments for >2 players. Separate per-player-count leaderboards + overall leaderboard. |
 
-## Prompt: Implement Continuous Thinking (#17c)
-
-Copy-paste this into a new Claude session to start implementation:
-
-> Read `CONTINUOUS-THINKING-SPEC.md` and `CLAUDE.md` fully. Then implement TODO #17c: the continuous thinking engine infrastructure. Follow the spec's 15-step implementation priority (Section 12). Start by entering plan mode and creating a concrete implementation plan based on the spec, then work through it step by step. Key points: (1) ContinuousWorker interface in `engine/`, (2) MctsContinuousWorker with TreeNavigator for MCTS tree persistence, (3) FlatMc/Creator/Expectimax/Heuristic workers, (4) ContinuousEvaluator wrapper with AtomicBoolean flag-based control, (5) Timekeeper with minThinkTimeMs, (6) Server-side PlayerVsAiController, (7) AI turn dramatic reveal endpoint, (8) Frontend Player-vs-AI mode, (9) Tests. The spec has all the detail you need — follow it closely but ask if anything is ambiguous.
-
 ## Scaling Roadmap
 
 Confirmed direction: **(1)** Perfect 2P engines + insights → **(2)** 3/4P adjustments, retraining, UI, narrator → **(3)** Expansion support.
@@ -89,6 +83,11 @@ Moved here when completed. Full history in CHANGELOG.md.
 | 17b | Time budget mode Phase 3 — Player-vs-AI TODOs (#14, #15) updated with continuous thinking dependencies and time budget infrastructure notes. Superseded by #17c spec. |
 | 17a | Time budget mode Phase 2 — Research & design complete. Discussed MCTS tree reuse vs. background re-eval vs. minThinkTimeMs wiring. Concluded: persistent MCTS tree with "letter on desk" flag-based control is correct approach. Full spec written in `CONTINUOUS-THINKING-SPEC.md`. Implementation task is #17c. |
 | 17b | Time budget mode Phase 3 — Player-vs-AI TODOs (#14, #15) updated with continuous thinking dependencies and time budget infrastructure notes. Superseded by #17c spec. |
+| — | PvAI game history: PvAiGameStore + PvAiGamesListHandler, save-on-finish with luck + cardIncome + wrPerRoll, PvAiGamesOverview list + H2hGameReplay viewer, "PvAI History" button in SetupScreen. |
+| — | Purple card income fixes: Stadion/Fernsehsender now correctly subtracts from victims in RollResolver.attributeIncomePerCard; steal losses excluded from victim's card value table. |
+| — | Roll breakdown table in Game Insights: per-roll income (1d6/2d6) with Bahnhof detection, per-roll luck via LuckAnalyzer.RollLuck.wrPerRoll (6 or 11 values). LuckAnalyzer extended; TurnLog + MatchRunner + PvAiSaveHandler wired. 1d6 panel (33%) + 2d6 panel (66%, two-column) below luck chart. Events section merged into per-player stats. income_base added to /api/projects. |
+| — | Endgame WR bug: GameSimulator Bahnhof skip now scoped to getLandmarkCount < 3 (four locations: greedyBuy, boltzmannBuy, greedyBuyBit, boltzmannBuyBit). |
+| — | Income code unification: BitState.applyRollIncome() is single source of truth; applyRoll() = applyRollIncome() + Bürohaus swap. ChanceNode and ExpectimaxEngine delegate to it. |
 
 | Old # | Task |
 |-------|------|

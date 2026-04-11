@@ -42,8 +42,15 @@ public final class LuckAnalyzer {
      * @param luck          actual WR minus expected WR (positive = lucky)
      * @param wrAfterActual win rate after the actual roll was applied
      * @param expectedWr    probability-weighted average WR across all possible rolls
+     * @param wrPerRoll     WR for each possible roll in order (rolls 1-6 for 1d6, rolls 2-12 for 2d6).
+     *                      Index 0 = roll 1 (1d6) or roll 2 (2d6), etc.
      */
-    public record RollLuck(double luck, double wrAfterActual, double expectedWr) {}
+    public record RollLuck(double luck, double wrAfterActual, double expectedWr, double[] wrPerRoll) {
+        /** Convenience constructor without wrPerRoll (backward compatibility). */
+        public RollLuck(double luck, double wrAfterActual, double expectedWr) {
+            this(luck, wrAfterActual, expectedWr, null);
+        }
+    }
 
     /**
      * Computes the per-roll luck for a specific dice outcome using Monte Carlo.
@@ -90,22 +97,26 @@ public final class LuckAnalyzer {
         double wrAfterActual = 0.0;
 
         if (usedTwoDice) {
-            // 2d6: enumerate sums 2-12
+            // 2d6: enumerate sums 2-12 (11 values)
+            double[] wrPerRoll = new double[11]; // index 0 = roll 2, index 10 = roll 12
             for (int r = 2; r <= 12; r++) {
                 double wr = wrAfterRoll(stateBeforeRoll, activePlayer, r, mcSims, useMc);
+                wrPerRoll[r - 2] = wr;
                 expectedWr += CardIncome.P2[r] * wr;
                 if (r == actualRoll) wrAfterActual = wr;
             }
+            return new RollLuck(wrAfterActual - expectedWr, wrAfterActual, expectedWr, wrPerRoll);
         } else {
-            // 1d6: enumerate 1-6
+            // 1d6: enumerate 1-6 (6 values)
+            double[] wrPerRoll = new double[6]; // index 0 = roll 1, index 5 = roll 6
             for (int r = 1; r <= 6; r++) {
                 double wr = wrAfterRoll(stateBeforeRoll, activePlayer, r, mcSims, useMc);
+                wrPerRoll[r - 1] = wr;
                 expectedWr += CardIncome.P1[r] * wr;
                 if (r == actualRoll) wrAfterActual = wr;
             }
+            return new RollLuck(wrAfterActual - expectedWr, wrAfterActual, expectedWr, wrPerRoll);
         }
-
-        return new RollLuck(wrAfterActual - expectedWr, wrAfterActual, expectedWr);
     }
 
     /**

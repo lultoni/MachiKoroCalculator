@@ -19,6 +19,7 @@ import { DieFace } from './DiceInterface';
 import { CardTooltip } from './CardTooltip';
 import { BürohausPanel } from './BürohausPanel';
 import { cardTextClass, categoryIconPath } from '../utils/cardDisplay';
+import * as api from '../api/client';
 
 const LANDMARK_IDS = ['bahnhof', 'einkaufszentrum', 'freizeitpark', 'funkturm'];
 
@@ -369,7 +370,7 @@ function CardMarketGrid({
                 <button
                   className={`rounded-lg border p-2 text-left flex flex-col gap-0.5 transition-all w-full ${
                     humanOwns
-                      ? 'border-machi-yellow/40 bg-machi-yellow/5 opacity-60 cursor-default'
+                      ? 'border-machi-yellow bg-machi-yellow/10 cursor-default'
                       : isHighlighted
                       ? 'border-machi-accent bg-machi-accent/10 ring-1 ring-machi-accent/50 scale-[1.04]'
                       : clickable
@@ -409,6 +410,90 @@ function CardMarketGrid({
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── Win Screen ─────────────────────────────────────────────────────────────
+
+interface WinScreenProps {
+  players: { name: string; coins: number }[];
+  winnerIndex: number;
+  humanPlayerIndex: number;
+  aiPlayerIndex: number;
+  engineId: string;
+  onNewGame: () => void;
+}
+
+function WinScreen({ players, winnerIndex, humanPlayerIndex, aiPlayerIndex, engineId, onNewGame }: WinScreenProps) {
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [savedId, setSavedId] = useState<string | null>(null);
+
+  const handleSave = useCallback(async () => {
+    setSaveState('saving');
+    try {
+      const res = await api.pvaiSave({
+        humanName: players[humanPlayerIndex].name,
+        aiPlayerIndex,
+        engineId,
+      });
+      setSavedId(res.id);
+      setSaveState('saved');
+    } catch {
+      setSaveState('error');
+    }
+  }, [players, humanPlayerIndex, aiPlayerIndex, engineId]);
+
+  const winner = players[winnerIndex];
+  const humanWon = winnerIndex === humanPlayerIndex;
+
+  return (
+    <div className="min-h-screen bg-machi-bg flex items-center justify-center">
+      <div className="bg-machi-surface rounded-xl border border-machi-border p-8 space-y-4 max-w-lg w-full text-center">
+        <h2 className={`text-2xl font-bold ${humanWon ? 'text-machi-yellow' : 'text-machi-text-dim'}`}>
+          {humanWon ? '🎉 You win!' : `${winner?.name ?? '?'} wins!`}
+        </h2>
+        <div className="space-y-2">
+          {players.map((p, i) => (
+            <div key={i} className={`flex justify-between px-3 py-1 rounded ${i === winnerIndex ? 'bg-machi-yellow/10' : ''}`}>
+              <span className="text-machi-text">{p.name}</span>
+              <span className="text-machi-text-dim">{p.coins}c</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Save game button */}
+        {saveState === 'idle' && (
+          <button
+            className="w-full py-2 rounded-lg font-semibold border border-machi-border text-machi-text hover:border-machi-accent hover:text-machi-accent transition-all"
+            onClick={handleSave}
+          >
+            Save Game
+          </button>
+        )}
+        {saveState === 'saving' && (
+          <div className="w-full py-2 text-center text-machi-text-dim text-sm animate-pulse">
+            Analysing game…
+          </div>
+        )}
+        {saveState === 'saved' && (
+          <div className="w-full py-2 text-center text-machi-accent text-sm">
+            Game saved {savedId ? `(#${savedId})` : ''}
+          </div>
+        )}
+        {saveState === 'error' && (
+          <div className="w-full py-2 text-center text-red-400 text-sm">
+            Save failed — check server log
+          </div>
+        )}
+
+        <button
+          className="w-full py-2 rounded-lg font-semibold bg-machi-accent text-machi-bg hover:brightness-110 transition-all"
+          onClick={onNewGame}
+        >
+          New Game
+        </button>
+      </div>
     </div>
   );
 }
@@ -698,27 +783,15 @@ export function PvAiBoardScreen({ session, settings, projects, pvai }: Props) {
 
   // ── Game over ─────────────────────────────────────────────────────────────
   if (s.finished) {
-    const winner = s.state.players[s.winnerIndex];
     return (
-      <div className="min-h-screen bg-machi-bg flex items-center justify-center">
-        <div className="bg-machi-surface rounded-xl border border-machi-border p-8 space-y-4 max-w-lg w-full text-center">
-          <h2 className="text-2xl font-bold text-machi-yellow">{winner?.name ?? '?'} wins!</h2>
-          <div className="space-y-2">
-            {s.state.players.map((p, i) => (
-              <div key={i} className={`flex justify-between px-3 py-1 rounded ${i === s.winnerIndex ? 'bg-machi-yellow/10' : ''}`}>
-                <span className="text-machi-text">{p.name}</span>
-                <span className="text-machi-text-dim">{p.coins}c</span>
-              </div>
-            ))}
-          </div>
-          <button
-            className="w-full py-2 rounded-lg font-semibold bg-machi-accent text-machi-bg hover:brightness-110 transition-all"
-            onClick={() => session.clearSession()}
-          >
-            New Game
-          </button>
-        </div>
-      </div>
+      <WinScreen
+        players={s.state.players}
+        winnerIndex={s.winnerIndex}
+        humanPlayerIndex={humanPlayerIndex}
+        aiPlayerIndex={pvai.aiPlayerIndex}
+        engineId={settings.engineId}
+        onNewGame={() => { pvai.stopPvAi(); session.clearSession(); }}
+      />
     );
   }
 
@@ -817,7 +890,11 @@ export function PvAiBoardScreen({ session, settings, projects, pvai }: Props) {
           <PlayerRow
             name={humanPlayer.name}
             coins={humanPlayer.coins}
-            coinDelta={lockedIn ? (preview.coinDeltas?.[humanPlayerIndex] ?? null) : null}
+            coinDelta={
+              isAiTurn
+                ? (aiRollCoinDeltas ? (aiRollCoinDeltas[humanPlayerIndex] ?? null) : null)
+                : (lockedIn ? (preview.coinDeltas?.[humanPlayerIndex] ?? null) : null)
+            }
             ownedIds={humanPlayer.ownedIds}
             isActive={isHumanTurn}
             gradient={HUMAN_GRADIENT}

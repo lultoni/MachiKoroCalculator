@@ -382,3 +382,24 @@ export interface AiTurnResult {
   thinkTimeMs: number;
   session?: SessionJson;
 }
+
+// ─── PvAI Game Records ───────────────────────────────────────────────────
+
+/** Summary of a saved PvAI game (no gameLog). Returned by GET /api/session/pvai/games. */
+export interface PvAiGameSummary {
+  id: string;
+  date: string;
+  engineId: string;
+  humanPlayerIndex: number;
+  winnerIndex: number;
+  totalTurns: number;
+  playerNames: string[];
+  finalCoins: number[];
+  landmarkCounts: number[];
+  totalLuck: number[];
+}
+
+/** Full saved PvAI game record including gameLog. Returned by GET /api/session/pvai/games?full=true. */
+export interface PvAiGameRecord extends PvAiGameSummary {
+  gameLog: H2hGameLog;
+}

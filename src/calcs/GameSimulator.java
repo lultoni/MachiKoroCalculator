@@ -181,7 +181,8 @@ public class GameSimulator {
 
         for (String lmId : LANDMARK_ORDER) {
             if (!player.hasProject(lmId)) {
-                if (lmId.equals("bahnhof") && !hasHighRangeCard(player)) break;
+                if (lmId.equals("bahnhof") && !hasHighRangeCard(player)
+                        && player.getLandmarkCount() < 3) break;
                 Project lm = ProjectLoader.getProject(lmId).orElse(null);
                 if (lm != null && player.getCoins() >= lm.getCost()) {
                     purchase(player, lm, supply);
@@ -216,7 +217,8 @@ public class GameSimulator {
 
         for (String lmId : LANDMARK_ORDER) {
             if (!player.hasProject(lmId)) {
-                if (lmId.equals("bahnhof") && !hasHighRangeCard(player)) break;
+                if (lmId.equals("bahnhof") && !hasHighRangeCard(player)
+                        && player.getLandmarkCount() < 3) break;
                 Project lm = ProjectLoader.getProject(lmId).orElse(null);
                 if (lm != null && player.getCoins() >= lm.getCost()) {
                     purchase(player, lm, supply);
@@ -385,8 +387,9 @@ public class GameSimulator {
         // Landmark-first: iterate in buy order, find first unowned
         for (int li : BitStateTranslator.LANDMARK_BUY_ORDER) {
             if (!bs.hasLandmark(activePlayer, li)) {
-                // Skip Bahnhof if no high-range card
-                if (li == BitStateTranslator.LM_BAHNHOF && !bs.hasHighRangeCard(activePlayer)) break;
+                // Skip Bahnhof if no high-range card, unless Bahnhof is the winning purchase
+                if (li == BitStateTranslator.LM_BAHNHOF && !bs.hasHighRangeCard(activePlayer)
+                        && bs.getLandmarkCount(activePlayer) < 3) break;
                 if (coins >= BitStateTranslator.LANDMARK_COSTS[li]) {
                     bs.setCoins(activePlayer, coins - BitStateTranslator.LANDMARK_COSTS[li]);
                     bs.setLandmark(activePlayer, li);
@@ -455,7 +458,8 @@ public class GameSimulator {
         // Landmark-first (same greedy logic)
         for (int li : BitStateTranslator.LANDMARK_BUY_ORDER) {
             if (!bs.hasLandmark(activePlayer, li)) {
-                if (li == BitStateTranslator.LM_BAHNHOF && !bs.hasHighRangeCard(activePlayer)) break;
+                if (li == BitStateTranslator.LM_BAHNHOF && !bs.hasHighRangeCard(activePlayer)
+                        && bs.getLandmarkCount(activePlayer) < 3) break;
                 if (coins >= BitStateTranslator.LANDMARK_COSTS[li]) {
                     bs.setCoins(activePlayer, coins - BitStateTranslator.LANDMARK_COSTS[li]);
                     bs.setLandmark(activePlayer, li);

@@ -18,6 +18,7 @@ interface Props {
   loading: boolean;
   error: string | null;
   onH2h?: () => void;
+  onPvAiHistory?: () => void;
 }
 
 const DEFAULT_NAMES = ['Alice', 'Bob', 'Carol', 'Dave'];
@@ -30,7 +31,7 @@ const ENGINE_OPTIONS = [
   { id: 'heuristic-ev', label: 'Heuristic (instant)' },
 ];
 
-export function SetupScreen({ onStart, onLoad, onFromSnapshot, loading, error, onH2h }: Props) {
+export function SetupScreen({ onStart, onLoad, onFromSnapshot, loading, error, onH2h, onPvAiHistory }: Props) {
   const { t, locale, setLocale } = useLocale();
   const [playerCount, setPlayerCount] = useState(2);
   const [names, setNames] = useState<string[]>([...DEFAULT_NAMES]);
@@ -84,6 +85,14 @@ export function SetupScreen({ onStart, onLoad, onFromSnapshot, loading, error, o
                 onClick={onH2h}
               >
                 {t('h2h.nav')}
+              </button>
+            )}
+            {onPvAiHistory && (
+              <button
+                className="text-sm text-machi-text-dim hover:text-machi-accent transition-colors"
+                onClick={onPvAiHistory}
+              >
+                PvAI History
               </button>
             )}
           </div>

@@ -9,9 +9,10 @@ import { SetupScreen } from './components/SetupScreen';
 import type { PvAiSetupConfig } from './components/SetupScreen';
 import { GameScreen } from './components/GameScreen';
 import { H2hOverview } from './components/H2hOverview';
+import { PvAiGamesOverview } from './components/PvAiGamesOverview';
 import type { CreateSessionRequest } from './api/types';
 
-type AppView = 'game' | 'h2h';
+type AppView = 'game' | 'h2h' | 'pvai-history';
 
 export default function App() {
   const session = useSession();
@@ -43,6 +44,11 @@ export default function App() {
     return <H2hOverview onBack={() => setView('game')} projects={projects} language={settings.language} />;
   }
 
+  // PvAI history view
+  if (view === 'pvai-history') {
+    return <PvAiGamesOverview onBack={() => setView('game')} projects={projects} language={settings.language} />;
+  }
+
   // No active session → setup screen
   if (!session.session) {
     return (
@@ -53,6 +59,7 @@ export default function App() {
         loading={session.loading}
         error={session.error}
         onH2h={() => setView('h2h')}
+        onPvAiHistory={() => setView('pvai-history')}
       />
     );
   }

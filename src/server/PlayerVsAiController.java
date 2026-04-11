@@ -49,6 +49,7 @@ public final class PlayerVsAiController {
     private ContinuousEvaluator evaluator;
     private Timekeeper timekeeper;
     private int aiPlayerIndex;
+    private String engineClassId;
     private EngineConfig engineConfig;
     private final Random rng = new Random();
 
@@ -80,6 +81,7 @@ public final class PlayerVsAiController {
         if (this.active) stop(); // clean up any prior instance
 
         this.aiPlayerIndex  = aiPlayerIndex;
+        this.engineClassId  = engineClassId;
         this.engineConfig   = config;
 
         ContinuousWorker worker = createWorker(engineClassId, config);
@@ -271,6 +273,9 @@ public final class PlayerVsAiController {
 
     /** Returns the AI's player seat index, or -1 if not active. */
     public int getAiPlayerIndex() { return active ? aiPlayerIndex : -1; }
+
+    /** Returns the engine class ID used by the AI, or null if not active. */
+    public String getEngineClassId() { return active ? engineClassId : null; }
 
     /**
      * Peeks at the current best result without stopping the worker.

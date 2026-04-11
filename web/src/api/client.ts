@@ -24,6 +24,8 @@ import type {
   SweepRun,
   PvAiStartRequest,
   AiTurnResult,
+  PvAiGameSummary,
+  PvAiGameRecord,
 } from './types';
 
 const BASE = '';  // same-origin; Vite proxy handles /api → :8080
@@ -233,3 +235,18 @@ export const pvaiHumanTurn = (req: ApplyTurnRequest & {
 
 export const pvaiAiTurn = () =>
   json<AiTurnResult>('/api/session/pvai/ai-turn');
+
+export const pvaiSave = (req: {
+  humanName: string;
+  aiPlayerIndex: number;
+  engineId: string;
+}) => post<{ id: string; date: string }>('/api/session/pvai/save', req);
+
+export const pvaiGames = () =>
+  json<PvAiGameSummary[]>('/api/session/pvai/games');
+
+export const pvaiGamesFull = () =>
+  json<PvAiGameRecord[]>('/api/session/pvai/games?full=true');
+
+export const pvaiGameById = (id: string) =>
+  json<PvAiGameRecord>(`/api/session/pvai/games?id=${encodeURIComponent(id)}`);

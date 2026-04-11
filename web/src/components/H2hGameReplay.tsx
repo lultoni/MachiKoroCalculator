@@ -17,6 +17,8 @@ interface Props {
   onBack: () => void;
 }
 
+/** Purple steal cards — victims should not have losses attributed to these in their own card table. */
+const STEAL_PURPLE_CARDS = new Set(['stadion', 'fernsehsender']);
 const LANDMARK_IDS = ['bahnhof', 'einkaufszentrum', 'freizeitpark', 'funkturm'];
 const LANDMARK_ABBR_DE = ['B', 'E', 'F', 'F'];
 const LANDMARK_ABBR_EN = ['T', 'S', 'A', 'R'];
@@ -401,8 +403,11 @@ function computeCardValueData(
 
       for (const [cardId, deltas] of Object.entries(tn.cardIncome)) {
         const delta = deltas[playerIdx] ?? 0;
-        // Only track income from cards this player actually owns
+        // Only track income from cards this player actually owns.
+        // For steal-type purple cards (Stadion/Fernsehsender), only count positive income
+        // (the roller's gain) — never attribute a victim's loss to that card in the victim's table.
         if (delta !== 0 && ownedSet.has(cardId)) {
+          if (delta < 0 && STEAL_PURPLE_CARDS.has(cardId) && tn.playerIndex !== playerIdx) continue;
           cumIncome[cardId] = (cumIncome[cardId] ?? 0) + delta;
           totalIncome[cardId] = (totalIncome[cardId] ?? 0) + delta;
         }
@@ -941,7 +946,7 @@ export function H2hGameReplay({ game, engines, matchId, projects, language, onBa
                 </div>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">
                   <div>{t('h2h.totalIncome')}: <span className="text-green-400 font-mono">{insights.totalIncome[i]}</span></div>
-                  <div>{language === 'en' ? 'Lost to red' : 'Rot verloren'}: <span className="text-red-400 font-mono">{insights.totalLost[i]}</span></div>
+                  <div>{language === 'en' ? 'Lost to opponents' : 'Verloren'}: <span className="text-red-400 font-mono">{insights.totalLost[i]}</span></div>
                   <div>{language === 'en' ? 'Avg/turn' : 'Ø/Zug'}: <span className="text-green-400/80 font-mono">{insights.avgIncome[i].toFixed(1)}</span></div>
                   <div>{language === 'en' ? 'Best turn' : 'Bester Zug'}: <span className="font-mono text-machi-yellow">{insights.biggestIncome[i]}</span></div>
                   <div>{t('h2h.purchases')}: <span className="font-mono">{insights.totalPurchases[i]}</span></div>
@@ -1317,7 +1322,7 @@ export function H2hGameReplay({ game, engines, matchId, projects, language, onBa
                         // Per-copy ROI: income proportional to turns, divided by unit cost
                         const totalCopyTurns = entry.perCopyTurns.reduce((s, t) => s + t, 0);
                         const perCopyRoi = showPerCopy && entry.unitCost > 0 && totalCopyTurns > 0
-                          ? entry.perCopyTurns.map(t => ((entry.totalIncome * t / totalCopyTurns) / entry.unitCost).toFixed(1) + 'x')
+                          ? entry.perCopyTurns.map(t => entry.totalIncome * t / totalCopyTurns / entry.unitCost)
                           : null;
                         return (
                           <tr key={entry.cardId} className="border-b border-machi-border/10 hover:bg-machi-surface/30">
@@ -1342,9 +1347,15 @@ export function H2hGameReplay({ game, engines, matchId, projects, language, onBa
                             <td className="text-right py-1 px-1 text-machi-text-dim">
                               {entry.incomePerTurn.toFixed(2)}
                             </td>
-                            <td className={`text-right py-1 px-1 ${entry.roi >= 1 ? 'text-green-400' : 'text-machi-text-dim'}`}>
+                            <td className="text-right py-1 px-1">
                               {entry.totalCost > 0
-                                ? (perCopyRoi ? perCopyRoi.join('/') : `${entry.roi.toFixed(1)}x`)
+                                ? perCopyRoi
+                                  ? perCopyRoi.map((roi, ri) => (
+                                      <span key={ri} className={roi >= 1 ? 'text-green-400' : 'text-machi-text-dim'}>
+                                        {roi.toFixed(1)}x{ri < perCopyRoi.length - 1 ? '/' : ''}
+                                      </span>
+                                    ))
+                                  : <span className={entry.roi >= 1 ? 'text-green-400' : 'text-machi-text-dim'}>{entry.roi.toFixed(1)}x</span>
                                 : '-'}
                             </td>
                             <td className="text-right py-1 px-1 text-machi-text-dim">

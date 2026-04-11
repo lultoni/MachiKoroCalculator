@@ -4612,15 +4612,14 @@ public class RuntimeTester {
                 + ", P1: " + sums[1] + " vs " + expected[1] + ")",
                 sums[0] == expected[0] && sums[1] == expected[1]);
 
-        // Check stadion specifically
-        // Note: computeAllDeltasForRoll returns the active player's gain from purple
-        // but does NOT decrement opponent deltas (opponent coin loss is implicit in the gain).
-        // attributeIncomePerCard mirrors this behavior.
+        // Check stadion specifically — P0 gains +2, P1 loses 2
         int[] stadionDeltas = perCard.get("stadion");
         assertTrue("Purple roll 6: stadion attribution exists", stadionDeltas != null);
         if (stadionDeltas != null) {
             assertTrue("Purple roll 6: stadion gives P0 +2 (was " + stadionDeltas[0] + ")",
                     stadionDeltas[0] == 2);
+            assertTrue("Purple roll 6: stadion takes 2 from P1 (was " + stadionDeltas[1] + ")",
+                    stadionDeltas[1] == -2);
         }
 
         // Purple should NOT fire on opponent's turn

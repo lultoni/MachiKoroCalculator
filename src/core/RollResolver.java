@@ -96,10 +96,41 @@ public final class RollResolver {
                 // with Harbor expansion (Flower Shop on 6, Loan Office on 5-6). Fix: use
                 // players[i].getCoins() + deltas[i] instead of players[i].getCoins().
                 int[] freshOpponentCoins = CardIncome.buildOpponentCoins(players, activePlayer);
-                deltas[activePlayer] += CardIncome.get_I(roll, p.getId(), true,
+                int gain = CardIncome.get_I(roll, p.getId(), true,
                         activeStats.hasEinkaufszentrum,
                         activeStats.foodCount, activeStats.animalCount, activeStats.productionCount,
                         active.getCoins() + deltas[activePlayer], freshOpponentCoins);
+                deltas[activePlayer] += gain;
+
+                // For "take from opponent" purple cards, also subtract from the affected opponent(s).
+                // get_I returns the roller's gain; we must mirror it as a loss for the source.
+                if (gain > 0 && roll == 6) {
+                    switch (p.getId()) {
+                        case "stadion" -> {
+                            // Takes 2 from EACH opponent
+                            for (int i = 0; i < n; i++) {
+                                if (i != activePlayer) {
+                                    int loss = -Math.min(2, players[i].getCoins());
+                                    deltas[i] += loss;
+                                }
+                            }
+                        }
+                        case "fernsehsender" -> {
+                            // Takes 5 from the RICHEST opponent
+                            int richest = 0;
+                            int richestIdx = -1;
+                            for (int i = 0; i < n; i++) {
+                                if (i != activePlayer && players[i].getCoins() > richest) {
+                                    richest = players[i].getCoins();
+                                    richestIdx = i;
+                                }
+                            }
+                            if (richestIdx >= 0) {
+                                deltas[richestIdx] -= Math.min(5, richest);
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -185,7 +216,7 @@ public final class RollResolver {
         }
 
         // Step 4: Purple income for the active player
-        // Uses same freshOpponentCoins logic as computeAllDeltasForRoll
+        // Coins are taken from opponent(s) — record both the gain and the opponent loss.
         int activeDeltaSoFar = 0;
         for (int[] d : result.values()) activeDeltaSoFar += d[activePlayer];
         for (Project p : active.getOwned_projects()) {
@@ -199,6 +230,26 @@ public final class RollResolver {
                     int[] deltas = result.computeIfAbsent(p.getId(), k -> new int[n]);
                     deltas[activePlayer] += income;
                     activeDeltaSoFar += income;
+                    // Also record per-opponent losses for "steal" purple cards
+                    if (roll == 6) {
+                        switch (p.getId()) {
+                            case "stadion" -> {
+                                for (int i = 0; i < n; i++) {
+                                    if (i != activePlayer)
+                                        deltas[i] -= Math.min(2, players[i].getCoins());
+                                }
+                            }
+                            case "fernsehsender" -> {
+                                int richest = 0, richestIdx = -1;
+                                for (int i = 0; i < n; i++) {
+                                    if (i != activePlayer && players[i].getCoins() > richest) {
+                                        richest = players[i].getCoins(); richestIdx = i;
+                                    }
+                                }
+                                if (richestIdx >= 0) deltas[richestIdx] -= Math.min(5, richest);
+                            }
+                        }
+                    }
                 }
             }
         }

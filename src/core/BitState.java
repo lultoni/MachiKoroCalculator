@@ -280,6 +280,24 @@ public final class BitState {
      * @param roll         dice total (1-12)
      */
     public void applyRoll(int activePlayer, int roll) {
+        applyRollIncome(activePlayer, roll);
+        // Bürohaus swap
+        if (roll == 6 && hasPurple(activePlayer, 2)) { // bürohaus = purple idx 2
+            executeGreedySwap(activePlayer);
+        }
+    }
+
+    /**
+     * Applies dice roll income to all players (Red → Blue → Green → Purple coins),
+     * WITHOUT performing the automatic Bürohaus greedy swap.
+     *
+     * <p>Used by MCTS {@code ChanceNode} and {@code ExpectimaxEngine} where Bürohaus
+     * is a separate decision node — not an automatic swap.
+     *
+     * @param activePlayer the rolling player
+     * @param roll         dice total (1-12)
+     */
+    public void applyRollIncome(int activePlayer, int roll) {
         int[] deltas = new int[numPlayers];
 
         boolean activeHasEKZ = hasLandmark(activePlayer, BitStateTranslator.LM_EKZ);
@@ -306,46 +324,38 @@ public final class BitState {
         // Step 3: Green income for active player only
         deltas[activePlayer] += computeGreenIncome(activePlayer, activeHasEKZ, roll);
 
-        // Step 4: Purple income for active player
-        // NOTE: RollResolver only adds to the active player's delta for purple cards —
-        // it does NOT subtract from opponents. This is a known simplification in the
-        // object-based model (purple cards treated as "from bank" in simulations).
-        // BitState must match this behavior for equivalence.
-        // Opponent coins below use getCoins(p) (base, pre-delta) to match RollResolver.
-        // This is correct for the base game because no red/blue/green card activates on
-        // roll 6. TODO(expansions): Harbor expansion adds Flower Shop (roll 6) and Loan
-        // Office (rolls 5-6) — when those are added, use getCoins(p)+deltas[p] here and
-        // fix RollResolver to match.
+        // Step 4: Purple income for active player (stadion, fernsehsender — roll 6 only)
+        // Coins are taken from opponent(s) and given to the active player.
         if (roll == 6) {
-            // Stadion
+            // Stadion: takes 2 from EACH opponent
             if (hasPurple(activePlayer, 0)) { // stadion = purple idx 0
-                int total = 0;
                 for (int p = 0; p < numPlayers; p++) {
                     if (p == activePlayer) continue;
-                    total += Math.min(2, getCoins(p));
+                    int loss = Math.min(2, getCoins(p));
+                    deltas[activePlayer] += loss;
+                    deltas[p]            -= loss;
                 }
-                deltas[activePlayer] += total;
             }
-            // Fernsehsender
+            // Fernsehsender: takes 5 from the RICHEST opponent
             if (hasPurple(activePlayer, 1)) { // fernsehsender = purple idx 1
                 int richest = 0;
+                int richestIdx = -1;
                 for (int p = 0; p < numPlayers; p++) {
                     if (p == activePlayer) continue;
-                    int oppCoins = getCoins(p);
-                    if (oppCoins > richest) richest = oppCoins;
+                    int c = getCoins(p);
+                    if (c > richest) { richest = c; richestIdx = p; }
                 }
-                deltas[activePlayer] += Math.min(5, richest);
+                if (richestIdx >= 0) {
+                    int loss = Math.min(5, richest);
+                    deltas[activePlayer] += loss;
+                    deltas[richestIdx]   -= loss;
+                }
             }
         }
 
         // Apply deltas with clamping
         for (int p = 0; p < numPlayers; p++) {
             setCoins(p, Math.max(0, getCoins(p) + deltas[p]));
-        }
-
-        // Bürohaus swap
-        if (roll == 6 && hasPurple(activePlayer, 2)) { // bürohaus = purple idx 2
-            executeGreedySwap(activePlayer);
         }
     }
 

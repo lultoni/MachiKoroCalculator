@@ -35,6 +35,8 @@ import java.util.concurrent.Executors;
  *   <li>{@code POST /api/session/pvai/start}       — activate Player-vs-AI continuous thinking</li>
  *   <li>{@code POST /api/session/pvai/human-turn}  — human lock-in event; navigate engine</li>
  *   <li>{@code GET  /api/session/pvai/ai-turn}     — block until think time elapses; return AI decision</li>
+ *   <li>{@code POST /api/session/pvai/save}        — save completed PvAI game with luck/WR analysis</li>
+ *   <li>{@code GET  /api/session/pvai/games}       — list all saved PvAI game records</li>
  *   <li>{@code POST /api/h2h/start}             — start H2H match in background</li>
  *   <li>{@code GET  /api/h2h/status/{matchId}}  — match progress</li>
  *   <li>{@code GET  /api/h2h/results}           — all completed matches (summary)</li>
@@ -59,6 +61,7 @@ public final class ApiServer {
     private final SessionManager sessionManager;
     private final PrecomputeCache precomputeCache;
     private final H2hResultStore h2hStore;
+    private final PvAiGameStore pvAiGameStore;
     private HttpServer httpServer;
 
     /**
@@ -73,6 +76,7 @@ public final class ApiServer {
         this.sessionManager = new SessionManager(Path.of("saves"));
         this.precomputeCache = new PrecomputeCache(orchestrator);
         this.h2hStore = new H2hResultStore();
+        this.pvAiGameStore = new PvAiGameStore();
     }
 
     /** Convenience constructor using {@link #DEFAULT_PORT}. */
@@ -117,6 +121,8 @@ public final class ApiServer {
         httpServer.createContext("/api/session/pvai/start",      new PvAiStartHandler(sessionManager));
         httpServer.createContext("/api/session/pvai/human-turn", new PvAiHumanTurnHandler(sessionManager));
         httpServer.createContext("/api/session/pvai/ai-turn",    new PvAiAiTurnHandler(sessionManager));
+        httpServer.createContext("/api/session/pvai/save",       new PvAiSaveHandler(sessionManager, pvAiGameStore));
+        httpServer.createContext("/api/session/pvai/games",      new PvAiGamesListHandler(pvAiGameStore));
 
         // H2H engine testing endpoints
         H2hHandler h2hHandler = new H2hHandler(orchestrator, h2hStore);

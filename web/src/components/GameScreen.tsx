@@ -193,6 +193,18 @@ export function GameScreen({ session, settings, updateSettings, projects, hover,
   // Derive Bürohaus panel visibility (own turn) — always shown when roll=6 and owns Bürohaus
   const showBürohausInline = rollTotal === 6 && ownsBürohaus;
 
+  // PvAI mode → dedicated board screen (handles its own game-over)
+  if (pvai.pvaiActive) {
+    return (
+      <PvAiBoardScreen
+        session={session}
+        settings={settings}
+        projects={projects}
+        pvai={pvai}
+      />
+    );
+  }
+
   // Game over check
   if (s.finished) {
     const winner = s.state.players[s.winnerIndex];
@@ -243,18 +255,6 @@ export function GameScreen({ session, settings, updateSettings, projects, hover,
           )}
         </div>
       </div>
-    );
-  }
-
-  // PvAI mode → dedicated board screen
-  if (pvai.pvaiActive) {
-    return (
-      <PvAiBoardScreen
-        session={session}
-        settings={settings}
-        projects={projects}
-        pvai={pvai}
-      />
     );
   }
 

@@ -1,7 +1,7 @@
 /** Purchase area — manual buy + assistant recommendation, wired to dice selection. */
 
 import { useLocale } from '../i18n/useLocale';
-import type { RankedOption, MetricRange, ProjectDef } from '../api/types';
+import type { RankedOption, MetricRange, ProjectDef, RollLuckResponse } from '../api/types';
 import { cardTextClass, categoryIconPath } from '../utils/cardDisplay';
 import { CardTooltip } from './CardTooltip';
 import { AssistantPanel } from './AssistantPanel';
@@ -19,12 +19,15 @@ interface Props {
   engineId?: string;
   iterationsUsed?: number;
   computeTimeMs?: number;
+  rollLuck?: RollLuckResponse | null;
+  luckLoading?: boolean;
 }
 
 export function PurchaseArea({
   options, metricRanges, evaluating,
   projects, language, coinsAfterRoll, ownedIds,
   onHover, onBuy, engineId, iterationsUsed, computeTimeMs,
+  rollLuck, luckLoading,
 }: Props) {
   const { t } = useLocale();
 
@@ -48,6 +51,28 @@ export function PurchaseArea({
 
   return (
     <div className="space-y-4">
+      {/* Roll luck chip — shown once a roll is active, placeholders while loading */}
+      {(rollLuck != null || luckLoading) && (
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-machi-surface border border-machi-border/50 text-xs">
+          <span className="text-machi-text-dim">Roll luck:</span>
+          {luckLoading || rollLuck == null ? (
+            <span className="font-mono font-medium text-machi-text-dim">–</span>
+          ) : (
+            <>
+              <span className={`font-mono font-medium ${
+                rollLuck.luck > 0.02 ? 'text-machi-green' :
+                rollLuck.luck < -0.02 ? 'text-red-400' : 'text-machi-text-dim'
+              }`}>
+                {rollLuck.luck >= 0 ? '+' : ''}{(rollLuck.luck * 100).toFixed(1)}%
+              </span>
+              <span className="text-machi-text-dim/50">
+                (WR {(rollLuck.wrAfterActual * 100).toFixed(1)}% vs avg {(rollLuck.expectedWr * 100).toFixed(1)}%)
+              </span>
+            </>
+          )}
+        </div>
+      )}
+
       {/* Assistant recommendation */}
       <AssistantPanel
         options={options}

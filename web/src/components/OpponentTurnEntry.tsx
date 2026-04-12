@@ -1,9 +1,9 @@
 /** Opponent turn entry — simplified dice + purchase selector for tracking opponent moves. */
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useLocale } from '../i18n/useLocale';
 import { DiceInterface } from './DiceInterface';
-import type { ProjectDef, ApplyTurnRequest, BürohausRequest, GameStateJson, PlayerState } from '../api/types';
+import type { ProjectDef, ApplyTurnRequest, BürohausRequest, GameStateJson, PlayerState, RollLuckResponse } from '../api/types';
 import { cardTextClass, categoryIconPath } from '../utils/cardDisplay';
 import { CardTooltip } from './CardTooltip';
 import { BürohausPanel } from './BürohausPanel';
@@ -24,41 +24,62 @@ interface Props {
   ownedIds: string[];
   showBürohausPopupSetting: boolean;
   onCoinDeltasChange?: (deltas: number[] | null) => void;
+  luckUseMc?: boolean;
 }
 
-export function OpponentTurnEntry({ opponentName, canUse2d6, projects, language, coinsAvailable, onConfirm, loading, state, activePlayerIndex, players, ownedIds, showBürohausPopupSetting, onCoinDeltasChange }: Props) {
+export function OpponentTurnEntry({ opponentName, canUse2d6, projects, language, coinsAvailable, onConfirm, loading, state, activePlayerIndex, players, ownedIds, showBürohausPopupSetting, onCoinDeltasChange, luckUseMc }: Props) {
   const { t } = useLocale();
-  const [die1, setDie1] = useState<number | null>(null);
-  const [die2, setDie2] = useState<number | null>(null);
-  const [diceCount, setDiceCount] = useState<1 | 2>(1);
+  const [dice, setDice] = useState<{ die1: number | null; die2: number | null; count: 1 | 2 }>({ die1: null, die2: null, count: 1 });
   const [boughtId, setBoughtId] = useState<string | null>(null);
   const [coinDeltas, setCoinDeltas] = useState<number[] | null>(null);
+  const [rollLuck, setRollLuck] = useState<RollLuckResponse | null>(null);
+  const [luckLoading, setLuckLoading] = useState(false);
   const [pendingBürohausSwap, setPendingBürohausSwap] = useState<BürohausRequest | null>(null);
   const [showBürohausPopup, setShowBürohausPopup] = useState(false);
 
+  const { die1, die2, count: diceCount } = dice;
   const rollTotal = die1 != null ? (diceCount === 2 && die2 != null ? die1 + die2 : die1) : 0;
   const isDoubles = diceCount === 2 && die1 != null && die2 != null && die1 === die2;
+
+  const stateRef = useRef(state);
+  stateRef.current = state;
+  const onCoinDeltasChangeRef = useRef(onCoinDeltasChange);
+  onCoinDeltasChangeRef.current = onCoinDeltasChange;
   const ownsBürohaus = ownedIds.includes('bürohaus');
   const showBürohausPanelInline = rollTotal === 6 && ownsBürohaus;
 
-  // Fetch coin deltas when roll is selected
+  // Fetch coin deltas and roll luck when roll is selected
   useEffect(() => {
     if (rollTotal <= 0) {
       setCoinDeltas(null);
-      onCoinDeltasChange?.(null);
+      setRollLuck(null);
+      setLuckLoading(false);
+      onCoinDeltasChangeRef.current?.(null);
       return;
     }
-    api.previewRoll(state, activePlayerIndex, rollTotal)
-      .then(res => { setCoinDeltas(res.coinDeltas); onCoinDeltasChange?.(res.coinDeltas); })
-      .catch(() => { setCoinDeltas(null); onCoinDeltasChange?.(null); });
-  }, [rollTotal, state, activePlayerIndex, onCoinDeltasChange]);
+    let cancelled = false;
+    api.previewRoll(stateRef.current, activePlayerIndex, rollTotal)
+      .then(res => { if (!cancelled) { setCoinDeltas(res.coinDeltas); onCoinDeltasChangeRef.current?.(res.coinDeltas); } })
+      .catch(() => { if (!cancelled) { setCoinDeltas(null); onCoinDeltasChangeRef.current?.(null); } });
+    // Fetch roll luck only when roll is complete (1d6 always, 2d6 only when both dice set)
+    const rollComplete = diceCount === 1 || die2 != null;
+    if (rollComplete) {
+      setLuckLoading(true);
+      api.getRollLuck(rollTotal, diceCount as 1 | 2, activePlayerIndex, luckUseMc ?? false)
+        .then(res => { if (!cancelled) { setRollLuck(res); setLuckLoading(false); } })
+        .catch(() => { if (!cancelled) setLuckLoading(false); });
+    }
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rollTotal, activePlayerIndex, diceCount, die2, luckUseMc]);
 
   const handleRollSelect = useCallback((count: 1 | 2, d1: number, d2: number | null) => {
-    setDiceCount(count);
-    setDie1(d1 > 0 ? d1 : null);
-    setDie2(d2 != null && d2 > 0 ? d2 : null);
+    const newDie1 = d1 > 0 ? d1 : null;
+    const newDie2 = d2 != null && d2 > 0 ? d2 : null;
+    setDice({ die1: newDie1, die2: newDie2, count });
+    setLuckLoading(true);
     // Reset pending swap when roll changes away from 6
-    const total = d1 > 0 ? (count === 2 && d2 != null && d2 > 0 ? d1 + d2 : d1) : 0;
+    const total = newDie1 != null ? (count === 2 && newDie2 != null ? newDie1 + newDie2 : newDie1) : 0;
     if (total !== 6) {
       setPendingBürohausSwap(null);
       setShowBürohausPopup(false);
@@ -76,10 +97,11 @@ export function OpponentTurnEntry({ opponentName, canUse2d6, projects, language,
       diceCount,
     }, pendingBürohausSwap ?? undefined);
     // Reset
-    setDie1(null);
-    setDie2(null);
+    setDice({ die1: null, die2: null, count: 1 });
     setBoughtId(null);
     setCoinDeltas(null);
+    setRollLuck(null);
+    setLuckLoading(false);
     onCoinDeltasChange?.(null);
     setPendingBürohausSwap(null);
     setShowBürohausPopup(false);
@@ -111,6 +133,28 @@ export function OpponentTurnEntry({ opponentName, canUse2d6, projects, language,
         selectedDie2={die2}
         selectedDiceCount={diceCount}
       />
+
+      {/* Roll luck chip — shown once a roll is active, placeholders while loading */}
+      {(rollLuck != null || luckLoading) && rollTotal > 0 && (
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-machi-surface border border-machi-border/50 text-xs">
+          <span className="text-machi-text-dim">Roll luck:</span>
+          {luckLoading || rollLuck == null ? (
+            <span className="font-mono font-medium text-machi-text-dim">–</span>
+          ) : (
+            <>
+              <span className={`font-mono font-medium ${
+                rollLuck.luck > 0.02 ? 'text-machi-green' :
+                rollLuck.luck < -0.02 ? 'text-red-400' : 'text-machi-text-dim'
+              }`}>
+                {rollLuck.luck >= 0 ? '+' : ''}{(rollLuck.luck * 100).toFixed(1)}%
+              </span>
+              <span className="text-machi-text-dim/50">
+                (WR {(rollLuck.wrAfterActual * 100).toFixed(1)}% vs avg {(rollLuck.expectedWr * 100).toFixed(1)}%)
+              </span>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Coin flow from this roll */}
       {rollTotal > 0 && coinDeltas && (

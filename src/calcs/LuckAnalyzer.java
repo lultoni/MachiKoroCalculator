@@ -138,8 +138,10 @@ public final class LuckAnalyzer {
             BürohausLogic.executeSwap(copy, activePlayer);
         }
 
-        return useMc
+        double wr = useMc
                 ? GameSimulator.mcWinRate(copy, activePlayer, mcSims)
                 : WinProbability.computeBaselineWinProb(copy, activePlayer);
+
+        return wr;
     }
 }

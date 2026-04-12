@@ -148,6 +148,12 @@ export interface InsightsResponse {
   narrative?: NarrativeInsight[];
 }
 
+export interface RollLuckResponse {
+  luck: number;
+  wrAfterActual: number;
+  expectedWr: number;
+}
+
 // ─── Saves ───────────────────────────────────────────────────────────────
 
 export interface SaveEntry {

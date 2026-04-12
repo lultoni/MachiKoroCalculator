@@ -9,6 +9,7 @@ import type {
   EvaluateResponse,
   FromSnapshotRequest,
   InsightsResponse,
+  RollLuckResponse,
   ProjectDef,
   EngineRegistryEntry,
   EngineParamSchema,
@@ -107,6 +108,9 @@ export const fromSnapshot = (req: FromSnapshotRequest) =>
 
 export const getInsights = (playerIndex?: number) =>
   json<InsightsResponse>(`/api/session/insights${playerIndex != null ? `?playerIndex=${playerIndex}` : ''}`);
+
+export const getRollLuck = (roll: number, diceCount: 1 | 2, playerIndex: number, luckUseMc: boolean) =>
+  post<RollLuckResponse>('/api/session/roll-luck', { roll, diceCount, playerIndex, luckUseMc });
 
 // ─── Roll Preview (stateless) ────────────────────────────────────────────
 

@@ -14,7 +14,7 @@ import { useRollPreview } from '../hooks/useRollPreview';
 import type { UseSessionReturn } from '../hooks/useSession';
 import type { Settings } from '../hooks/useSettings';
 import type { UsePvAiReturn } from '../hooks/usePlayerVsAi';
-import type { ProjectDef, BürohausRequest } from '../api/types';
+import type { ProjectDef, BürohausRequest, RollLuckResponse } from '../api/types';
 import { DieFace } from './DiceInterface';
 import { CardTooltip } from './CardTooltip';
 import { BürohausPanel } from './BürohausPanel';
@@ -444,7 +444,13 @@ function WinScreen({ players, winnerIndex, humanPlayerIndex, aiPlayerIndex, engi
     } catch {
       setSaveState('error');
     }
-  }, [players, humanPlayerIndex, aiPlayerIndex, engineId]);
+  }, [players, humanPlayerIndex, aiPlayerIndex, engineId, luckUseMc]);
+
+  // Autosave on mount — no manual click required
+  useEffect(() => {
+    handleSave();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const winner = players[winnerIndex];
   const humanWon = winnerIndex === humanPlayerIndex;
@@ -464,15 +470,7 @@ function WinScreen({ players, winnerIndex, humanPlayerIndex, aiPlayerIndex, engi
           ))}
         </div>
 
-        {/* Save game button */}
-        {saveState === 'idle' && (
-          <button
-            className="w-full py-2 rounded-lg font-semibold border border-machi-border text-machi-text hover:border-machi-accent hover:text-machi-accent transition-all"
-            onClick={handleSave}
-          >
-            Save Game
-          </button>
-        )}
+        {/* Save status */}
         {saveState === 'saving' && (
           <div className="w-full py-2 text-center text-machi-text-dim text-sm animate-pulse">
             Analysing game…
@@ -484,9 +482,12 @@ function WinScreen({ players, winnerIndex, humanPlayerIndex, aiPlayerIndex, engi
           </div>
         )}
         {saveState === 'error' && (
-          <div className="w-full py-2 text-center text-red-400 text-sm">
-            Save failed — check server log
-          </div>
+          <button
+            className="w-full py-2 rounded-lg font-semibold border border-red-500/40 text-red-400 hover:border-red-400 transition-all text-sm"
+            onClick={handleSave}
+          >
+            Save failed — retry
+          </button>
         )}
 
         <button
@@ -523,6 +524,9 @@ export function PvAiBoardScreen({ session, settings, projects, pvai }: Props) {
   const [hasUsedFunkturmReroll, setHasUsedFunkturmReroll] = useState(false);
   const [pendingBürohausSwap, setPendingBürohausSwap] = useState<BürohausRequest | null>(null);
 
+  // ── Roll luck ────────────────────────────────────────────────────────────
+  const [rollLuck, setRollLuck] = useState<RollLuckResponse | null>(null);
+
   // ── Roll animation ───────────────────────────────────────────────────────
   const rollAnim = useRollAnimation(diceCount);
 
@@ -555,6 +559,7 @@ export function PvAiBoardScreen({ session, settings, projects, pvai }: Props) {
     setHasUsedFunkturmReroll(false);
     setDiceCount(1);
     setPendingBürohausSwap(null);
+    setRollLuck(null);
     // Clear AI dice display when human's new turn starts (keep summary text)
     if (isHumanTurn) {
       setAiDiceResult(null);
@@ -576,6 +581,10 @@ export function PvAiBoardScreen({ session, settings, projects, pvai }: Props) {
   // ── Auto-request AI turn ──────────────────────────────────────────────────
   const aiTurnRequested = useRef(false);
   useEffect(() => {
+    // Reset on every turn boundary so bonus turns (Freizeitpark doubles) also trigger
+    if (!isAiTurn) {
+      aiTurnRequested.current = false;
+    }
     if (isAiTurn && !s.finished && !aiTurnRequested.current) {
       aiTurnRequested.current = true;
       pvai.requestAiTurn().then(() => {
@@ -583,9 +592,6 @@ export function PvAiBoardScreen({ session, settings, projects, pvai }: Props) {
         // before the turn flips back to the human.
         setTimeout(() => session.refresh(), 1200);
       });
-    }
-    if (!isAiTurn) {
-      aiTurnRequested.current = false;
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAiTurn, s.effectiveTurnCount]);
@@ -649,6 +655,14 @@ export function PvAiBoardScreen({ session, settings, projects, pvai }: Props) {
     if (aiAnimTimeoutRef.current) clearTimeout(aiAnimTimeoutRef.current);
   }, []);
 
+  // ── Roll luck fetch ───────────────────────────────────────────────────────
+  const fetchRollLuck = useCallback((total: number, count: 1 | 2) => {
+    if (total <= 0) return;
+    api.getRollLuck(total, count, humanPlayerIndex, settings.luckUseMc)
+      .then(setRollLuck)
+      .catch(() => {});
+  }, [humanPlayerIndex, settings.luckUseMc]);
+
   // ── Roll handler ──────────────────────────────────────────────────────────
   const handleRoll = useCallback(async () => {
     const result = await rollAnim.roll();
@@ -656,8 +670,10 @@ export function PvAiBoardScreen({ session, settings, projects, pvai }: Props) {
     // Auto-lock-in if player doesn't own Funkturm (no reroll option)
     if (!ownsFunkturm) {
       setLockedIn(true);
+      const total = diceCount === 2 && result.die2 != null ? result.die1 + result.die2 : result.die1;
+      fetchRollLuck(total, diceCount);
     }
-  }, [rollAnim, ownsFunkturm]);
+  }, [rollAnim, ownsFunkturm, diceCount, fetchRollLuck]);
 
   // ── Re-roll handler (Funkturm only, once per turn) ────────────────────────
   const handleReroll = useCallback(async () => {
@@ -667,12 +683,18 @@ export function PvAiBoardScreen({ session, settings, projects, pvai }: Props) {
     setRolledDice(result);
     // Second roll always locks in (Funkturm rule: one reroll max)
     setLockedIn(true);
-  }, [rollAnim]);
+    const total = diceCount === 2 && result.die2 != null ? result.die1 + result.die2 : result.die1;
+    fetchRollLuck(total, diceCount);
+  }, [rollAnim, diceCount, fetchRollLuck]);
 
   // ── Lock-in handler (Funkturm owners keeping their first roll) ────────────
   const handleLockIn = useCallback(() => {
     setLockedIn(true);
-  }, []);
+    if (rolledDice) {
+      const total = diceCount === 2 && rolledDice.die2 != null ? rolledDice.die1 + rolledDice.die2 : rolledDice.die1;
+      fetchRollLuck(total, diceCount);
+    }
+  }, [rolledDice, diceCount, fetchRollLuck]);
 
   // ── Buy handler ───────────────────────────────────────────────────────────
   const handleBuy = useCallback(async (projectId: string | null) => {
@@ -694,6 +716,7 @@ export function PvAiBoardScreen({ session, settings, projects, pvai }: Props) {
       bürohausOppPlayer: pendingBürohausSwap?.oppPlayerIndex ?? null,
     });
 
+    setRollLuck(null);
     await session.refresh();
   }, [rolledDice, lockedIn, diceCount, rollTotal, preview, pvai, session, projects, settings.language, pendingBürohausSwap, humanPlayerIndex]);
 
@@ -791,7 +814,7 @@ export function PvAiBoardScreen({ session, settings, projects, pvai }: Props) {
         winnerIndex={s.winnerIndex}
         humanPlayerIndex={humanPlayerIndex}
         aiPlayerIndex={pvai.aiPlayerIndex}
-        engineId={settings.engineId}
+        engineId={pvai.aiEngineId ?? 'unknown'}
         luckUseMc={settings.luckUseMc}
         onNewGame={() => { pvai.stopPvAi(); session.clearSession(); }}
       />
@@ -871,6 +894,24 @@ export function PvAiBoardScreen({ session, settings, projects, pvai }: Props) {
               pendingSwap={pendingBürohausSwap}
               onSwapChange={setPendingBürohausSwap}
             />
+          </div>
+        )}
+
+        {/* Roll luck chip (human turn, after lock-in) */}
+        {isHumanTurn && rollLuck != null && (
+          <div className="px-4 pb-1 shrink-0">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-machi-surface border border-machi-border/50 text-xs">
+              <span className="text-machi-text-dim">Roll luck:</span>
+              <span className={`font-mono font-medium ${
+                rollLuck.luck > 0.02 ? 'text-machi-green' :
+                rollLuck.luck < -0.02 ? 'text-red-400' : 'text-machi-text-dim'
+              }`}>
+                {rollLuck.luck >= 0 ? '+' : ''}{(rollLuck.luck * 100).toFixed(1)}%
+              </span>
+              <span className="text-machi-text-dim/50">
+                (WR {(rollLuck.wrAfterActual * 100).toFixed(1)}% vs avg {(rollLuck.expectedWr * 100).toFixed(1)}%)
+              </span>
+            </div>
           </div>
         )}
 

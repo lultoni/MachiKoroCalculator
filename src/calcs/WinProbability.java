@@ -55,7 +55,8 @@ public final class WinProbability {
         int n = players.length;
 
         if (n == 2) {
-            return sigmoid(computeLogit(gs, playerIndex));
+            double logit = computeLogit(gs, playerIndex);
+            return sigmoid(logit);
         }
         double[] scores = computeScores(gs);
         return softmaxEntry(scores, playerIndex);

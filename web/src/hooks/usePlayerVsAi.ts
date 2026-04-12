@@ -35,6 +35,8 @@ export interface UsePvAiReturn {
   pvaiActive: boolean;
   /** Seat index the AI occupies. */
   aiPlayerIndex: number;
+  /** Engine ID of the AI opponent (set when PvAI starts, null before). */
+  aiEngineId: string | null;
   /** True while the AI is thinking (between human lock-in and turn reveal). */
   aiThinking: boolean;
   /** True while the AI's turn is being animated. */
@@ -63,6 +65,7 @@ const STEP_DELAY_MS = 220; // pause between animation steps
 export function usePlayerVsAi(): UsePvAiReturn {
   const [pvaiActive, setPvaiActive] = useState(false);
   const [aiPlayerIndex, setAiPlayerIndex] = useState(1);
+  const [aiEngineId, setAiEngineId] = useState<string | null>(null);
   const [aiThinking, setAiThinking] = useState(false);
   const [animating, setAnimating] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
@@ -80,6 +83,7 @@ export function usePlayerVsAi(): UsePvAiReturn {
     try {
       await api.pvaiStart({ engineId, aiPlayerIndex: aiIdx, minThinkTimeMs });
       setAiPlayerIndex(aiIdx);
+      setAiEngineId(engineId);
       setPvaiActive(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -128,6 +132,7 @@ export function usePlayerVsAi(): UsePvAiReturn {
 
   const stopPvAi = useCallback(() => {
     setPvaiActive(false);
+    setAiEngineId(null);
     setAiThinking(false);
     setAnimating(false);
     setSteps([]);
@@ -136,7 +141,7 @@ export function usePlayerVsAi(): UsePvAiReturn {
   }, []);
 
   return {
-    pvaiActive, aiPlayerIndex,
+    pvaiActive, aiPlayerIndex, aiEngineId,
     aiThinking, animating, currentStep, steps, lastAiTurn, error,
     startPvAi, onHumanBuy, requestAiTurn, stopPvAi,
   };

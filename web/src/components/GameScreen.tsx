@@ -8,7 +8,8 @@ import { useInsights } from '../hooks/useInsights';
 import type { UseSessionReturn } from '../hooks/useSession';
 import type { Settings } from '../hooks/useSettings';
 import type { UseHoverReturn } from '../hooks/useHover';
-import type { ProjectDef, ApplyTurnRequest, BürohausRequest } from '../api/types';
+import type { ProjectDef, ApplyTurnRequest, BürohausRequest, RollLuckResponse } from '../api/types';
+import * as api from '../api/client';
 import { cardTextClass, categoryIconPath } from '../utils/cardDisplay';
 import { TurnIndicator } from './TurnIndicator';
 import { DiceInterface } from './DiceInterface';
@@ -66,6 +67,10 @@ export function GameScreen({ session, settings, updateSettings, projects, hover,
   // Opponent turn coin deltas (propagated from OpponentTurnEntry)
   const [opponentCoinDeltas, setOpponentCoinDeltas] = useState<number[] | null>(null);
 
+  // Roll luck for current turn (fetched after dice selected)
+  const [rollLuck, setRollLuck] = useState<RollLuckResponse | null>(null);
+  const [luckLoading, setLuckLoading] = useState(false);
+
   // Compute roll total
   const rollTotal = die1 != null
     ? (diceCount === 2 && die2 != null ? die1 + die2 : die1)
@@ -106,6 +111,8 @@ export function GameScreen({ session, settings, updateSettings, projects, hover,
     setPendingBürohausSwap(null);
     setShowBürohausPopup(false);
     setOpponentCoinDeltas(null);
+    setRollLuck(null);
+    setLuckLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [s.nextPlayerIndex, s.effectiveTurnCount]);
 
@@ -128,7 +135,14 @@ export function GameScreen({ session, settings, updateSettings, projects, hover,
     } else if (total === 6 && ownsBürohaus && settings.showBürohausPanel) {
       setShowBürohausPopup(true);
     }
-  }, [ownsBürohaus, settings.showBürohausPanel]);
+    // Fetch luck for this roll (only when a complete roll is specified)
+    if (d1 > 0 && (count === 1 || (d2 != null && d2 > 0))) {
+      setLuckLoading(true);
+      api.getRollLuck(total, count, s.nextPlayerIndex, settings.luckUseMc)
+        .then(res => { setRollLuck(res); setLuckLoading(false); })
+        .catch(() => { setLuckLoading(false); });
+    }
+  }, [ownsBürohaus, settings.showBürohausPanel, settings.luckUseMc, s.nextPlayerIndex]);
 
   const handleBuy = useCallback(async (projectId: string | null) => {
     if (rollTotal === 0) return;
@@ -158,6 +172,8 @@ export function GameScreen({ session, settings, updateSettings, projects, hover,
       await session.applyBürohaus(pendingBürohausSwap);
     }
     setPendingBürohausSwap(null);
+    setRollLuck(null);
+    setLuckLoading(false);
   }, [rollTotal, diceCount, die1, die2, session, engine.result, pendingBürohausSwap]);
 
   const handleOpponentConfirm = useCallback(async (req: ApplyTurnRequest, bürohausSwap?: BürohausRequest) => {
@@ -466,6 +482,8 @@ export function GameScreen({ session, settings, updateSettings, projects, hover,
                   engineId={engine.result?.engineId}
                   iterationsUsed={engine.result?.iterationsUsed}
                   computeTimeMs={engine.result?.computeTimeMs}
+                  rollLuck={rollLuck}
+                  luckLoading={luckLoading}
                 />
               )}
             </>
@@ -506,6 +524,7 @@ export function GameScreen({ session, settings, updateSettings, projects, hover,
                   ownedIds={activePlayer.ownedIds}
                   showBürohausPopupSetting={settings.showBürohausPanel}
                   onCoinDeltasChange={setOpponentCoinDeltas}
+                  luckUseMc={settings.luckUseMc}
                 />
               </div>
               <InsightsPanel

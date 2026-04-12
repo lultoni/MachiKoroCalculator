@@ -153,15 +153,12 @@ public final class PlayerVsAiController {
         GameState state = session.getState();
         TurnPlan plan = buildPlan(result, state);
 
-        // Roll dice
+        // Roll dice: two independent dice, then derive sum and doubles
         int diceCount = plan.diceCount;
-        int roll = rollDice(diceCount);
-        boolean isDoubles = (diceCount == 2) && (rng.nextInt(6) + 1 == rng.nextInt(6) + 1);
-        // Re-roll properly: two independent dice
         int die1 = rng.nextInt(6) + 1;
         int die2 = (diceCount == 2) ? (rng.nextInt(6) + 1) : 0;
-        roll     = (diceCount == 2) ? (die1 + die2) : die1;
-        isDoubles = (diceCount == 2) && (die1 == die2);
+        int roll = (diceCount == 2) ? (die1 + die2) : die1;
+        boolean isDoubles = (diceCount == 2) && (die1 == die2);
 
         // Navigate the plan's tree with the actual roll
         plan.navigateRoll(roll, isDoubles);
@@ -223,13 +220,15 @@ public final class PlayerVsAiController {
         }
 
         // Apply turn to session
+        TurnRecord.AiDecisionSnapshot snapshot = buildAiDecisionSnapshot(result, purchasedCardId, plan.scoreIsWinRate, iterationsUsed);
         TurnRecord record = new TurnRecord(
                 aiPlayerIndex, finalRoll, purchase, finalDbl,
                 coinDeltas,
                 bürohausOwnCardId != null ? plan.bürohausOwnCard : null,
                 bürohausOppCardId != null ? plan.bürohausOppCard : null,
                 bürohausOppPlayer != null ? bürohausOppPlayer : -1,
-                diceCount);
+                diceCount,
+                thinkTimeMs, snapshot);
         session.applyTurn(record);
         sessionManager.addEngineSnapshot(null); // AI turns don't store engine snapshots in replay
 
@@ -326,5 +325,52 @@ public final class PlayerVsAiController {
         int sum = 0;
         for (int i = 0; i < count; i++) sum += rng.nextInt(6) + 1;
         return sum;
+    }
+
+    /**
+     * Builds a compact AI decision snapshot from the engine result for storage in TurnRecord.
+     * Mirrors {@code MatchRunner.buildDecisionDetail} but produces the lighter-weight
+     * {@link TurnRecord.AiDecisionSnapshot} format instead of the full {@link h2h.TurnLog.DecisionDetail}.
+     *
+     * @param result           engine result (may be null for fallback turns)
+     * @param chosenCardId     card the engine chose (null = save)
+     * @param scoresAreWinRates true if option scores are [0,1] win rates, false for composite scores
+     * @param iterationsUsed   engine iteration count from evaluator
+     * @return snapshot for storage in TurnRecord, or null when no evaluation data is available
+     */
+    private static TurnRecord.AiDecisionSnapshot buildAiDecisionSnapshot(
+            EngineResult result, String chosenCardId, boolean scoresAreWinRates, int iterationsUsed) {
+        if (result == null) return null;
+
+        java.util.List<TurnRecord.DecisionEntry> entries = new java.util.ArrayList<>();        String chosenKey = chosenCardId != null ? chosenCardId : "_wait_";
+        boolean chosenIncluded = false;
+
+        for (EngineResult.Option opt : result.rankedOptions) {
+            if (!opt.affordable) continue;
+            double score = sanitizeDouble(opt.score);
+            String cardId = opt.project.getId();
+            if (cardId.equals(chosenKey)) chosenIncluded = true;
+            entries.add(new TurnRecord.DecisionEntry(cardId, score));
+            if (entries.size() >= 5 && chosenIncluded) break;
+        }
+
+        // Ensure the chosen option is always present (may be outside the top-5)
+        if (!chosenIncluded) {
+            for (EngineResult.Option opt : result.rankedOptions) {
+                if (!opt.affordable) continue;
+                if (opt.project.getId().equals(chosenKey)) {
+                    entries.add(new TurnRecord.DecisionEntry(opt.project.getId(), sanitizeDouble(opt.score)));
+                    break;
+                }
+            }
+        }
+
+        if (entries.isEmpty()) return null;
+        return new TurnRecord.AiDecisionSnapshot(entries, iterationsUsed, scoresAreWinRates);
+    }
+
+    /** Replaces NaN/Infinity with -1 for JSON serialization safety. */
+    private static double sanitizeDouble(double v) {
+        return Double.isFinite(v) ? v : -1.0;
     }
 }

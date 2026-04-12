@@ -36,7 +36,7 @@ public final class CreatorContinuousWorker implements ContinuousWorker {
 
     private final CreatorEngine engine = new CreatorEngine();
 
-    private List<CreatorEngine.CandidateOption> candidates;
+    private volatile List<CreatorEngine.CandidateOption> candidates;
     private BitRolloutFn rolloutFn;
     private int playerIndex;
     private int numPlayers;
@@ -67,7 +67,9 @@ public final class CreatorContinuousWorker implements ContinuousWorker {
 
         List<CreatorScorer.ScoredCandidate> scored = CreatorScorer.scoreAll(gs, playerIndex, baseSupply, config);
 
-        this.candidates = new ArrayList<>();
+        // Build into a local list first, then assign atomically so runOneIteration()
+        // never sees a partially-populated candidates reference.
+        List<CreatorEngine.CandidateOption> newCandidates = new ArrayList<>();
         for (CreatorScorer.ScoredCandidate sc : scored) {
             boolean isSave = sc.card == calcs.RankEntry.WAIT_SENTINEL;
             boolean isInstantWin = sc.compositeScore == Double.MAX_VALUE;
@@ -76,7 +78,7 @@ public final class CreatorContinuousWorker implements ContinuousWorker {
                 CreatorEngine.CandidateOption opt = new CreatorEngine.CandidateOption(
                         sc.card, state, rootSupplyArr, false, true,
                         sc.compositeScore, sc.metrics, sc.factors, true, sc.activationGuard);
-                candidates.add(opt);
+                newCandidates.add(opt);
                 continue;
             }
 
@@ -106,7 +108,7 @@ public final class CreatorContinuousWorker implements ContinuousWorker {
                         sc.card, childBS, childSupply, true, false,
                         sc.compositeScore, sc.metrics, sc.factors, canAfford, sc.activationGuard);
                 opt.wins = 1; opt.samples = 1;
-                candidates.add(opt);
+                newCandidates.add(opt);
                 continue;
             }
 
@@ -114,26 +116,33 @@ public final class CreatorContinuousWorker implements ContinuousWorker {
                     sc.card, childBS, childSupply, false, false,
                     sc.compositeScore, sc.metrics, sc.factors, canAfford, sc.activationGuard);
             opt.unaffordable = !canAfford;
-            candidates.add(opt);
+            newCandidates.add(opt);
         }
 
         // Initial survey: 20 samples per eligible MC candidate
         int nextPlayer = (playerIndex + 1) % numPlayers;
-        for (CreatorEngine.CandidateOption c : candidates) {
+        for (CreatorEngine.CandidateOption c : newCandidates) {
             if (!c.unaffordable && !c.isInstantWin && !c.isSave && c.activationGuard > 0.0) {
                 engine.runSamples(c, 20, nextPlayer, playerIndex, rolloutFn);
                 totalMcSamples += 20;
             }
         }
+
+        // Single atomic write — worker thread sees either the old complete list or the new
+        // complete list, never a partially-constructed one.
+        this.candidates = newCandidates;
     }
 
     @Override
     public void runOneIteration() {
-        if (candidates == null || candidates.isEmpty()) return;
+        // Snapshot the reference once — if init() replaces candidates concurrently,
+        // we keep iterating over the old (complete) list safely.
+        List<CreatorEngine.CandidateOption> snap = candidates;
+        if (snap == null || snap.isEmpty()) return;
 
         // Build MC-eligible candidates sorted by heuristic score descending
         List<CreatorEngine.CandidateOption> eligible = new ArrayList<>();
-        for (CreatorEngine.CandidateOption c : candidates) {
+        for (CreatorEngine.CandidateOption c : snap) {
             if (!c.unaffordable && !c.isInstantWin && !c.isSave && c.activationGuard > 0.0) {
                 eligible.add(c);
             }
@@ -181,9 +190,10 @@ public final class CreatorContinuousWorker implements ContinuousWorker {
 
     @Override
     public EngineResult peekResult(GameState state, int playerIdx, EngineConfig cfg) {
-        if (candidates == null) return null;
+        List<CreatorEngine.CandidateOption> snap = candidates;
+        if (snap == null || snap.isEmpty()) return null;
         boolean usedMC = totalMcSamples >= MC_THRESHOLD;
-        return engine.buildResult(candidates, state.getPlayers()[playerIdx].getCoins(),
+        return engine.buildResult(snap, state.getPlayers()[playerIdx].getCoins(),
                 iterCount, 0L, usedMC, 0L);
     }
 

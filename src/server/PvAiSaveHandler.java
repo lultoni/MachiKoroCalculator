@@ -212,7 +212,7 @@ final class PvAiSaveHandler implements HttpHandler {
                     wrAfterPurchase, true, /* scoreIsWinRate */
                     coinsAfterPurchase,
                     bürohausSwapStr, bürohausActivated,
-                    false, 0L, null, /* funkturmRerolled, evaluateTimeMs, decisionDetail */
+                    false, record.evaluateTimeMs, buildDecisionDetail(record, purchasedCardId),
                     rollLuck.luck(), rollLuck.expectedWr(), rollLuck.wrAfterActual(), rollLuck.wrPerRoll(),
                     cardIncome.isEmpty() ? null : cardIncome, purchasedCardExpectedEv
             );
@@ -251,5 +251,26 @@ final class PvAiSaveHandler implements HttpHandler {
             if ("gelb".equals(p.getColor())) count++;
         }
         return count;
+    }
+
+    /**
+     * Converts the {@link TurnRecord.AiDecisionSnapshot} stored during the AI's turn
+     * into a {@link TurnLog.DecisionDetail} for the replay UI.
+     *
+     * @param record           the turn record being converted
+     * @param purchasedCardId  the card id that was actually purchased (null = save)
+     * @return the decision detail, or null if no AI decision snapshot was stored
+     */
+    private static TurnLog.DecisionDetail buildDecisionDetail(TurnRecord record, String purchasedCardId) {
+        TurnRecord.AiDecisionSnapshot snap = record.aiDecision;
+        if (snap == null || snap.entries().isEmpty()) return null;
+
+        String chosenKey = purchasedCardId != null ? purchasedCardId : "_wait_";
+        List<TurnLog.DecisionOption> options = new java.util.ArrayList<>(snap.entries().size());
+        for (TurnRecord.DecisionEntry entry : snap.entries()) {
+            boolean chosen = entry.cardId().equals(chosenKey);
+            options.add(new TurnLog.DecisionOption(entry.cardId(), entry.score(), chosen));
+        }
+        return new TurnLog.DecisionDetail(options, snap.iterationsUsed(), -1.0, snap.scoresAreWinRates());
     }
 }

@@ -12,7 +12,6 @@ Priorisiere in deiner Abarbeitung die wichtigsten Features. Erkenne Abhängigkei
 
 | # | Task | Type | Notes |
 |---|------|------|-------|
-| 5 | Luck display in live game UI | Dev | Show luck info in main game session (AssistantPanel or similar). Lower priority than replay. Depends on #1. |
 
 ### Engine Quality
 
@@ -83,7 +82,7 @@ Moved here when completed. Full history in CHANGELOG.md.
 | 17b | Time budget mode Phase 3 — Player-vs-AI TODOs (#14, #15) updated with continuous thinking dependencies and time budget infrastructure notes. Superseded by #17c spec. |
 | 17a | Time budget mode Phase 2 — Research & design complete. Discussed MCTS tree reuse vs. background re-eval vs. minThinkTimeMs wiring. Concluded: persistent MCTS tree with "letter on desk" flag-based control is correct approach. Full spec written in `CONTINUOUS-THINKING-SPEC.md`. Implementation task is #17c. |
 | 17b | Time budget mode Phase 3 — Player-vs-AI TODOs (#14, #15) updated with continuous thinking dependencies and time budget infrastructure notes. Superseded by #17c spec. |
-| — | PvAI game history: PvAiGameStore + PvAiGamesListHandler, save-on-finish with luck + cardIncome + wrPerRoll, PvAiGamesOverview list + H2hGameReplay viewer, "PvAI History" button in SetupScreen. |
+| — | Luck display in live game UI — Roll luck chip (luck %, WR vs avg) shown in PurchaseArea after dice selected. POST /api/session/roll-luck endpoint (heuristic mode, instant). Clears on buy/turn change. |
 | — | Purple card income fixes: Stadion/Fernsehsender now correctly subtracts from victims in RollResolver.attributeIncomePerCard; steal losses excluded from victim's card value table. |
 | — | Roll breakdown table in Game Insights: per-roll income (1d6/2d6) with Bahnhof detection, per-roll luck via LuckAnalyzer.RollLuck.wrPerRoll (6 or 11 values). LuckAnalyzer extended; TurnLog + MatchRunner + PvAiSaveHandler wired. 1d6 panel (33%) + 2d6 panel (66%, two-column) below luck chart. Events section merged into per-player stats. income_base added to /api/projects. |
 | — | Endgame WR bug: GameSimulator Bahnhof skip now scoped to getLandmarkCount < 3 (four locations: greedyBuy, boltzmannBuy, greedyBuyBit, boltzmannBuyBit). |

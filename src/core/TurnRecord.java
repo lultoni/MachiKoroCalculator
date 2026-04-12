@@ -1,6 +1,7 @@
 package core;
 
 import java.util.Arrays;
+import java.util.List;
 
 /**
  * Immutable record of what happened in a single turn.
@@ -22,6 +23,28 @@ import java.util.Arrays;
  * that predate this field.
  */
 public class TurnRecord {
+
+    // -------------------------------------------------------------------------
+    // Inner types
+    // -------------------------------------------------------------------------
+
+    /** Compact representation of one ranked purchase option evaluated by the AI engine. */
+    public record DecisionEntry(String cardId, double score) {}
+
+    /**
+     * Snapshot of the engine's purchase decision for this turn (AI turns only, null for human turns).
+     * Carries the top-N ranked options, engine iteration count, and score-type metadata needed to
+     * reconstruct a {@link h2h.TurnLog.DecisionDetail} when the game is saved.
+     */
+    public record AiDecisionSnapshot(
+            List<DecisionEntry> entries,
+            int iterationsUsed,
+            boolean scoresAreWinRates
+    ) {}
+
+    // -------------------------------------------------------------------------
+    // Fields
+    // -------------------------------------------------------------------------
 
     /** Index of the player who took this turn (0-based). */
     public final int playerIndex;
@@ -77,24 +100,37 @@ public class TurnRecord {
     public final int diceCount;
 
     /**
+     * Wall-clock milliseconds the AI engine spent computing this turn.
+     * 0 for human turns. Populated only for AI turns in PvAI mode.
+     */
+    public final long evaluateTimeMs;
+
+    /**
+     * Compact snapshot of the AI engine's purchase decision for this turn.
+     * Null for human turns and any turn where no engine evaluation was performed.
+     * Used when saving PvAI games to reconstruct the decision detail panel.
+     */
+    public final AiDecisionSnapshot aiDecision;
+
+    /**
      * Constructs a turn record without doubles information (backwards-compatible).
      */
     public TurnRecord(int playerIndex, int roll, Project bought) {
-        this(playerIndex, roll, bought, false, null, null, null, -1, 1);
+        this(playerIndex, roll, bought, false, null, null, null, -1, 1, 0L, null);
     }
 
     /**
      * Constructs a turn record with explicit doubles flag.
      */
     public TurnRecord(int playerIndex, int roll, Project bought, boolean isDoubles) {
-        this(playerIndex, roll, bought, isDoubles, null, null, null, -1, 1);
+        this(playerIndex, roll, bought, isDoubles, null, null, null, -1, 1, 0L, null);
     }
 
     /**
      * Constructs a full turn record with doubles flag and per-player coin deltas.
      */
     public TurnRecord(int playerIndex, int roll, Project bought, boolean isDoubles, int[] coinDeltas) {
-        this(playerIndex, roll, bought, isDoubles, coinDeltas, null, null, -1, 1);
+        this(playerIndex, roll, bought, isDoubles, coinDeltas, null, null, -1, 1, 0L, null);
     }
 
     /**
@@ -102,15 +138,27 @@ public class TurnRecord {
      */
     public TurnRecord(int playerIndex, int roll, Project bought, boolean isDoubles,
                       int[] coinDeltas, Project swappedAway, Project swappedIn) {
-        this(playerIndex, roll, bought, isDoubles, coinDeltas, swappedAway, swappedIn, -1, 1);
+        this(playerIndex, roll, bought, isDoubles, coinDeltas, swappedAway, swappedIn, -1, 1, 0L, null);
     }
 
     /**
-     * Constructs a fully specified turn record with all fields.
+     * Constructs a fully specified turn record with all fields (no AI decision).
      */
     public TurnRecord(int playerIndex, int roll, Project bought, boolean isDoubles,
                       int[] coinDeltas, Project swappedAway, Project swappedIn,
                       int swapOppPlayerIndex, int diceCount) {
+        this(playerIndex, roll, bought, isDoubles, coinDeltas, swappedAway, swappedIn,
+                swapOppPlayerIndex, diceCount, 0L, null);
+    }
+
+    /**
+     * Constructs a fully specified turn record including AI think-time and decision snapshot.
+     * Used for AI turns in PvAI mode.
+     */
+    public TurnRecord(int playerIndex, int roll, Project bought, boolean isDoubles,
+                      int[] coinDeltas, Project swappedAway, Project swappedIn,
+                      int swapOppPlayerIndex, int diceCount,
+                      long evaluateTimeMs, AiDecisionSnapshot aiDecision) {
         if (playerIndex < 0) throw new IllegalArgumentException("playerIndex must be >= 0");
         if (roll < 1 || roll > 12) throw new IllegalArgumentException("roll must be 1–12, got: " + roll);
         this.playerIndex = playerIndex;
@@ -122,6 +170,8 @@ public class TurnRecord {
         this.swappedIn = swappedIn;
         this.swapOppPlayerIndex = swapOppPlayerIndex;
         this.diceCount = diceCount;
+        this.evaluateTimeMs = evaluateTimeMs;
+        this.aiDecision = aiDecision;
     }
 
     @Override
@@ -133,6 +183,7 @@ public class TurnRecord {
                 ? ", swap=" + swappedAway.getId() + "→" + swappedIn.getId() + "(opp=" + swapOppPlayerIndex + ")"
                 : "";
         String diceStr = diceCount == 2 ? ", 2d6" : "";
-        return "Turn{player=" + playerIndex + ", roll=" + roll + ", " + buyStr + doublesStr + deltaStr + swapStr + diceStr + "}";
+        String aiStr = evaluateTimeMs > 0 ? ", aiThink=" + evaluateTimeMs + "ms" : "";
+        return "Turn{player=" + playerIndex + ", roll=" + roll + ", " + buyStr + doublesStr + deltaStr + swapStr + diceStr + aiStr + "}";
     }
 }

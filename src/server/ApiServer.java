@@ -116,6 +116,7 @@ public final class ApiServer {
         httpServer.createContext("/api/session/saves",         new SessionSavesListHandler(sessionManager));
         httpServer.createContext("/api/session/from-snapshot", new SessionFromSnapshotHandler(sessionManager));
         httpServer.createContext("/api/session/insights",      new SessionInsightsHandler(sessionManager));
+        httpServer.createContext("/api/session/roll-luck",     new SessionRollLuckHandler(sessionManager));
 
         // Player-vs-AI endpoints
         httpServer.createContext("/api/session/pvai/start",      new PvAiStartHandler(sessionManager));

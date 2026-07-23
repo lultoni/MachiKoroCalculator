@@ -141,8 +141,8 @@ public final class RuleBasedEngine implements SimulationEngine {
             if (pair != null) return pair;
         }
 
-        // 5. Wald — once, after mini-markt owned, when coins > 3; skip if already owned
-        if (bs.getCardCount(p, IDX_MINI_MARKT) > 0 && bs.getCardCount(p, IDX_WALD) == 0 && coins > 3) {
+        // 5. Wald — once, after mini-markt owned; skip if already owned
+        if (bs.getCardCount(p, IDX_MINI_MARKT) > 0 && bs.getCardCount(p, IDX_WALD) == 0) {
             int cost = BitStateTranslator.NORMAL_CARD_COSTS[IDX_WALD];
             if (coins >= cost && supply[IDX_WALD] > 0) return "wald";
         }

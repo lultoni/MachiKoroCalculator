@@ -42,11 +42,12 @@ public final class ServerMain {
         orchestrator.register(new HeuristicEvEngine());
         orchestrator.register(new ExpectimaxEngine());
         orchestrator.register(new CreatorEngine());
+        orchestrator.register(new engine.rulebased.RuleBasedEngine());
 
         ApiServer server = new ApiServer(orchestrator);
         server.start();
 
-        System.out.println("[ServerMain] MCTS v1 + Variants A-E + Flat MC + Heuristic EV + Expectimax + Creator registered. Server running.");
+        System.out.println("[ServerMain] MCTS v1 + Variants A-E + Flat MC + Heuristic EV + Expectimax + Creator + Rule-Based registered. Server running.");
         System.out.println("[ServerMain] Press Ctrl+C to stop.");
 
         // Keep the main thread alive until interrupted

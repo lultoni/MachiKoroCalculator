@@ -486,5 +486,16 @@
       "wUrgency": "4.8316",
       "wWinProb": "4.0619"
     }
+  },
+  {
+    "id": "rule-based",
+    "engineClass": "rule-based",
+    "description": "Rule-Based — deterministic 2p priority strategy (mini-markt → TV station → EKZ → Funkturm → Wald → Bahnhof+FZP pair)",
+    "default": false,
+    "tier": "fast",
+    "config": {
+      "iterations": "0",
+      "timeBudgetMs": "0"
+    }
   }
 ]

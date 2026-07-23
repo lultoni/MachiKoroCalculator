@@ -1,6 +1,5 @@
 package engine.rulebased;
 
-import calcs.WinProbability;
 import core.BitState;
 import core.BitStateTranslator;
 import core.CardIncome;
@@ -14,37 +13,36 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+
 /**
  * Rule-based engine — deterministic priority queue, no search, no rollouts.
  *
- * <p>Implements a hand-crafted 2-player strategy as an ordered list of
- * conditional purchase rules. Evaluated in priority order; the first rule
- * whose condition is satisfied and whose card is available (supply > 0, coins ≥ cost)
- * determines the purchase. If no rule fires, save.
+ * <p>Implements a hand-crafted 2-player strategy evaluated top-to-bottom.
+ * The first rule whose condition fires and whose card is affordable + in supply
+ * wins. If nothing fires: save.
  *
- * <h2>Rule order (2-player)</h2>
+ * <h2>Priority order</h2>
  * <ol>
- *   <li>Instant-win landmark — always buy if affordable.</li>
- *   <li>TV station (fernsehsender) — buy if coins ≥ 7 and not owned.</li>
- *   <li>Shopping mall (einkaufszentrum) — buy as soon as affordable.</li>
- *   <li>Radio tower (funkturm) — buy after shopping mall is owned.</li>
- *   <li>Mini-markt — buy if coins > 2 and not already owned (first copy).</li>
- *   <li>Bäckerei — fallback income when coins ≤ 2 or mini-markt already owned
- *       (up to 2 copies, scaled by demand).</li>
- *   <li>Wald — buy once, after mini-markt is owned and coins > 3.</li>
- *   <li>Bahnhof + Freizeitpark pair — buy bahnhof first, then freizeitpark,
- *       once 75%-confidence 2-turn income covers both costs together.</li>
- *   <li>Fallback red cards — café if opponent plays 1d6, familienrestaurant if
- *       opponent likely plays 2d6 (has Bahnhof).</li>
- *   <li>Fallback blue cards — bauernhof then weizenfeld.</li>
- *   <li>Save — no beneficial purchase found.</li>
+ *   <li>Instant-win (3 landmarks owned, can afford 4th).</li>
+ *   <li>Einkaufszentrum (shopping mall) — buy as soon as affordable.</li>
+ *   <li>Fernsehsender (TV station) — buy as soon as affordable (after EKZ check).</li>
+ *   <li>Funkturm (radio tower) — buy after EKZ is owned.</li>
+ *   <li>Bahnhof + Freizeitpark pair — buy bahnhof first, then FZP, once the
+ *       75th-percentile 2-turn income projection covers both combined costs.</li>
+ *   <li>Mini-markt — buy first copy when coins > 2.</li>
+ *   <li>Wald — buy once, after mini-markt is owned.</li>
+ *   <li>Bäckerei — buy up to 2 copies as income fallback.</li>
+ *   <li>Blue fallback — bauernhof, then weizenfeld.</li>
+ *   <li>Red fallback — only one copy; café vs familienrestaurant based on
+ *       whether the opponent has Bahnhof (→ likely 2d6 portfolio).</li>
+ *   <li>Save.</li>
  * </ol>
  *
  * <p>All evaluation is BitState-native; no {@code toGameState()} in the hot path.
  */
 public final class RuleBasedEngine implements SimulationEngine {
 
-    // --- Card indices (BitStateTranslator.NORMAL_CARD_IDS) ---
+    // Normal card indices (BitStateTranslator.NORMAL_CARD_IDS order)
     private static final int IDX_WEIZENFELD         = 0;
     private static final int IDX_BAECKEREI          = 1;
     private static final int IDX_BAUERNHOF          = 2;
@@ -53,17 +51,17 @@ public final class RuleBasedEngine implements SimulationEngine {
     private static final int IDX_CAFE               = 5;
     private static final int IDX_FAMILIENRESTAURANT = 10;
 
-    // --- Purple card indices ---
-    private static final int PURPLE_FERNSEHSENDER = 1;  // TV station
+    // Purple card indices
+    private static final int PURPLE_FERNSEHSENDER = 1;
 
-    // --- Landmark indices (BitStateTranslator) ---
-    private static final int LM_BAHNHOF     = BitStateTranslator.LM_BAHNHOF;   // 0
-    private static final int LM_EKZ         = BitStateTranslator.LM_EKZ;       // 1  (shopping mall)
-    private static final int LM_FZP         = BitStateTranslator.LM_FZP;       // 2  (amusement park)
-    private static final int LM_FUNKTURM    = BitStateTranslator.LM_FT;        // 3  (radio tower)
+    // Landmark indices
+    private static final int LM_BAHNHOF  = BitStateTranslator.LM_BAHNHOF;
+    private static final int LM_EKZ      = BitStateTranslator.LM_EKZ;
+    private static final int LM_FZP      = BitStateTranslator.LM_FZP;
+    private static final int LM_FUNKTURM = BitStateTranslator.LM_FT;
 
-    /** 75th-percentile multiplier: mean + 0.67 * std approximation. */
-    private static final double PERCENTILE_75_Z = 0.674;
+    /** z-score for 75th percentile (mean - 0.674σ for a lower bound). */
+    private static final double Z75 = 0.674;
 
     @Override
     public String id() { return "rule-based"; }
@@ -75,12 +73,7 @@ public final class RuleBasedEngine implements SimulationEngine {
     public TurnPlan evaluateFullTurn(GameState state, int playerIndex, EngineConfig config) {
         long start = System.currentTimeMillis();
         BitState bs = BitState.fromGameState(state);
-        int diceCount = CardIncome.bestDiceEV(
-                bs.hasLandmark(playerIndex, LM_BAHNHOF), r -> 1.0) > 0 &&
-                bs.hasLandmark(playerIndex, LM_BAHNHOF) ? 2 : 1;
-        // Use optimalDiceCount logic via EV comparison
-        diceCount = optimalDice(bs, playerIndex);
-
+        int diceCount = bs.hasLandmark(playerIndex, LM_BAHNHOF) ? 2 : 1;
         EngineResult result = evaluate(state, playerIndex, config);
         long elapsed = System.currentTimeMillis() - start;
         TurnPlan plan = SimulationEngine.staticPlanWithInstantWinPriority(
@@ -97,195 +90,150 @@ public final class RuleBasedEngine implements SimulationEngine {
 
         String chosen = choosePurchase(bs, supply, playerIndex);
 
-        // Build ranked list: chosen card first (score 1.0), save last (score 0.0)
         List<EngineResult.Option> options = new ArrayList<>();
-
-        // Find chosen card's Project and add it
         core.Project chosenProject = resolveProject(chosen);
-        boolean isSave = chosenProject == null;
 
-        if (!isSave) {
-            Map<String, String> metrics = new LinkedHashMap<>();
-            metrics.put("rule", chosen);
-            metrics.put("cost", String.valueOf(chosenProject.getCost()));
-            options.add(new EngineResult.Option(chosenProject, 1.0, List.of(), metrics, true));
+        if (chosenProject != null) {
+            Map<String, String> m = new LinkedHashMap<>();
+            m.put("rule", chosen);
+            m.put("cost", String.valueOf(chosenProject.getCost()));
+            options.add(new EngineResult.Option(chosenProject, 1.0, List.of(), m, true));
         }
 
-        // Always include save as last option
-        Map<String, String> saveMetrics = new LinkedHashMap<>();
-        saveMetrics.put("rule", "save");
-        options.add(new EngineResult.Option(calcs.RankEntry.WAIT_SENTINEL, 0.0, List.of(), saveMetrics, true));
+        Map<String, String> saveM = new LinkedHashMap<>();
+        saveM.put("rule", "save");
+        options.add(new EngineResult.Option(calcs.RankEntry.WAIT_SENTINEL, 0.0, List.of(), saveM, true));
 
         long elapsed = System.currentTimeMillis() - startTime;
         return new EngineResult(options, 0.0, 0, elapsed, "rule:" + chosen);
     }
 
     // -------------------------------------------------------------------------
-    // Core rule evaluation
+    // Rule evaluation — strictly top-to-bottom priority
     // -------------------------------------------------------------------------
 
-    /**
-     * Returns the ID of the chosen purchase, or {@code "save"} if no rule fires.
-     * All checks are BitState-native.
-     */
     private String choosePurchase(BitState bs, int[] supply, int p) {
         int coins = bs.getCoins(p);
 
-        // --- Rule 0: instant win ---
-        String win = findInstantWin(bs, supply, p, coins);
+        // 0. Instant win
+        String win = findInstantWin(bs, p, coins);
         if (win != null) return win;
 
-        // --- Rule 1: TV station (fernsehsender) at 7 coins ---
-        if (!bs.hasPurple(p, PURPLE_FERNSEHSENDER) && coins >= 7) {
-            int cost = BitStateTranslator.PURPLE_CARD_COSTS[PURPLE_FERNSEHSENDER];
-            if (coins >= cost && purpleSupplyAvailable(bs, PURPLE_FERNSEHSENDER)) {
-                return "fernsehsender";
-            }
-        }
-
-        // --- Rule 2: shopping mall (EKZ) as soon as affordable ---
+        // 1. Einkaufszentrum (shopping mall) — highest landmark priority
         if (!bs.hasLandmark(p, LM_EKZ)) {
-            int cost = BitStateTranslator.LANDMARK_COSTS[LM_EKZ];
-            if (coins >= cost) return "einkaufszentrum";
+            if (canBuyLandmark(coins, LM_EKZ)) return "einkaufszentrum";
         }
 
-        // --- Rule 3: radio tower (Funkturm) after shopping mall ---
+        // 2. Fernsehsender (TV station) — buy as soon as affordable
+        if (!bs.hasPurple(p, PURPLE_FERNSEHSENDER)) {
+            int cost = BitStateTranslator.PURPLE_CARD_COSTS[PURPLE_FERNSEHSENDER];
+            if (coins >= cost && purpleAvailable(bs, PURPLE_FERNSEHSENDER)) return "fernsehsender";
+        }
+
+        // 3. Funkturm (radio tower) — after EKZ
         if (bs.hasLandmark(p, LM_EKZ) && !bs.hasLandmark(p, LM_FUNKTURM)) {
-            int cost = BitStateTranslator.LANDMARK_COSTS[LM_FUNKTURM];
-            if (coins >= cost) return "funkturm";
+            if (canBuyLandmark(coins, LM_FUNKTURM)) return "funkturm";
         }
 
-        // --- Rule 4: mini-markt if coins > 2 and not yet owned ---
+        // 4. Bahnhof + Freizeitpark pair — when 75%-confidence 2-turn income covers both
+        if (!bs.hasLandmark(p, LM_BAHNHOF) || !bs.hasLandmark(p, LM_FZP)) {
+            String pair = checkBahnhofFzpPair(bs, p, coins);
+            if (pair != null) return pair;
+        }
+
+        // 5. Wald — once, after mini-markt owned, when coins > 3; skip if already owned
+        if (bs.getCardCount(p, IDX_MINI_MARKT) > 0 && bs.getCardCount(p, IDX_WALD) == 0 && coins > 3) {
+            int cost = BitStateTranslator.NORMAL_CARD_COSTS[IDX_WALD];
+            if (coins >= cost && supply[IDX_WALD] > 0) return "wald";
+        }
+
+        // 6. Mini-markt — first copy, when coins > 2
         if (bs.getCardCount(p, IDX_MINI_MARKT) == 0 && coins > 2) {
             int cost = BitStateTranslator.NORMAL_CARD_COSTS[IDX_MINI_MARKT];
             if (coins >= cost && supply[IDX_MINI_MARKT] > 0) return "mini-markt";
         }
 
-        // --- Rule 5: bäckerei fallback (buy up to 2 copies) ---
-        // Buy if coins <= 2 OR mini-markt unavailable AND bakery count < 2
-        boolean miniMarktMissed = bs.getCardCount(p, IDX_MINI_MARKT) == 0
-                && (supply[IDX_MINI_MARKT] == 0 || coins <= 2);
-        boolean wantBaeckerei = miniMarktMissed && bs.getCardCount(p, IDX_BAECKEREI) < 2;
-        if (wantBaeckerei) {
+        // 7. Bäckerei — up to 2 copies as income fallback
+        if (bs.getCardCount(p, IDX_BAECKEREI) < 2) {
             int cost = BitStateTranslator.NORMAL_CARD_COSTS[IDX_BAECKEREI];
             if (coins >= cost && supply[IDX_BAECKEREI] > 0) return "bäckerei";
         }
 
-        // --- Rule 6: wald — once, after mini-markt owned and coins > 3 ---
-        if (bs.getCardCount(p, IDX_MINI_MARKT) > 0
-                && bs.getCardCount(p, IDX_WALD) == 0
-                && coins > 3) {
-            int cost = BitStateTranslator.NORMAL_CARD_COSTS[IDX_WALD];
-            if (coins >= cost && supply[IDX_WALD] > 0) return "wald";
-        }
+        // 8. Blue/red fallback — only when bäckerei AND mini-markt are both sold out
+        if (supply[IDX_BAECKEREI] == 0 && supply[IDX_MINI_MARKT] == 0) {
+            // Blue: bauernhof > weizenfeld
+            int bauernhofCost = BitStateTranslator.NORMAL_CARD_COSTS[IDX_BAUERNHOF];
+            if (coins >= bauernhofCost && supply[IDX_BAUERNHOF] > 0) return "bauernhof";
+            int weizenfeldCost = BitStateTranslator.NORMAL_CARD_COSTS[IDX_WEIZENFELD];
+            if (coins >= weizenfeldCost && supply[IDX_WEIZENFELD] > 0) return "weizenfeld";
 
-        // --- Rule 7: bahnhof + freizeitpark pair when 75%-confidence affordable in 2 turns ---
-        if (!bs.hasLandmark(p, LM_BAHNHOF) || !bs.hasLandmark(p, LM_FZP)) {
-            String pair = checkBahnhofFzpPair(bs, supply, p, coins);
-            if (pair != null) return pair;
-        }
-
-        // --- Rule 8: red card fallback ---
-        // café if opponent plays 1d6, familienrestaurant if opponent has Bahnhof
-        int opp = 1 - p;
-        boolean oppHasBahnhof = bs.hasLandmark(opp, LM_BAHNHOF);
-        if (oppHasBahnhof) {
-            // Familienrestaurant activates on 9+10 — better with 2d6 opponent
-            int cost = BitStateTranslator.NORMAL_CARD_COSTS[IDX_FAMILIENRESTAURANT];
-            if (coins >= cost && supply[IDX_FAMILIENRESTAURANT] > 0
-                    && bs.getCardCount(p, IDX_FAMILIENRESTAURANT) < 1) {
-                return "familienrestaurant";
-            }
-        } else {
-            // Café activates on 3 — reliable against 1d6 opponent
-            int cost = BitStateTranslator.NORMAL_CARD_COSTS[IDX_CAFE];
-            if (coins >= cost && supply[IDX_CAFE] > 0
-                    && bs.getCardCount(p, IDX_CAFE) < 1) {
-                return "café";
+            // Red: one copy only; familienrestaurant if opponent has Bahnhof (likely 2d6), else café
+            int opp = 1 - p;
+            boolean oppLikely2d6 = bs.hasLandmark(opp, LM_BAHNHOF);
+            if (oppLikely2d6) {
+                int cost = BitStateTranslator.NORMAL_CARD_COSTS[IDX_FAMILIENRESTAURANT];
+                if (coins >= cost && supply[IDX_FAMILIENRESTAURANT] > 0
+                        && bs.getCardCount(p, IDX_FAMILIENRESTAURANT) == 0) return "familienrestaurant";
+            } else {
+                int cost = BitStateTranslator.NORMAL_CARD_COSTS[IDX_CAFE];
+                if (coins >= cost && supply[IDX_CAFE] > 0
+                        && bs.getCardCount(p, IDX_CAFE) == 0) return "café";
             }
         }
-
-        // --- Rule 9: blue card fallback ---
-        // bauernhof (animal, synergizes with molkerei) > weizenfeld (food)
-        int bauernhofCost = BitStateTranslator.NORMAL_CARD_COSTS[IDX_BAUERNHOF];
-        if (coins >= bauernhofCost && supply[IDX_BAUERNHOF] > 0) return "bauernhof";
-        int weizenfeldCost = BitStateTranslator.NORMAL_CARD_COSTS[IDX_WEIZENFELD];
-        if (coins >= weizenfeldCost && supply[IDX_WEIZENFELD] > 0) return "weizenfeld";
 
         return "save";
     }
 
     // -------------------------------------------------------------------------
-    // Rule helpers
+    // Helpers
     // -------------------------------------------------------------------------
 
-    /** Finds an instant-win landmark purchase, or null. */
-    private String findInstantWin(BitState bs, int[] supply, int p, int coins) {
+    private String findInstantWin(BitState bs, int p, int coins) {
         if (bs.getLandmarkCount(p) == 3) {
             for (int i = 0; i < BitStateTranslator.NUM_LANDMARKS; i++) {
-                if (!bs.hasLandmark(p, i) && coins >= BitStateTranslator.LANDMARK_COSTS[i]) {
+                if (!bs.hasLandmark(p, i) && coins >= BitStateTranslator.LANDMARK_COSTS[i])
                     return BitStateTranslator.LANDMARK_IDS[i];
-                }
             }
         }
         return null;
     }
 
+    private boolean canBuyLandmark(int coins, int landmarkIdx) {
+        return coins >= BitStateTranslator.LANDMARK_COSTS[landmarkIdx];
+    }
+
     /**
-     * Checks the bahnhof+freizeitpark pair purchase.
-     * Buys bahnhof first (if not owned), then freizeitpark (if bahnhof owned).
-     * Only fires when 75th-percentile 2-turn income projection covers the
-     * combined remaining cost of both landmarks.
+     * Returns "bahnhof" or "freizeitpark" when the 75th-percentile projection of
+     * (current coins + 2 turns of income) covers the combined cost of both unowned
+     * landmarks. Buys bahnhof first, then freizeitpark.
      */
-    private String checkBahnhofFzpPair(BitState bs, int[] supply, int p, int coins) {
+    private String checkBahnhofFzpPair(BitState bs, int p, int coins) {
         boolean hasBahnhof = bs.hasLandmark(p, LM_BAHNHOF);
         boolean hasFzp     = bs.hasLandmark(p, LM_FZP);
 
         int costBahnhof = BitStateTranslator.LANDMARK_COSTS[LM_BAHNHOF];
         int costFzp     = BitStateTranslator.LANDMARK_COSTS[LM_FZP];
+        int totalNeeded = (!hasBahnhof ? costBahnhof : 0) + (!hasFzp ? costFzp : 0);
 
-        // Combined remaining cost for whichever landmarks are still needed
-        int remainingCost = (!hasBahnhof ? costBahnhof : 0) + (!hasFzp ? costFzp : 0);
+        double ev = CardIncome.playerEvPerRound(bs, p);
+        double meanIn2  = ev * 2.0;
+        // Conservative σ for 2 rounds: sqrt(2 * 3 * ev) — empirically reasonable for mid-game portfolios
+        double stdIn2   = Math.sqrt(2.0 * 3.0 * Math.max(ev, 0.5));
+        double p75      = coins + meanIn2 - Z75 * stdIn2;
 
-        // 2-turn income projection: mean EV + conservative std estimate
-        double evPerRound = CardIncome.playerEvPerRound(bs, p);
-        double incomeIn2Turns = evPerRound * 2.0;
+        if (p75 < totalNeeded) return null;
 
-        // Rough std approximation: sqrt(2) * sqrt(variance) ≈ sqrt(2 * 4 * evPerRound) for typical portfolios
-        // Use a simple σ ≈ sqrt(evPerRound * 3) as a conservative heuristic
-        double std2Turns = Math.sqrt(evPerRound * 3.0 * 2.0);
-        double projected75th = coins + incomeIn2Turns - PERCENTILE_75_Z * std2Turns;
-
-        if (projected75th < remainingCost) return null;  // not confident enough yet
-
-        // Ready — buy bahnhof first, then fzp
         if (!hasBahnhof && coins >= costBahnhof) return "bahnhof";
         if (hasBahnhof && !hasFzp && coins >= costFzp) return "freizeitpark";
-
         return null;
     }
 
-    /** Returns true if a purple card slot has not been taken by any player (supply proxy). */
-    private boolean purpleSupplyAvailable(BitState bs, int purpleIdx) {
-        // Purple cards are unique per player; check no player already owns this one
-        // In practice supply is tracked separately but for simplicity: if we don't own it, it might be available.
-        // The real supply check for purple is done at the GameState level; here we conservatively allow it.
+    /** True if no opponent already owns this purple card (purple cards are unique per player). */
+    private boolean purpleAvailable(BitState bs, int purpleIdx) {
         for (int i = 0; i < bs.getNumPlayers(); i++) {
-            if (i != 0 && bs.hasPurple(i, purpleIdx)) return false;
+            if (bs.hasPurple(i, purpleIdx)) return false;
         }
         return true;
-    }
-
-    // -------------------------------------------------------------------------
-    // Utility
-    // -------------------------------------------------------------------------
-
-    private static int optimalDice(BitState bs, int p) {
-        if (!bs.hasLandmark(p, BitStateTranslator.LM_BAHNHOF)) return 1;
-        double ev1 = CardIncome.playerEvPerRound(bs, p);
-        // Build temporary state with 2d6 assumption baked into evPerRound (already does this)
-        // evPerRound already picks max(1d6, 2d6) when hasBahnhof — so just return 2
-        return 2;
     }
 
     private static core.Project resolveProject(String id) {
@@ -293,3 +241,4 @@ public final class RuleBasedEngine implements SimulationEngine {
         return core.ProjectLoader.getProject(id).orElse(null);
     }
 }
+

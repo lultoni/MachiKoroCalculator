@@ -4,33 +4,19 @@ import com.google.gson.JsonObject;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import engine.EngineConfig;
+import engine.SimulationEngine;
+import iface.EngineOrchestrator;
 
 import java.io.IOException;
 
-/**
- * POST /api/session/pvai/start — activates Player-vs-AI mode for the current session.
- *
- * <h2>Request body</h2>
- * <pre>
- * {
- *   "engineId":       "mcts-v1",   // engine class id (default: "mcts-v1")
- *   "aiPlayerIndex":  1,            // seat index for the AI (0 or 1)
- *   "minThinkTimeMs": 1000,         // minimum think time before AI turn reveal (ms)
- *   "timeBudgetMs":   5000          // engine time budget per position (ms)
- * }
- * </pre>
- *
- * <h2>Response (200)</h2>
- * <pre>
- * { "ok": true, "aiPlayerIndex": 1 }
- * </pre>
- */
 final class PvAiStartHandler implements HttpHandler {
 
     private final SessionManager sessionManager;
+    private final EngineOrchestrator orchestrator;
 
-    PvAiStartHandler(SessionManager sessionManager) {
+    PvAiStartHandler(SessionManager sessionManager, EngineOrchestrator orchestrator) {
         this.sessionManager = sessionManager;
+        this.orchestrator   = orchestrator;
     }
 
     @Override
@@ -60,8 +46,13 @@ final class PvAiStartHandler implements HttpHandler {
             long   timeBudgetMs  = body.has("timeBudgetMs")   ? body.get("timeBudgetMs").getAsLong() : 5000L;
 
             EngineConfig config = new EngineConfig(500, 0, 0.0, null);
+            SimulationEngine engine = orchestrator.getEngine(engineId);
+            if (engine == null) {
+                ApiUtils.sendError(exchange, 400, "Unknown engine: " + engineId);
+                return;
+            }
 
-            sessionManager.getPvaiController().start(aiPlayerIndex, engineId, config, minThinkMs);
+            sessionManager.getPvaiController().start(aiPlayerIndex, engineId, engine, config, minThinkMs);
 
             JsonObject resp = new JsonObject();
             resp.addProperty("ok", true);

@@ -244,8 +244,8 @@ public final class MatchRunner {
     private TurnLog playTurn(GameState state, int activePlayer,
                              SimulationEngine engine, EngineConfig evalConfig,
                              MatchConfig matchConfig) {
-        // 1. Engine evaluates full turn
-        TurnPlan plan = engine.evaluateFullTurn(state, activePlayer, evalConfig);
+        // 1. Engine decides dice count (and starts tree search for MCTS)
+        TurnPlan plan = engine.planTurn(state, activePlayer, evalConfig);
 
         // 2. Roll dice
         ThreadLocalRandom rng = ThreadLocalRandom.current();
@@ -263,26 +263,28 @@ public final class MatchRunner {
             d2 = 0;
         }
 
-        // 3. Navigate tree with actual roll
+        // 3. Navigate MCTS tree to the actual roll (no-op for non-MCTS static plans)
         plan.navigateRoll(roll, doubles);
 
-        // 4. Funkturm reroll decision
+        // 4. Funkturm reroll decision — engine decides, only if player owns Funkturm
         boolean funkturmRerolled = false;
-        if (plan.hasFunkturmChoice && !plan.funkturmKeep) {
-            funkturmRerolled = true;
-            // Reroll
-            if (diceCount == 2) {
-                d1 = rng.nextInt(1, 7);
-                d2 = rng.nextInt(1, 7);
-                roll = d1 + d2;
-                doubles = (d1 == d2);
-            } else {
-                roll = rng.nextInt(1, 7);
-                d1 = roll;
-                d2 = 0;
-                doubles = false;
+        if (state.getPlayers()[activePlayer].hasProject("funkturm")) {
+            boolean keep = engine.decideFunkturm(plan, state, activePlayer, roll, doubles, evalConfig);
+            if (!keep) {
+                funkturmRerolled = true;
+                if (diceCount == 2) {
+                    d1 = rng.nextInt(1, 7);
+                    d2 = rng.nextInt(1, 7);
+                    roll = d1 + d2;
+                    doubles = (d1 == d2);
+                } else {
+                    roll = rng.nextInt(1, 7);
+                    d1 = roll;
+                    d2 = 0;
+                    doubles = false;
+                }
+                plan.navigateReroll(roll, doubles);
             }
-            plan.navigateReroll(roll, doubles);
         }
 
         // 4b. Compute per-roll luck (between final roll and income application)
@@ -300,7 +302,6 @@ public final class MatchRunner {
 
         // 5. Apply roll income
         int n = state.getPlayers().length;
-        // Per-card income attribution (computed before income is applied, same state as RollResolver)
         Map<String, int[]> cardIncome = null;
         if (matchConfig.computeCardIncome()) {
             cardIncome = RollResolver.attributeIncomePerCard(state, activePlayer, roll);
@@ -311,37 +312,28 @@ public final class MatchRunner {
             state.getPlayers()[i].setCoins(Math.max(0, newCoins));
         }
 
-        // 6. Bürohaus swap
-        // MCTS engines populate plan.hasBürohausChoice + swap details via tree navigation.
-        // Non-MCTS engines (FlatMc, Creator) use staticPlan which leaves these empty.
-        // Fallback: if the active player owns Bürohaus and rolled 6, apply greedy swap.
+        // 6. Bürohaus swap — engine decides, only if player owns Bürohaus and rolled 6
         String bürohausSwap = null;
-        boolean bürohausActivated = plan.hasBürohausChoice;
-        if (plan.hasBürohausChoice && plan.bürohausOwnCard != null
-                && plan.bürohausOppPlayer >= 0 && plan.bürohausOppCard != null) {
-            // MCTS-provided swap decision
-            try {
-                BürohausLogic.executeSwap(state, activePlayer,
-                        plan.bürohausOwnCard, plan.bürohausOppPlayer, plan.bürohausOppCard);
-                bürohausSwap = plan.bürohausOwnCard.getId() + "→" + plan.bürohausOppCard.getId();
-            } catch (IllegalArgumentException e) {
-                // Swap not valid in current state (tree divergence) — skip
-            }
-        } else if (!plan.hasBürohausChoice
-                && state.getPlayers()[activePlayer].hasProject("bürohaus") && roll == 6) {
-            // Greedy fallback for non-MCTS engines
+        boolean bürohausActivated = false;
+        if (state.getPlayers()[activePlayer].hasProject("bürohaus") && roll == 6) {
             bürohausActivated = true;
-            BürohausLogic.SwapCandidates candidates = BürohausLogic.findCandidates(state, activePlayer);
-            if (candidates.isBeneficial()) {
-                BürohausLogic.executeSwap(state, activePlayer);
-                bürohausSwap = candidates.worstOwn().getId() + "→" + candidates.bestOpp().getId();
+            SimulationEngine.BürohausDecision swap =
+                    engine.decideBürohaus(plan, state, activePlayer, evalConfig);
+            if (swap.isSwap()) {
+                try {
+                    BürohausLogic.executeSwap(state, activePlayer,
+                            swap.ownCard(), swap.oppPlayerIndex(), swap.oppCard());
+                    bürohausSwap = swap.ownCard().getId() + "→" + swap.oppCard().getId();
+                } catch (IllegalArgumentException e) {
+                    // Swap not valid in current state — skip
+                }
             }
         }
 
-        // 7. Apply purchase
+        // 7. Purchase — engine decides on post-roll, post-swap state
         String purchasedCardId = null;
         Double purchasedCardExpectedEv = null;
-        Project purchase = plan.purchase;
+        Project purchase = engine.decidePurchase(plan, state, activePlayer, evalConfig);
         if (purchase != null && purchase != RankEntry.WAIT_SENTINEL) {
             int cost = purchase.getCost();
             Player active = state.getPlayers()[activePlayer];
@@ -350,7 +342,6 @@ public final class MatchRunner {
                 active.addProject(purchase);
                 purchasedCardId = purchase.getId();
 
-                // Compute expected per-round EV for the purchased card in current context
                 if (matchConfig.computeCardIncome() && !purchase.isIs_grossprojekt()) {
                     CardIncome.PlayerStats stats = CardIncome.PlayerStats.of(active);
                     int[] oppCoins = CardIncome.buildOpponentCoins(state.getPlayers(), activePlayer);
@@ -358,7 +349,6 @@ public final class MatchRunner {
                             purchase, stats, n, oppCoins);
                 }
 
-                // Update unbuilt_projects if supply exhausted
                 if (!purchase.isIs_grossprojekt()) {
                     updateSupply(state, purchase, n);
                 }
@@ -367,7 +357,7 @@ public final class MatchRunner {
 
         int coinsAfterPurchase = state.getPlayers()[activePlayer].getCoins();
 
-        // 8. Build decision detail from engine evaluation
+        // 8. Build decision detail
         TurnLog.DecisionDetail detail = buildDecisionDetail(plan, purchasedCardId);
 
         return new TurnLog(

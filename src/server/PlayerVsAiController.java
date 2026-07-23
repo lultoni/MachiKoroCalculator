@@ -1,16 +1,15 @@
 package server;
 
-import core.BitState;
 import core.GameSession;
 import core.GameState;
 import core.Project;
-import core.ProjectLoader;
 import core.RollResolver;
 import core.TurnRecord;
 import engine.ContinuousEvaluator;
 import engine.ContinuousWorker;
 import engine.EngineConfig;
 import engine.EngineResult;
+import engine.SimulationEngine;
 import engine.TurnPlan;
 import engine.Timekeeper;
 import engine.creator.CreatorContinuousWorker;
@@ -51,6 +50,7 @@ public final class PlayerVsAiController {
     private int aiPlayerIndex;
     private String engineClassId;
     private EngineConfig engineConfig;
+    private SimulationEngine simulationEngine;
     private final Random rng = new Random();
 
     /** True while PvAI mode is active. */
@@ -74,15 +74,16 @@ public final class PlayerVsAiController {
      * @throws IllegalStateException if no session is active
      */
     public synchronized void start(int aiPlayerIndex, String engineClassId,
-                                   EngineConfig config, int minThinkTimeMs) {
+                                   SimulationEngine engine, EngineConfig config, int minThinkTimeMs) {
         GameSession session = sessionManager.getSession();
         if (session == null) throw new IllegalStateException("No active session");
 
-        if (this.active) stop(); // clean up any prior instance
+        if (this.active) stop();
 
-        this.aiPlayerIndex  = aiPlayerIndex;
-        this.engineClassId  = engineClassId;
-        this.engineConfig   = config;
+        this.aiPlayerIndex      = aiPlayerIndex;
+        this.engineClassId      = engineClassId;
+        this.engineConfig       = config;
+        this.simulationEngine   = engine;
 
         ContinuousWorker worker = createWorker(engineClassId, config);
         this.evaluator  = new ContinuousEvaluator(worker);
@@ -136,107 +137,108 @@ public final class PlayerVsAiController {
         if (session == null) return null;
 
         long thinkStart = System.currentTimeMillis();
-
-        // Block until minThinkTimeMs has elapsed, then get result
-        EngineResult result;
         try {
-            result = timekeeper.requestResult().get();
+            timekeeper.requestResult().get();
         } catch (InterruptedException | ExecutionException e) {
             Thread.currentThread().interrupt();
-            result = evaluator.peekResult();
         }
-
         long thinkTimeMs = System.currentTimeMillis() - thinkStart;
         int iterationsUsed = evaluator.iterations();
 
-        // Build TurnPlan from result (or fall back to save)
         GameState state = session.getState();
-        TurnPlan plan = buildPlan(result, state);
 
-        // Roll dice: two independent dice, then derive sum and doubles
+        // 1. Engine decides dice count (and starts tree search for MCTS)
+        TurnPlan plan = simulationEngine.planTurn(state, aiPlayerIndex, engineConfig);
         int diceCount = plan.diceCount;
+
+        // 2. Roll dice
         int die1 = rng.nextInt(6) + 1;
         int die2 = (diceCount == 2) ? (rng.nextInt(6) + 1) : 0;
         int roll = (diceCount == 2) ? (die1 + die2) : die1;
         boolean isDoubles = (diceCount == 2) && (die1 == die2);
 
-        // Navigate the plan's tree with the actual roll
+        // 3. Navigate MCTS tree to actual roll (no-op for non-MCTS)
         plan.navigateRoll(roll, isDoubles);
 
-        // Funkturm handling
+        // 4. Funkturm — engine decides
         Boolean funkturmKeep = null;
-        Integer rerollTotal  = null;
+        Integer rerollTotal = null;
         Boolean rerollIsDoubles = null;
-        if (plan.hasFunkturmChoice) {
-            funkturmKeep = plan.funkturmKeep;
-            if (!plan.funkturmKeep) {
+        if (state.getPlayers()[aiPlayerIndex].hasProject("funkturm")) {
+            boolean keep = simulationEngine.decideFunkturm(
+                    plan, state, aiPlayerIndex, roll, isDoubles, engineConfig);
+            funkturmKeep = keep;
+            if (!keep) {
                 int rd1 = rng.nextInt(6) + 1;
                 int rd2 = (diceCount == 2) ? (rng.nextInt(6) + 1) : 0;
                 int reroll = (diceCount == 2) ? (rd1 + rd2) : rd1;
-                boolean rerollDoubles = (diceCount == 2) && (rd1 == rd2);
-                rerollTotal     = reroll;
-                rerollIsDoubles = rerollDoubles;
-                plan.navigateReroll(reroll, rerollDoubles);
-                // Use reroll for applying income
-                roll      = reroll;
-                isDoubles = rerollDoubles;
+                boolean rerollDbl = (diceCount == 2) && (rd1 == rd2);
+                rerollTotal = reroll;
+                rerollIsDoubles = rerollDbl;
+                plan.navigateReroll(reroll, rerollDbl);
+                roll = reroll;
+                isDoubles = rerollDbl;
             }
         }
 
-        // Compute coin deltas (income resolution)
-        int finalRoll    = roll;
-        boolean finalDbl = isDoubles;
-        int[] coinDeltas = RollResolver.computeAllDeltasForRoll(state, aiPlayerIndex, finalRoll);
+        // 5. Apply income
+        int[] coinDeltas = RollResolver.computeAllDeltasForRoll(state, aiPlayerIndex, roll);
+        int n = state.getPlayers().length;
+        for (int i = 0; i < n; i++) {
+            state.getPlayers()[i].setCoins(
+                    Math.max(0, state.getPlayers()[i].getCoins() + coinDeltas[i]));
+        }
 
-        // Bürohaus
+        // 6. Bürohaus — engine decides on post-income state
         String bürohausOwnCardId = null;
         String bürohausOppCardId = null;
         Integer bürohausOppPlayer = null;
-        if (plan.hasBürohausChoice && plan.bürohausOwnCard != null
-                && plan.bürohausOppPlayer >= 0 && plan.bürohausOppCard != null) {
-            bürohausOwnCardId = plan.bürohausOwnCard.getId();
-            bürohausOppCardId = plan.bürohausOppCard.getId();
-            bürohausOppPlayer = plan.bürohausOppPlayer;
-        }
-
-        // Determine purchase — null out WAIT_SENTINEL so TurnRecord treats it as save
-        String purchasedCardId = null;
-        Project purchase = plan.purchase;
-        if (purchase != null && !calcs.RankEntry.WAIT_SENTINEL.getId().equals(purchase.getId())) {
-            purchasedCardId = purchase.getId();
-        } else {
-            purchase = null; // treat as save for session.applyTurn
-        }
-
-        // Validate purchase affordability AFTER income is applied — engine evaluated pre-roll coins;
-        // red-card income can reduce the AI's coins, making the planned purchase unaffordable.
-        if (purchase != null) {
-            int coinsAfterIncome = Math.max(0, state.getPlayers()[aiPlayerIndex].getCoins()
-                    + coinDeltas[aiPlayerIndex]);
-            if (coinsAfterIncome < purchase.getCost()) {
-                purchase = null;
-                purchasedCardId = null;
+        if (state.getPlayers()[aiPlayerIndex].hasProject("bürohaus") && roll == 6) {
+            SimulationEngine.BürohausDecision swap =
+                    simulationEngine.decideBürohaus(plan, state, aiPlayerIndex, engineConfig);
+            if (swap.isSwap()) {
+                try {
+                    core.BürohausLogic.executeSwap(state, aiPlayerIndex,
+                            swap.ownCard(), swap.oppPlayerIndex(), swap.oppCard());
+                    bürohausOwnCardId = swap.ownCard().getId();
+                    bürohausOppCardId = swap.oppCard().getId();
+                    bürohausOppPlayer = swap.oppPlayerIndex();
+                } catch (IllegalArgumentException e) {
+                    // Swap not valid — skip
+                }
             }
         }
 
-        // Apply turn to session
-        TurnRecord.AiDecisionSnapshot snapshot = buildAiDecisionSnapshot(result, purchasedCardId, plan.scoreIsWinRate, iterationsUsed);
+        // 7. Purchase — engine decides on post-income, post-swap state
+        Project purchase = simulationEngine.decidePurchase(plan, state, aiPlayerIndex, engineConfig);
+        if (purchase != null && calcs.RankEntry.WAIT_SENTINEL.getId().equals(purchase.getId())) {
+            purchase = null;
+        }
+        String purchasedCardId = purchase != null ? purchase.getId() : null;
+
+        // Build snapshot from latest engine result (for replay display)
+        EngineResult latestResult = evaluator.peekResult();
+        TurnRecord.AiDecisionSnapshot snapshot = buildAiDecisionSnapshot(
+                latestResult, purchasedCardId, plan.scoreIsWinRate, iterationsUsed);
+
+        int finalRoll = roll;
+        boolean finalDbl = isDoubles;
+
         TurnRecord record = new TurnRecord(
                 aiPlayerIndex, finalRoll, purchase, finalDbl,
                 coinDeltas,
-                bürohausOwnCardId != null ? plan.bürohausOwnCard : null,
-                bürohausOppCardId != null ? plan.bürohausOppCard : null,
+                bürohausOwnCardId != null ? core.ProjectLoader.getProject(bürohausOwnCardId).orElse(null) : null,
+                bürohausOppCardId != null ? core.ProjectLoader.getProject(bürohausOppCardId).orElse(null) : null,
                 bürohausOppPlayer != null ? bürohausOppPlayer : -1,
                 diceCount,
                 thinkTimeMs, snapshot);
         session.applyTurn(record);
-        sessionManager.addEngineSnapshot(null); // AI turns don't store engine snapshots in replay
+        sessionManager.addEngineSnapshot(null);
 
-        // Now start thinking on the human's upcoming turn
+        // Start thinking on the human's upcoming turn
         GameState newState = session.getState();
         int humanPlayerIndex = (aiPlayerIndex == 0) ? 1 : 0;
         evaluator.init(newState, humanPlayerIndex, engineConfig);
-        // Note: human triggers navigate() via their own actions; engine previews from initial position
         timekeeper.start(System.currentTimeMillis());
 
         return new AiTurnResult(
@@ -306,19 +308,6 @@ public final class PlayerVsAiController {
             case "heuristic-ev" -> new HeuristicContinuousWorker();
             default          -> new MctsContinuousWorker(); // covers mcts-v1 + variants
         };
-    }
-
-    private TurnPlan buildPlan(EngineResult result, GameState state) {
-        if (result == null) {
-            // Fallback: save (dice count = Bahnhof check)
-            boolean hasBahnhof = state.getPlayers()[aiPlayerIndex].hasProject("bahnhof");
-            return TurnPlan.staticPlan(hasBahnhof ? 2 : 1, calcs.RankEntry.WAIT_SENTINEL,
-                    0.0, 0, 0L, null);
-        }
-        boolean hasBahnhof = state.getPlayers()[aiPlayerIndex].hasProject("bahnhof");
-        int diceCount = hasBahnhof ? 2 : 1;
-        return engine.SimulationEngine.staticPlanWithInstantWinPriority(
-                diceCount, result, state, aiPlayerIndex, 0L);
     }
 
     private int rollDice(int count) {

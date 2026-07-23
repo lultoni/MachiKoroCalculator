@@ -119,7 +119,7 @@ public final class ApiServer {
         httpServer.createContext("/api/session/roll-luck",     new SessionRollLuckHandler(sessionManager));
 
         // Player-vs-AI endpoints
-        httpServer.createContext("/api/session/pvai/start",      new PvAiStartHandler(sessionManager));
+        httpServer.createContext("/api/session/pvai/start",      new PvAiStartHandler(sessionManager, orchestrator));
         httpServer.createContext("/api/session/pvai/human-turn", new PvAiHumanTurnHandler(sessionManager));
         httpServer.createContext("/api/session/pvai/ai-turn",    new PvAiAiTurnHandler(sessionManager));
         httpServer.createContext("/api/session/pvai/save",       new PvAiSaveHandler(sessionManager, pvAiGameStore));

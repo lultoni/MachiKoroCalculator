@@ -148,6 +148,49 @@ public class MctsV1Engine implements SimulationEngine {
         return new TurnPlan(tree, diceCount, iterationsUsed, computeTimeMs);
     }
 
+    // -------------------------------------------------------------------------
+    // Per-step decision methods — delegate to TurnPlan tree navigation
+    // -------------------------------------------------------------------------
+
+    @Override
+    public TurnPlan planTurn(GameState state, int playerIndex, EngineConfig config) {
+        return evaluateFullTurn(state, playerIndex, config);
+    }
+
+    /**
+     * MCTS Funkturm decision: reads the pre-computed choice from the tree.
+     * MatchRunner has already called plan.navigateRoll before this.
+     */
+    @Override
+    public boolean decideFunkturm(TurnPlan plan, GameState state, int playerIndex,
+                                   int roll, boolean isDoubles, EngineConfig config) {
+        return plan.funkturmKeep;
+    }
+
+    /**
+     * MCTS Bürohaus decision: reads the pre-computed swap from the tree.
+     * MatchRunner has already called navigateRoll (and navigateReroll if applicable).
+     */
+    @Override
+    public SimulationEngine.BürohausDecision decideBürohaus(TurnPlan plan, GameState state,
+                                                             int playerIndex, EngineConfig config) {
+        if (plan.hasBürohausChoice && plan.bürohausOwnCard != null
+                && plan.bürohausOppPlayer >= 0 && plan.bürohausOppCard != null) {
+            return new SimulationEngine.BürohausDecision(
+                    plan.bürohausOwnCard, plan.bürohausOppCard, plan.bürohausOppPlayer);
+        }
+        return SimulationEngine.BürohausDecision.noSwap();
+    }
+
+    /**
+     * MCTS purchase decision: reads the pre-computed purchase from the tree.
+     */
+    @Override
+    public core.Project decidePurchase(TurnPlan plan, GameState state,
+                                        int playerIndex, EngineConfig config) {
+        return plan.purchase != null ? plan.purchase : calcs.RankEntry.WAIT_SENTINEL;
+    }
+
     /**
      * Builds a full-turn MctsTree rooted at DiceChoiceNode or ChanceNode.
      * Overridable by subclasses to inject custom rollout functions.

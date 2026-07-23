@@ -82,6 +82,34 @@ public final class RuleBasedEngine implements SimulationEngine {
         return plan;
     }
 
+    /**
+     * Reroll if the current roll yields below-average expected income.
+     * "Average" = E[income] over all possible outcomes, weighted by dice probabilities.
+     */
+    @Override
+    public boolean decideFunkturm(engine.TurnPlan plan, GameState state, int playerIndex,
+                                   int roll, boolean isDoubles, engine.EngineConfig config) {
+        core.BitState bs = core.BitState.fromGameState(state);
+        boolean twoDice = plan.diceCount == 2;
+
+        double currentIncome = bs.computeActivePlayerRollIncome(playerIndex, roll);
+
+        double expectedIncome = 0.0;
+        if (!twoDice) {
+            for (int r = 1; r <= 6; r++) {
+                expectedIncome += core.CardIncome.P1[r] * bs.computeActivePlayerRollIncome(playerIndex, r);
+            }
+        } else {
+            for (int r = 2; r <= 12; r++) {
+                double prob = core.CardIncome.P2[r];
+                if (prob <= 0) continue;
+                expectedIncome += prob * bs.computeActivePlayerRollIncome(playerIndex, r);
+            }
+        }
+
+        return currentIncome >= expectedIncome;
+    }
+
     @Override
     public EngineResult evaluate(GameState state, int playerIndex, EngineConfig config) {
         long startTime = System.currentTimeMillis();

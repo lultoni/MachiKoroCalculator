@@ -61,11 +61,67 @@ import java.util.Map;
  */
 public final class CreatorEngine implements SimulationEngine {
 
+    /** Samples per reroll outcome for Funkturm evaluation. Small to keep latency <300ms. */
+    private static final int FUNKTURM_SAMPLES_PER_OUTCOME = 10;
+
     @Override
     public String id() { return "creator"; }
 
     @Override
     public String description() { return "Creator Engine — heuristic-seeded Flat Monte Carlo"; }
+
+    /**
+     * Keep if MC win rate of this roll >= expected MC win rate over reroll distribution.
+     * Uses the same rollout policy as the main evaluation (configurable via config).
+     * Runs {@link #FUNKTURM_SAMPLES_PER_OUTCOME} rollouts per outcome for speed.
+     */
+    @Override
+    public boolean decideFunkturm(engine.TurnPlan plan, GameState state, int playerIndex,
+                                   int roll, boolean isDoubles, engine.EngineConfig config) {
+        BitState preRoll = BitState.fromGameState(state);
+        int[] supply = preRoll.buildSupplyArray();
+        boolean twoDice = plan.diceCount == 2;
+        int n = preRoll.getNumPlayers();
+        int nextPlayer = (playerIndex + 1) % n;
+        BitRolloutFn rolloutFn = selectRolloutFn(config);
+
+        // Keep win rate
+        BitState afterKeep = preRoll.copy();
+        afterKeep.applyRollIncome(playerIndex, roll);
+        double keepWr = sampleWinRate(afterKeep, supply, nextPlayer, playerIndex,
+                FUNKTURM_SAMPLES_PER_OUTCOME, rolloutFn);
+
+        // Expected win rate over reroll distribution
+        double rerollWr = 0.0;
+        if (!twoDice) {
+            for (int r = 1; r <= 6; r++) {
+                BitState s = preRoll.copy();
+                s.applyRollIncome(playerIndex, r);
+                rerollWr += core.CardIncome.P1[r] * sampleWinRate(s, supply, nextPlayer, playerIndex,
+                        FUNKTURM_SAMPLES_PER_OUTCOME, rolloutFn);
+            }
+        } else {
+            for (int r = 2; r <= 12; r++) {
+                double prob = core.CardIncome.P2[r];
+                if (prob <= 0) continue;
+                BitState s = preRoll.copy();
+                s.applyRollIncome(playerIndex, r);
+                rerollWr += prob * sampleWinRate(s, supply, nextPlayer, playerIndex,
+                        FUNKTURM_SAMPLES_PER_OUTCOME, rolloutFn);
+            }
+        }
+
+        return keepWr >= rerollWr;
+    }
+
+    private static double sampleWinRate(BitState bs, int[] supply, int nextPlayer, int perspective,
+                                        int n, BitRolloutFn rolloutFn) {
+        double wins = 0.0;
+        for (int i = 0; i < n; i++) {
+            wins += rolloutFn.simulate(bs, supply, nextPlayer, perspective);
+        }
+        return wins / n;
+    }
 
     @Override
     public TurnPlan evaluateFullTurn(GameState state, int playerIndex, EngineConfig config) {

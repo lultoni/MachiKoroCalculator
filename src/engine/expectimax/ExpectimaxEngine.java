@@ -75,6 +75,45 @@ public final class ExpectimaxEngine implements SimulationEngine {
     @Override
     public String description() { return "Expectimax — deterministic minimax with probability-weighted chance nodes"; }
 
+    /**
+     * Keep if leafEval(current roll) >= E[leafEval(reroll)].
+     * Uses the same leaf evaluation function as the tree search, consistent with
+     * Expectimax's search-based identity. Runs at depth 0 (leaf-eval only) since
+     * the search budget has already been spent in planTurn.
+     */
+    @Override
+    public boolean decideFunkturm(engine.TurnPlan plan, GameState state, int playerIndex,
+                                   int roll, boolean isDoubles, engine.EngineConfig config) {
+        String evalFn = config.getExtra("leafEval", "winprob");
+        BitState preRoll = BitState.fromGameState(state);
+        boolean twoDice = plan.diceCount == 2;
+
+        // Keep value: apply this roll's income, evaluate position
+        BitState afterKeep = preRoll.copy();
+        applyRollIncomeOnly(afterKeep, playerIndex, roll);
+        double keepVal = leafEval(afterKeep, playerIndex, evalFn);
+
+        // Reroll expected value: average leafEval over all outcomes
+        double rerollVal = 0.0;
+        if (!twoDice) {
+            for (int r = 1; r <= 6; r++) {
+                BitState s = preRoll.copy();
+                applyRollIncomeOnly(s, playerIndex, r);
+                rerollVal += CardIncome.P1[r] * leafEval(s, playerIndex, evalFn);
+            }
+        } else {
+            for (int r = 2; r <= 12; r++) {
+                double prob = CardIncome.P2[r];
+                if (prob <= 0) continue;
+                BitState s = preRoll.copy();
+                applyRollIncomeOnly(s, playerIndex, r);
+                rerollVal += prob * leafEval(s, playerIndex, evalFn);
+            }
+        }
+
+        return keepVal >= rerollVal;
+    }
+
     @Override
     public TurnPlan evaluateFullTurn(GameState state, int playerIndex, EngineConfig config) {
         long start = System.currentTimeMillis();

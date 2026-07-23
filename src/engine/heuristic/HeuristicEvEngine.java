@@ -69,6 +69,43 @@ public final class HeuristicEvEngine implements SimulationEngine {
     @Override
     public String description() { return "Heuristic EV — zero-search, formula-based ranking"; }
 
+    /**
+     * Keep if WinProb(current roll) >= E[WinProb(reroll)].
+     * Both sides use {@link calcs.WinProbability#computeBaselineWinProb}, consistent
+     * with this engine's heuristic-formula identity.
+     */
+    @Override
+    public boolean decideFunkturm(TurnPlan plan, GameState state, int playerIndex,
+                                   int roll, boolean isDoubles, EngineConfig config) {
+        core.BitState preRoll = core.BitState.fromGameState(state);
+        boolean twoDice = plan.diceCount == 2;
+
+        // Keep value: apply this roll's income, evaluate
+        core.BitState afterKeep = preRoll.copy();
+        afterKeep.applyRollIncome(playerIndex, roll);
+        double wpKeep = calcs.WinProbability.computeBaselineWinProb(afterKeep, playerIndex);
+
+        // Reroll expected value: average WP over all outcomes
+        double wpReroll = 0.0;
+        if (!twoDice) {
+            for (int r = 1; r <= 6; r++) {
+                core.BitState s = preRoll.copy();
+                s.applyRollIncome(playerIndex, r);
+                wpReroll += core.CardIncome.P1[r] * calcs.WinProbability.computeBaselineWinProb(s, playerIndex);
+            }
+        } else {
+            for (int r = 2; r <= 12; r++) {
+                double prob = core.CardIncome.P2[r];
+                if (prob <= 0) continue;
+                core.BitState s = preRoll.copy();
+                s.applyRollIncome(playerIndex, r);
+                wpReroll += prob * calcs.WinProbability.computeBaselineWinProb(s, playerIndex);
+            }
+        }
+
+        return wpKeep >= wpReroll;
+    }
+
     @Override
     public TurnPlan evaluateFullTurn(GameState state, int playerIndex, EngineConfig config) {
         long start = System.currentTimeMillis();

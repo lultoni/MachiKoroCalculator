@@ -50,6 +50,57 @@ import java.util.Map;
  */
 public final class FlatMcEngine implements SimulationEngine {
 
+    /** Samples per reroll outcome for Funkturm evaluation. Small to keep latency <300ms. */
+    private static final int FUNKTURM_SAMPLES_PER_OUTCOME = 10;
+
+    /**
+     * Keep if MC win rate of this roll >= expected MC win rate over reroll distribution.
+     * Runs {@link #FUNKTURM_SAMPLES_PER_OUTCOME} rollouts per outcome — a speed/accuracy
+     * tradeoff (full budget would be 350-600 rollouts and ~2-3s).
+     */
+    @Override
+    public boolean decideFunkturm(engine.TurnPlan plan, GameState state, int playerIndex,
+                                   int roll, boolean isDoubles, engine.EngineConfig config) {
+        BitState preRoll = BitState.fromGameState(state);
+        int[] supply = preRoll.buildSupplyArray();
+        boolean twoDice = plan.diceCount == 2;
+        int n = preRoll.getNumPlayers();
+        int nextPlayer = (playerIndex + 1) % n;
+
+        // Keep win rate
+        BitState afterKeep = preRoll.copy();
+        afterKeep.applyRollIncome(playerIndex, roll);
+        double keepWr = sampleWinRate(afterKeep, supply, nextPlayer, playerIndex, FUNKTURM_SAMPLES_PER_OUTCOME);
+
+        // Expected win rate over reroll distribution
+        double rerollWr = 0.0;
+        if (!twoDice) {
+            for (int r = 1; r <= 6; r++) {
+                BitState s = preRoll.copy();
+                s.applyRollIncome(playerIndex, r);
+                rerollWr += core.CardIncome.P1[r] * sampleWinRate(s, supply, nextPlayer, playerIndex, FUNKTURM_SAMPLES_PER_OUTCOME);
+            }
+        } else {
+            for (int r = 2; r <= 12; r++) {
+                double prob = core.CardIncome.P2[r];
+                if (prob <= 0) continue;
+                BitState s = preRoll.copy();
+                s.applyRollIncome(playerIndex, r);
+                rerollWr += prob * sampleWinRate(s, supply, nextPlayer, playerIndex, FUNKTURM_SAMPLES_PER_OUTCOME);
+            }
+        }
+
+        return keepWr >= rerollWr;
+    }
+
+    private static double sampleWinRate(BitState bs, int[] supply, int nextPlayer, int perspective, int n) {
+        double wins = 0.0;
+        for (int i = 0; i < n; i++) {
+            wins += BitMctsRollout.simulateBit(bs, supply, nextPlayer, perspective);
+        }
+        return wins / n;
+    }
+
     /** Top-K options to focus on after survey phase. */
     private static final int FOCUS_TOP_K = 5;
 

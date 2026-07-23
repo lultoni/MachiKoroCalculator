@@ -49,7 +49,7 @@ const PARAM_HINTS: Record<string, { description: string; options?: string[] }> =
   rolloutTemperature:   { description: 'Boltzmann temperature (e.g. 0.3, 0.7, 2.0)' },
   maxRolloutDepth:      { description: 'Max rollout depth in turns (e.g. 3, 7, 10)' },
   maxDepthRounds:       { description: 'Expectimax search depth (e.g. 1, 2)' },
-  leafEval:             { description: 'Leaf evaluator function', options: ['winprob', 'composite'] },
+  leafEval:             { description: 'Leaf evaluator function', options: ['winprob', 'composite', 'accurate', 'etw'] },
 };
 
 /** Format milliseconds as human-readable elapsed time. */

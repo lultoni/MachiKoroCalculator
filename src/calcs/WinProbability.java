@@ -1,5 +1,7 @@
 package calcs;
 
+import core.BitState;
+import core.BitStateTranslator;
 import core.CardIncome;
 import core.GameState;
 import core.Player;
@@ -17,6 +19,10 @@ import core.ProjectLoader;
  * </ul>
  *
  * <p>All methods are stateless and side-effect-free.
+ *
+ * <p><b>BitState-native hot path:</b> {@link #computeBaselineWinProb(BitState, int)} is the
+ * real implementation — no {@code toGameState()} call. The {@link #computeBaselineWinProb(GameState, int)}
+ * overload is a bridge that converts via {@code BitState.fromGameState()}.
  */
 public final class WinProbability {
 
@@ -47,23 +53,24 @@ public final class WinProbability {
 
     /**
      * Fast heuristic win probability estimate (~0.25 MAE, <1ms).
-     * Used by MCTS rollouts, Expectimax, and other engine internals
-     * where speed is critical.
+     * Bridge overload — converts to BitState and delegates to the native implementation.
      */
     public static double computeBaselineWinProb(GameState gs, int playerIndex) {
-        Player[] players = gs.getPlayers();
-        int n = players.length;
-
-        if (n == 2) {
-            double logit = computeLogit(gs, playerIndex);
-            return sigmoid(logit);
-        }
-        double[] scores = computeScores(gs);
-        return softmaxEntry(scores, playerIndex);
+        return computeBaselineWinProb(BitState.fromGameState(gs), playerIndex);
     }
 
-    public static double computeBaselineWinProb(core.BitState bs, int playerIndex) {
-        return computeBaselineWinProb(bs.toGameState(), playerIndex);
+    /**
+     * Fast heuristic win probability estimate (~0.25 MAE, <1ms).
+     * Real implementation — fully BitState-native, no {@code toGameState()} call.
+     * Used by MCTS rollouts, Expectimax, and other engine internals where speed is critical.
+     */
+    public static double computeBaselineWinProb(BitState bs, int playerIndex) {
+        int n = bs.getNumPlayers();
+        if (n == 2) {
+            return sigmoid(computeLogitBit(bs, playerIndex));
+        }
+        double[] scores = computeScoresBit(bs);
+        return softmaxEntry(scores, playerIndex);
     }
 
     /**
@@ -78,7 +85,7 @@ public final class WinProbability {
         return GameSimulator.mcWinRate(gs, playerIndex, MICRO_MC_SIMS);
     }
 
-    public static double computeAccurateWinProb(core.BitState bs, int playerIndex) {
+    public static double computeAccurateWinProb(BitState bs, int playerIndex) {
         return computeAccurateWinProb(bs.toGameState(), playerIndex);
     }
 
@@ -94,7 +101,7 @@ public final class WinProbability {
         return GameSimulator.mcWinRate(gs, playerIndex, HYBRID_MC_SIMS);
     }
 
-    public static double computeHybridWinProb(core.BitState bs, int playerIndex) {
+    public static double computeHybridWinProb(BitState bs, int playerIndex) {
         return computeHybridWinProb(bs.toGameState(), playerIndex);
     }
 
@@ -111,69 +118,86 @@ public final class WinProbability {
     }
 
     // -------------------------------------------------------------------------
-    // Fast logistic model
+    // Fast logistic model — BitState-native
     // -------------------------------------------------------------------------
 
-    private static double computeLogit(GameState gs, int playerIndex) {
-        Player[] players = gs.getPlayers();
-        int n = players.length;
+    private static double computeLogitBit(BitState bs, int playerIndex) {
+        int n = bs.getNumPlayers();
         int oi = 1 - playerIndex;
 
-        int[] oppCoinsI = CardIncome.buildOpponentCoins(players, playerIndex);
-        int[] oppCoinsJ = CardIncome.buildOpponentCoins(players, oi);
-        double grossSelf = CardIncome.playerEvPerRound(players[playerIndex], n, oppCoinsI);
-        double grossOpp = CardIncome.playerEvPerRound(players[oi], n, oppCoinsJ);
+        double grossSelf = CardIncome.playerEvPerRound(bs, playerIndex);
+        double grossOpp  = CardIncome.playerEvPerRound(bs, oi);
 
-        double investSelf = 0, investOpp = 0;
-        for (Project p : players[playerIndex].getOwned_projects())
-            if (!p.isIs_grossprojekt()) investSelf += p.getCost();
-        for (Project p : players[oi].getOwned_projects())
-            if (!p.isIs_grossprojekt()) investOpp += p.getCost();
+        double investSelf = investmentCostBit(bs, playerIndex);
+        double investOpp  = investmentCostBit(bs, oi);
 
-        double drainSelf = computeRedDrain(players, playerIndex, n, oppCoinsI);
-        double drainOpp = computeRedDrain(players, oi, n, oppCoinsJ);
+        double drainSelf = computeRedDrainBit(bs, playerIndex, n);
+        double drainOpp  = computeRedDrainBit(bs, oi, n);
 
         double netSelf = Math.max(0.5, grossSelf - drainSelf * 0.5);
-        double netOpp = Math.max(0.5, grossOpp - drainOpp * 0.5);
+        double netOpp  = Math.max(0.5, grossOpp  - drainOpp  * 0.5);
 
-        int remSelf = remainingLandmarkCost(players[playerIndex]);
-        int remOpp = remainingLandmarkCost(players[oi]);
+        int remSelf = remainingLandmarkCostBit(bs, playerIndex);
+        int remOpp  = remainingLandmarkCostBit(bs, oi);
 
-        double ttwSelf = Math.max(0, remSelf - players[playerIndex].getCoins()) / netSelf;
-        double ttwOpp = Math.max(0, remOpp - players[oi].getCoins()) / netOpp;
+        double ttwSelf = Math.max(0, remSelf - bs.getCoins(playerIndex)) / netSelf;
+        double ttwOpp  = Math.max(0, remOpp  - bs.getCoins(oi))         / netOpp;
 
-        int lmSelf = players[playerIndex].getLandmarkCount();
-        int lmOpp = players[oi].getLandmarkCount();
+        int lmSelf = bs.getLandmarkCount(playerIndex);
+        int lmOpp  = bs.getLandmarkCount(oi);
 
-        double coinUtilAdv = coinUtility(players[playerIndex]) - coinUtility(players[oi]);
+        double coinUtilAdv = coinUtilityBit(bs, playerIndex) - coinUtilityBit(bs, oi);
 
         double avgTtw = (ttwSelf + ttwOpp) / 2.0;
         double incomeTimesHorizon = (grossSelf - grossOpp) * Math.min(avgTtw, 20.0);
 
-        // Endgame urgency: 3-landmark positions are highly non-linear
-        double urgency = endgameUrgency(players[playerIndex], remSelf, netSelf)
-                       - endgameUrgency(players[oi], remOpp, netOpp);
+        double urgency = endgameUrgencyBit(bs, playerIndex, remSelf, netSelf)
+                       - endgameUrgencyBit(bs, oi, remOpp, netOpp);
 
         return W_BIAS
-                + W_INCOME_ADV * (grossSelf - grossOpp)
-                + W_COIN_ADV * coinUtilAdv
-                + W_INVESTMENT_ADV * (investSelf - investOpp)
-                + W_LANDMARK_ADV * (lmSelf - lmOpp)
-                + W_TTW_GAP * (ttwOpp - ttwSelf)
-                + W_RED_DRAIN * (drainSelf - drainOpp)
-                + 0.05 * incomeTimesHorizon
+                + W_INCOME_ADV      * (grossSelf - grossOpp)
+                + W_COIN_ADV        * coinUtilAdv
+                + W_INVESTMENT_ADV  * (investSelf - investOpp)
+                + W_LANDMARK_ADV    * (lmSelf - lmOpp)
+                + W_TTW_GAP         * (ttwOpp - ttwSelf)
+                + W_RED_DRAIN       * (drainSelf - drainOpp)
+                + 0.05              * incomeTimesHorizon
                 + W_ENDGAME_URGENCY * urgency;
     }
 
-    private static double coinUtility(Player player) {
+    /** Sum of non-landmark card costs owned by a player — reads directly from BitState. */
+    private static double investmentCostBit(BitState bs, int player) {
+        double total = 0;
+        for (int i = 0; i < BitStateTranslator.NUM_NORMAL_CARDS; i++) {
+            int cnt = bs.getCardCount(player, i);
+            if (cnt > 0) total += cnt * BitStateTranslator.NORMAL_CARD_COSTS[i];
+        }
+        for (int i = 0; i < BitStateTranslator.NUM_PURPLE_CARDS; i++) {
+            if (bs.hasPurple(player, i)) total += BitStateTranslator.PURPLE_CARD_COSTS[i];
+        }
+        return total;
+    }
+
+    /** Remaining total cost of unbuilt landmarks for a player. */
+    private static int remainingLandmarkCostBit(BitState bs, int player) {
+        int total = 0;
+        for (int i = 0; i < BitStateTranslator.NUM_LANDMARKS; i++) {
+            if (!bs.hasLandmark(player, i)) total += BitStateTranslator.LANDMARK_COSTS[i];
+        }
+        return total;
+    }
+
+    /** Coin utility: non-linear value of current coins relative to the cheapest unbuilt landmark. */
+    private static double coinUtilityBit(BitState bs, int player) {
         int cheapest = Integer.MAX_VALUE;
-        for (Project p : ProjectLoader.getAllProjects()) {
-            if (p.isIs_grossprojekt() && !player.hasProject(p.getId())) {
-                if (p.getCost() < cheapest) cheapest = p.getCost();
+        for (int i = 0; i < BitStateTranslator.NUM_LANDMARKS; i++) {
+            if (!bs.hasLandmark(player, i)) {
+                int cost = BitStateTranslator.LANDMARK_COSTS[i];
+                if (cost < cheapest) cheapest = cost;
             }
         }
         if (cheapest == Integer.MAX_VALUE) return 0;
-        double coins = player.getCoins();
+        double coins = bs.getCoins(player);
         if (coins >= cheapest) return cheapest + Math.sqrt(coins - cheapest);
         return coins * coins / cheapest;
     }
@@ -184,137 +208,125 @@ public final class WinProbability {
      * their next turn with very high probability. This binary threshold
      * is poorly captured by linear features.
      */
-    private static double endgameUrgency(Player player, int remainingCost, double netIncome) {
-        int lm = player.getLandmarkCount();
+    private static double endgameUrgencyBit(BitState bs, int player, int remainingCost, double netIncome) {
+        int lm = bs.getLandmarkCount(player);
         if (lm < 2) return 0.0;
-        int coins = player.getCoins();
+        int coins = bs.getCoins(player);
         if (lm == 3) {
-            // Can afford the last landmark — near-certain win
             if (coins >= remainingCost) return 3.0;
-            // Close to affording — scaled by proximity
             double proximity = (double) coins / Math.max(1, remainingCost);
-            // Also factor in income: high income means 1-2 turns away
             double turnsAway = Math.max(0, remainingCost - coins) / netIncome;
             if (turnsAway <= 1.0) return 2.5 * proximity;
             if (turnsAway <= 3.0) return 1.5 * proximity;
             return 0.5 * proximity;
         }
-        if (lm == 2) {
-            // 2 landmarks — mild urgency based on proximity
-            double proximity = 1.0 - (double) Math.max(0, remainingCost - coins)
-                    / Math.max(1, remainingCost);
-            return 0.3 * proximity;
-        }
-        return 0.0;
+        // lm == 2
+        double proximity = 1.0 - (double) Math.max(0, remainingCost - coins)
+                / Math.max(1, remainingCost);
+        return 0.3 * proximity;
     }
 
-    private static double computeRedDrain(Player[] players, int targetIdx, int n, int[] oppCoins) {
+    /**
+     * Expected coin drain per round inflicted on {@code targetIdx} by all opponents' red cards.
+     * Reads card counts and EKZ status directly from BitState.
+     */
+    private static double computeRedDrainBit(BitState bs, int targetIdx, int n) {
+        int targetCoins = Math.max(1, bs.getCoins(targetIdx));
         double drain = 0;
         for (int j = 0; j < n; j++) {
             if (j == targetIdx) continue;
-            for (Project card : players[j].getOwned_projects()) {
-                if (!"rot".equals(card.getColor())) continue;
-                CardIncome.PlayerStats oppStats = CardIncome.PlayerStats.of(players[j]);
-                for (int r = 1; r <= 6; r++) {
-                    int loss = CardIncome.get_I(r, card.getId(), false, oppStats.hasEinkaufszentrum,
-                            oppStats.foodCount, oppStats.animalCount, oppStats.productionCount,
-                            Math.max(1, players[targetIdx].getCoins()), oppCoins);
-                    if (loss < 0) drain += CardIncome.P1[r] * (-loss);
-                }
+            boolean oppHasEKZ = bs.hasLandmark(j, BitStateTranslator.LM_EKZ);
+            // café (idx 5): r=3
+            int cafeCount = bs.getCardCount(j, 5);
+            if (cafeCount > 0) {
+                int demand = cafeCount * (oppHasEKZ ? 2 : 1);
+                double loss = Math.min(demand, targetCoins);
+                drain += CardIncome.P1[3] * loss;
+            }
+            // familienrestaurant (idx 10): r=9, r=10
+            int restCount = bs.getCardCount(j, 10);
+            if (restCount > 0) {
+                int demand = restCount * (oppHasEKZ ? 3 : 2);
+                double loss = Math.min(demand, targetCoins);
+                drain += (CardIncome.P1[9] + CardIncome.P1[10]) * loss;
             }
         }
         return drain;
-    }
-
-    private static int remainingLandmarkCost(Player player) {
-        int total = 0;
-        for (Project p : ProjectLoader.getAllProjects()) {
-            if (p.isIs_grossprojekt() && !player.hasProject(p.getId())) total += p.getCost();
-        }
-        return total;
     }
 
     /**
      * Computes estimated turns-to-win for each player (used by diagnostics).
      */
     static double[] computeTurnsToWin(GameState gs) {
-        Player[] players = gs.getPlayers();
-        int n = players.length;
+        BitState bs = BitState.fromGameState(gs);
+        return computeTurnsToWinBit(bs);
+    }
+
+    static double[] computeTurnsToWinBit(BitState bs) {
+        int n = bs.getNumPlayers();
         double[] ttw = new double[n];
         for (int i = 0; i < n; i++) {
-            int[] oppCoins = CardIncome.buildOpponentCoins(players, i);
-            double gross = CardIncome.playerEvPerRound(players[i], n, oppCoins);
+            double gross = CardIncome.playerEvPerRound(bs, i);
             double net = Math.max(0.5, gross);
-            int remCost = remainingLandmarkCost(players[i]);
-            double deficit = Math.max(0, remCost - players[i].getCoins());
+            int remCost = remainingLandmarkCostBit(bs, i);
+            double deficit = Math.max(0, remCost - bs.getCoins(i));
             ttw[i] = deficit / net;
         }
         return ttw;
     }
 
     // -------------------------------------------------------------------------
-    // N-player scoring (fast mode)
+    // N-player scoring (fast mode) — BitState-native
     // -------------------------------------------------------------------------
 
     static double[] computeScores(GameState gs) {
-        Player[] players = gs.getPlayers();
-        int n = players.length;
+        return computeScoresBit(BitState.fromGameState(gs));
+    }
 
-        // Pre-compute per-player features
-        double[] gross = new double[n];
+    static double[] computeScoresBit(BitState bs) {
+        int n = bs.getNumPlayers();
+
+        double[] gross     = new double[n];
         double[] netIncome = new double[n];
-        double[] invest = new double[n];
-        int[] remCost = new int[n];
-        int[] lm = new int[n];
-        double[] coinUtil = new double[n];
-        double[] drain = new double[n];
-        double[] urgency = new double[n];
+        double[] invest    = new double[n];
+        int[]    remCost   = new int[n];
+        int[]    lm        = new int[n];
+        double[] coinUtil  = new double[n];
+        double[] drain     = new double[n];
+        double[] urgency   = new double[n];
 
         for (int i = 0; i < n; i++) {
-            int[] oppCoins = CardIncome.buildOpponentCoins(players, i);
-            gross[i] = CardIncome.playerEvPerRound(players[i], n, oppCoins);
-            drain[i] = computeRedDrain(players, i, n, oppCoins);
+            gross[i]     = CardIncome.playerEvPerRound(bs, i);
+            drain[i]     = computeRedDrainBit(bs, i, n);
             netIncome[i] = Math.max(0.5, gross[i] - drain[i] * 0.5);
-
-            for (Project p : players[i].getOwned_projects())
-                if (!p.isIs_grossprojekt()) invest[i] += p.getCost();
-
-            remCost[i] = remainingLandmarkCost(players[i]);
-            lm[i] = players[i].getLandmarkCount();
-            coinUtil[i] = coinUtility(players[i]);
-            urgency[i] = endgameUrgency(players[i], remCost[i], netIncome[i]);
+            invest[i]    = investmentCostBit(bs, i);
+            remCost[i]   = remainingLandmarkCostBit(bs, i);
+            lm[i]        = bs.getLandmarkCount(i);
+            coinUtil[i]  = coinUtilityBit(bs, i);
+            urgency[i]   = endgameUrgencyBit(bs, i, remCost[i], netIncome[i]);
         }
 
-        // Compute averages for relative features
         double avgGross = 0, avgCoinUtil = 0, avgInvest = 0, avgLm = 0, avgDrain = 0, avgUrgency = 0;
         for (int i = 0; i < n; i++) {
-            avgGross += gross[i];
+            avgGross    += gross[i];
             avgCoinUtil += coinUtil[i];
-            avgInvest += invest[i];
-            avgLm += lm[i];
-            avgDrain += drain[i];
-            avgUrgency += urgency[i];
+            avgInvest   += invest[i];
+            avgLm       += lm[i];
+            avgDrain    += drain[i];
+            avgUrgency  += urgency[i];
         }
         avgGross /= n; avgCoinUtil /= n; avgInvest /= n;
-        avgLm /= n; avgDrain /= n; avgUrgency /= n;
+        avgLm    /= n; avgDrain    /= n; avgUrgency /= n;
 
-        // Per-player logit using same features as 2-player model
         double[] scores = new double[n];
         for (int i = 0; i < n; i++) {
-            double incomeAdv = gross[i] - avgGross;
-            double coinAdv = coinUtil[i] - avgCoinUtil;
-            double investAdv = invest[i] - avgInvest;
-            double lmAdv = lm[i] - avgLm;
-            double drainAdv = drain[i] - avgDrain;
-            double urgencyAdv = urgency[i] - avgUrgency;
-
             scores[i] = W_BIAS
-                    + W_INCOME_ADV * incomeAdv
-                    + W_COIN_ADV * coinAdv
-                    + W_INVESTMENT_ADV * investAdv
-                    + W_LANDMARK_ADV * lmAdv
-                    + W_RED_DRAIN * drainAdv
-                    + W_ENDGAME_URGENCY * urgencyAdv;
+                    + W_INCOME_ADV     * (gross[i]    - avgGross)
+                    + W_COIN_ADV       * (coinUtil[i] - avgCoinUtil)
+                    + W_INVESTMENT_ADV * (invest[i]   - avgInvest)
+                    + W_LANDMARK_ADV   * (lm[i]       - avgLm)
+                    + W_RED_DRAIN      * (drain[i]    - avgDrain)
+                    + W_ENDGAME_URGENCY* (urgency[i]  - avgUrgency);
         }
         return scores;
     }
@@ -334,7 +346,7 @@ public final class WinProbability {
         return Math.exp((scores[index] - max) / T) / sumExp;
     }
 
-    private static double sigmoid(double x) {
+    static double sigmoid(double x) {
         return 1.0 / (1.0 + Math.exp(-x));
     }
 }

@@ -70,7 +70,7 @@ public final class CreatorEngine implements SimulationEngine {
     @Override
     public TurnPlan evaluateFullTurn(GameState state, int playerIndex, EngineConfig config) {
         long start = System.currentTimeMillis();
-        int diceCount = Calcs.optimalDiceCount(state, playerIndex);
+        int diceCount = Calcs.optimalDiceCount(BitState.fromGameState(state), playerIndex);
         EngineResult result = evaluate(state, playerIndex, config);
         long elapsed = System.currentTimeMillis() - start;
         return SimulationEngine.staticPlanWithInstantWinPriority(diceCount, result, state, playerIndex, elapsed);

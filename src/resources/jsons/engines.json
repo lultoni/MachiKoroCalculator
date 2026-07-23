@@ -398,6 +398,32 @@
     }
   },
   {
+    "id": "expectimax-d1-etw",
+    "engineClass": "expectimax",
+    "description": "Expectimax — depth 1, ETW-ratio leaf eval (BitState-native turns-to-win race)",
+    "default": false,
+    "tier": "fast",
+    "config": {
+      "iterations": "0",
+      "timeBudgetMs": "0",
+      "maxDepthRounds": "1",
+      "leafEval": "etw"
+    }
+  },
+  {
+    "id": "expectimax-d2-etw",
+    "engineClass": "expectimax",
+    "description": "Expectimax — depth 2, ETW-ratio leaf eval (BitState-native turns-to-win race)",
+    "default": false,
+    "tier": "balanced",
+    "config": {
+      "iterations": "0",
+      "timeBudgetMs": "0",
+      "maxDepthRounds": "2",
+      "leafEval": "etw"
+    }
+  },
+  {
     "id": "creator-fast",
     "engineClass": "creator",
     "description": "Creator Engine — fast mode (~500 iterations)",

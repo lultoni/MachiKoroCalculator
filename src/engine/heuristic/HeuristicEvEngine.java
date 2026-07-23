@@ -2,6 +2,7 @@ package engine.heuristic;
 
 import calcs.Calcs;
 import calcs.RankEntry;
+import core.BitState;
 import core.GameState;
 import core.Player;
 import core.Project;
@@ -71,7 +72,7 @@ public final class HeuristicEvEngine implements SimulationEngine {
     @Override
     public TurnPlan evaluateFullTurn(GameState state, int playerIndex, EngineConfig config) {
         long start = System.currentTimeMillis();
-        int diceCount = Calcs.optimalDiceCount(state, playerIndex);
+        int diceCount = Calcs.optimalDiceCount(BitState.fromGameState(state), playerIndex);
         EngineResult result = evaluate(state, playerIndex, config);
         long elapsed = System.currentTimeMillis() - start;
         TurnPlan plan = SimulationEngine.staticPlanWithInstantWinPriority(

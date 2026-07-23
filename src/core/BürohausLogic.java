@@ -176,6 +176,71 @@ public final class BürohausLogic {
     }
 
     // -------------------------------------------------------------------------
+    // BitState-native swap candidate search — no toGameState() call
+    // -------------------------------------------------------------------------
+
+    /**
+     * Result of a BitState-native swap scan: normal-card indices instead of Project objects.
+     * Both indices are -1 when no beneficial swap exists.
+     */
+    public record BitSwapCandidates(int worstOwnIdx, int bestOppIdx, int bestOppPlayer) {
+        public boolean isBeneficial() {
+            return worstOwnIdx >= 0 && bestOppIdx >= 0;
+        }
+    }
+
+    /**
+     * BitState-native version of {@link #findCandidates} — no {@code toGameState()} call.
+     *
+     * <p>Builds {@link CardIncome.PlayerStats} directly from BitState via
+     * {@link BitState#buildPlayerStats} and evaluates card EV via
+     * {@link CardIncome#contextualCardEvPerRound} using
+     * {@link BitStateTranslator#NORMAL_CARD_PROJECTS} for Project references.
+     * Purple cards are excluded (same invariant as the GameState version).
+     */
+    public static BitSwapCandidates findCandidatesBit(BitState bs, int activePlayer) {
+        int n = bs.getNumPlayers();
+
+        CardIncome.PlayerStats activeStats = bs.buildPlayerStats(activePlayer);
+
+        // Build opponent coins array
+        int[] oppCoins = new int[n - 1];
+        int idx = 0;
+        for (int i = 0; i < n; i++) {
+            if (i != activePlayer) oppCoins[idx++] = bs.getCoins(i);
+        }
+
+        // Find worst own normal card
+        int worstOwnIdx = -1;
+        double worstOwnEV = Double.MAX_VALUE;
+        for (int i = 0; i < BitStateTranslator.NUM_NORMAL_CARDS; i++) {
+            if (bs.getCardCount(activePlayer, i) == 0) continue;
+            Project card = BitStateTranslator.NORMAL_CARD_PROJECTS[i];
+            double ev = CardIncome.contextualCardEvPerRound(card, activeStats, n, oppCoins);
+            if (ev < worstOwnEV) { worstOwnEV = ev; worstOwnIdx = i; }
+        }
+
+        // Find best opponent normal card
+        int bestOppIdx = -1;
+        double bestOppEV = 0.0;
+        int bestOppPlayer = -1;
+        for (int i = 0; i < n; i++) {
+            if (i == activePlayer) continue;
+            for (int j = 0; j < BitStateTranslator.NUM_NORMAL_CARDS; j++) {
+                if (bs.getCardCount(i, j) == 0) continue;
+                Project card = BitStateTranslator.NORMAL_CARD_PROJECTS[j];
+                double ev = CardIncome.contextualCardEvPerRound(card, activeStats, n, oppCoins);
+                if (ev > bestOppEV) { bestOppEV = ev; bestOppIdx = j; bestOppPlayer = i; }
+            }
+        }
+
+        if (worstOwnIdx < 0 || bestOppIdx < 0 || bestOppEV <= worstOwnEV) {
+            return new BitSwapCandidates(-1, -1, -1);
+        }
+        return new BitSwapCandidates(worstOwnIdx, bestOppIdx, bestOppPlayer);
+    }
+
+    // -------------------------------------------------------------------------
     // Utility
     // -------------------------------------------------------------------------
 

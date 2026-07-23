@@ -395,18 +395,156 @@ public class CardIncome {
     }
 
     /**
-     * BitState overload — converts to Player/GameState internally.
+     * BitState-native overload — no GameState allocation.
+     *
+     * <p>Mirrors {@link #playerEvPerRound(Player, int, int[])} exactly, but reads all
+     * card counts and landmark flags directly from the packed {@code long} fields via
+     * shift+mask operations. No object allocation in the hot path.
      *
      * @param bs          current bitwise game state
      * @param playerIndex the player whose EV per round to estimate
      * @return expected coins per round from all income sources
      */
     public static double playerEvPerRound(BitState bs, int playerIndex) {
-        core.GameState gs = bs.toGameState();
-        Player player = gs.getPlayers()[playerIndex];
-        int n = gs.getPlayers().length;
-        int[] oppCoins = buildOpponentCoins(gs.getPlayers(), playerIndex);
-        return playerEvPerRound(player, n, oppCoins);
+        int n = bs.getNumPlayers();
+
+        boolean hasEKZ      = bs.hasLandmark(playerIndex, BitStateTranslator.LM_EKZ);
+        boolean hasBahnhof  = bs.hasLandmark(playerIndex, BitStateTranslator.LM_BAHNHOF);
+        boolean hasStadion  = bs.hasPurple(playerIndex, 0);
+        boolean hasFernseh  = bs.hasPurple(playerIndex, 1);
+
+        int foodC   = bs.foodCount(playerIndex);
+        int animalC = bs.animalCount(playerIndex);
+        int prodC   = bs.productionCount(playerIndex);
+
+        // Build opponent coins array for purple card EV and red-card clamping
+        int[] oppCoins = new int[n - 1];
+        int idx = 0;
+        for (int i = 0; i < n; i++) {
+            if (i != playerIndex) oppCoins[idx++] = bs.getCoins(i);
+        }
+        int avgOppCoins = 99;
+        if (oppCoins.length > 0) {
+            int sum = 0;
+            for (int c : oppCoins) sum += c;
+            avgOppCoins = Math.max(1, sum / oppCoins.length);
+        }
+
+        // --- Own-turn income: single dice choice across all cards ---
+        double ownTurn1d6 = 0.0;
+        for (int r = 1; r <= 6; r++) {
+            ownTurn1d6 += P1[r] * portfolioIncomeForRollBit(
+                    bs, playerIndex, r, true, hasEKZ, hasStadion, hasFernseh,
+                    foodC, animalC, prodC, avgOppCoins, oppCoins);
+        }
+        double ownTurnEv;
+        if (hasBahnhof) {
+            double ownTurn2d6 = 0.0;
+            for (int r = 2; r <= 12; r++) {
+                ownTurn2d6 += P2[r] * portfolioIncomeForRollBit(
+                        bs, playerIndex, r, true, hasEKZ, hasStadion, hasFernseh,
+                        foodC, animalC, prodC, avgOppCoins, oppCoins);
+            }
+            ownTurnEv = Math.max(ownTurn1d6, ownTurn2d6);
+        } else {
+            ownTurnEv = ownTurn1d6;
+        }
+
+        // --- Opponent-turn income: blue + red (1d6 assumption) ---
+        double oppTurnEv = 0.0;
+        for (int r = 1; r <= 6; r++) {
+            oppTurnEv += P1[r] * portfolioIncomeForRollBit(
+                    bs, playerIndex, r, false, hasEKZ, hasStadion, hasFernseh,
+                    foodC, animalC, prodC, avgOppCoins, oppCoins);
+        }
+        oppTurnEv *= (n - 1);
+
+        return ownTurnEv + oppTurnEv;
+    }
+
+    /**
+     * BitState-native portfolio income for a single roll — no object allocation.
+     *
+     * <p>Reads card counts directly from the BitState via index-based accessors.
+     * Matches the logic of {@link #portfolioIncomeForRoll} exactly.
+     */
+    private static double portfolioIncomeForRollBit(
+            BitState bs, int player, int roll, boolean isOwnTurn,
+            boolean hasEKZ, boolean hasStadion, boolean hasFernseh,
+            int foodC, int animalC, int prodC, int avgOppCoins, int[] oppCoins) {
+        double income = 0.0;
+
+        // --- Blue cards (fire on all turns) ---
+        // weizenfeld (idx 0): r=1, +1
+        if (roll == 1) income += bs.getCardCount(player, 0);
+        // bauernhof (idx 2): r=2, +1
+        if (roll == 2) income += bs.getCardCount(player, 2);
+        // wald (idx 3): r=5, +1
+        if (roll == 5) income += bs.getCardCount(player, 3);
+        // bergwerk (idx 8): r=9, +5
+        if (roll == 9) income += bs.getCardCount(player, 8) * 5;
+        // apfelplantage (idx 9): r=10, +3
+        if (roll == 10) income += bs.getCardCount(player, 9) * 3;
+
+        if (isOwnTurn) {
+            // --- Green cards (own turn only) ---
+            // bäckerei (idx 1): r=2,3
+            if (roll == 2 || roll == 3) {
+                int cnt = bs.getCardCount(player, 1);
+                if (cnt > 0) income += cnt * (hasEKZ ? 2 : 1);
+            }
+            // mini-markt (idx 4): r=4
+            if (roll == 4) {
+                int cnt = bs.getCardCount(player, 4);
+                if (cnt > 0) income += cnt * (hasEKZ ? 4 : 3);
+            }
+            // molkerei (idx 6): r=7, +3×animal
+            if (roll == 7) {
+                int cnt = bs.getCardCount(player, 6);
+                if (cnt > 0) income += cnt * 3 * animalC;
+            }
+            // möbelfabrik (idx 7): r=8, +3×production
+            if (roll == 8) {
+                int cnt = bs.getCardCount(player, 7);
+                if (cnt > 0) income += cnt * 3 * prodC;
+            }
+            // markthalle (idx 11): r=11,12, +2×food
+            if (roll == 11 || roll == 12) {
+                int cnt = bs.getCardCount(player, 11);
+                if (cnt > 0) income += cnt * 2 * foodC;
+            }
+            // --- Purple cards (own turn, roll=6) ---
+            if (roll == 6) {
+                if (hasStadion) {
+                    for (int c : oppCoins) income += Math.min(2, c);
+                }
+                if (hasFernseh) {
+                    int richest = 0;
+                    for (int c : oppCoins) if (c > richest) richest = c;
+                    income += Math.min(5, richest);
+                }
+            }
+        } else {
+            // --- Red cards (opponent turns only, gain = roller's loss) ---
+            // café (idx 5): r=3
+            if (roll == 3) {
+                int cnt = bs.getCardCount(player, 5);
+                if (cnt > 0) {
+                    int demand = cnt * (hasEKZ ? 2 : 1);
+                    income += Math.min(demand, avgOppCoins);
+                }
+            }
+            // familienrestaurant (idx 10): r=9,10
+            if (roll == 9 || roll == 10) {
+                int cnt = bs.getCardCount(player, 10);
+                if (cnt > 0) {
+                    int demand = cnt * (hasEKZ ? 3 : 2);
+                    income += Math.min(demand, avgOppCoins);
+                }
+            }
+        }
+
+        return income;
     }
 
     /**

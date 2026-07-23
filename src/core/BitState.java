@@ -439,34 +439,17 @@ public final class BitState {
     // -------------------------------------------------------------------------
 
     /**
-     * Executes the greedy Bürohaus swap, mirroring {@link BürohausLogic#executeSwap}.
-     *
-     * <p>Phase 1 pragmatism: converts to temporary Player objects and delegates EV
-     * computation to {@link CardIncome#contextualCardEvPerRound}. The swap itself
-     * is performed via bitwise operations.
+     * Executes the greedy Bürohaus swap — fully BitState-native, no {@code toGameState()}.
+     * Delegates candidate search to {@link BürohausLogic#findCandidatesBit}.
      */
     public void executeGreedySwap(int activePlayer) {
-        // Build temporary GameState for BürohausLogic
-        GameState tempGs = toGameState();
-        BürohausLogic.SwapCandidates candidates = BürohausLogic.findCandidates(tempGs, activePlayer);
+        BürohausLogic.BitSwapCandidates candidates = BürohausLogic.findCandidatesBit(this, activePlayer);
         if (!candidates.isBeneficial()) return;
 
-        // Find the card indices to swap
-        String worstOwnId = candidates.worstOwn().getId();
-        String bestOppId = candidates.bestOpp().getId();
-        int oppPlayer = candidates.bestOppPlayer();
-
-        int worstIdx = BitStateTranslator.normalCardIndex(worstOwnId);
-        int bestIdx = BitStateTranslator.normalCardIndex(bestOppId);
-
-        // Both must be normal cards (purple/landmarks are excluded by findCandidates)
-        if (worstIdx < 0 || bestIdx < 0) return;
-
-        // Swap via bit operations
-        removeCard(activePlayer, worstIdx);
-        removeCard(oppPlayer, bestIdx);
-        addCard(activePlayer, bestIdx);
-        addCard(oppPlayer, worstIdx);
+        removeCard(activePlayer, candidates.worstOwnIdx());
+        removeCard(candidates.bestOppPlayer(), candidates.bestOppIdx());
+        addCard(activePlayer, candidates.bestOppIdx());
+        addCard(candidates.bestOppPlayer(), candidates.worstOwnIdx());
     }
 
     // -------------------------------------------------------------------------

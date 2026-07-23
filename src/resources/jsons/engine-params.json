@@ -40,7 +40,7 @@
     "heuristic-ev": [],
     "expectimax": [
       { "key": "maxDepthRounds", "description": "Search depth in full rounds", "type": "number", "min": 1, "max": 4, "step": 1, "default": "2", "category": "Search" },
-      { "key": "leafEval", "description": "Leaf node evaluation function", "type": "select", "default": "winprob", "options": ["winprob", "composite", "accurate"], "category": "Search" }
+      { "key": "leafEval", "description": "Leaf node evaluation function", "type": "select", "default": "winprob", "options": ["winprob", "composite", "accurate", "etw"], "category": "Search" }
     ],
     "creator": [
       { "key": "rolloutPolicy", "description": "Rollout policy for FlatMC simulations", "type": "select", "default": "creator", "options": ["creator", "greedy", "uniform", "boltzmann"], "category": "Rollout" },

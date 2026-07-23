@@ -78,7 +78,7 @@ public final class ExpectimaxEngine implements SimulationEngine {
     @Override
     public TurnPlan evaluateFullTurn(GameState state, int playerIndex, EngineConfig config) {
         long start = System.currentTimeMillis();
-        int diceCount = Calcs.optimalDiceCount(state, playerIndex);
+        int diceCount = Calcs.optimalDiceCount(BitState.fromGameState(state), playerIndex);
         EngineResult result = evaluate(state, playerIndex, config);
         long elapsed = System.currentTimeMillis() - start;
         return SimulationEngine.staticPlanWithInstantWinPriority(diceCount, result, state, playerIndex, elapsed);
@@ -151,18 +151,20 @@ public final class ExpectimaxEngine implements SimulationEngine {
      * @return scored options for all valid purchases + save
      */
     /** Package-private for use by {@link ExpectimaxContinuousWorker}. */
+    /** Forward-pruning threshold: drop options whose quick-score is below bestScore × (1 - PRUNE_THRESHOLD). */
+    private static final double PRUNE_THRESHOLD = 0.30;
+
     List<ScoredOption> evaluateAtDepth(BitState bs, int[] rootSupply,
                                                 int playerIndex, int nextPlayer, int coins,
                                                 int n, int depth, String leafEval) {
-        List<ScoredOption> scored = new ArrayList<>();
+        // --- Phase 1: enumerate all candidates and apply quick leaf-eval ---
+        record Candidate(Project card, BitState childBS, int[] childSupply, boolean affordable) {}
+        List<Candidate> candidates = new ArrayList<>();
 
-        // Save option
-        double saveScore = Math.min(1.0, evaluateTurn(bs, rootSupply, nextPlayer, playerIndex,
-                depth, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY,
-                leafEval, false));
-        scored.add(new ScoredOption(RankEntry.WAIT_SENTINEL, saveScore, true));
+        // Save option — always included, no pruning
+        candidates.add(new Candidate(RankEntry.WAIT_SENTINEL, bs, rootSupply, true));
 
-        // Non-landmark cards via CANDIDATE_ITERATION_ORDER
+        // Non-landmark cards
         for (int entry : BitStateTranslator.CANDIDATE_ITERATION_ORDER) {
             if (entry < BitStateTranslator.NUM_NORMAL_CARDS) {
                 int ci = entry;
@@ -175,16 +177,7 @@ public final class ExpectimaxEngine implements SimulationEngine {
                 childBS.addCard(playerIndex, ci);
                 int[] childSupply = Arrays.copyOf(rootSupply, rootSupply.length);
                 childSupply[ci]--;
-
-                double score;
-                if (!affordable) {
-                    score = leafEval(childBS, playerIndex, leafEval);
-                } else {
-                    score = Math.min(1.0, evaluateTurn(childBS, childSupply, nextPlayer, playerIndex,
-                            depth, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY,
-                            leafEval, false));
-                }
-                scored.add(new ScoredOption(BitStateTranslator.NORMAL_CARD_PROJECTS[ci], score, affordable));
+                candidates.add(new Candidate(BitStateTranslator.NORMAL_CARD_PROJECTS[ci], childBS, childSupply, affordable));
             } else {
                 int pi = entry - BitStateTranslator.NUM_NORMAL_CARDS;
                 if (bs.hasPurple(playerIndex, pi)) continue;
@@ -194,16 +187,7 @@ public final class ExpectimaxEngine implements SimulationEngine {
                 BitState childBS = bs.copy();
                 if (affordable) childBS.setCoins(playerIndex, coins - cost);
                 childBS.setPurple(playerIndex, pi);
-
-                double score;
-                if (!affordable) {
-                    score = leafEval(childBS, playerIndex, leafEval);
-                } else {
-                    score = Math.min(1.0, evaluateTurn(childBS, rootSupply, nextPlayer, playerIndex,
-                            depth, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY,
-                            leafEval, false));
-                }
-                scored.add(new ScoredOption(BitStateTranslator.PURPLE_CARD_PROJECTS[pi], score, affordable));
+                candidates.add(new Candidate(BitStateTranslator.PURPLE_CARD_PROJECTS[pi], childBS, rootSupply, affordable));
             }
         }
 
@@ -216,26 +200,48 @@ public final class ExpectimaxEngine implements SimulationEngine {
             BitState childBS = bs.copy();
             if (affordable) childBS.setCoins(playerIndex, coins - cost);
             childBS.setLandmark(playerIndex, li);
+            candidates.add(new Candidate(
+                    ProjectLoader.getProject(BitStateTranslator.LANDMARK_IDS[li]).orElse(null),
+                    childBS, rootSupply, affordable));
+        }
 
-            // Check instant win
-            if (affordable && childBS.hasWon(playerIndex)) {
-                scored.add(new ScoredOption(
-                        ProjectLoader.getProject(BitStateTranslator.LANDMARK_IDS[li]).orElse(null),
-                        1.0, true));
+        // --- Phase 2: quick-score all candidates with leaf-eval ---
+        double[] quickScores = new double[candidates.size()];
+        double bestQuick = Double.NEGATIVE_INFINITY;
+        for (int i = 0; i < candidates.size(); i++) {
+            Candidate c = candidates.get(i);
+            quickScores[i] = leafEval(c.childBS(), c.childBS() == bs ? playerIndex : playerIndex, leafEval);
+            if (quickScores[i] > bestQuick) bestQuick = quickScores[i];
+        }
+
+        // --- Phase 3: full search only on non-pruned candidates ---
+        double pruneFloor = bestQuick * (1.0 - PRUNE_THRESHOLD);
+        List<ScoredOption> scored = new ArrayList<>();
+
+        for (int i = 0; i < candidates.size(); i++) {
+            Candidate c = candidates.get(i);
+            boolean isSave = c.card() == RankEntry.WAIT_SENTINEL;
+
+            // Instant win: always include regardless of pruning
+            if (c.affordable() && c.childBS().hasWon(playerIndex)) {
+                scored.add(new ScoredOption(c.card(), 1.0, true));
                 continue;
             }
 
+            // Save option and unaffordable options always included (no pruning)
+            boolean pruned = !isSave && c.affordable() && quickScores[i] < pruneFloor;
+
             double score;
-            if (!affordable) {
-                score = leafEval(childBS, playerIndex, leafEval);
+            if (pruned || !c.affordable()) {
+                score = quickScores[i];
+            } else if (isSave) {
+                score = Math.min(1.0, evaluateTurn(bs, rootSupply, nextPlayer, playerIndex,
+                        depth, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, leafEval, false));
             } else {
-                score = Math.min(1.0, evaluateTurn(childBS, rootSupply, nextPlayer, playerIndex,
-                        depth, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY,
-                        leafEval, false));
+                score = Math.min(1.0, evaluateTurn(c.childBS(), c.childSupply(), nextPlayer, playerIndex,
+                        depth, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, leafEval, false));
             }
-            scored.add(new ScoredOption(
-                    ProjectLoader.getProject(BitStateTranslator.LANDMARK_IDS[li]).orElse(null),
-                    score, affordable));
+            scored.add(new ScoredOption(c.card(), score, c.affordable()));
         }
 
         return scored;
@@ -727,7 +733,15 @@ public final class ExpectimaxEngine implements SimulationEngine {
 
     /**
      * Evaluates a position at the depth limit. Uses BitState overloads for
-     * heuristic scoring; converts to GameState only in composite evaluation.
+     * heuristic scoring — no {@code toGameState()} in any branch.
+     *
+     * <p>Supported {@code evalFn} values:
+     * <ul>
+     *   <li>{@code "winprob"} (default) — fast logistic heuristic (~0.25 MAE)</li>
+     *   <li>{@code "composite"} — EV+landmark+coin weighted formula</li>
+     *   <li>{@code "accurate"} — micro MC (50 rollouts, only practical at depth 1)</li>
+     *   <li>{@code "etw"} — ETW-ratio: bestOppETW / (myETW + bestOppETW), fully BitState-native</li>
+     * </ul>
      */
     private double leafEval(BitState bs, int perspective, String evalFn) {
         if ("composite".equals(evalFn)) {
@@ -737,8 +751,44 @@ public final class ExpectimaxEngine implements SimulationEngine {
             return Math.max(0.0, Math.min(1.0,
                     WinProbability.computeAccurateWinProb(bs, perspective)));
         }
+        if ("etw".equals(evalFn)) {
+            return leafEvalEtw(bs, perspective);
+        }
         return Math.max(0.0, Math.min(1.0,
                 WinProbability.computeBaselineWinProb(bs, perspective)));
+    }
+
+    /**
+     * ETW-ratio leaf evaluator — fully BitState-native, no {@code toGameState()}.
+     *
+     * <p>ETW (Estimated Turns to Win) = remainingLandmarkCost / evPerRound.
+     * Score = bestOppETW / (myETW + bestOppETW), in [0, 1].
+     * Score > 0.5 means the perspective player leads the race to victory.
+     */
+    private double leafEvalEtw(BitState bs, int perspective) {
+        int n = bs.getNumPlayers();
+        double myETW = computeEtw(bs, perspective);
+        double bestOppETW = Double.MAX_VALUE;
+        for (int i = 0; i < n; i++) {
+            if (i == perspective) continue;
+            bestOppETW = Math.min(bestOppETW, computeEtw(bs, i));
+        }
+        if (myETW <= 0) return 1.0;
+        if (bestOppETW >= Double.MAX_VALUE) return 1.0;
+        double sum = myETW + bestOppETW;
+        if (sum <= 0) return 0.5;
+        return Math.max(0.0, Math.min(1.0, bestOppETW / sum));
+    }
+
+    /** ETW for one player: deficit of coins to finish all landmarks, divided by income per round. */
+    private double computeEtw(BitState bs, int player) {
+        int remCost = 0;
+        for (int i = 0; i < BitStateTranslator.NUM_LANDMARKS; i++) {
+            if (!bs.hasLandmark(player, i)) remCost += BitStateTranslator.LANDMARK_COSTS[i];
+        }
+        double deficit = Math.max(0, remCost - bs.getCoins(player));
+        double ev = CardIncome.playerEvPerRound(bs, player);
+        return deficit / Math.max(0.5, ev);
     }
 
     /**

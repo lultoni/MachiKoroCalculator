@@ -3,34 +3,37 @@ package calcs;
 import core.*;
 
 /**
- * Per-roll luck computation using the backgammon model.
+ * Per-roll luck computation using a coin-delta model.
  *
  * <p><b>Formula:</b>
  * <pre>
- *   Luck(roll) = WR_after(actual_roll) - E[WR_after(all_possible_rolls)]
+ *   netDelta(roll) = activePlayerGain(roll) - sum(opponentGains(roll))
+ *   expectedDelta  = Σ prob(r) * netDelta(r)   (over all possible rolls)
+ *   luck(roll)     = netDelta(actualRoll) - expectedDelta
  * </pre>
  *
- * <p>For each possible roll outcome, we copy the game state, apply income via
- * {@link RollResolver#computeAllDeltasForRoll}, and evaluate win rate via either
- * Monte Carlo simulation ({@link GameSimulator#mcWinRate}) or the
- * {@link WinProbability} softmax heuristic. The {@code useMc} flag selects the mode:
- * MC is more accurate but slower; heuristic is instant but has ~0.25 MAE.
+ * <p>Opponent gains are subtracted because coins in their hands are disadvantageous
+ * to the active player. This gives intuitive luck values: rolling your best income
+ * number is always the luckiest outcome, and a roll that pays the opponent heavily
+ * while giving you nothing is the unluckiest.
+ *
+ * <p>The formula is fully deterministic — no Monte Carlo, no WinProbability heuristic.
+ * Values are in coins (e.g. +3.2 means this roll paid 3.2 coins above the average
+ * net outcome across all rolls).
  *
  * <p><b>Properties:</b>
  * <ul>
  *   <li>Luck &gt; 0 means the actual roll was better than average (lucky).</li>
  *   <li>Luck &lt; 0 means the actual roll was worse than average (unlucky).</li>
- *   <li>Over many rolls, the sum of luck values for any player converges to ~0.</li>
+ *   <li>The expected value of luck over many rolls converges to 0 (unbiased).</li>
  * </ul>
  *
  * <p><b>Doubles handling:</b> When the player uses 2d6, even sums can come from
- * doubles or non-doubles. This implementation does not split doubles vs non-doubles
- * for the hypothetical rolls — it enumerates only by sum (2-12). The Freizeitpark
- * bonus turn effect is therefore averaged out. This is acceptable because the luck
- * value captures the <i>income</i> difference across rolls, and doubles with FZP
- * only add a bonus income roll (which is itself random and averaged by MC).
+ * doubles or non-doubles. Luck is computed by sum only (2-12), not split by doubles
+ * flag. The Freizeitpark bonus-turn effect averages out across many rolls.
  *
- * @see <a href="https://www.gnu.org/software/gnubg/">GNU Backgammon luck model</a>
+ * <p><b>Legacy parameters:</b> {@code mcSims} and {@code useMc} are accepted but
+ * ignored — the formula is always deterministic.
  */
 public final class LuckAnalyzer {
 
@@ -39,11 +42,12 @@ public final class LuckAnalyzer {
     /**
      * Result of a per-roll luck computation.
      *
-     * @param luck          actual WR minus expected WR (positive = lucky)
-     * @param wrAfterActual win rate after the actual roll was applied
-     * @param expectedWr    probability-weighted average WR across all possible rolls
-     * @param wrPerRoll     WR for each possible roll in order (rolls 1-6 for 1d6, rolls 2-12 for 2d6).
+     * @param luck          actual netDelta minus expected netDelta (positive = lucky), in coins
+     * @param wrAfterActual netDelta for the actual roll (coins gained minus opponent coins gained)
+     * @param expectedWr    probability-weighted expected netDelta across all possible rolls
+     * @param wrPerRoll     netDelta for each possible roll in order (rolls 1-6 for 1d6, rolls 2-12 for 2d6).
      *                      Index 0 = roll 1 (1d6) or roll 2 (2d6), etc.
+     *                      Field name kept for JSON/API compatibility.
      */
     public record RollLuck(double luck, double wrAfterActual, double expectedWr, double[] wrPerRoll) {
         /** Convenience constructor without wrPerRoll (backward compatibility). */
@@ -53,16 +57,14 @@ public final class LuckAnalyzer {
     }
 
     /**
-     * Computes the per-roll luck for a specific dice outcome using Monte Carlo.
-     *
-     * <p>Equivalent to {@code computeRollLuck(state, activePlayer, actualRoll, usedTwoDice, mcSims, true)}.
+     * Computes the per-roll luck for a specific dice outcome (deterministic, coin-delta model).
      *
      * @param stateBeforeRoll game state before the dice roll (not mutated)
      * @param activePlayer    index of the rolling player
      * @param actualRoll      the dice total that was actually rolled
-     * @param usedTwoDice     true if the player rolled 2d6 (Bahnhof + high-range cards)
-     * @param mcSims          number of MC simulations per roll outcome (higher = more accurate)
-     * @return {@link RollLuck} with luck value, actual WR, and expected WR
+     * @param usedTwoDice     true if the player rolled 2d6
+     * @param mcSims          ignored (kept for API compatibility)
+     * @return {@link RollLuck} with luck value, actual netDelta, and expected netDelta
      */
     public static RollLuck computeRollLuck(GameState stateBeforeRoll, int activePlayer,
                                             int actualRoll, boolean usedTwoDice, int mcSims) {
@@ -70,78 +72,54 @@ public final class LuckAnalyzer {
     }
 
     /**
-     * Computes the per-roll luck for a specific dice outcome.
-     *
-     * <p>The {@code stateBeforeRoll} should be the game position immediately before
-     * dice are rolled (after the previous buy phase). The method:
-     * <ol>
-     *   <li>Enumerates all possible roll outcomes (1-6 for 1d6, 2-12 for 2d6)</li>
-     *   <li>For each outcome: copies state, applies income, evaluates WR</li>
-     *   <li>Computes the probability-weighted expected WR</li>
-     *   <li>Returns the difference: actual WR minus expected WR</li>
-     * </ol>
+     * Computes the per-roll luck for a specific dice outcome (deterministic, coin-delta model).
      *
      * @param stateBeforeRoll game state before the dice roll (not mutated)
      * @param activePlayer    index of the rolling player
      * @param actualRoll      the dice total that was actually rolled
-     * @param usedTwoDice     true if the player rolled 2d6 (Bahnhof + high-range cards)
-     * @param mcSims          number of MC simulations per roll outcome (ignored when useMc is false)
-     * @param useMc           true = Monte Carlo evaluation (accurate, slow);
-     *                        false = WinProbability heuristic (instant, ~0.25 MAE)
-     * @return {@link RollLuck} with luck value, actual WR, and expected WR
+     * @param usedTwoDice     true if the player rolled 2d6
+     * @param mcSims          ignored (kept for API compatibility)
+     * @param useMc           ignored (kept for API compatibility)
+     * @return {@link RollLuck} with luck value, actual netDelta, and expected netDelta
      */
     public static RollLuck computeRollLuck(GameState stateBeforeRoll, int activePlayer,
                                             int actualRoll, boolean usedTwoDice,
                                             int mcSims, boolean useMc) {
-        double expectedWr = 0.0;
-        double wrAfterActual = 0.0;
+        double expectedDelta = 0.0;
+        double actualDelta = 0.0;
 
         if (usedTwoDice) {
-            // 2d6: enumerate sums 2-12 (11 values)
-            double[] wrPerRoll = new double[11]; // index 0 = roll 2, index 10 = roll 12
+            double[] netPerRoll = new double[11]; // index 0 = roll 2, index 10 = roll 12
             for (int r = 2; r <= 12; r++) {
-                double wr = wrAfterRoll(stateBeforeRoll, activePlayer, r, mcSims, useMc);
-                wrPerRoll[r - 2] = wr;
-                expectedWr += CardIncome.P2[r] * wr;
-                if (r == actualRoll) wrAfterActual = wr;
+                double nd = netDelta(stateBeforeRoll, activePlayer, r);
+                netPerRoll[r - 2] = nd;
+                expectedDelta += CardIncome.P2[r] * nd;
+                if (r == actualRoll) actualDelta = nd;
             }
-            return new RollLuck(wrAfterActual - expectedWr, wrAfterActual, expectedWr, wrPerRoll);
+            return new RollLuck(actualDelta - expectedDelta, actualDelta, expectedDelta, netPerRoll);
         } else {
-            // 1d6: enumerate 1-6 (6 values)
-            double[] wrPerRoll = new double[6]; // index 0 = roll 1, index 5 = roll 6
+            double[] netPerRoll = new double[6]; // index 0 = roll 1, index 5 = roll 6
             for (int r = 1; r <= 6; r++) {
-                double wr = wrAfterRoll(stateBeforeRoll, activePlayer, r, mcSims, useMc);
-                wrPerRoll[r - 1] = wr;
-                expectedWr += CardIncome.P1[r] * wr;
-                if (r == actualRoll) wrAfterActual = wr;
+                double nd = netDelta(stateBeforeRoll, activePlayer, r);
+                netPerRoll[r - 1] = nd;
+                expectedDelta += CardIncome.P1[r] * nd;
+                if (r == actualRoll) actualDelta = nd;
             }
-            return new RollLuck(wrAfterActual - expectedWr, wrAfterActual, expectedWr, wrPerRoll);
+            return new RollLuck(actualDelta - expectedDelta, actualDelta, expectedDelta, netPerRoll);
         }
     }
 
     /**
-     * Applies a roll to a copy of the state and evaluates the resulting win rate.
+     * Computes the net coin delta for the active player on a given roll.
+     * netDelta = activePlayerGain - sum(opponentGains).
+     * Opponent gains are subtracted: coins in their hands weaken the active player's position.
      */
-    private static double wrAfterRoll(GameState stateBeforeRoll, int activePlayer,
-                                       int roll, int mcSims, boolean useMc) {
-        GameState copy = stateBeforeRoll.copy();
-        Player[] players = copy.getPlayers();
-
-        // Apply income via authoritative RollResolver
-        int[] deltas = RollResolver.computeAllDeltasForRoll(copy, activePlayer, roll);
-        for (int i = 0; i < players.length; i++) {
-            players[i].setCoins(Math.max(0, players[i].getCoins() + deltas[i]));
+    private static double netDelta(GameState state, int activePlayer, int roll) {
+        int[] deltas = RollResolver.computeAllDeltasForRoll(state, activePlayer, roll);
+        double net = deltas[activePlayer];
+        for (int i = 0; i < deltas.length; i++) {
+            if (i != activePlayer) net -= Math.max(0, deltas[i]);
         }
-
-        // Handle Bürohaus swap on roll 6
-        if (roll == 6 && players[activePlayer].hasProject("bürohaus")) {
-            BürohausLogic.executeSwap(copy, activePlayer);
-        }
-
-        double wr = useMc
-                ? GameSimulator.mcWinRate(copy, activePlayer, mcSims)
-                : WinProbability.computeBaselineWinProb(copy, activePlayer);
-
-        return wr;
+        return net;
     }
 }

@@ -86,14 +86,14 @@ public final class TurnLog {
     public final boolean funkturmRerolled;
     public final long evaluateTimeMs;
     public final DecisionDetail decisionDetail; // null for legacy logs without detail
-    public final Double rollLuck;      // luck value (positive = lucky), null when luck not computed
-    public final Double wrBeforeRoll;  // E[WR] across all possible rolls (pre-roll baseline)
-    public final Double wrAfterRoll;   // WR after actual roll income applied
+    public final Double rollLuck;      // luck in coins (positive = lucky), null when luck not computed
+    public final Double wrBeforeRoll;  // expected netDelta across all possible rolls (coin-delta baseline)
+    public final Double wrAfterRoll;   // netDelta for the actual roll (coins gained minus opponent gains)
     /**
-     * WR for each possible roll in ascending order.
+     * Net coin delta (activeGain - opponentGains) for each possible roll in ascending order.
      * For 1d6: 6 values, index 0 = roll 1 ... index 5 = roll 6.
      * For 2d6: 11 values, index 0 = roll 2 ... index 10 = roll 12.
-     * Null when luck not computed.
+     * Null when luck not computed. Field name kept for JSON/API compatibility.
      */
     public final double[] wrPerRoll;
     /** Per-card income breakdown: cardId → int[playerCount] deltas. Null when not computed. */

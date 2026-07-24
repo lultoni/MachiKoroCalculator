@@ -19,7 +19,7 @@ function formatDate(dateStr: string): string {
 
 function formatLuck(luck: number[]): string {
   if (!luck || luck.length === 0) return '';
-  return luck.map(l => (l >= 0 ? '+' : '') + l.toFixed(2)).join(' / ');
+  return luck.map(l => (l >= 0 ? '+' : '') + l.toFixed(1) + 'c').join(' / ');
 }
 
 export function PvAiGamesOverview({ onBack, projects, language }: Props) {

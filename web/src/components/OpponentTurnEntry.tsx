@@ -143,13 +143,13 @@ export function OpponentTurnEntry({ opponentName, canUse2d6, projects, language,
           ) : (
             <>
               <span className={`font-mono font-medium ${
-                rollLuck.luck > 0.02 ? 'text-machi-green' :
-                rollLuck.luck < -0.02 ? 'text-red-400' : 'text-machi-text-dim'
+                rollLuck.luck > 0.5 ? 'text-machi-green' :
+                rollLuck.luck < -0.5 ? 'text-red-400' : 'text-machi-text-dim'
               }`}>
-                {rollLuck.luck >= 0 ? '+' : ''}{(rollLuck.luck * 100).toFixed(1)}%
+                {rollLuck.luck >= 0 ? '+' : ''}{rollLuck.luck.toFixed(1)}c
               </span>
               <span className="text-machi-text-dim/50">
-                (WR {(rollLuck.wrAfterActual * 100).toFixed(1)}% vs avg {(rollLuck.expectedWr * 100).toFixed(1)}%)
+                ({rollLuck.wrAfterActual.toFixed(1)}c vs avg {rollLuck.expectedWr.toFixed(1)}c)
               </span>
             </>
           )}

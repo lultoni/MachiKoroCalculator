@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useLocale } from '../i18n/useLocale';
 import type { H2hGameLog, H2hTurnLog, ProjectDef } from '../api/types';
 import { cardTextClass, categoryIconPath } from '../utils/cardDisplay';
@@ -320,6 +320,81 @@ function extractEvents(
   return merged;
 }
 
+/**
+ * Formats the board state at the end of a given turn as a compact, LLM-readable text block.
+ * Covers: whose turn it was, dice roll, income, current inventories, coin totals.
+ */
+function formatPositionText(
+  turnIdx: number,
+  turn: H2hTurnLog,
+  engines: string[],
+  inventories: string[][][],
+  coinHistory: number[][],
+  byId: (id: string) => ProjectDef | undefined,
+  language: 'de' | 'en',
+): string {
+  const nameKey = `name_${language}` as 'name_de' | 'name_en';
+  const cardName = (id: string) => {
+    if (id === '_wait_') return 'Save';
+    const p = byId(id);
+    return p?.[nameKey] ?? p?.name_de ?? id;
+  };
+
+  const lines: string[] = [];
+  lines.push(`=== Position after turn ${turnIdx + 1} ===`);
+  lines.push(`Active player: P${turn.playerIndex + 1} (${engines[turn.playerIndex]})`);
+
+  const diceStr = turn.diceCount === 1 ? `1d6 = ${turn.roll}` : `2d6 = ${turn.roll}${turn.isDoubles ? ' (doubles)' : ''}`;
+  let rollLine = `Roll: ${diceStr}`;
+  if (turn.funkturmRerolled) rollLine += ' [rerolled via Funkturm]';
+  lines.push(rollLine);
+
+  const incomeStrs = (turn.coinDeltas ?? []).map((d, i) => `P${i + 1}: ${d >= 0 ? '+' : ''}${d}`);
+  lines.push(`Income: ${incomeStrs.join(', ')}`);
+
+  if (turn.bürohausSwap) {
+    const parts = turn.bürohausSwap.split('→');
+    if (parts.length === 2) {
+      lines.push(`Bürohaus swap: gave ${cardName(parts[0].trim())} → received ${cardName(parts[1].trim())}`);
+    }
+  }
+
+  if (turn.purchasedCardId) {
+    lines.push(`Purchase: ${cardName(turn.purchasedCardId)}`);
+  } else {
+    lines.push('Purchase: save');
+  }
+
+  lines.push('');
+  lines.push('--- Board state ---');
+
+  const inv = inventories[turnIdx];
+  const coins = coinHistory[turnIdx];
+  for (let p = 0; p < engines.length; p++) {
+    const playerCoins = coins?.[p] ?? 0;
+    const cards = inv?.[p] ?? [];
+    const landmarks = cards.filter(id => LANDMARK_IDS.includes(id));
+    const nonLandmarks = cards.filter(id => !LANDMARK_IDS.includes(id));
+
+    // Count non-landmark cards
+    const cardMap = new Map<string, number>();
+    for (const id of nonLandmarks) cardMap.set(id, (cardMap.get(id) ?? 0) + 1);
+    const cardList = Array.from(cardMap.entries())
+      .map(([id, n]) => n > 1 ? `${cardName(id)}×${n}` : cardName(id))
+      .join(', ');
+
+    const lmList = landmarks.length > 0
+      ? landmarks.map(id => cardName(id)).join(', ')
+      : 'none';
+
+    lines.push(`P${p + 1} (${engines[p]}): ${playerCoins} coins`);
+    lines.push(`  Landmarks: ${lmList}`);
+    lines.push(`  Cards: ${cardList || 'none'}`);
+  }
+
+  return lines.join('\n');
+}
+
 /** Background color class for card color. */
 function cardBgClass(color?: string): string {
   switch (color) {
@@ -460,10 +535,11 @@ function computeRollBreakdown(
       const wrPerRollMatchesDiceMode = turn.wrPerRoll != null
         && (twoDice ? turn.wrPerRoll.length === 11 : turn.wrPerRoll.length === 6);
       let luck: number | null = null;
-      if (wrPerRollMatchesDiceMode && turn.wrBeforeRoll != null) {
+      if (wrPerRollMatchesDiceMode) {
         const rollIdx = roll - (twoDice ? 2 : 1);
         if (rollIdx >= 0 && rollIdx < turn.wrPerRoll!.length) {
-          luck = turn.wrPerRoll![rollIdx] - turn.wrBeforeRoll;
+          // wrPerRoll stores netDelta per roll; wrBeforeRoll is the expected netDelta baseline
+          luck = turn.wrPerRoll![rollIdx] - (turn.wrBeforeRoll ?? 0);
         }
       } else if (isActual && turn.rollLuck != null) {
         luck = turn.rollLuck;
@@ -711,6 +787,26 @@ export function H2hGameReplay({ game, engines, matchId, projects, language, onBa
     return { ownCount, oppCount };
   }, [turnIdx, game.turns, playerCount]);
 
+  // Arrow key navigation
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft')  setTurnIdx(i => Math.max(0, i - 1));
+      if (e.key === 'ArrowRight') setTurnIdx(i => Math.min(totalTurns - 1, i + 1));
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [totalTurns]);
+
+  const [copyLabel, setCopyLabel] = useState<'idle' | 'copied'>('idle');
+  const copyPosition = useCallback(() => {
+    if (!turn) return;
+    const text = formatPositionText(turnIdx, turn, engines, inventories, coinHistory, projects.byId, language);
+    navigator.clipboard.writeText(text).then(() => {
+      setCopyLabel('copied');
+      setTimeout(() => setCopyLabel('idle'), 1500);
+    });
+  }, [turn, turnIdx, engines, inventories, coinHistory, projects, language]);
+
   // Current game turn number for chart reference lines (1-indexed)
   const currentChartTurn = turnIdx + 1;
 
@@ -821,6 +917,15 @@ export function H2hGameReplay({ game, engines, matchId, projects, language, onBa
           >
             ⏭
           </button>
+          <button
+            onClick={copyPosition}
+            disabled={!turn}
+            title={language === 'en' ? 'Copy board position to clipboard' : 'Brettposition in Zwischenablage kopieren'}
+            className="px-3 py-1.5 bg-machi-surface border border-machi-border rounded-lg text-sm
+                       disabled:opacity-30 hover:bg-machi-bg transition ml-2"
+          >
+            {copyLabel === 'copied' ? '✓ Copied' : '📋'}
+          </button>
         </div>
 
         {/* Main 3-column layout: P1 Hand | Turn Detail | P2 Hand */}
@@ -875,10 +980,10 @@ export function H2hGameReplay({ game, engines, matchId, projects, language, onBa
                   )}
                   {turn.rollLuck != null && (
                     <div className={`text-xs mt-1 font-mono ${
-                      turn.rollLuck > 0.02 ? 'text-green-400' :
-                      turn.rollLuck < -0.02 ? 'text-red-400' : 'text-machi-text-dim/60'
+                      turn.rollLuck > 0.5 ? 'text-green-400' :
+                      turn.rollLuck < -0.5 ? 'text-red-400' : 'text-machi-text-dim/60'
                     }`}>
-                      Luck: {turn.rollLuck >= 0 ? '+' : ''}{(turn.rollLuck * 100).toFixed(1)}%
+                      Luck: {turn.rollLuck >= 0 ? '+' : ''}{turn.rollLuck.toFixed(1)}c
                     </div>
                   )}
                 </div>
@@ -1142,8 +1247,8 @@ export function H2hGameReplay({ game, engines, matchId, projects, language, onBa
             const winnerIdx = game.winnerIndex;
             const loserIdx = 1 - winnerIdx;
             const winnerLuckAdv = totalLuck[winnerIdx] - totalLuck[loserIdx];
-            const isLuckyWin = winnerLuckAdv > 0.05;
-            const isSkilledWin = winnerLuckAdv < -0.05;
+            const isLuckyWin = winnerLuckAdv > 1.0;
+            const isSkilledWin = winnerLuckAdv < -1.0;
 
             const chartTooltipStyle = {
               backgroundColor: '#1e1e2e',
@@ -1163,10 +1268,10 @@ export function H2hGameReplay({ game, engines, matchId, projects, language, onBa
                         <span className={i === 0 ? 'text-machi-accent' : 'text-fuchsia-400'}>P{i + 1}</span>
                         {' '}{t('h2h.totalLuck')}:{' '}
                         <span className={`font-mono font-semibold ${
-                          totalLuck[i] > 0.02 ? 'text-green-400' :
-                          totalLuck[i] < -0.02 ? 'text-red-400' : 'text-machi-text-dim'
+                          totalLuck[i] > 0.5 ? 'text-green-400' :
+                          totalLuck[i] < -0.5 ? 'text-red-400' : 'text-machi-text-dim'
                         }`}>
-                          {totalLuck[i] >= 0 ? '+' : ''}{(totalLuck[i] * 100).toFixed(1)}%
+                          {totalLuck[i] >= 0 ? '+' : ''}{totalLuck[i].toFixed(1)}c
                         </span>
                       </span>
                     ))}
@@ -1176,8 +1281,8 @@ export function H2hGameReplay({ game, engines, matchId, projects, language, onBa
                     <div className={`mt-1.5 text-[11px] font-semibold ${
                       isLuckyWin ? 'text-amber-400' : 'text-cyan-400'
                     }`}>
-                      {isLuckyWin && `P${winnerIdx + 1}: ${t('h2h.luckyWin')} (+${(winnerLuckAdv * 100).toFixed(1)}% ${t('h2h.lucky').toLowerCase()})`}
-                      {isSkilledWin && `P${winnerIdx + 1}: ${t('h2h.skilledWin')} (${(winnerLuckAdv * 100).toFixed(1)}% ${t('h2h.unlucky').toLowerCase()})`}
+                      {isLuckyWin && `P${winnerIdx + 1}: ${t('h2h.luckyWin')} (+${winnerLuckAdv.toFixed(1)}c ${t('h2h.lucky').toLowerCase()})`}
+                      {isSkilledWin && `P${winnerIdx + 1}: ${t('h2h.skilledWin')} (${winnerLuckAdv.toFixed(1)}c ${t('h2h.unlucky').toLowerCase()})`}
                     </div>
                   )}
                 </div>
@@ -1191,7 +1296,7 @@ export function H2hGameReplay({ game, engines, matchId, projects, language, onBa
                       <XAxis dataKey="turn" tick={{ fontSize: 9, fill: 'rgba(255,255,255,0.4)' }} />
                       <YAxis
                         tick={{ fontSize: 9, fill: 'rgba(255,255,255,0.4)' }}
-                        tickFormatter={(v: number) => `${(v * 100).toFixed(0)}%`}
+                        tickFormatter={(v: number) => `${v.toFixed(0)}c`}
                         width={40}
                       />
                       <ReferenceLine y={0} stroke="rgba(255,255,255,0.2)" strokeDasharray="3 3" />
@@ -1199,7 +1304,7 @@ export function H2hGameReplay({ game, engines, matchId, projects, language, onBa
                       <Tooltip
                         contentStyle={chartTooltipStyle}
                         labelFormatter={(v) => `Turn ${v}`}
-                        formatter={(v) => [`${(Number(v) * 100).toFixed(1)}%`]}
+                        formatter={(v) => [`${Number(v).toFixed(1)}c`]}
                       />
                       <Line type="monotone" dataKey="P1" stroke="#38bdf8" strokeWidth={2} dot={false} />
                       <Line type="monotone" dataKey="P2" stroke="#E879F9" strokeWidth={2} dot={false} />
@@ -1236,10 +1341,10 @@ export function H2hGameReplay({ game, engines, matchId, projects, language, onBa
                             {showLuck && (
                               <td className={`text-right ${
                                 row.luck != null
-                                  ? row.luck > 0.02 ? 'text-green-400' : row.luck < -0.02 ? 'text-red-400' : 'text-machi-text-dim/60'
+                                  ? row.luck > 0.5 ? 'text-green-400' : row.luck < -0.5 ? 'text-red-400' : 'text-machi-text-dim/60'
                                   : 'text-machi-text-dim/30'
                               }`}>
-                                {row.luck != null ? `${row.luck >= 0 ? '+' : ''}${(row.luck * 100).toFixed(1)}%` : '·'}
+                                {row.luck != null ? `${row.luck >= 0 ? '+' : ''}${row.luck.toFixed(1)}c` : '·'}
                               </td>
                             )}
                           </tr>

@@ -516,6 +516,18 @@ public class RuntimeTester {
             test_continuous_evaluator_navigate_resets();
         });
 
+        runSection("RuleBasedEngine Tests", () -> {
+            engine.rulebased.RuleBasedEngine rbe = new engine.rulebased.RuleBasedEngine();
+            test_rbe_instant_win(rbe);
+            test_rbe_funkturm_reroll(rbe);
+            // Purchase priority scenarios
+            test_rbe_pos1_baeckerei_when_minimarkt_unaffordable(rbe);
+            test_rbe_pos2_funkturm_before_fernsehsender(rbe);
+            test_rbe_baeckerei_with_1_coin(rbe);
+            test_rbe_minimarkt_preferred_over_baeckerei_when_affordable(rbe);
+            test_rbe_wald_requires_two_minimarkts(rbe);
+        });
+
         System.out.println("\n--- Results: " + passed + " passed, " + failed + " failed ---");
 
         if (failed > 0) {
@@ -1456,10 +1468,9 @@ public class RuntimeTester {
      */
     private static void runPerRollLuckTest() {
         int NUM_GAMES = 50;
-        int MC_SIMS = 200;
+        int MC_SIMS = 200; // ignored by LuckAnalyzer (coin-delta model is deterministic)
 
-        System.out.println("\n=== Per-Roll Luck Analysis (" + NUM_GAMES + " games, "
-                + MC_SIMS + " MC sims/roll) ===\n");
+        System.out.println("\n=== Per-Roll Luck Analysis (" + NUM_GAMES + " games, coin-delta model) ===\n");
 
         // Accumulate per-game P0 luck sums
         List<Double> gameLuckSums = new ArrayList<>();
@@ -1532,9 +1543,10 @@ public class RuntimeTester {
         assertTrue("Luck analysis: mean |per-roll luck| > 0 (luck is not trivially zero, was "
                 + String.format("%.4f", meanAbsLuck) + ")",
                 meanAbsLuck > 0.001);
-        assertTrue("Luck analysis: mean per-game luck sum within ±0.15 of 0 (was "
+        // Coin-delta luck is unbiased by construction; ±5 coins/game tolerates small-sample noise over 50 games.
+        assertTrue("Luck analysis: mean per-game luck sum within ±5.0 of 0 (was "
                 + String.format("%+.4f", meanLuckSum) + ")",
-                Math.abs(meanLuckSum) < 0.15);
+                Math.abs(meanLuckSum) < 5.0);
     }
 
 
@@ -6226,5 +6238,149 @@ public class RuntimeTester {
         assertTrue("ContinuousEvaluator: iterations reset after navigate (now " + itersAfter + ")",
                 itersAfter < itersBefore || itersBefore == 0);
         evaluator.shutdown();
+    }
+
+    // =========================================================================
+    // RuleBasedEngine Tests
+    // =========================================================================
+
+    /**
+     * Builds a 2-player GameState for RuleBasedEngine scenario tests.
+     *
+     * <p>Usage: pass card IDs (normal, purple, or landmark) for each player's owned
+     * cards and their coin counts. The unbuilt pool is built from all cards NOT already
+     * owned across both players (full 6-copy pool minus starter adjustments).
+     * Use {@code GameState.initial} for the base, then mutate.
+     *
+     * @param p0Coins    coins for player 0
+     * @param p0Cards    card IDs owned by player 0 (beyond starters; may include landmarks)
+     * @param p1Coins    coins for player 1
+     * @param p1Cards    card IDs owned by player 1 (beyond starters; may include landmarks)
+     * @return a GameState ready for engine evaluation
+     */
+    private static core.GameState rbeState(
+            int p0Coins, String[] p0Cards,
+            int p1Coins, String[] p1Cards) {
+        core.GameState gs = core.GameState.initial(2);
+        core.Player p0 = gs.getPlayers()[0];
+        core.Player p1 = gs.getPlayers()[1];
+        p0.setCoins(p0Coins);
+        p1.setCoins(p1Coins);
+        for (String id : p0Cards) core.ProjectLoader.getProject(id).ifPresent(p0::addProject);
+        for (String id : p1Cards) core.ProjectLoader.getProject(id).ifPresent(p1::addProject);
+        return gs;
+    }
+
+    /** Asserts that the RuleBasedEngine picks the expected card (or "save") for player 0. */
+    private static void assertRbePurchase(String label,
+            engine.rulebased.RuleBasedEngine rbe,
+            core.GameState gs,
+            String expectedId) {
+        engine.EngineResult result = rbe.evaluate(gs, 0, engine.EngineConfig.ofIterations(1));
+        String topId = result.topRecommendation().project.getId();
+        assertEq(label, expectedId, topId);
+    }
+
+    /** Asserts that decideFunkturm returns the expected keep/reroll decision for player 0. */
+    private static void assertRbeFunkturm(String label,
+            engine.rulebased.RuleBasedEngine rbe,
+            core.GameState gs,
+            int roll, boolean isDoubles,
+            boolean expectedKeep) {
+        engine.TurnPlan plan = rbe.evaluateFullTurn(gs, 0, engine.EngineConfig.ofIterations(1));
+        boolean keep = rbe.decideFunkturm(plan, gs, 0, roll, isDoubles, engine.EngineConfig.ofIterations(1));
+        assertEq(label, expectedKeep, keep);
+    }
+
+    // --- Scenario tests (add new ones here as you describe situations) ---
+
+    private static void test_rbe_instant_win(engine.rulebased.RuleBasedEngine rbe) {
+        // Player 0 has 3 landmarks (bahnhof, einkaufszentrum, freizeitpark) + 22 coins.
+        // Only funkturm (cost 22) is missing → must pick funkturm.
+        core.GameState gs = rbeState(
+                22, new String[]{"bahnhof", "einkaufszentrum", "freizeitpark"},
+                3,  new String[]{});
+        assertRbePurchase("RBE instant-win: picks funkturm with 22 coins and 3 landmarks", rbe, gs, "funkturm");
+    }
+
+    private static void test_rbe_funkturm_reroll(engine.rulebased.RuleBasedEngine rbe) {
+        // Starter state: weizenfeld (blue, r=1) + bäckerei (green, r=2-3).
+        // Expected income over 1d6 = (1/6)*1 + (1/6)*1 + (1/6)*1 = 0.5.
+        // Roll=1 → income=1 ≥ 0.5 → keep.
+        core.GameState gs = rbeState(5, new String[]{"funkturm"}, 3, new String[]{});
+        assertRbeFunkturm("RBE funkturm: keep on roll=1 (weizenfeld fires, 1 ≥ avg 0.5)", rbe, gs, 1, false, true);
+        assertRbeFunkturm("RBE funkturm: keep on roll=3 (bäckerei fires, 1 ≥ avg 0.5)", rbe, gs, 3, false, true);
+        // Roll=4 → no card fires → income=0 < 0.5 → reroll.
+        assertRbeFunkturm("RBE funkturm: reroll on roll=4 (no card fires, 0 < avg 0.5)", rbe, gs, 4, false, false);
+    }
+
+    private static void test_rbe_pos1_baeckerei_when_minimarkt_unaffordable(engine.rulebased.RuleBasedEngine rbe) {
+        // Position 1/3: P2 has 2 coins, owns weizenfeld+bäckerei+mini-markt (starters + 1 mini-markt).
+        // mini-markt costs 2 but coins > 2 gate means it won't fire at exactly 2 coins.
+        // bäckerei costs 1 → should be bought (coins >= 1, mini-markt unaffordable this turn).
+        // P1: weizenfeld, bäckerei, mini-markt, wald (3 coins) — opponent context.
+        core.GameState gs = rbeState(
+                2, new String[]{"mini-markt"},        // P2 owns starter weizenfeld+bäckerei + 1 mini-markt
+                3, new String[]{"mini-markt", "wald"} // P1
+        );
+        assertRbePurchase("RBE pos1: 2 coins → buy bäckerei not save", rbe, gs, "bäckerei");
+    }
+
+    private static void test_rbe_pos2_funkturm_before_fernsehsender(engine.rulebased.RuleBasedEngine rbe) {
+        // Position 2: P1 has einkaufszentrum + 23 coins, no funkturm yet, no fernsehsender yet.
+        // Funkturm costs 22, fernsehsender costs 7 — both affordable.
+        // Rule: funkturm should be prioritised above fernsehsender once EKZ is owned.
+        core.GameState gs = rbeState(
+                23, new String[]{"einkaufszentrum", "bäckerei", "mini-markt", "mini-markt",
+                                 "mini-markt", "mini-markt", "mini-markt", "wald"},
+                0,  new String[]{"bäckerei", "bäckerei", "mini-markt", "wald"}
+        );
+        assertRbePurchase("RBE pos2: funkturm before fernsehsender when EKZ owned + 23 coins", rbe, gs, "funkturm");
+    }
+
+    private static void test_rbe_baeckerei_with_1_coin(engine.rulebased.RuleBasedEngine rbe) {
+        // Even with only 1 coin, should buy bäckerei (cost=1) — no wasted tempo.
+        core.GameState gs = rbeState(
+                1, new String[]{"mini-markt"},
+                3, new String[]{}
+        );
+        assertRbePurchase("RBE: 1 coin → still buy bäckerei, no wasted tempo", rbe, gs, "bäckerei");
+    }
+
+    private static void test_rbe_wald_requires_two_minimarkts(engine.rulebased.RuleBasedEngine rbe) {
+        // With only 1 mini-markt, should NOT buy wald yet — save or buy bäckerei instead.
+        core.GameState gs1 = rbeState(
+                6, new String[]{"mini-markt"},  // 1 mini-markt, 6 coins (wald costs 5)
+                3, new String[]{}
+        );
+        // bäckerei is unaffordable path (coins=6 ≥ 3 → mini-markt preferred, but supply gone after 1 copy owned;
+        // actually coins=6 ≥ 3, mini-markt in supply → engine buys mini-markt, not wald. Confirm that.
+        assertRbePurchase("RBE wald: 1 mini-markt + 6 coins → buy another mini-markt, not wald", rbe, gs1, "mini-markt");
+
+        // Drain mini-markt supply: give player 6 copies so supply is 0.
+        // Then with 1 mini-markt owned and wald affordable, should still NOT buy wald yet.
+        core.GameState gs2 = rbeState(
+                6, new String[]{"mini-markt"},  // 1 owned, 6 coins
+                3, new String[]{"mini-markt", "mini-markt", "mini-markt", "mini-markt", "mini-markt"} // 5 more owned by opp → supply = 0
+        );
+        // mini-markt supply now 0, only 1 owned → should buy bäckerei (coins=6 ≥ 3 but mini-markt gone, bäckerei available)
+        // Actually coins=6 ≥ 3 → mini-markt gate but supply=0 → bäckerei fallback fires.
+        assertRbePurchase("RBE wald: 1 mini-markt, supply exhausted, 6 coins → buy bäckerei not wald", rbe, gs2, "bäckerei");
+
+        // With 2 mini-markts owned and wald affordable → should buy wald.
+        core.GameState gs3 = rbeState(
+                6, new String[]{"mini-markt", "mini-markt"}, // 2 owned, supply has remaining copies
+                3, new String[]{}
+        );
+        assertRbePurchase("RBE wald: 2 mini-markts + 6 coins → buy wald", rbe, gs3, "wald");
+    }
+
+    private static void test_rbe_minimarkt_preferred_over_baeckerei_when_affordable(engine.rulebased.RuleBasedEngine rbe) {
+        // With 3+ coins, mini-markt (cost=2) should still be bought before bäckerei.
+        core.GameState gs = rbeState(
+                3, new String[]{},
+                3, new String[]{}
+        );
+        assertRbePurchase("RBE: 3 coins → buy mini-markt, not bäckerei", rbe, gs, "mini-markt");
     }
 }

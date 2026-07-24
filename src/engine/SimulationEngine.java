@@ -123,6 +123,7 @@ public interface SimulationEngine {
         EngineResult.Option top = result.topAffordableRecommendation();
         plan.purchaseWinRate = top.score;
         plan.engineResult = result;
+        plan.computeTimeMs += result.computeTimeMs;
         Project p = top.project;
         return "_wait_".equals(p.getId()) ? calcs.RankEntry.WAIT_SENTINEL : p;
     }

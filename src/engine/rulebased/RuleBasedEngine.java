@@ -25,16 +25,16 @@ import java.util.Map;
  * <ol>
  *   <li>Instant-win (3 landmarks owned, can afford 4th).</li>
  *   <li>Einkaufszentrum (shopping mall) — buy as soon as affordable.</li>
- *   <li>Fernsehsender (TV station) — buy as soon as affordable (after EKZ check).</li>
- *   <li>Funkturm (radio tower) — buy after EKZ is owned.</li>
- *   <li>Bahnhof + Freizeitpark pair — buy bahnhof first, then FZP, once the
- *       75th-percentile 2-turn income projection covers both combined costs.</li>
- *   <li>Mini-markt — buy first copy when coins > 2.</li>
- *   <li>Wald — buy once, after mini-markt is owned.</li>
- *   <li>Bäckerei — buy up to 2 copies as income fallback.</li>
- *   <li>Blue fallback — bauernhof, then weizenfeld.</li>
- *   <li>Red fallback — only one copy; café vs familienrestaurant based on
- *       whether the opponent has Bahnhof (→ likely 2d6 portfolio).</li>
+ *   <li>Funkturm (radio tower) — buy right after EKZ; reroll ability is immediately valuable.</li>
+ *   <li>Fernsehsender (TV station) — buy after EKZ+Funkturm check.</li>
+ *   <li>Wald — buy once, after at least 2 mini-markts are owned.</li>
+ *   <li>Mini-markt — buy every copy available when coins &ge; 3.</li>
+ *   <li>Bäckerei — buy whenever mini-markt is unaffordable this turn (coins &lt; 3) or supply exhausted;
+ *       always buy at coins &ge; 1 — never waste tempo.</li>
+ *   <li>Bahnhof + Freizeitpark — only after EKZ and Funkturm owned; buy bahnhof first,
+ *       then FZP, once 75th-percentile 2-turn income projection covers both costs.</li>
+ *   <li>Blue fallback (bauernhof, weizenfeld) — only after both mini-markt and bäckerei supply exhausted.</li>
+ *   <li>Red fallback — one copy only; same supply gate as blue.</li>
  *   <li>Save.</li>
  * </ol>
  *
@@ -152,43 +152,49 @@ public final class RuleBasedEngine implements SimulationEngine {
             if (canBuyLandmark(coins, LM_EKZ)) return "einkaufszentrum";
         }
 
-        // 2. Fernsehsender (TV station) — buy as soon as affordable
-        if (!bs.hasPurple(p, PURPLE_FERNSEHSENDER)) {
-            int cost = BitStateTranslator.PURPLE_CARD_COSTS[PURPLE_FERNSEHSENDER];
-            if (coins >= cost && purpleAvailable(bs, PURPLE_FERNSEHSENDER)) return "fernsehsender";
-        }
-
-        // 3. Funkturm (radio tower) — after EKZ
+        // 2. Funkturm (radio tower) — right after EKZ; reroll ability is immediately valuable
         if (bs.hasLandmark(p, LM_EKZ) && !bs.hasLandmark(p, LM_FUNKTURM)) {
             if (canBuyLandmark(coins, LM_FUNKTURM)) return "funkturm";
         }
 
-        // 4. Bahnhof + Freizeitpark pair — when 75%-confidence 2-turn income covers both
-        if (!bs.hasLandmark(p, LM_BAHNHOF) || !bs.hasLandmark(p, LM_FZP)) {
-            String pair = checkBahnhofFzpPair(bs, p, coins);
-            if (pair != null) return pair;
+        // 3. Fernsehsender (TV station) — buy once affordable, after EKZ+Funkturm check
+        if (!bs.hasPurple(p, PURPLE_FERNSEHSENDER)) {
+            int cost = BitStateTranslator.PURPLE_CARD_COSTS[PURPLE_FERNSEHSENDER];
+            if (coins >= cost) return "fernsehsender";
         }
 
-        // 5. Wald — once, after mini-markt owned; skip if already owned
-        if (bs.getCardCount(p, IDX_MINI_MARKT) > 0 && bs.getCardCount(p, IDX_WALD) == 0) {
+        // 4. Wald — once, after at least 2 mini-markts are owned
+        if (bs.getCardCount(p, IDX_MINI_MARKT) >= 2 && bs.getCardCount(p, IDX_WALD) == 0) {
             int cost = BitStateTranslator.NORMAL_CARD_COSTS[IDX_WALD];
             if (coins >= cost && supply[IDX_WALD] > 0) return "wald";
         }
 
-        // 6. Mini-markt — first copy, when coins > 2
-        if (bs.getCardCount(p, IDX_MINI_MARKT) == 0 && coins > 2) {
+        // 5. Mini-markt — buy every copy available when coins >= 3 (keep at least 1 coin after, cost=2)
+        if (coins >= 3) {
             int cost = BitStateTranslator.NORMAL_CARD_COSTS[IDX_MINI_MARKT];
             if (coins >= cost && supply[IDX_MINI_MARKT] > 0) return "mini-markt";
         }
 
-        // 7. Bäckerei — up to 2 copies as income fallback
-        if (bs.getCardCount(p, IDX_BAECKEREI) < 2) {
+        // 5b. Bäckerei — buy whenever mini-markt is unaffordable this turn (coins < 3) and coins >= 1.
+        //     Also buy when coins >= 3 but mini-markt supply is exhausted.
+        //     Never save when a 1-coin income card can be bought — tempo loss compounds quickly.
+        {
             int cost = BitStateTranslator.NORMAL_CARD_COSTS[IDX_BAECKEREI];
-            if (coins >= cost && supply[IDX_BAECKEREI] > 0) return "bäckerei";
+            boolean miniMarktAffordableAndAvailable = coins >= 3 && supply[IDX_MINI_MARKT] > 0;
+            if (!miniMarktAffordableAndAvailable && coins >= cost && supply[IDX_BAECKEREI] > 0)
+                return "bäckerei";
         }
 
-        // 8. Blue/red fallback — only when bäckerei AND mini-markt are both sold out
-        if (supply[IDX_BAECKEREI] == 0 && supply[IDX_MINI_MARKT] == 0) {
+        // 6. Bahnhof + Freizeitpark — only after EKZ and Funkturm are owned
+        if (bs.hasLandmark(p, LM_EKZ) && bs.hasLandmark(p, LM_FUNKTURM)) {
+            if (!bs.hasLandmark(p, LM_BAHNHOF) || !bs.hasLandmark(p, LM_FZP)) {
+                String pair = checkBahnhofFzpPair(bs, p, coins);
+                if (pair != null) return pair;
+            }
+        }
+
+        // 7. Blue/red income fillers — only after both mini-markt and bäckerei supply exhausted
+        if (supply[IDX_MINI_MARKT] == 0 && supply[IDX_BAECKEREI] == 0) {
             // Blue: bauernhof > weizenfeld
             int bauernhofCost = BitStateTranslator.NORMAL_CARD_COSTS[IDX_BAUERNHOF];
             if (coins >= bauernhofCost && supply[IDX_BAUERNHOF] > 0) return "bauernhof";
@@ -254,14 +260,6 @@ public final class RuleBasedEngine implements SimulationEngine {
         if (!hasBahnhof && coins >= costBahnhof) return "bahnhof";
         if (hasBahnhof && !hasFzp && coins >= costFzp) return "freizeitpark";
         return null;
-    }
-
-    /** True if no opponent already owns this purple card (purple cards are unique per player). */
-    private boolean purpleAvailable(BitState bs, int purpleIdx) {
-        for (int i = 0; i < bs.getNumPlayers(); i++) {
-            if (bs.hasPurple(i, purpleIdx)) return false;
-        }
-        return true;
     }
 
     private static core.Project resolveProject(String id) {
